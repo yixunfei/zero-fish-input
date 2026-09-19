@@ -34,6 +34,10 @@ class ExpressionBrowserStateTest {
         assertTrue(EmojiCatalog.search("qingzhu").any { it.value == "🎉" })
         assertTrue(EmojiCatalog.search("pingguo").any { it.value == "🍎" })
         assertTrue(EmojiCatalog.search("wanan").any { it.value == "🌙" })
+        // Multi-syllable pinyin must be written joined, otherwise the substring
+        // match cannot reach it; biji is the correct reading of 笔记 (not bidi).
+        assertTrue(EmojiCatalog.search("yanjing").any { it.value == "👀" })
+        assertTrue(EmojiCatalog.search("biji").any { it.value == "📝" })
         assertTrue(EmojiCatalog.search("zhukuanbucunzai").isEmpty())
     }
 
