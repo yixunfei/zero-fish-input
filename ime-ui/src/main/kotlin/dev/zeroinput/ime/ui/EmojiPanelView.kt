@@ -164,7 +164,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         adapter.submit(entries, state.personal.favorites, state.personalizationAllowed)
         emptyLabel.visibility = if (entries.isEmpty()) VISIBLE else GONE
         emptyLabel.setText(when {
-            !state.personalizationAllowed && state.category in setOf(EmojiCategory.RECENT, EmojiCategory.FAVORITES, EmojiCategory.CUSTOM) -> R.string.expression_private
+            !state.personalizationAllowed && (state.category == EmojiCategory.RECENT || state.category == EmojiCategory.FAVORITES || state.category == EmojiCategory.CUSTOM) -> R.string.expression_private
             state.searchActive && state.query.isNotEmpty() -> R.string.expression_no_results
             state.category == EmojiCategory.FAVORITES -> R.string.expression_no_favorites
             state.category == EmojiCategory.CUSTOM -> R.string.expression_no_custom

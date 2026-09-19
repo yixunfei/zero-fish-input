@@ -65,7 +65,15 @@ internal class PersonalCandidatePaging {
         val personal = page.items.mapNotNull { term ->
             normalize(term.text)?.let { Candidate("personal:${term.id}", it, "个人词组", term.frequency, term.input) }
         }
-        val items = if (offset > 0) personal else (personal + native.candidates).distinctBy(Candidate::text)
+        val items = when {
+            offset > 0 -> personal
+            // The personal page is empty on most keystrokes: skip the
+            // concatenation and the deduplication set.  Native candidate
+            // lists are text-unique by construction, so passing them through
+            // unchanged matches the merged result.
+            personal.isEmpty() -> native.candidates
+            else -> (personal + native.candidates).distinctBy(Candidate::text)
+        }
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         return native.copy(candidates = items, highlightedIndex = if (offset > 0) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),

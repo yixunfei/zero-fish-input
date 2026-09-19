@@ -223,7 +223,7 @@ internal class RimeInputEngine(
             highlightedIndex = update.highlightedIndex,
             hasPreviousPage = update.candidates.isNotEmpty() && update.pageNumber > 0,
             hasNextPage = update.candidates.isNotEmpty() && !update.lastPage,
-            readings = if (hasFixedSelection) emptyList() else nineKeyReadings?.choices(update.rawInput, update.comments.toList()).orEmpty(),
+            readings = if (hasFixedSelection) emptyList() else nineKeyReadings?.choices(update.rawInput, update.comments).orEmpty(),
             canUndoSelection = selectedIndices.isNotEmpty(),
             canSelectSyllable = update.rawInput.isNotEmpty(),
         )

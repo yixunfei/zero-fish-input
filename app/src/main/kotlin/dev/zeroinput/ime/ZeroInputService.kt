@@ -545,7 +545,7 @@ class ZeroInputService : InputMethodService() {
         syncSessionPrivacy()
         maybeReloadLanguagePack()
         if (action is KeyboardAction.Text || action == KeyboardAction.Backspace) modelRanking.typing()
-        else if (action !in listOf(KeyboardAction.Space, KeyboardAction.Enter)) modelRanking.invalidate()
+        else if (action != KeyboardAction.Space && action != KeyboardAction.Enter) modelRanking.invalidate()
         if (graph.settings.hapticFeedbackEnabled) {
             inputView?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }

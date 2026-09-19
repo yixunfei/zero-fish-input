@@ -89,8 +89,11 @@ object EmojiCatalog {
         return search(query, entries)
     }
 
+    // Compiled once; search runs on every keystroke of the expression panel.
+    private val queryWhitespace = Regex("\\s+")
+
     fun search(query: String, source: List<EmojiEntry>): List<EmojiEntry> {
-        val terms = query.take(128).trim().lowercase(java.util.Locale.ROOT).split(Regex("\\s+"))
+        val terms = query.take(128).trim().lowercase(java.util.Locale.ROOT).split(queryWhitespace)
             .filter(String::isNotEmpty)
         if (terms.isEmpty()) return source
         return source.filter { entry -> terms.all { it in entry.searchText } }

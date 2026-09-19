@@ -36,11 +36,23 @@ class PersonalCandidatePagingTest {
         assertEquals(first, paging.publish(native, store, InputLanguage.CHINESE, true) { it })
     }
 
+    @Test fun `a resolved empty personal page passes native candidates through`() {
+        val paging = PersonalCandidatePaging()
+        val native = EngineSnapshot("ni", "ni", listOf(Candidate("native", "你"), Candidate("native2", "好")))
+        val store = Store().apply { empty = true }
+        val result = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        assertEquals(native.candidates, result.candidates)
+        assertFalse(result.hasNextPage)
+    }
+
     private class Store : PagedPersonalizationStore {
         var ready = true
         var revision = 0L
+        var empty = false
         override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int) =
-            if (!ready) PersonalSuggestionPage(ready = false, revision = revision) else PersonalSuggestionPage(
+            if (!ready) PersonalSuggestionPage(ready = false, revision = revision)
+            else if (empty) PersonalSuggestionPage(emptyList(), hasMore = false, revision = revision)
+            else PersonalSuggestionPage(
                 (offset until minOf(offset + limit, 117)).map { PersonalSuggestion("$it", "词组$it", 1, "ni") },
                 offset + limit < 117, revision = revision)
         override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = suggestionPage(prefix, language, 0, limit).items

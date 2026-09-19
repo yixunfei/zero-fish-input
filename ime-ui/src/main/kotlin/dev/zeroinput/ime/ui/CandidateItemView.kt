@@ -16,6 +16,7 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     var onSelected: (Int) -> Unit = {}
     private var index = -1
     private var identity = ""
+    private var identityText = ""
     private var bindingRevision = 0L
     private var touchRevision: Long? = null
     private var holding = false
@@ -48,9 +49,9 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     }
 
     fun bind(candidate: Candidate, visibleIndex: Int, highlighted: Boolean) {
-        val updatedIdentity = candidate.id + "\u0000" + candidate.text
-        if (identity != updatedIdentity || index != visibleIndex) bindingRevision++
-        identity = updatedIdentity
+        if (identity != candidate.id || identityText != candidate.text || index != visibleIndex) bindingRevision++
+        identity = candidate.id
+        identityText = candidate.text
         index = visibleIndex
         val label = if (candidate.kind == CandidateKind.RELATED_READING)
             context.getString(R.string.related_candidate, candidate.text) else candidate.text
@@ -63,6 +64,7 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     fun clear() {
         bindingRevision++
         identity = ""
+        identityText = ""
         index = -1
         text = ""
         contentDescription = null

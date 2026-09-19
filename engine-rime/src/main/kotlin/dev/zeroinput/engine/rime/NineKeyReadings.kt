@@ -12,7 +12,7 @@ internal class NineKeyReadings(syllables: List<String>) {
         codes.putAll(syllables.distinct().groupBy(::digits))
     }
 
-    fun choices(raw: String, comments: List<String>): List<String> {
+    fun choices(raw: String, comments: Array<String>): List<String> {
         val span = numericSpan(raw) ?: return emptyList()
         val code = raw.substring(span)
         val available = LinkedHashSet<String>()

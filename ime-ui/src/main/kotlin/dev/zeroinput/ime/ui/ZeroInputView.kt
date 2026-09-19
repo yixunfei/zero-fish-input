@@ -419,8 +419,10 @@ class ZeroInputView @JvmOverloads constructor(
     private fun refreshHeader() {
         reconvertButton.visibility = if (canReconvert && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         val hasCandidates = currentSnapshot.isComposing || currentSnapshot.candidates.isNotEmpty()
-        val needsStatus = engineStatus in setOf(InputEngineStatus.PREPARING, InputEngineStatus.PENDING_CONFIGURATION, InputEngineStatus.FAILED)
-        val showCandidates = mode in setOf(PanelMode.KEYBOARD, PanelMode.CANDIDATES) &&
+        val needsStatus = engineStatus == InputEngineStatus.PREPARING ||
+            engineStatus == InputEngineStatus.PENDING_CONFIGURATION ||
+            engineStatus == InputEngineStatus.FAILED
+        val showCandidates = (mode == PanelMode.KEYBOARD || mode == PanelMode.CANDIDATES) &&
             !manualTools && (hasCandidates || needsStatus)
         candidateStrip.visibility = if (showCandidates) VISIBLE else GONE
         toolbar.visibility = if (showCandidates) GONE else VISIBLE
