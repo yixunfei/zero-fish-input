@@ -12,6 +12,7 @@ local.properties
 .env
 .env.*
 !.env.example
+.workbuddy/
 keystore.properties
 signing.properties
 *.apk
