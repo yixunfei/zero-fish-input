@@ -24,6 +24,19 @@ class ExpressionBrowserStateTest {
         assertTrue(EmojiCatalog.search("no-match-fixture-123").isEmpty())
     }
 
+    @Test fun builtinEmojiAreReachableByPinyin() {
+        // The main catalog carries pinyin aliases, so common emoji are reachable
+        // from a pinyin keyboard alongside AdditionalEmoji and kaomoji.
+        val kaixin = EmojiCatalog.search("kaixin").map { it.value }
+        assertTrue(kaixin.containsAll(listOf("😀", "😃", "😄")))
+        assertTrue(EmojiCatalog.search("shengqi").any { it.value == "😡" })
+        assertTrue(EmojiCatalog.search("zan").any { it.value == "👍" })
+        assertTrue(EmojiCatalog.search("qingzhu").any { it.value == "🎉" })
+        assertTrue(EmojiCatalog.search("pingguo").any { it.value == "🍎" })
+        assertTrue(EmojiCatalog.search("wanan").any { it.value == "🌙" })
+        assertTrue(EmojiCatalog.search("zhukuanbucunzai").isEmpty())
+    }
+
     @Test fun filteringIsIndependentOfTheSystemLocale() {
         val original = Locale.getDefault()
         try {
