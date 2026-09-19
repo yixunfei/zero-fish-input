@@ -31,6 +31,12 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private val keys = mutableListOf<KeyboardKeyView>()
     private var radius = 0f
     private var inset = 0
+    private var colorsResolved = false
+    private var surfaceColor = 0
+    private var surfaceVariantColor = 0
+    private var primaryContainerColor = 0
+    private var outlineColor = 0
+    private var enterSpec: KeySpec? = null
 
     init {
         orientation = VERTICAL
@@ -75,8 +81,10 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         if (composing == value) return
         composing = value
         // Only the action label changes when composition starts or ends.
-        val specs = specs().flatten()
-        keys.forEachIndexed { index, key -> if (specs[index].action == KeyboardAction.Enter) bind(key, specs[index]) }
+        // Every layout exposes at most one Enter key, so the spec captured
+        // during the last render is reused instead of rebuilding the layout.
+        val spec = enterSpec ?: return
+        keys.forEach { key -> if (key.boundAction == KeyboardAction.Enter) bind(key, spec) }
     }
 
     fun showLetters() {
@@ -106,7 +114,12 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         val rows = specs()
         val updated = rows.map { row -> row.map(KeySpec::widthWeight) }
         if (geometry != updated) rebuild(rows, updated)
-        rows.flatten().forEachIndexed { index, spec -> bind(keys[index], spec) }
+        var enter: KeySpec? = null
+        rows.flatten().forEachIndexed { index, spec ->
+            if (spec.action == KeyboardAction.Enter) enter = spec
+            bind(keys[index], spec)
+        }
+        enterSpec = enter
     }
 
     private fun rebuild(rows: List<List<KeySpec>>, updated: List<List<Float>>) {
@@ -154,6 +167,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     private fun bind(view: KeyboardKeyView, original: KeySpec) {
+        ensureKeyColors()
         val spec = if (original.action == KeyboardAction.Enter) {
             val label = context.getString(if (composing) R.string.key_enter else enterLabel())
             original.copy(label = if (composing || editor.enterAction == EnterAction.NEW_LINE) "↵" else label, contentDescription = label)
@@ -167,8 +181,16 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         view.isSelected = selected
         ViewCompat.setStateDescription(view, if (spec.action == KeyboardAction.Shift)
             context.getString(when (shift) { Shift.OFF -> R.string.key_lowercase; Shift.ON -> R.string.key_uppercase; Shift.LOCKED -> R.string.key_caps_lock }) else null)
-        view.setColors(backgroundColor(if (selected) KeyStyle.PRIMARY else spec.style), backgroundColor(KeyStyle.PRIMARY),
-            androidx.core.graphics.ColorUtils.setAlphaComponent(color(com.google.android.material.R.attr.colorOutline), 80), radius, inset)
+        view.setColors(
+            if (selected) primaryContainerColor else when (spec.style) {
+                KeyStyle.NORMAL -> surfaceColor
+                KeyStyle.MODIFIER -> surfaceVariantColor
+                KeyStyle.PRIMARY -> primaryContainerColor
+            },
+            primaryContainerColor,
+            outlineColor,
+            radius, inset,
+        )
     }
 
     private fun enterLabel(): Int = when (editor.enterAction) {
@@ -201,11 +223,21 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private fun rowHeight() = dp(if (compact) 48 else height.rowHeight(
         resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE))
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    private fun backgroundColor(style: KeyStyle) = color(when (style) {
-        KeyStyle.NORMAL -> com.google.android.material.R.attr.colorSurface
-        KeyStyle.MODIFIER -> com.google.android.material.R.attr.colorSurfaceVariant
-        KeyStyle.PRIMARY -> com.google.android.material.R.attr.colorPrimaryContainer
-    })
+    private fun ensureKeyColors() {
+        if (colorsResolved) return
+        surfaceColor = color(com.google.android.material.R.attr.colorSurface)
+        surfaceVariantColor = color(com.google.android.material.R.attr.colorSurfaceVariant)
+        primaryContainerColor = color(com.google.android.material.R.attr.colorPrimaryContainer)
+        outlineColor = androidx.core.graphics.ColorUtils.setAlphaComponent(color(com.google.android.material.R.attr.colorOutline), 80)
+        colorsResolved = true
+    }
+
+    override fun onAttachedToWindow() {
+        // A re-attach can carry a new theme; resolve the key palette again.
+        colorsResolved = false
+        super.onAttachedToWindow()
+    }
+
     private fun color(attribute: Int): Int = com.google.android.material.color.MaterialColors.getColor(context, attribute, Color.GRAY)
     private enum class Shift { OFF, ON, LOCKED }
 }

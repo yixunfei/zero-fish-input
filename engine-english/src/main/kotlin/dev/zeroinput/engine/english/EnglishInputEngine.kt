@@ -95,24 +95,36 @@ class EnglishInputEngine(
         } else {
             emptyList()
         }
-        val standard = lexicon.asSequence()
-            .filter { it.startsWith(normalized) }
-            .take(MAX_CANDIDATES)
-            .mapIndexed { index, word -> word to 1_000 - index }
-        val candidates = sequenceOf(typed to Int.MAX_VALUE)
-            .plus(learned.asSequence().map { it.text to 10_000 + it.weight })
-            .plus(standard)
-            .distinctBy { it.first.lowercase() }
-            .sortedByDescending { it.second }
-            .take(MAX_CANDIDATES)
-            .mapIndexed { index, (word, score) ->
-                Candidate(
-                    id = "english:$index:$word",
-                    text = preserveCase(typed, word),
-                    score = score,
-                )
+        // Collected with plain loops: a Sequence pipeline allocates an
+        // iterator and a lambda for every stage on each keystroke, while the
+        // lexicon is small enough that loops are allocation-light.  Keeping
+        // the first occurrence of a word mirrors the previous distinctBy.
+        val seen = HashSet<String>(MAX_CANDIDATES * 2)
+        val scored = ArrayList<Pair<String, Int>>(MAX_CANDIDATES * 2)
+        fun collect(word: String, score: Int) {
+            if (seen.add(word.lowercase())) scored.add(word to score)
+        }
+        collect(typed, Int.MAX_VALUE)
+        learned.forEach { collect(it.text, 10_000 + it.weight) }
+        var matched = 0
+        for (word in lexicon) {
+            if (matched >= MAX_CANDIDATES) break
+            if (word.startsWith(normalized)) {
+                collect(word, 1_000 - matched)
+                matched++
             }
-            .toList()
+        }
+        scored.sortByDescending { it.second }
+        val limit = minOf(scored.size, MAX_CANDIDATES)
+        val candidates = ArrayList<Candidate>(limit)
+        for (index in 0 until limit) {
+            val (word, score) = scored[index]
+            candidates += Candidate(
+                id = "english:$index:$word",
+                text = preserveCase(typed, word),
+                score = score,
+            )
+        }
 
         return EngineSnapshot(
             rawInput = typed,

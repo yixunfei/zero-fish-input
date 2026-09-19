@@ -17,6 +17,7 @@ import androidx.core.view.WindowCompat
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.ime.core.privacy.PrivacyConfiguration
 import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.engine.rime.RimeRuntimeState
 import dev.zeroinput.ime.concurrency.BoundedExecutors
@@ -107,6 +108,23 @@ class ZeroInputService : InputMethodService() {
     private var sessionChineseOptions = ChineseInputOptions()
     private var sessionChineseEngine = ChineseEngineChoice.RIME
     private var nativeRetryRequested = false
+
+    // Settings-derived values mirrored in memory so the per-keystroke engine
+    // probe does not re-read SharedPreferences.  Refreshed synchronously by the
+    // settings observer below, before its posted main-thread turn, so a
+    // privacy tightening is visible to the next key dispatch without delay.
+    // @Volatile: a commit() write could invoke the observer off the IME looper.
+    @Volatile private var configuredChineseOptions = ChineseInputOptions()
+    @Volatile private var configuredChineseEngine = ChineseEngineChoice.RIME
+    @Volatile private var configuredPrivacy = PrivacyConfiguration()
+    @Volatile private var configuredHapticFeedback = true
+
+    private fun refreshConfiguredSettings() {
+        configuredChineseOptions = graph.settings.chineseInputOptions
+        configuredChineseEngine = graph.settings.chineseEngine
+        configuredPrivacy = graph.settings.privacyConfiguration()
+        configuredHapticFeedback = graph.settings.hapticFeedbackEnabled
+    }
     @Volatile
     private var secureClipboardRequest: SecureClipboardRequest? = null
     private var pasteConsentObserver: AutoCloseable? = null
@@ -128,6 +146,7 @@ class ZeroInputService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
+        refreshConfiguredSettings()
         pasteConsentObserver = graph.securePaste.observe { bindPasteConsent(authenticationFinished = true) }
         expressionObserver = graph.observeExpressions {
             mainHandler.post {
@@ -179,6 +198,9 @@ class ZeroInputService : InputMethodService() {
             // turn below. Advance the generation immediately so a queued
             // personal-data write cannot win a race with a privacy change.
             invalidatePendingPersonalization()
+            // Refresh the mirrored settings here, still synchronously, so the
+            // next key dispatch on the IME looper observes the new values.
+            refreshConfiguredSettings()
             mainHandler.post {
                 // Settings can be changed while the authentication activity
                 // is in the foreground (for example by another settings
@@ -501,6 +523,7 @@ class ZeroInputService : InputMethodService() {
                 if (current.script == dev.zeroinput.engine.api.ChineseScript.SIMPLIFIED)
                     dev.zeroinput.engine.api.ChineseScript.TRADITIONAL
                 else dev.zeroinput.engine.api.ChineseScript.SIMPLIFIED)
+            refreshConfiguredSettings()
             reconcileChineseOptions()
         }
         view.onCandidateSelected = { handleControllerCommand(InputCommand.SelectCandidate(it)) }
@@ -513,6 +536,7 @@ class ZeroInputService : InputMethodService() {
             val options = graph.settings.chineseInputOptions
             graph.settings.chineseInputOptions = options.copy(keyboardLayout =
                 if (options.keyboardLayout == ChineseKeyboardLayout.FULL) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL)
+            refreshConfiguredSettings()
             reconcileChineseOptions()
             activeSession?.let { scheduleEngineWarmup(it) }
         }
@@ -546,7 +570,7 @@ class ZeroInputService : InputMethodService() {
         maybeReloadLanguagePack()
         if (action is KeyboardAction.Text || action == KeyboardAction.Backspace) modelRanking.typing()
         else if (action != KeyboardAction.Space && action != KeyboardAction.Enter) modelRanking.invalidate()
-        if (graph.settings.hapticFeedbackEnabled) {
+        if (configuredHapticFeedback) {
             inputView?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }
         when (action) {
@@ -648,7 +672,7 @@ class ZeroInputService : InputMethodService() {
 
     private fun syncSessionPrivacy() {
         val session = activeSession ?: return
-        if (session.controller.updatePrivacy(graph.settings.privacyConfiguration())) {
+        if (session.controller.updatePrivacy(configuredPrivacy)) {
             inputView?.cancelPendingGestures()
             // A prepared engine carries the old policy. Invalidate it before
             // publishing the new state, then let the worker build a context
@@ -985,8 +1009,8 @@ class ZeroInputService : InputMethodService() {
             session.controller.state.languagePackKey == request.languagePackKey &&
             session.controller.state.privacy == request.privacy &&
             sessionChineseOptions == request.chineseOptions &&
-            graph.settings.chineseInputOptions == request.chineseOptions &&
-            sessionChineseEngine == request.chineseEngine && graph.settings.chineseEngine == request.chineseEngine
+            configuredChineseOptions == request.chineseOptions &&
+            sessionChineseEngine == request.chineseEngine && configuredChineseEngine == request.chineseEngine
 
     private fun cancelEngineWarmup(clearInstalled: Boolean = false) {
         engineWarmupCoordinator?.cancel()
@@ -1120,9 +1144,9 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun reconcileChineseOptions() {
-        val configured = graph.settings.chineseInputOptions
+        val configured = configuredChineseOptions
         inputView?.renderChineseOptions(configured)
-        val chosenEngine = graph.settings.chineseEngine
+        val chosenEngine = configuredChineseEngine
         if (configured == sessionChineseOptions && chosenEngine == sessionChineseEngine) return
         val session = activeSession ?: return
         if (session.controller.state.snapshot.isComposing) {
@@ -1145,14 +1169,14 @@ class ZeroInputService : InputMethodService() {
         val status = when {
             state == null || !state.privacy.suggestionsAllowed || state.language != InputLanguage.CHINESE ||
                 state.languagePackKey != null -> InputEngineStatus.HIDDEN
-            sessionChineseOptions != graph.settings.chineseInputOptions || sessionChineseEngine != graph.settings.chineseEngine -> InputEngineStatus.PENDING_CONFIGURATION
+            sessionChineseOptions != configuredChineseOptions || sessionChineseEngine != configuredChineseEngine -> InputEngineStatus.PENDING_CONFIGURATION
             (sessionChineseEngine == ChineseEngineChoice.RIME && graph.rime.runtime.state == RimeRuntimeState.FAILED) ||
                 unavailableEngineWarmupContext != null -> InputEngineStatus.FAILED
             installedEngineWarmupContext == session.warmupRequest(sessionChineseOptions, nativeRetryRequested, sessionChineseEngine) -> InputEngineStatus.READY
             else -> InputEngineStatus.PREPARING
         }
         inputView?.renderEngineStatus(status)
-        inputView?.renderChineseOptions(graph.settings.chineseInputOptions)
+        inputView?.renderChineseOptions(configuredChineseOptions)
         inputView?.renderActiveLayout(sessionChineseOptions.keyboardLayout)
     }
 

@@ -28,6 +28,10 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     val isSearchActive: Boolean get() = state.searchActive
     private val categoryButtons = linkedMapOf<EmojiCategory, MaterialButton>()
     private val groupButtons = linkedMapOf<KaomojiGroup?, MaterialButton>()
+    private var colorsResolved = false
+    private var primaryTextColor = 0
+    private var onSurfaceTextColor = 0
+    private var selectedBackgroundColor = 0
     private val adapter = EmojiAdapter({ onEmojiSelected(it) }, { entry, selected -> onFavoriteRequested(entry, selected) },
         { onManageRequested(it) }, { onUserInteraction() })
     private val queryLabel = TextView(context).apply {
@@ -172,10 +176,25 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         })
     }
 
+    private fun ensureColors() {
+        if (colorsResolved) return
+        primaryTextColor = color(com.google.android.material.R.attr.colorPrimary)
+        onSurfaceTextColor = color(com.google.android.material.R.attr.colorOnSurface)
+        selectedBackgroundColor = color(com.google.android.material.R.attr.colorPrimaryContainer)
+        colorsResolved = true
+    }
+
+    override fun onAttachedToWindow() {
+        // A re-attach can carry a new theme; resolve the tab colors again.
+        colorsResolved = false
+        super.onAttachedToWindow()
+    }
+
     private fun select(button: MaterialButton, selected: Boolean) {
+        ensureColors()
         button.isSelected = selected
-        button.setTextColor(color(if (selected) com.google.android.material.R.attr.colorPrimary else com.google.android.material.R.attr.colorOnSurface))
-        button.setBackgroundColor(if (selected) color(com.google.android.material.R.attr.colorPrimaryContainer) else Color.TRANSPARENT)
+        button.setTextColor(if (selected) primaryTextColor else onSurfaceTextColor)
+        button.setBackgroundColor(if (selected) selectedBackgroundColor else Color.TRANSPARENT)
     }
 
     private fun tab(label: String, description: String, compact: Boolean, action: () -> Unit) = MaterialButton(context).apply {

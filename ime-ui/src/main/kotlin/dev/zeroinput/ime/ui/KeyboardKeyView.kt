@@ -14,7 +14,8 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
     private var holding = false
     private var revision = 0L
     private var gestureRevision: Long? = null
-    private var boundAction: KeyboardAction? = null
+    private var action: KeyboardAction? = null
+    internal val boundAction: KeyboardAction? get() = action
     private var longPressed = false
     private var palette: KeyPalette? = null
     private val longPress = Runnable { if (holding) longPressed = performLongClick() }
@@ -27,12 +28,12 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
         isSoundEffectsEnabled = false
         letterSpacing = 0f
         setPadding(0, 0, 0, 0)
-        setOnClickListener { boundAction?.let(onAction) }
+        setOnClickListener { action?.let(onAction) }
     }
 
     fun bind(spec: KeySpec) {
-        if (boundAction != spec.action) { revision++; cancelTouch() }
-        boundAction = spec.action
+        if (action != spec.action) { revision++; cancelTouch() }
+        action = spec.action
         if (text != spec.label) text = spec.label
         contentDescription = spec.contentDescription
         isEnabled = spec.enabled
