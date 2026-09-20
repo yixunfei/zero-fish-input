@@ -313,6 +313,23 @@ class InputSessionControllerTest {
     }
 
     @Test
+    fun `a repeated privacy configuration is a no-op`() {
+        val connection = ComposingRecordingConnection()
+        val controller = controller(connection, RecordingPersonalization())
+        val configuration = PrivacyConfiguration(learningEnabled = true, incognitoMode = false)
+        controller.start(textEditor(), InputLanguage.CHINESE, configuration)
+        connection.compositionUpdates = 0
+
+        // Same configuration: no re-evaluation, so the editor is untouched.
+        assertFalse(controller.updatePrivacy(configuration))
+        assertEquals(0, connection.compositionUpdates)
+
+        // A genuinely different configuration still clears the pre-edit.
+        assertTrue(controller.updatePrivacy(PrivacyConfiguration(learningEnabled = false)))
+        assertTrue(connection.compositionUpdates > 0)
+    }
+
+    @Test
     fun `privacy changes invalidate an already open session`() {
         val connection = ComposingRecordingConnection()
         val personalization = RecordingPersonalization(

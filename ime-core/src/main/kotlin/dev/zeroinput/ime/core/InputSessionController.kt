@@ -43,6 +43,11 @@ class InputSessionController(
         learningAllowed = false,
         reason = dev.zeroinput.ime.core.privacy.PrivacyReason.USER_DISABLED,
     )
+    // The configuration that produced [privacy].  evaluate() is deterministic
+    // in editorInfo and configuration, and editorInfo only changes through
+    // start(), which resets this marker; so an equal configuration cannot
+    // produce a different session policy.
+    private var evaluatedFor: PrivacyConfiguration? = null
     private var routes: List<CandidateRoute?> = emptyList()
     /**
      * Engine-owned state without the personal-candidate overlay.  Keeping
@@ -72,6 +77,7 @@ class InputSessionController(
         if (hadEngine) connection.clearComposingText()
         this.editorInfo = editorInfo
         privacy = privacyPolicy.evaluate(editorInfo, privacyConfiguration)
+        evaluatedFor = privacyConfiguration
         language = initialLanguage
         this.languagePackKey = languagePackKey
         replaceEngine()
@@ -88,7 +94,13 @@ class InputSessionController(
      * @return true when the engine/session state was recreated.
      */
     fun updatePrivacy(configuration: PrivacyConfiguration): Boolean {
+        // A repeated configuration cannot change the outcome: evaluate() is
+        // deterministic and editorInfo only changes through start(), which
+        // clears this marker.  Skipping the allocation keeps the tightening
+        // semantics intact because a genuine change always compares unequal.
+        if (configuration == evaluatedFor) return false
         val updated = privacyPolicy.evaluate(editorInfo, configuration)
+        evaluatedFor = configuration
         if (updated == privacy) return false
         privacy = updated
         runCatching { engine?.reset() }
