@@ -165,8 +165,13 @@ class WordAssociationIntegrationTest {
                 }
             }
             await { views(panel()).filterIsInstance<TextView>().any { it.isShown && it.text.toString() == label } }
-            // Permit the lifecycle-owned prepared-engine handoff to finish before the fixture starts.
-            SystemClock.sleep(400)
+            // A fixed sleep can start this fixture in the small fallback dictionary.
+            // Wait for the actual session handoff before testing native vocabulary.
+            if (language == InputLanguage.CHINESE) await {
+                views(panel()).filterIsInstance<TextView>().any {
+                    it.text.toString() == it.context.getString(dev.zeroinput.ime.ui.R.string.engine_ready)
+                }
+            }
             action(editor)
         } finally {
             activity?.let { onMain { it.finish() } }

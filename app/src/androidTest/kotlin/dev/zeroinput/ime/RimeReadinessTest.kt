@@ -53,6 +53,9 @@ class RimeReadinessTest {
             } finally {
                 factory.close()
                 check(root.deleteRecursively())
+                // Native runtime is process-wide. Restore the application's public
+                // assets so later real-editor tests do not inherit this fault fixture.
+                check(graph.rime.warmUp()) { "Application runtime restoration failed" }
             }
         }.get(60, TimeUnit.SECONDS)
     }

@@ -6,37 +6,37 @@
 
 **离线中文与英文输入法，面向 Android 8.0 及以上设备。**
 
-[下载 v0.2.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.2.0) ·
+[下载 v0.3.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.3.0) ·
 [提交问题](https://github.com/yixunfei/zero-fish-input/issues) ·
 [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [Apache-2.0](LICENSE)
 
 zero fish input（原工程名 ZeroInput）以隐私、安全、离线和可扩展性为核心。当前版本为
-`v0.2.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
+`v0.3.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
 以及需要系统身份认证的安全剪贴板。另提供默认关闭的本地 AI 短词候选排序实验，使用
 UER RoBERTa-Mini WWM INT8 模型，全程在设备端运行。
 
 An offline Android keyboard for Chinese Pinyin and English, with encrypted local
 personalization, a private authenticated snippet vault, and optional offline
 RoBERTa-Mini INT8 candidate ranking. Android 8.0+;
-Apache-2.0 project code. Version 0.2.0 is a debug-signed testing prerelease.
+Apache-2.0 project code. Version 0.3.0 is a debug-signed testing prerelease.
 
 项目展示及应用显示名称使用 `zero fish input`。Logo 保留所提供原图，图中文字为
 `ZERO FISH INPUT`；Android 启动图标使用该图的主体裁切。内部包名和数据标识保留 `zeroinput`。
 
 当前源码已修正误写的 `finish`，测试打包脚本生成 `zero-fish-input-<版本>-<ABI>.apk`
-及同名前缀的许可压缩包。远程仓库已更名为 [yixunfei/zero-fish-input](https://github.com/yixunfei/zero-fish-input)。`v0.2.0` 已发布附件仍使用旧文件名，以下下载说明与发布页一致。
+及同名前缀的许可压缩包。远程仓库为 [yixunfei/zero-fish-input](https://github.com/yixunfei/zero-fish-input)。
 
 ## 安装与启用
 
-以下链接指向已发布的 `v0.2.0` 测试包。当前源码另包含中文引擎就绪校验、准备进度提示、
-`NO_SUGGESTIONS` 输入策略及名称修正；这些更新尚未替换发布页附件。
-需要验证当前修复时，请按下方构建说明运行 `./tools/package-test-apk.ps1` 生成新包。
+v0.3.0 包含中文引擎就绪校验、准备进度提示、离线词联想、安全存储可靠性改进、
+`NO_SUGGESTIONS` 输入策略及名称修正。完整变化见 [发布说明](docs/releases/v0.3.0.md)。
+也可按下方构建说明运行 `./tools/package-test-apk.ps1` 自行生成测试包。
 
-1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.2.0)
-   下载 `zero-finish-input-0.2.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
+1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.3.0)
+   下载 `zero-fish-input-0.3.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
    `x86_64` 三种架构，要求 Android 8.0（API 26）或更新版本。
 2. 对照同页 `SHA256SUMS.txt` 校验下载；Windows 可运行
-   `Get-FileHash .\zero-finish-input-0.2.0-debug-universal.apk -Algorithm SHA256`。
+   `Get-FileHash .\zero-fish-input-0.3.0-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，在系统输入法设置中启用，然后选择为当前键盘。
    Android 会显示针对所有第三方输入法的系统提醒；项目的隐私边界见下文。
 4. 在普通输入框中输入 `nihao` 并选取“你好”，通过语言切换键切换英文。
@@ -45,7 +45,7 @@ Apache-2.0 project code. Version 0.2.0 is a debug-signed testing prerelease.
    `nihao` 选取“你好”。准备失败会显示“中文加载失败”，可重试；仅在验证中文转换和选词
    可用后才切换到 Rime。普通输入框请求禁止预测建议时保留中文转换、关闭英文预测，且不读取或学习个人数据。
 
-本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.2.0-debug`，
+本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.3.0-debug`，
 可调试，仅用于体验和反馈。尚未配置维护者正式发布签名，不建议用此测试包保存真实秘密。
 Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地数据彼此独立。
 不同开发环境的 Debug 签名可能不同；遇到签名冲突不要直接卸载，以免丢失本地数据。
@@ -55,7 +55,7 @@ Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地�
 
 ## 当前能力与边界
 
-v0.2.0 新增连续候选浏览、逐段选字/撤销选段和上屏后重选上一词。展开候选后滚动或翻页
+自 v0.2.0 起支持连续候选浏览、逐段选字/撤销选段和上屏后重选上一词。展开候选后滚动或翻页
 继续查看；全键盘在原拼音结果结束后给出标有“相近”的有效分组和相近读音。相关来源均已
 检索完会停止，不会用无关内容重复填满列表。
 
@@ -71,14 +71,15 @@ v0.2.0 新增连续候选浏览、逐段选字/撤销选段和上屏后重选上
 模型选型、启用方式与测量边界见下文[本地 AI](#本地-ai短词智能排序实验)。更多输入策略与验收记录见
 [输入策略对比](docs/input-strategy-comparison.md)及[验证报告](docs/input-improvement-validation.md)。
 
-本版还修复 Android 16 设备回归中输入法未绑定导致的剪贴板确认超时，以及状态栏遮挡
+v0.2.0 已修复 Android 16 设备回归中输入法未绑定导致的剪贴板确认超时，以及状态栏遮挡
 测试文字导致的原生选字菜单不稳定；补充取消确认、关闭监听和服务未绑定的负向测试。
 详细结果见[模型与剪贴板验证](docs/model-integration-validation.md)和
-[v0.2.0 发布验证](docs/releases/v0.2.0-validation.md)。
+[v0.2.0 发布验证](docs/releases/v0.2.0-validation.md)。本次验证见
+[v0.3.0 发布验证](docs/releases/v0.3.0-validation.md)。
 
 当前源码还补充了键盘内选中文字复制、自动处理已有系统当前项，以及“认证后返回再确认粘贴”，
-并修复等待内容库期间继续编辑仍可能收到迟到粘贴的问题。这些修复尚未发布到上述 Release 页面；
-最新本地测试包与验证记录见[剪贴板修复验证](docs/clipboard-device-validation.md#product-repair-and-authenticated-return-2026-09-09)。
+并修复等待内容库期间继续编辑仍可能收到迟到粘贴的问题。这些修复已纳入 v0.3.0；
+相关验证记录见[剪贴板修复验证](docs/clipboard-device-validation.md#product-repair-and-authenticated-return-2026-09-09)。
 其中 iQOO 历史剪贴板删除仍未实现，不能把当前项清理成功当作历史已清空。
 
 | 能力 | 当前实现 |
@@ -86,7 +87,7 @@ v0.2.0 新增连续候选浏览、逐段选字/撤销选段和上屏后重选上
 | 中文 | 真实 librime 1.13.1，全拼、简拼、简繁、模糊音、全键盘与九键 |
 | 本地 AI 排序 | RoBERTa-Mini WWM INT8，默认关闭，仅对 Rime 全键盘的合格两字词候选评分 |
 | 英文 | 内置离线候选，无云端补全 |
-| 词联想（当前源码） | 默认开启，中英文成功上屏后提供最多 8 个公开词对续词，点选可继续联想 |
+| 离线词联想 | 默认开启，中英文成功上屏后提供最多 8 个公开词对续词，点选可继续联想 |
 | 键盘外观 | 经典、极简灰、薄荷绿、樱花粉；深浅模式与三档按键高度 |
 | 个性化 | 本地加密词组与词频，支持隐身模式和禁用学习 |
 | 表情与颜文字 | 扩充 emoji、颜文字情绪子标签、中英文及拼音关键词搜索、加密最近记录与收藏、自定义颜文字管理 |
@@ -98,7 +99,7 @@ v0.2.0 新增连续候选浏览、逐段选字/撤销选段和上屏后重选上
 目前没有云同步、语音输入、手写识别或联网语言包市场。ARM 真机、厂商输入框以及真实系统
 身份认证流程仍需扩大验收；模拟器测试通过不等同于所有设备均已验证。
 
-## 词联想（当前源码，尚未发布）
+## 离线词联想
 
 设置 → 输入中的 **“词联想”** 默认开启。普通文本输入框中选中“谢谢”后可点“你”，再点
 “的帮助”；英文输入 `thank` 并按空格后可点 `you`、`very`、`much`，自动补齐必要的单词间空格。
@@ -332,7 +333,7 @@ cd zero-fish-input
 ./tools/bootstrap-rime.ps1
 ```
 
-v0.2.0 同时需要预先生成并校验随包的 Mini INT8 模型与词表，即使运行时排序开关关闭也需要这些
+v0.3.0 同时需要预先生成并校验随包的 Mini INT8 模型与词表，即使运行时排序开关关闭也需要这些
 构建资产。请先按[模型构建说明](docs/model-integration.md#reproduce-assets-and-build)准备固定版本的
 Python 依赖，再从仓库根目录执行：
 
@@ -463,4 +464,4 @@ APK、第三方许可证压缩包及 SHA-256 清单位于 `app/build/outputs/tes
 
 下一阶段优先扩大 ARM 真机和系统认证验收、测量实际输入延迟，并持续改进输入正确性。
 当前进展见 [项目推进记录](docs/project-progress.md)，本版说明见
-[v0.2.0](docs/releases/v0.2.0.md)，首发记录见 [v0.1.0](docs/releases/v0.1.0.md)。
+[v0.3.0](docs/releases/v0.3.0.md)，首发记录见 [v0.1.0](docs/releases/v0.1.0.md)。

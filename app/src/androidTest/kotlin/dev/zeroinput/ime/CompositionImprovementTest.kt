@@ -16,7 +16,12 @@ class CompositionImprovementTest {
             val original = engine.snapshot.rawInput
             var pages = 0
             while (engine.snapshot.candidates.none { it.id.startsWith("related:") } &&
-                engine.snapshot.hasNextPage && pages++ < 100) engine.changePage(PageDirection.NEXT)
+                engine.snapshot.hasNextPage && pages++ < 100) {
+                engine.changePage(PageDirection.NEXT)
+                // Related sessions are created lazily on the engine worker. Let that
+                // request finish before pressing Next again; never occupy its worker.
+                graph.engineExecutor.submit {}.get(60, TimeUnit.SECONDS)
+            }
             assertTrue("Related reading must follow exact candidates", engine.snapshot.candidates.any { it.id.startsWith("related:") })
             assertEquals(original, engine.snapshot.rawInput)
             val relatedText = engine.snapshot.candidates.first().text
@@ -73,14 +78,15 @@ class CompositionImprovementTest {
         }
 
     private fun type(engine: InputEngine, input: String) { input.forEach { engine.handle(EngineKey.Character(it.toString())) } }
+    private val graph get() = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
     private fun withEngine(options: ChineseInputOptions, action: (InputEngine) -> Unit) {
-        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
-        graph.engineExecutor.submit {
+        val engine = graph.engineExecutor.submit<InputEngine> {
             check(graph.rime.runtime.isReady)
-            checkNotNull(graph.rime.createNativeOrNull(options)).use { engine ->
-                engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
-                action(engine)
-            }
+            checkNotNull(graph.rime.createNativeOrNull(options))
         }.get(60, TimeUnit.SECONDS)
+        engine.use {
+            it.start(EditorContext(InputLanguage.CHINESE, false, false, null))
+            action(it)
+        }
     }
 }

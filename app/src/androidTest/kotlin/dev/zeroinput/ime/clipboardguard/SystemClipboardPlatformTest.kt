@@ -68,8 +68,10 @@ class SystemClipboardPlatformTest {
         val graph = (context.applicationContext as ZeroInputApplication).graph
         val original = graph.clipboardGuardPreferences.options
         val originalIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        val ownIme = ComponentName(context, ZeroInputService::class.java).flattenToString()
         val other = device.shell("ime list -s").lineSequence().map(String::trim)
-            .firstOrNull { it.contains('/') && it != originalIme }
+            .firstOrNull { it.contains('/') && ComponentName.unflattenFromString(it)?.packageName != context.packageName &&
+                !it.contains("VoiceInput") }
         assumeTrue(!original.listening && other != null)
         val activity = instrumentation.startActivitySync(Intent(context, InputFixtureActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
@@ -77,6 +79,8 @@ class SystemClipboardPlatformTest {
         var page: android.app.Activity? = null
         var timestamp: Long? = null
         try {
+            device.shell("ime enable $ownIme")
+            device.shell("ime set $ownIme")
             device.showFixtureKeyboard(activity)
             assumeTrue(port.timestamp() == null)
             context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("", "public guard fixture"))

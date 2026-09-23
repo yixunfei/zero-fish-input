@@ -2,6 +2,15 @@
 
 Date: 2026-09-06
 
+## v0.3.0 testing prerelease (2026-09-23)
+
+The release includes verified Chinese-engine readiness, persistent preparation
+feedback, prediction/conversion privacy separation, offline public associations,
+storage reliability fixes, hot-path improvements and corrected zero fish input
+branding. Version 0.3.0-debug uses code 3 and the existing Debug signing identity.
+See [release notes](releases/v0.3.0.md) and [validation](releases/v0.3.0-validation.md)
+for current checks and remaining device boundaries.
+
 ## Association coverage follow-up (2026-09-21)
 
 The approved priority is association coverage and evaluation. The project-authored
