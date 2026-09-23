@@ -19,6 +19,8 @@ data class EditorContext(
     val isSensitive: Boolean,
     val learningAllowed: Boolean,
     val packageName: String?,
+    /** Optional predictions may be disabled while required script conversion remains available. */
+    val predictionsAllowed: Boolean = true,
 )
 
 data class Candidate(
@@ -30,7 +32,7 @@ data class Candidate(
     val kind: CandidateKind = CandidateKind.STANDARD,
 )
 
-enum class CandidateKind { STANDARD, RELATED_READING }
+enum class CandidateKind { STANDARD, RELATED_READING, NEXT_WORD }
 
 data class EngineSnapshot(
     val rawInput: String = "",

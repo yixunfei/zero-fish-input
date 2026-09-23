@@ -94,20 +94,33 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         var items: List<Candidate> = emptyList()
             private set
         private var highlighted = 0
+        // Reused across renders: calculateDiff consumes the callback
+        // synchronously on the UI thread, so mutable fields are safe here and
+        // avoid one anonymous-class allocation per snapshot.
+        private val diffCallback = CandidateDiffCallback()
 
         fun replace(values: List<Candidate>, selected: Int) {
-            val before = items
-            val oldHighlighted = highlighted
-            val changes = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                override fun getOldListSize() = before.size
-                override fun getNewListSize() = values.size
-                override fun areItemsTheSame(old: Int, new: Int) = before[old].id == values[new].id
-                override fun areContentsTheSame(old: Int, new: Int) = before[old] == values[new] &&
-                    (old == oldHighlighted) == (new == selected)
-            }, false)
+            diffCallback.before = items
+            diffCallback.after = values
+            diffCallback.oldHighlighted = highlighted
+            diffCallback.selected = selected
+            val changes = DiffUtil.calculateDiff(diffCallback, false)
             items = values
             highlighted = selected
             changes.dispatchUpdatesTo(this)
+        }
+
+        private inner class CandidateDiffCallback : DiffUtil.Callback() {
+            var before: List<Candidate> = emptyList()
+            var after: List<Candidate> = emptyList()
+            var oldHighlighted = 0
+            var selected = 0
+
+            override fun getOldListSize() = before.size
+            override fun getNewListSize() = after.size
+            override fun areItemsTheSame(old: Int, new: Int) = before[old].id == after[new].id
+            override fun areContentsTheSame(old: Int, new: Int) = before[old] == after[new] &&
+                (old == oldHighlighted) == (new == selected)
         }
 
         override fun getItemCount(): Int = items.size

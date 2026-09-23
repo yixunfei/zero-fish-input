@@ -24,7 +24,7 @@
     <string name="clipboard_guard_cleared">Current item cleanup requested; history not deleted</string>
     <string name="clipboard_guard_failed">Clipboard operation incomplete</string>
     <string name="clipboard_guard_expired">Request expired or clipboard changed. Confirm again.</string>
-    <string name="clipboard_guard_automatic_warning">While monitoring is on, cleanup will be attempted for the existing current item and new changes, including when protection resumes or you return to this page. Ordinary copy and paste may stop working. System or keyboard history, pinned items and cloud copies are outside this cleanup scope. Earlier reads cannot be recalled; newly copied content may also be cleared. Content is not saved. This cannot be undone.</string>
+    <string name="clipboard_guard_automatic_warning">While monitoring is on, cleanup will be attempted for the existing current item and new changes, including when protection resumes, you return to this page, or you make a private copy from the keyboard. Ordinary copy and paste may stop working. System or keyboard history, pinned items and cloud copies are outside this cleanup scope. Earlier reads cannot be recalled; newly copied content may also be cleared. Content is not saved. This cannot be undone.</string>
     <string name="clipboard_guard_enable_automatic">Enable automatic cleanup</string>
     <string name="clipboard_guard_confirmation_warning">Only the current clipboard item will be targeted. History, pinned items and cloud copies kept by the system or other keyboards will not be deleted; manage them in the app that stores them.\n\nThis cannot be undone. New content may arrive between checking and clearing, so newly copied content could also be cleared. Content is not saved, and earlier copies cannot be recalled.</string>
     <string name="clipboard_guard_confirm_action">Clear current item</string>
@@ -59,9 +59,9 @@
     <string name="clipboard_guard_dismiss">Dismiss reminder</string>
     <string name="clipboard_guard_go_clear">Review cleanup</string>
     <string name="clipboard_guard_open_status">View status</string>
-    <string name="app_name">zero finish input</string>
+    <string name="app_name">zero fish input</string>
     <string name="unlock_secure_clipboard">Unlock secure clipboard</string>
-    <string name="input_method_name">zero finish input</string>
+    <string name="input_method_name">zero fish input</string>
     <string name="subtype_chinese">Chinese</string>
     <string name="subtype_english">English</string>
     <string name="secure_clipboard">Private clipboard</string>
@@ -180,4 +180,5 @@
     <string name="keyboard_height">Keyboard height</string>
     <string name="keyboard_preview">Preview</string>
     <string name="clipboard_selection_unavailable">Select text in a regular input field first, then tap Copy (up to 8192 characters)</string>
+    <string name="setting_word_associations">Next-word suggestions</string>
 </resources>

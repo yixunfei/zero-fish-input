@@ -14,6 +14,7 @@ data class SessionPrivacy(
     val suggestionsAllowed: Boolean,
     val learningAllowed: Boolean,
     val reason: PrivacyReason,
+    val predictionsAllowed: Boolean = suggestionsAllowed,
 ) {
     /**
      * Personal data is a stricter boundary than engine-generated candidates.
@@ -39,12 +40,10 @@ class EditorPrivacyPolicy {
         if (isPasswordField(editorInfo.inputType)) return restricted(PrivacyReason.PASSWORD_FIELD, true)
         if (!isKnownEditor(editorInfo.inputType)) return restricted(PrivacyReason.UNKNOWN_EDITOR, true)
         if (editorRequestsNoSuggestions(editorInfo.inputType)) {
-            return SessionPrivacy(
-                isSensitive = false,
-                suggestionsAllowed = false,
-                learningAllowed = false,
-                reason = PrivacyReason.EDITOR_REQUEST,
-            )
+            // This flag disables predictive suggestions, not conversion needed
+            // to write Chinese. Password/unknown editors were rejected above;
+            // public engine candidates remain usable without personal data.
+            return restricted(PrivacyReason.EDITOR_REQUEST, false).copy(predictionsAllowed = false)
         }
         if (editorRequestsNoLearning(editorInfo)) return restricted(PrivacyReason.EDITOR_REQUEST, false)
         if (configuration.incognitoMode) return restricted(PrivacyReason.INCOGNITO_MODE, false)

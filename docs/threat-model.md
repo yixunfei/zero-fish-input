@@ -18,6 +18,21 @@
 - 密码、PIN、可见密码及应用请求的无个性化输入上下文强制禁用学习和个性化数据读取；邮箱、
   URI、隐身模式及用户关闭学习时同样不读取个人词组或 emoji 历史。运行中收紧隐私设置会立即
   取消当前组合状态。
+- `TYPE_TEXT_FLAG_NO_SUGGESTIONS` does not disable public Chinese conversion in
+  known non-sensitive text fields. Personalization reads/writes, emoji history,
+  model context and next-word predictions remain disabled. Password and unknown
+  field classification still takes precedence.
+- The preparation notice contains only static resource text,
+  never editor input, and owns no editor connection or pending key replay.
+- Prediction permission travels with the immutable editor context and prepared
+  engine identity. `NO_SUGGESTIONS` suppresses public English completions in both
+  built-in and language-pack engines while preserving Chinese conversion. A
+  no-personalized-learning request alone still allows public completions.
+- Native readiness is verified off the IME thread using fixed public input and
+  candidate selection, with learning disabled and no editor connection. The
+  probe is reset before handoff and never logs input or candidates. A missing
+  dictionary fails readiness even if librime can create a session; the private
+  data boundary is unchanged and the memory-only fallback remains usable.
 - 常规用户数据和安全剪贴板使用不同的 Keystore 密钥。
 - librime 内建用户词典关闭，候选学习只通过加密的 `PersonalizationStore`。
 - 安全剪贴板默认关闭；读取由用户点击发起并要求系统身份认证。
@@ -46,8 +61,42 @@
 - 所有应用层后台队列均有明确容量，取消时移除排队 Future；队列满时不回退到 IME 主线程，
   仅丢弃可重试的预热、历史刷新或可选学习任务。用户主动清除个性化数据会先清理排队的旧
   操作并串行执行删除；若耐久清除提交被拒绝，只允许设置页后台线程作最后一次同步重试。
-- 导入器限制文件大小、条目数、路径、扩展名和校验和，防止 zip slip 与 zip bomb。
+- 导入器对归档和展开内容限制文件大小、条目数、路径、扩展名和校验和；manifest
+  通过有界字节流严格按 UTF-8 解码，实际读取字节仍会在激活前复核，防止 zip slip、zip
+  bomb 和压缩条目元数据失真。
 - release 构建关闭调试，源码不得记录输入文本。
+
+## Encrypted storage failure boundaries
+
+- Ciphertext reads require the existing dedicated Keystore key. Missing keys,
+  invalid envelopes, wrong AAD and failed GCM authentication cannot produce
+  plaintext or silently create a replacement key. Envelope format 1 is unchanged.
+- One-use authorization is consumed atomically, including failed expiry checks.
+  Callers cannot extend the 30-second maximum. This remains an application-layer
+  gate; Keystore keys are not newly bound to biometric/credential authentication.
+- Unreadable existing files are not treated as an empty repository. AtomicFile
+  commit and deletion results are checked for surviving base/backup/new files as
+  appropriate. Failed file deletion still attempts key deletion; no error claims
+  a successful erase. Owned plaintext and intermediate byte buffers are wiped.
+- Vault JSON errors use content-free messages without parser causes. Malformed
+  input cannot be silently replaced by a new empty vault. JVM strings and parser
+  objects remain subject to garbage collection; complete memory erasure is not
+  guaranteed.
+- Clear revokes queued operations before waiting for active storage work. Both
+  body and index deletion are attempted, and incomplete clear blocks access until
+  retry in the current instance. Metadata/removal/addition recheck the deletion
+  generation after storage work; management tasks capture it before queuing and
+  Save captures it before authentication. Failed index refresh hides stale rows
+  until authenticated reconciliation.
+- Body and index are separate atomic files, not a cross-file transaction. Pending
+  deletion and index-repair flags are not persisted. Process death after partial
+  failure can leave a stale body-free index or require another explicit clear;
+  this change does not claim crash-proof erasure or durable rollback.
+- Negative tests cover missing keys, malformed/tampered envelopes, failed atomic
+  commits/deletes, buffer cleanup, grant races, failed clear/retry and concurrent
+  clear against metadata/removal. Only public fixtures and test-only key aliases
+  are used. API 26 AtomicFile behavior, physical biometric/key invalidation and
+  power-loss recovery remain unverified. See [validation](security-storage-validation.md).
 
 ## Input configuration and interaction controls
 
@@ -213,6 +262,13 @@
   processing of the existing current item without another confirmation, including
   with another keyboard selected. This request still requires the foreground lease
   and current automatic options. Authentication cannot be combined with this mode.
+- An explicit keyboard private copy is an equivalent automatic-mode authorization
+  moment. After the selection snapshot is captured for the private vault, the IME
+  queues one silent inspection that clears a stale current item only under
+  current automatic options. It holds an input-session lease, carries no captured
+  text or grant, and an editing-context change revokes it before execution.
+  Without monitoring opt-in or under any non-automatic mode this path leaves the
+  current item untouched, which the platform regression suite asserts.
 - Cleanup feedback reports a request for the current item and explicitly states
   that history was not deleted. The confirmation and automatic-mode warnings name
   system/keyboard history, pinned items and cloud copies. The platform clear API
@@ -322,6 +378,53 @@ disk cache. Only the fixed public model is copied to noBackupFilesDir. Source,
 graph, vocabulary and runtime are pinned; size/hash checks precede activation.
 Malformed/missing assets and runtime errors keep baseline input working. No new
 permission, component, network path or personal-data format is introduced.
+
+## Offline association context
+
+Coverage expansion uses only project-authored public phrase pairs; no user data,
+external corpus, runtime dependency or additional permission is introduced. The
+existing row/field/query/candidate limits remain unchanged. One-character Chinese
+anchors now require a full-context match, reducing spurious suffix matches.
+The developer evaluation uses fixed synthetic fixtures and records only case
+identifiers, ranks and counts. Evaluation fixtures and baseline reports are test
+resources and are absent from application packages.
+
+The default-on association setting permits a maximum of 32 UTF-16 units from
+successful IME commits in the current normal text editor. A borrowed read-only
+view is used synchronously against a bounded, immutable public phrase index;
+there is no private-context background task. Failed commits, sensitive/unknown
+editors, numeric/phone/date layouts, identifiers, no-learning/no-suggestions,
+incognito and disabled learning cannot seed or query this context. The feature
+never reads surrounding editor text, clipboard bodies or private history.
+
+Session/view/connection, cursor/selection, deletion, language/engine, settings,
+panel, reconversion and literal/private insertion boundaries wipe the mutable
+buffer and revoke candidate identities. Typing hides old predictions. An old
+click cannot accept a replacement candidate; Space/Enter cannot accept an idle
+prediction. Selection can only commit the currently visible public continuation.
+Late public-index readiness has no session callback and cannot resurrect
+candidates.
+
+Association order may follow learned personal frequency (ADR 0014). The lookup
+is read-only, covers at most the eight displayed public rows, and is answered
+from the prepared in-memory mirror under the same personalization gate as the
+strip itself; it cannot enumerate the personal store, injects no private word
+into the strip, and performs no disk, keystore or decryption work on the input
+thread. An explicit, adapter-accepted click on a visible public continuation
+also learns that word through the existing encrypted `PersonalizationStore`
+with the session's learning flag — the same channel, gates and deletion
+semantics as learning a typed commit. Chinese continuations are learned with
+their own text as the shortcut (no reading is fabricated), so they cannot
+resurface through pinyin prefix matching; they only feed frequency reranking
+and the phrase management screen. Failed, stale or gated clicks write nothing,
+and write-back failures are counted without affecting the commit.
+
+The bounded phrase resource is loaded off the input thread. Malformed/missing
+data and lookup failures leave ordinary input usable. Context is never persisted,
+logged, backed up or transmitted; temporary JVM lookup strings remain subject to
+garbage collection. No new permission, exported component, dependency or stored
+personal format is added. Unit and device regressions use constructed public
+phrases. See ADR 0013, ADR 0014 and `word-association-validation.md`.
 
 ## Out of scope
 

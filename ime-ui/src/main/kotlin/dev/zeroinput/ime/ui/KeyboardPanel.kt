@@ -35,6 +35,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var surfaceColor = 0
     private var surfaceVariantColor = 0
     private var primaryContainerColor = 0
+    private var onSurfaceColor = 0
     private var outlineColor = 0
     private var enterSpec: KeySpec? = null
 
@@ -115,9 +116,12 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         val updated = rows.map { row -> row.map(KeySpec::widthWeight) }
         if (geometry != updated) rebuild(rows, updated)
         var enter: KeySpec? = null
-        rows.flatten().forEachIndexed { index, spec ->
-            if (spec.action == KeyboardAction.Enter) enter = spec
-            bind(keys[index], spec)
+        var index = 0
+        for (row in rows) {
+            for (spec in row) {
+                if (spec.action == KeyboardAction.Enter) enter = spec
+                bind(keys[index++], spec)
+            }
         }
         enterSpec = enter
     }
@@ -147,7 +151,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         isAllCaps = false
         letterSpacing = 0f
         setSingleLine()
-        setTextColor(color(com.google.android.material.R.attr.colorOnSurface))
+        ensureKeyColors()
+        setTextColor(onSurfaceColor)
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         onAction = ::handleAction
         if (spec.action == KeyboardAction.Backspace) {
@@ -228,6 +233,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         surfaceColor = color(com.google.android.material.R.attr.colorSurface)
         surfaceVariantColor = color(com.google.android.material.R.attr.colorSurfaceVariant)
         primaryContainerColor = color(com.google.android.material.R.attr.colorPrimaryContainer)
+        onSurfaceColor = color(com.google.android.material.R.attr.colorOnSurface)
         outlineColor = androidx.core.graphics.ColorUtils.setAlphaComponent(color(com.google.android.material.R.attr.colorOutline), 80)
         colorsResolved = true
     }

@@ -2,6 +2,7 @@ package dev.zeroinput.ime.core
 
 import android.view.inputmethod.EditorInfo
 import dev.zeroinput.engine.api.Candidate
+import dev.zeroinput.engine.api.CandidateKind
 import dev.zeroinput.engine.api.CandidateTextNormalizer
 import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.EngineKey
@@ -9,6 +10,8 @@ import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.EngineUpdate
 import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.engine.api.NextWordPredictor
+import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.ReadingSelectionEngine
 import dev.zeroinput.engine.api.EngineDescriptor
@@ -32,6 +35,8 @@ class InputSessionController(
      * the IME input thread.
      */
     private val deferHeavyEngineCreation: Boolean = false,
+    nextWordPredictor: NextWordPredictor = NextWordPredictor.Empty,
+    private val wordAssociationsEnabled: () -> Boolean = { true },
 ) : AutoCloseable {
     private var engine: InputEngine? = null
     private var language = InputLanguage.CHINESE
@@ -59,8 +64,26 @@ class InputSessionController(
     private val recentComposition = RecentComposition()
     private val candidateWindow = CandidateWindow()
     private val personalPaging = PersonalCandidatePaging()
+    private val associations = WordAssociationSession(nextWordPredictor) { language, words ->
+        // The privacy policy is re-evaluated at query time so a tightening
+        // takes effect on the very next commit, matching the strip's own gate.
+        if (privacy.personalizationAllowed) {
+            (personalization as? PersonalFrequencyStore)?.frequenciesFor(words, language).orEmpty()
+        } else {
+            emptyMap()
+        }
+    }
 
     var state = InputSessionState()
+        private set
+
+    /**
+     * Degradation counter for personalization writes.  A failing store must
+     * never break the input path, so learning exceptions are deliberately
+     * swallowed; this count keeps them observable for diagnostics and tests
+     * without logging any user content.
+     */
+    var learningFailureCount = 0
         private set
 
     fun start(
@@ -111,6 +134,15 @@ class InputSessionController(
     }
 
     fun handle(command: InputCommand) {
+        if (command is InputCommand.SelectCandidate && command.candidateId != null &&
+            state.snapshot.candidates.getOrNull(command.visibleIndex)?.id != command.candidateId) return
+        if (!associationsAllowed()) invalidateWordAssociations()
+        when (command) {
+            is InputCommand.Text -> associations.hide()
+            is InputCommand.SelectCandidate, is InputCommand.ChangeCandidatePage -> Unit
+            InputCommand.Space -> if (!state.snapshot.isComposing) associations.clear()
+            else -> associations.clear()
+        }
         if (command != InputCommand.ReconvertLast) invalidateReconversion(publishState = false)
         if (command !is InputCommand.ChangeCandidatePage && command !is InputCommand.SelectCandidate &&
             command != InputCommand.Space && command != InputCommand.Enter) candidateWindow.clear()
@@ -133,7 +165,8 @@ class InputSessionController(
                 is InputCommand.LiteralText -> commitLiteral(activeEngine, command.value)
                 InputCommand.Backspace -> handleKey(activeEngine, EngineKey.Backspace, fallbackBackspace = true)
                 InputCommand.Space, InputCommand.Enter -> {
-                    if ((candidateWindow.isBrowsing || personalPaging.isBrowsing || state.modelRanked) && state.snapshot.candidates.isNotEmpty()) {
+                    if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
+                        (candidateWindow.isBrowsing || personalPaging.isBrowsing || state.modelRanked)) {
                         selectCandidate(activeEngine, state.snapshot.highlightedIndex)
                     } else if (command == InputCommand.Enter) handleEnter(activeEngine)
                     else handleKey(activeEngine, EngineKey.Space)
@@ -147,6 +180,7 @@ class InputSessionController(
                 }
                 is InputCommand.SelectCandidate -> selectCandidate(activeEngine, command.visibleIndex)
                 is InputCommand.ChangeCandidatePage -> {
+                    if (!rawEngineSnapshot.isComposing) return
                     if (personalPaging.changePage(command.direction, candidateWindow.snapshot(rawEngineSnapshot))) {
                         publish(rawEngineSnapshot)
                     } else apply(candidateWindow.changePage(activeEngine, rawEngineSnapshot, command.direction))
@@ -177,6 +211,7 @@ class InputSessionController(
     }
 
     fun reset() {
+        associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
         runCatching { engine?.reset() }
@@ -193,6 +228,25 @@ class InputSessionController(
      */
     fun refreshPersonalization() {
         publish(rawEngineSnapshot)
+    }
+
+    /** Cursor, panel, settings and external-commit boundaries discard all prediction context. */
+    fun invalidateWordAssociations() {
+        val visible = associations.candidates.isNotEmpty()
+        associations.clear()
+        if (visible) publish(rawEngineSnapshot)
+    }
+
+    private fun associationsAllowed(): Boolean = wordAssociationsEnabled() && privacy.personalizationAllowed &&
+        !privacy.isSensitive && EditorInputOptions.from(editorInfo).layout == EditorLayout.TEXT
+
+    private fun commitPredictableText(text: String): Boolean {
+        val committed = connection.commitText(text)
+        if (committed && associationsAllowed()) associations.committed(text, language) { value ->
+            (engine as? CandidateTextNormalizer)?.normalizeCandidateText(value) ?: value
+        }
+        else associations.clear()
+        return committed
     }
 
     /** Main-thread-only handoff. A revision is consumed once and routes remain engine-owned. */
@@ -410,12 +464,12 @@ class InputSessionController(
             // commitText replaces the active composing span.  Finishing first
             // would make the pre-edit (for example, "ni") permanent and then
             // append the selected candidate (for example, "你").
-            connection.commitText(update.committedText)
-            if (language == InputLanguage.CHINESE && engine is CompositionEditingEngine &&
+            val committed = commitPredictableText(update.committedText)
+            if (committed && language == InputLanguage.CHINESE && engine is CompositionEditingEngine &&
                 connection is ReconversionEditorConnection && !update.snapshot.isComposing) {
                 recentComposition.remember(reading, update.committedText)
             }
-            if (privacy.personalizationAllowed && update.learnable) {
+            if (committed && privacy.personalizationAllowed && update.learnable) {
                 runCatching {
                     personalization.learn(
                         shortcut = reading.ifBlank { update.committedText },
@@ -423,7 +477,7 @@ class InputSessionController(
                         language = language,
                         learningAllowed = privacy.learningAllowed,
                     )
-                }
+                }.onFailure { learningFailureCount++ }
             }
         }
         if (update.snapshot.composition.isNotEmpty()) {
@@ -446,6 +500,7 @@ class InputSessionController(
         val before = state.snapshot
         if (!before.isComposing) {
             performEnterAction()
+            publish(EngineSnapshot.Empty)
             return
         }
 
@@ -478,6 +533,8 @@ class InputSessionController(
             flushUnconsumedComposition(activeEngine, remaining)
         }
         connection.commitText(text)
+        associations.clear()
+        publish(rawEngineSnapshot)
     }
 
     private fun performEnterAction() {
@@ -500,13 +557,36 @@ class InputSessionController(
                 val reading = route.input.ifBlank { state.snapshot.rawInput }
                 candidateWindow.clear()
                 activeEngine.reset()
-                connection.commitText(route.text)
-                if (language == InputLanguage.CHINESE && activeEngine is CompositionEditingEngine &&
+                val committed = commitPredictableText(route.text)
+                if (committed && language == InputLanguage.CHINESE && activeEngine is CompositionEditingEngine &&
                     connection is ReconversionEditorConnection) recentComposition.remember(reading, route.text)
-                if (privacy.personalizationAllowed) {
+                if (committed && privacy.personalizationAllowed) {
                     runCatching {
                         personalization.recordUse(route.id, learningAllowed = privacy.learningAllowed)
-                    }
+                    }.onFailure { learningFailureCount++ }
+                }
+                publish(EngineSnapshot.Empty)
+            }
+            is CandidateRoute.Association -> {
+                if (!associationsAllowed() || rawEngineSnapshot.isComposing) return
+                val selected = associations.selection(route.id) ?: return
+                candidateWindow.clear()
+                val committed = commitPredictableText(selected.commitText)
+                // ADR 0014: an explicit, adapter-accepted click learns the word
+                // through the ordinary encrypted channel with the session's
+                // learning flag.  The Chinese table carries no reading, so the
+                // value itself is the shortcut: it feeds frequency reranking
+                // and phrase management but cannot surface through pinyin
+                // prefix matching until the table gains a reading column.
+                if (committed && privacy.personalizationAllowed) {
+                    runCatching {
+                        personalization.learn(
+                            shortcut = selected.text,
+                            value = selected.text,
+                            language = language,
+                            learningAllowed = privacy.learningAllowed,
+                        )
+                    }.onFailure { learningFailureCount++ }
                 }
                 publish(EngineSnapshot.Empty)
             }
@@ -519,6 +599,7 @@ class InputSessionController(
     }
 
     private fun handleEditorFallback(command: InputCommand) {
+        associations.clear()
         when (command) {
             is InputCommand.Text -> connection.commitText(command.value)
             is InputCommand.LiteralText -> connection.commitText(command.value)
@@ -539,9 +620,13 @@ class InputSessionController(
     private fun publish(engineSnapshot: EngineSnapshot) {
         rawEngineSnapshot = engineSnapshot
         val browsed = candidateWindow.snapshot(engineSnapshot)
-        val visibleSnapshot = personalPaging.publish(browsed, personalization, language, privacy.personalizationAllowed) { text ->
+        val composed = personalPaging.publish(browsed, personalization, language, privacy.personalizationAllowed) { text ->
             runCatching { (engine as? CandidateTextNormalizer)?.normalizeCandidateText(text) ?: text }.getOrNull()
         }
+        if (!associationsAllowed()) associations.clear()
+        if (composed.isComposing) associations.hide()
+        val visibleSnapshot = if (!composed.isComposing && composed.candidates.isEmpty() && associations.candidates.isNotEmpty())
+            composed.copy(candidates = associations.candidates) else composed
         // The update snapshot is the authoritative view for this event.  Do
         // not resolve engine candidates through the engine's mutable
         // `snapshot` property: adapters may publish that property lazily (or
@@ -565,6 +650,7 @@ class InputSessionController(
         // some adapters expose a stale property while returning an update.
         val snapshot = updateSnapshot.takeIf(EngineSnapshot::isComposing)
             ?: beforeSnapshot.takeIf(EngineSnapshot::isComposing)
+        associations.clear()
         flushUnconsumedComposition(activeEngine, snapshot, beforeSnapshot)
         connection.commitText(text)
     }
@@ -600,6 +686,7 @@ class InputSessionController(
         snapshot.rawInput.ifEmpty { snapshot.composition }
 
     private fun commitRawComposition(rawComposition: String) {
+        associations.clear()
         // Clear the composing span first so finishComposingText cannot commit
         // the preedit a second time when the raw text is submitted explicitly.
         connection.setComposingText("")
@@ -609,7 +696,9 @@ class InputSessionController(
 
     private fun rebuildRoutes(snapshot: EngineSnapshot) {
         routes = snapshot.candidates.map { candidate ->
-            if (candidate.id.startsWith("personal:")) {
+            if (candidate.kind == CandidateKind.NEXT_WORD) {
+                CandidateRoute.Association(candidate.id)
+            } else if (candidate.id.startsWith("personal:")) {
                 CandidateRoute.Personal(candidate.id.removePrefix("personal:"), candidate.text, candidate.input)
             } else {
                 candidateWindow.route(candidate.id)?.let(CandidateRoute::Engine)
@@ -619,11 +708,13 @@ class InputSessionController(
 
     private fun startEngine(candidate: InputEngine): EngineSnapshot? = runCatching {
         candidate.start(
-            EditorContext(language, privacy.isSensitive, privacy.learningAllowed, editorInfo.packageName),
+            EditorContext(language, privacy.isSensitive, privacy.learningAllowed, editorInfo.packageName,
+                predictionsAllowed = privacy.predictionsAllowed),
         )
     }.getOrNull()
 
     private fun closeEngine() {
+        associations.clear()
         candidateWindow.clear()
         personalPaging.clear()
         invalidateReconversion(publishState = false)
@@ -651,6 +742,7 @@ class InputSessionController(
         data class Engine(val reference: CandidateWindow.Route) : CandidateRoute
 
         data class Personal(val id: String, val text: String, val input: String) : CandidateRoute
+        data class Association(val id: String) : CandidateRoute
     }
 
 }

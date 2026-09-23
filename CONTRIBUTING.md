@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to zero finish input. Read [AGENTS.md](AGENTS.md),
+Thanks for contributing to zero fish input. Read [AGENTS.md](AGENTS.md),
 [the architecture](docs/architecture.md) and [the threat model](docs/threat-model.md)
 before changing code. Project priorities are privacy, correct input, responsive
 offline operation and maintainable module boundaries.

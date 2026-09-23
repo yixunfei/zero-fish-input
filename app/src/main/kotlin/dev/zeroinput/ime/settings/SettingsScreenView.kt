@@ -29,6 +29,7 @@ data class SettingsScreenState(
     val engineStatus: String,
     val chineseOptions: ChineseInputOptions = ChineseInputOptions(),
     val experimentalModelRanking: Boolean = false,
+    val wordAssociationsEnabled: Boolean = true,
     val languagePacks: List<LanguagePackScreenState> = emptyList(),
     val chineseEngine: ChineseEngineChoice = ChineseEngineChoice.RIME,
     val engineCapabilities: Set<EngineCapability> = EngineCapability.entries.toSet(),
@@ -51,6 +52,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onIncognitoChanged: (Boolean) -> Unit = {}
     var onSecureClipboardChanged: (Boolean) -> Unit = {}
     var onHapticsChanged: (Boolean) -> Unit = {}
+    var onWordAssociationsChanged: (Boolean) -> Unit = {}
     var onDictionaryRequested: () -> Unit = {}
     var onExpressionsRequested: () -> Unit = {}
     var onAppearanceRequested: () -> Unit = {}
@@ -85,6 +87,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val incognitoSwitch = settingSwitch(context.getString(R.string.setting_incognito)) { onIncognitoChanged(it) }
     private val secureClipboardSwitch = settingSwitch(context.getString(R.string.secure_clipboard)) { onSecureClipboardChanged(it) }
     private val hapticsSwitch = settingSwitch(context.getString(R.string.setting_haptics)) { onHapticsChanged(it) }
+    private val associationSwitch = settingSwitch(context.getString(R.string.setting_word_associations)) { onWordAssociationsChanged(it) }
     private val engineButtons = ChineseEngineChoice.entries.associateWith { choice ->
         MaterialRadioButton(context).apply {
             id = View.generateViewId()
@@ -132,6 +135,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(incognitoSwitch, state.incognitoMode)
             updateSwitch(secureClipboardSwitch, state.secureClipboardEnabled)
             updateSwitch(hapticsSwitch, state.hapticsEnabled)
+            updateSwitch(associationSwitch, state.wordAssociationsEnabled)
         } finally {
             suppressSwitchCallbacks = false
         }
@@ -178,6 +182,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
 
         section(context.getString(R.string.section_input))
         content.addView(hapticsSwitch)
+        content.addView(associationSwitch)
         command(context.getString(R.string.keyboard_appearance)) { onAppearanceRequested() }
 
         section(context.getString(R.string.chinese_input_settings))

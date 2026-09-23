@@ -15,7 +15,8 @@ interface EditorConnection {
         finishComposingText()
     }
 
-    fun commitText(text: String)
+    /** True only when the currently bound editor accepts this commit. */
+    fun commitText(text: String): Boolean
 
     fun deleteBeforeCursor()
 

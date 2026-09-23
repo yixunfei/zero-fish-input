@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AtomicFile
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 class EncryptedFileStore(
@@ -26,6 +27,9 @@ class EncryptedFileStore(
                 encrypted.fill(0)
             }
         } catch (_: FileNotFoundException) {
+            if (file.exists() || File(file.path + ".bak").exists()) {
+                throw IOException("Encrypted data could not be read")
+            }
             null
         }
     }
@@ -40,6 +44,10 @@ class EncryptedFileStore(
             output.write(encrypted)
             atomicFile.finishWrite(output)
             output = null
+            // AtomicFile logs rename failures without throwing; callers must not publish an unsaved update.
+            if (!file.isFile || File(file.path + ".new").exists() || File(file.path + ".bak").exists()) {
+                throw IOException("Encrypted data could not be committed")
+            }
         } catch (error: Throwable) {
             output?.let { atomicFile.failWrite(it) }
             throw error
@@ -50,7 +58,9 @@ class EncryptedFileStore(
     }
 
     override fun delete(deleteKey: Boolean) = synchronized(lock) {
-        atomicFile.delete()
-        if (deleteKey) cipher.deleteKey()
+        try { atomicFile.delete() } finally { if (deleteKey) cipher.deleteKey() }
+        if (listOf(file, File(file.path + ".bak"), File(file.path + ".new")).any(File::exists)) {
+            throw IOException("Encrypted data deletion is incomplete")
+        }
     }
 }

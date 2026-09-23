@@ -1,0 +1,34 @@
+# Project-authored public synthetic candidate-generation fixtures; Apache-2.0.
+# Development/acceptance fixtures evaluated live against the bundled reference
+# dictionary. This is not a blind or real-user accuracy benchmark.
+# id	language	category	reading	acceptable-candidates (pipe-separated; - means abstain)
+zh001	zh	single	a	啊|阿
+zh002	zh	single	ba	把
+zh003	zh	single	shi	是|时
+zh004	zh	single	ni	你
+zh005	zh	word	nihao	你好
+zh006	zh	apostrophe	ni'hao	你好
+zh007	zh	word	beijing	北京
+zh008	zh	word	zhongguo	中国
+zh009	zh	word	shuru	输入
+zh010	zh	word	mingtian	明天
+zh011	zh	word	jintian	今天
+zh012	zh	word	zaijian	再见
+zh013	zh	word	xiexie	谢谢
+zh014	zh	word	zaoshang	早上
+zh015	zh	word	xuexi	学习
+zh016	zh	word	gongzuo	工作
+zh017	zh	word	ceshi	测试
+zh018	zh	word	shijie	世界
+zh019	zh	word	shijian	时间
+zh020	zh	word	women	我们
+zh021	zh	word	keyi	可以
+zh022	zh	word	meiyou	没有
+zh023	zh	prefix	zai	在|再
+zh024	zh	prefix	hao	好
+zh025	zh	abstention	q	-
+zh026	zh	abstention	zzzz	-
+zh027	zh	abstention	nihaoma	-
+zh028	zh	abstention	pinyin	-
+zh029	zh	abstention	v	-
+zh030	zh	abstention	ang	-

@@ -83,8 +83,9 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     }
 
     private fun loadMetadata(grant: AuthenticationGrant) {
+        val generation = graph.secureClipboard.captureGeneration()
         runVaultOperation(
-            operation = { graph.secureClipboard.metadata(grant) },
+            operation = { graph.secureClipboard.metadata(grant, generation) },
             onSuccess = {
                 metadata = it
                 screen.renderEntries(it)
@@ -122,8 +123,9 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                     val itemLabel = label.editText?.text?.toString().orEmpty()
+                    val generation = graph.secureClipboard.captureGeneration()
                     dialog.dismiss()
-                    authenticate(false) { grant -> addItem(itemLabel, secret, grant) }
+                    authenticate(false) { grant -> addItem(itemLabel, secret, grant, generation) }
                 }
             }
         }
@@ -157,9 +159,9 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun addItem(label: String, value: String, grant: AuthenticationGrant) {
+    private fun addItem(label: String, value: String, grant: AuthenticationGrant, generation: Long) {
         runVaultOperation(
-            operation = { graph.secureClipboard.add(label, value, grant) },
+            operation = { graph.secureClipboard.add(label, value, grant, generation) },
             onSuccess = { added ->
                 metadata = listOf(added) + metadata
                 screen.renderEntries(metadata)
@@ -180,8 +182,9 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     }
 
     private fun deleteItem(item: SecureClipboardMetadata, grant: AuthenticationGrant) {
+        val generation = graph.secureClipboard.captureGeneration()
         runVaultOperation(
-            operation = { graph.secureClipboard.remove(item.id, grant) },
+            operation = { graph.secureClipboard.remove(item.id, grant, generation) },
             onSuccess = { removed ->
                 if (removed) metadata = metadata.filterNot { it.id == item.id }
                 screen.renderEntries(metadata)

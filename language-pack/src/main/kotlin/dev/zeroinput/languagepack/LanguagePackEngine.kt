@@ -8,6 +8,7 @@ import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.EngineUpdate
 import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.InputEngineFactory
+import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.PageDirection
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,11 +47,16 @@ private class LanguagePackInputEngine(
     }
     private var input = ""
     private var currentSnapshot = EngineSnapshot.Empty
+    private var candidatesAllowed = true
 
     override val snapshot: EngineSnapshot
         get() = currentSnapshot
 
-    override fun start(context: EditorContext): EngineSnapshot = reset()
+    override fun start(context: EditorContext): EngineSnapshot {
+        candidatesAllowed = !context.isSensitive &&
+            (context.predictionsAllowed || context.language == InputLanguage.CHINESE)
+        return reset()
+    }
 
     override fun handle(key: EngineKey): EngineUpdate = when (key) {
         is EngineKey.Character -> handleCharacter(key.text)
@@ -111,6 +117,7 @@ private class LanguagePackInputEngine(
 
     private fun createSnapshot(): EngineSnapshot {
         if (input.isEmpty()) return EngineSnapshot.Empty
+        if (!candidatesAllowed) return EngineSnapshot(rawInput = input, composition = input)
         val candidates = entries.asSequence()
             .filter { (shortcut, _) -> shortcut.startsWith(input, ignoreCase = true) }
             .flatMap { (shortcut, values) -> values.asSequence().map { shortcut to it } }

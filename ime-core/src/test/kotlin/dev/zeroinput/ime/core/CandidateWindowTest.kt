@@ -11,7 +11,7 @@ class CandidateWindowTest {
         val editor = object : EditorConnection {
             override fun setComposingText(text: String) = Unit
             override fun finishComposingText() = Unit
-            override fun commitText(text: String) { committed = text }
+            override fun commitText(text: String): Boolean { committed = text; return true }
             override fun deleteBeforeCursor() = Unit
             override fun performEditorAction(actionId: Int) = false
             override fun sendEnterKey() = Unit

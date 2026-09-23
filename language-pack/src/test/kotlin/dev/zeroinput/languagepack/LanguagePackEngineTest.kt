@@ -12,6 +12,25 @@ import java.nio.file.Files
 import java.security.MessageDigest
 
 class LanguagePackEngineTest {
+    @Test fun `no predictions disables English expansion but retains Chinese conversion`() {
+        val directory = Files.createTempDirectory("zeroinput-pack-predictions").toFile()
+        try {
+            val dictionary = File(directory, "dictionary.txt").apply { writeText("hel\thello\nni\t你\n") }
+            for (language in InputLanguage.entries) {
+                val chinese = language == InputLanguage.CHINESE
+                val manifest = LanguagePackManifest(1, "test-predictions", "Test predictions", if (chinese) "zh" else "en",
+                    "1", "zeroinput.dictionary.predictions",
+                    listOf(LanguagePackFile(dictionary.name, sha256(dictionary), dictionary.length())))
+                val engine = LanguagePackEngineFactory(InstalledLanguagePack(manifest, directory)).create()
+                engine.start(EditorContext(language, false, false, null, predictionsAllowed = false))
+                (if (chinese) "ni" else "hel").forEach { engine.handle(EngineKey.Character(it.toString())) }
+                assertEquals(!chinese, engine.snapshot.candidates.isEmpty())
+                assertEquals(if (chinese) "你 " else "hel ", engine.handle(EngineKey.Space).committedText)
+                engine.close()
+            }
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test
     fun `enabled text dictionary becomes an input engine`() {
         val directory = Files.createTempDirectory("zeroinput-pack").toFile()

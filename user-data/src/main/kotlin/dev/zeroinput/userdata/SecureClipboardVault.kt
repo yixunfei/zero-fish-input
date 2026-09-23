@@ -7,6 +7,8 @@ import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.security.SecurityAliases
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONException
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.CancellationException
@@ -25,6 +27,8 @@ class SecureClipboardVault(
     private val generation = AtomicLong()
     /** Index entries contain no labels or正文 and are safe to cache in-process. */
     private var indexCache: List<StoredSummary>? = null
+    private var deletionPending = false
+    private var indexNeedsRepair = false
 
     fun count(): Int = synchronized(lock) { loadIndexSafely().size }
 
@@ -55,11 +59,17 @@ class SecureClipboardVault(
         }
     }
 
-    fun metadata(grant: AuthenticationGrant): List<SecureClipboardMetadata> = synchronized(lock) {
-        require(grant.consume()) { "Authentication expired or was already used" }
-        val entries = load().sortedByDescending(SecureClipboardEntry::updatedAtEpochMillis)
-        persistIndex(entries)
-        entries.map { it.toMetadata() }
+    fun metadata(grant: AuthenticationGrant, expectedGeneration: Long = captureGeneration()): List<SecureClipboardMetadata> {
+        val expected = expectedGeneration
+        return synchronized(lock) {
+            checkOperationActive(expected) { true }
+            require(grant.consume()) { "Authentication expired or was already used" }
+            val entries = load().sortedByDescending(SecureClipboardEntry::updatedAtEpochMillis)
+            checkOperationActive(expected) { true }
+            persistIndex(entries)
+            checkOperationActive(expected) { true }
+            entries.map { it.toMetadata() }
+        }
     }
 
     /** Capture before queuing an addition; deletion invalidates older requests. */
@@ -86,29 +96,41 @@ class SecureClipboardVault(
         entries += entry
         checkOperationActive(expectedGeneration, isActive)
         persist(entries) { checkOperationActive(expectedGeneration, isActive) }
+        checkOperationActive(expectedGeneration, isActive)
         persistIndex(entries)
+        checkOperationActive(expectedGeneration, isActive)
         entry.toMetadata()
     }
 
-    fun remove(id: String, grant: AuthenticationGrant): Boolean = synchronized(lock) {
-        require(grant.consume()) { "Authentication expired or was already used" }
-        val entries = load().toMutableList()
-        val removed = entries.removeAll { it.id == id }
-        if (removed) {
-            generation.incrementAndGet()
-            persist(entries)
-            persistIndex(entries)
+    fun remove(id: String, grant: AuthenticationGrant, expectedGeneration: Long = captureGeneration()): Boolean {
+        val expected = expectedGeneration
+        return synchronized(lock) {
+            checkOperationActive(expected) { true }
+            require(grant.consume()) { "Authentication expired or was already used" }
+            val entries = load().toMutableList()
+            checkOperationActive(expected) { true }
+            val removed = entries.removeAll { it.id == id }
+            if (removed) {
+                if (!generation.compareAndSet(expected, expected + 1)) throw CancellationException("Clipboard operation cancelled")
+                persist(entries) { checkOperationActive(expected + 1) { true } }
+                checkOperationActive(expected + 1) { true }
+                persistIndex(entries)
+                checkOperationActive(expected + 1) { true }
+            }
+            removed
         }
-        removed
     }
 
     fun clear(grant: AuthenticationGrant) {
         require(grant.consume()) { "Authentication expired or was already used" }
         generation.incrementAndGet()
         synchronized(lock) {
-            store.delete(deleteKey = true)
-            indexStore.delete(deleteKey = true)
+            deletionPending = true
             indexCache = emptyList()
+            indexNeedsRepair = true
+            try { store.delete(deleteKey = true) } finally { indexStore.delete(deleteKey = true) }
+            deletionPending = false
+            indexNeedsRepair = false
         }
     }
 
@@ -116,9 +138,15 @@ class SecureClipboardVault(
         if (generation.get() != expectedGeneration || !isActive() || Thread.currentThread().isInterrupted) {
             throw CancellationException("Clipboard operation cancelled")
         }
+        checkStorageAvailable()
+    }
+
+    private fun checkStorageAvailable() {
+        if (deletionPending) throw IOException("Secure clipboard deletion is incomplete")
     }
 
     private fun load(): List<SecureClipboardEntry> {
+        checkStorageAvailable()
         val bytes = store.read() ?: return emptyList()
         return try {
             val root = JSONObject(String(bytes, StandardCharsets.UTF_8))
@@ -134,12 +162,16 @@ class SecureClipboardVault(
                     updatedAtEpochMillis = item.getLong("updatedAt").coerceAtLeast(0L),
                 )
             }
+        } catch (_: JSONException) {
+            throw IOException("Invalid secure clipboard data")
         } finally {
             bytes.fill(0)
         }
     }
 
     private fun loadIndexSafely(): List<StoredSummary> {
+        checkStorageAvailable()
+        if (indexNeedsRepair) return emptyList()
         indexCache?.let { return it }
         // Do not cache a transient decryption/I/O failure as an empty index.
         // Keystore availability can briefly change while the device is
@@ -187,12 +219,17 @@ class SecureClipboardVault(
         try {
             beforeWrite()
             store.write(bytes)
+            indexCache = null
+            indexNeedsRepair = true
         } finally {
             bytes.fill(0)
         }
     }
 
     private fun persistIndex(entries: List<SecureClipboardEntry>) {
+        checkStorageAvailable()
+        indexCache = null
+        indexNeedsRepair = true
         val summaries = entries.map { entry ->
             StoredSummary(entry.id, entry.updatedAtEpochMillis)
         }
@@ -214,6 +251,7 @@ class SecureClipboardVault(
             bytes.fill(0)
         }
         indexCache = summaries
+        indexNeedsRepair = false
     }
 
     private fun validateId(value: String): String = value.also {

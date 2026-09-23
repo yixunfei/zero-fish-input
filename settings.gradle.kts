@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "zero finish input"
+rootProject.name = "zero fish input"
 
 include(
     ":app",

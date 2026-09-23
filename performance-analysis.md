@@ -1,8 +1,10 @@
 # ZeroInput 性能静态分析报告（CPU + 内存）
 
-分析日期：2026-09-19
+分析日期：2026-09-21
 分析对象：`dev.zeroinput.ime` 全部 Kotlin 主源码（约 110 个 main 源文件，跨 app / ime-core / ime-ui / engine-api / engine-rime / engine-english / engine-dictionary / language-pack / security / user-data / model-scoring）
 分析方法：纯静态阅读，追踪「一次按键」从 `ZeroInputService.handleKeyboardAction` 到 `InputConnection` 提交的完整链路，逐层标注 CPU 开销与对象分配；未做运行期插桩。
+
+2026-09-21 落地状态：本次评估中的设置镜像、英文快照循环与 scratch 容器、键盘/Emoji 主题颜色缓存、Enter 局部重绑和全拼 Rime secondary 懒创建已实施。懒创建任务受会话代次保护，运行时关闭会等待 native 创建临界区，过期会话会主动释放新会话。本文中的按键对象数和耗时均为优化前静态基线，未用运行期数据替代；后续仍需在目标设备上用现有 public-fixture 插桩复测。
 
 ---
 
@@ -32,7 +34,7 @@ ZeroInputService.handleKeyboardAction(action)
   ├─ maybeReloadLanguagePack()     [第1次]
   │    └─ scheduleEngineWarmup() → reconcileChineseOptions()：重建 ChineseInputOptions + warmupRequest()
   ├─ modelRanking.typing()/invalidate()
-  ├─ graph.settings.hapticFeedbackEnabled   ← SharedPreferences 读取
+  ├─ configuredHapticFeedback              ← 服务级设置镜像
   ├─ controller.handle(InputCommand.Text)
   │    └─ engine.handle(key) → RimeInputEngine.readUpdate()  ← JNI 读快照 + 逐候选构造
   │    └─ apply() → publish()
@@ -47,7 +49,7 @@ ZeroInputService.handleKeyboardAction(action)
        └─ 同上
 ```
 
-**量化结论**：一次按键约触发 **30–45 次 SharedPreferences 读取**和 **8–12 次可避免的中等对象分配**（不含引擎必需的 `EngineSnapshot`/`Candidate`）。中端设备上这部分纯开销约 0.5–2ms，直接吃掉 16ms 帧预算的 3%–12%。以下是逐项定位。
+**优化前基线**：一次按键约触发 **30–45 次 SharedPreferences 读取**和 **8–12 次可避免的中等对象分配**（不含引擎必需的 `EngineSnapshot`/`Candidate`）。中端设备上这部分纯开销约 0.5–2ms，直接吃掉 16ms 帧预算的 3%–12%；这些数字是静态估算，不能替代设备测量。
 
 ### 1.2 P1 级：热路径冗余
 
@@ -119,20 +121,20 @@ readings = if (hasFixedSelection || nineKeyReadings == null) emptyList()
 #### (10) `EnglishInputEngine.createSnapshot` 的序列管道
 `engine-english/.../EnglishInputEngine.kt:98-115`：`asSequence().filter{}.mapIndexed{}.plus().distinctBy{}.sortedByDescending{}.mapIndexed{}.toList()` 中，`Sequence` 的 `filter`/`map` **不是 inline 函数**，每一步都分配迭代器与 lambda 对象；`distinctBy` 再分配一个 HashSet。英文逐按键约 10 次小对象分配。
 
-**改法**：词表只有约 190 词，直接用普通 `for` 循环 + 一个可复用的 `ArrayList` + `HashSet` 手写收集，语义不变，分配降到 2–3 次（结果列表 + 去重集）。
+**状态**：已实施。词表只有约 190 词，使用普通 `for` 循环与复用的 `ArrayList`/`HashSet` 手写收集，保留首次大小写不敏感去重和稳定排序；每次仍创建不可变候选快照所需的 `Candidate` 对象。
 
 #### (11) 主题颜色在 bind 路径上重复解析
 - `ime-ui/.../KeyboardPanel.bind()`（每个按键每次 render）：`backgroundColor(...)` ×2 + `color(colorOutline)` ×1，底层是 `MaterialColors.getColor` → `obtainStyledAttributes`。一次 shift 切换触发的 render 约 30 个按键 = 90 次主题属性解析。
 - `ime-ui/.../EmojiPanelView.select()`（每个分类/分组按钮每次 refresh）：2 次 `color(...)`，约 20 个按钮 = 40 次解析。
 
-**改法**：在 `KeyboardPanel` / `EmojiPanelView` 里按主题缓存 3–4 个颜色整型，在 `onAttachedToWindow`/配置变化时重算。`setColors` 的 `KeyPalette` 守卫已经能避免 Drawable 重建，只是颜色解析本身还没省。
+**状态**：已实施。`KeyboardPanel` 和 `EmojiPanelView` 按附加生命周期缓存颜色，键盘文字色和 Emoji 图标色也复用缓存；重附加时失效并重新应用，`setColors` 的 `KeyPalette` 守卫继续避免 Drawable 重建。
 
 ### 1.3 P2 级：后台或低频路径
 
 | 位置 | 问题 | 改法 |
 |---|---|---|
 | `user-data/.../UserLexiconRepository.kt:51-58` | `suggestionPage` 对全量词表（最多 20,000 条）做 `asSequence().filter{}.sortedWith(compareBy...thenBy...thenBy...)`，每次查询都重建比较器链并全量排序。在后台线程执行，有 64 条 LRU 缓存兜底。 | 词表按语言分片后预排序（写入时维护 `sortedBy(frequency, lastUsed)` 的有序拷贝），查询时走归并取 top-N；或对 shortcut 建前缀索引。注意仍在 `delegateLock` 内串行。 |
-| `ime-ui/.../KeyboardPanel.kt:78` | `setComposing` 在每次组合开始/结束时调用 `specs().flatten()` 重建全部 KeySpec（约 30 个对象 + 列表 + 8 次 `getString`），只为了给 Enter 键换标签。 | 只对 Enter 键重绑：`keys.forEach { if (it.boundAction == KeyboardAction.Enter) bind(it, ...) }`，把 Enter 的标签计算单独抽出。 |
+| `ime-ui/.../KeyboardPanel.kt:80` | `setComposing` 过去调用 `specs().flatten()` 重建全部 KeySpec，只为了给 Enter 键换标签。 | 已实施：保存 Enter 规格，只遍历现有按键重绑 Enter；`KeyboardKeyView.boundAction` 保持私有字段并提供只读访问器。 |
 | `ime-ui/.../ExpressionBrowserState.kt:37-50` | `visible()` 每次 refresh 都执行 `EmojiCatalog.entries + personal.custom`（约 350 元素列表拷贝）；RECENT 分类还额外 `all.associateBy(...)` 建全量 HashMap。仅在表情面板打开时触发。 | 按 category 缓存过滤结果，仅在 category/group/query/个人数据版本变化时重算。 |
 | `ime-ui/.../EmojiAdapter.kt:40-41` | `submit()` 每次 refresh 都 `entries.toList()` + `starred.toSet()` 做防御性拷贝。 | `submit` 已有 `entries == values` 早退；让 `state.visible()` 返回不可变快照（`List`/`Set` 直接持有，不再每次新建），适配器端去掉 `toList()`/`toSet()`。 |
 | `ime-ui/.../ExpandedCandidatesView.kt:101` | 每次 `render` 都 new 一个匿名 `DiffUtil.Callback`。仅在展开候选面板时触发。 | 改为命名的内部类实例复用（Callback 无状态，只需替换前后列表引用）。 |
@@ -145,13 +147,13 @@ readings = if (hasFixedSelection || nineKeyReadings == null) emptyList()
 ### 2.1 P1 级
 
 #### (1) 全拼中文每个会话创建两个 native Rime 会话
-`engine-rime/.../RimeRuntime.kt:136-141`：非九键布局时，`createEngine` 同时创建 `primary` 与 `secondary` 两个 `RimeInputEngine`（各自 `nativeCreateSession`），包装成 `ExpandingRimeEngine`。secondary 的唯一用途是「关联读音」翻页扩展（`changePage` 走到页尾时的 `related.alternatives`）。
+`engine-rime/.../RimeRuntime.kt:136-141`：非九键布局时，`createEngine` 立即创建 primary，并把 secondary 的创建器交给 `ExpandingRimeEngine`。secondary 的唯一用途是「关联读音」翻页扩展（`changePage` 走到页尾时的 `related.alternatives`）。
 
 native 会话持有已编译 schema 与词典上下文，是输入法里最重的单块内存。**用户只要用全拼中文，内存就翻倍，而 secondary 在绝大多数会话里从未被触发。**
 
-**改法（推荐）**：把 secondary 改为**懒创建**——`ExpandingRimeEngine` 在首次走到页尾扩展（`eligible() && alternatives == null` 且需要 `moveSource`）时，才让 `RimeRuntime` 创建第二个会话。注意：
+**状态**：已实施。`ExpandingRimeEngine` 在首次走到页尾扩展（`eligible() && alternatives == null` 且需要 `moveSource`）时，才让 `RimeRuntime` 创建第二个会话。实现保留以下约束：
 - 创建必须走现有的 `engineExecutor`（不能在按键线程创建 native 会话），所以首次扩展会有一次异步等待，期间 `changePage` 返回 `consumed=false`，用户再按一次即生效——这个降级行为与现有「页尾才扩展」的语义一致。
-- `close()`/`clearExpansion()`/`markFailed` 路径要处理 secondary 尚未创建的状态，`activeEngines` 计数要相应调整。
+- `close()`/`clearExpansion()`/`markFailed` 路径处理 secondary 尚未创建的状态；运行时在锁内完成创建和 `start`，`activeEngines` 只在实际会话存活时递增，过期任务会关闭创建出的会话。
 - 这不改变任何隐私或正确性语义，只是把一个闲置的常驻 native 会话变成按需创建。
 
 #### (2) 每个活动输入法服务的线程数量
@@ -200,12 +202,12 @@ native 会话持有已编译 schema 与词典上下文，是输入法里最重�
 **第二批（需要小心保持语义）**
 7. `renderEngineStatus` 改用漂移标记而非每按键重建设置快照。
 8. `updatePrivacy` / `evaluate` 的分配短路（隐私收紧语义必须保持）。
-9. `EnglishInputEngine.createSnapshot` 序列改手写循环。
-10. `KeyboardPanel` / `EmojiPanelView` 主题颜色缓存。
-11. `KeyboardPanel.setComposing` 只重绑 Enter 键。
+9. `EnglishInputEngine.createSnapshot` 序列改手写循环（已实施）。
+10. `KeyboardPanel` / `EmojiPanelView` 主题颜色缓存（已实施）。
+11. `KeyboardPanel.setComposing` 只重绑 Enter 键（已实施）。
 
 **第三批（结构性，需要测试覆盖）**
-12. `ExpandingRimeEngine` 的 secondary 会话懒创建（最大内存收益）。
+12. `ExpandingRimeEngine` 的 secondary 会话懒创建（已实施，仍需设备内存复测）。
 13. Service 级执行器合并（减少常驻线程）。
 14. `UserLexiconRepository.suggestionPage` 的查询索引（后台 CPU 收益）。
 
@@ -224,4 +226,4 @@ native 会话持有已编译 schema 与词典上下文，是输入法里最重�
 
 ## 5. 一句话总结
 
-这个项目的并发与隐私边界设计得比大多数输入法应用都严格，按键热路径上没有真正的阻塞点；主要可优化项是**每按键 30–45 次 SharedPreferences 读取与 8–12 次冗余对象分配**（集中在 `ZeroInputService` 的设置重建与 `RimeInputEngine` 的候选构造），以及**全拼中文每个会话常驻两个 native Rime 会话**。前两者改动局部、风险低；后者是最大的单项内存收益，但需要异步化的测试配合。
+这个项目的并发与隐私边界设计得比大多数输入法应用都严格，按键热路径上没有真正的阻塞点；本次已消除配置读取、英文序列管道、主题颜色解析、组合状态全量重绑和全拼会话闲置 secondary 的常驻分配。仍待设备测量确认实际 P95、分配量与 native 内存收益；Service 执行器合并和用户词库查询索引仍未实施。

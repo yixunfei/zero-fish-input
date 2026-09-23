@@ -10,6 +10,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishInputEngineTest {
+    @Test fun `disabled prediction preserves editing without querying personal words`() {
+        val engine = EnglishInputEngine(learnedSuggestions = LearnedSuggestionSource { _, _ ->
+            error("Personal words must not be queried")
+        })
+        engine.start(context.copy(predictionsAllowed = false))
+        "help".forEach { engine.handle(EngineKey.Character(it.toString())) }
+        engine.handle(EngineKey.Backspace)
+        assertEquals("hel", engine.snapshot.composition)
+        assertTrue(engine.snapshot.candidates.isEmpty())
+        assertFalse(engine.selectCandidate(0).consumed)
+        assertEquals("hel ", engine.handle(EngineKey.Space).committedText)
+        engine.start(context.copy(learningAllowed = false))
+        "hel".forEach { engine.handle(EngineKey.Character(it.toString())) }
+        assertTrue(engine.snapshot.candidates.any { it.text == "hello" })
+        engine.close()
+    }
+
     private val context = EditorContext(
         language = InputLanguage.ENGLISH,
         isSensitive = false,
@@ -63,5 +80,23 @@ class EnglishInputEngineTest {
 
         assertFalse(queried)
         assertTrue(engine.snapshot.candidates.none { it.text == "private" })
+    }
+
+    @Test
+    fun `snapshot keeps first case insensitive occurrence and stable score order`() {
+        val engine = EnglishInputEngine(
+            learnedSuggestions = LearnedSuggestionSource { _, _ ->
+                listOf(
+                    dev.zeroinput.engine.api.WeightedTerm("HELLO", 100),
+                    dev.zeroinput.engine.api.WeightedTerm("hello", 99),
+                )
+            },
+        )
+        engine.start(context)
+
+        "hel".forEach { engine.handle(EngineKey.Character(it.toString())) }
+
+        assertEquals("hel", engine.snapshot.candidates.first().text)
+        assertEquals(1, engine.snapshot.candidates.count { it.text.equals("hello", ignoreCase = true) && it.text.length > 3 })
     }
 }

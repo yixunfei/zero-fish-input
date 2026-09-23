@@ -6,7 +6,7 @@
     <string name="select_single_syllable">Choose one syllable</string>
     <string name="clipboard_guard_open">System clipboard guard</string>
     <string name="clipboard_guard_changed">System clipboard changed</string>
-    <string name="keyboard_settings">zero finish input settings</string>
+    <string name="keyboard_settings">zero fish input settings</string>
     <string name="secure_clipboard_item">%1$s</string>
     <string name="secure_clipboard_item_description">Authenticate and paste %1$s</string>
     <string name="candidate_description">Candidate %1$s</string>
@@ -16,6 +16,8 @@
     <string name="next_candidates">Next page</string>
     <string name="retry_engine">Retry Chinese input</string>
     <string name="engine_preparing">Preparing Chinese</string>
+    <string name="engine_preparing_basic">Preparing Chinese · Basic input available</string>
+    <string name="engine_preparing_notice">Chinese is still preparing. Basic input is available with limited candidates. Full input will activate automatically when ready.</string>
     <string name="engine_ready">Chinese ready</string>
     <string name="engine_pending_configuration">Pending input completion</string>
     <string name="engine_failed">Chinese failed to load</string>
@@ -100,4 +102,5 @@
     <string name="secure_clipboard_confirm_hint">Check the current input field before pasting the selected snippet</string>
     <string name="secure_clipboard_confirm_paste">Confirm paste</string>
     <string name="secure_clipboard_cancel_paste">Cancel paste</string>
+    <string name="word_associations">Next word</string>
 </resources>

@@ -31,7 +31,7 @@ class ZeroInputView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : LinearLayout(context, attrs) {
     var onKeyboardAction: (KeyboardAction) -> Unit = {}
-    var onCandidateSelected: (Int) -> Unit = {}
+    var onCandidateSelected: (Int, String) -> Unit = { _, _ -> }
     var onCandidatePageChanged: (PageDirection) -> Unit = {}
     var onEmojiSelected: (EmojiEntry) -> Unit = {}
     var onExpressionFavoriteRequested: (EmojiEntry, Boolean) -> Unit = { _, _ -> }
@@ -83,6 +83,7 @@ class ZeroInputView @JvmOverloads constructor(
         dispatchKeyboardAction(KeyboardAction.SwitchLanguage)
     }
     private val candidateStrip = CandidateStripView(context)
+    private val enginePreparation = EnginePreparationView(context)
     private val clipboardGuard = ClipboardGuardReminderView(context).apply { onRequested = { onClipboardGuardRequested() } }
     private val expandedCandidates = ExpandedCandidatesView(context)
     private var currentSnapshot = EngineSnapshot.Empty
@@ -135,6 +136,7 @@ class ZeroInputView @JvmOverloads constructor(
             view.setPadding(bars.left, 0, bars.right, bars.bottom)
             insets
         }
+        addView(enginePreparation, LayoutParams(LayoutParams.MATCH_PARENT, enginePreparation.preferredHeight))
         addView(header)
         addView(clipboardGuard)
         content.addView(emoji)
@@ -186,11 +188,13 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun renderEngineStatus(status: InputEngineStatus) {
         engineStatus = status
-        candidateStrip.renderStatus(status)
+        enginePreparation.render(status)
+        candidateStrip.renderStatus(if (status == InputEngineStatus.PREPARING) InputEngineStatus.HIDDEN else status)
         refreshHeader()
     }
 
     fun startEditor(options: EditorInputOptions) {
+        enginePreparation.resetEditor()
         editorOptions = options
         manualTools = false
         emoji.clearSession()
@@ -213,7 +217,9 @@ class ZeroInputView @JvmOverloads constructor(
             else MeasureSpec.getSize(heightMeasureSpec)
         val limit = if (landscape && available > 0) minOf(parentLimit, (available - dp(48)).coerceAtLeast(dp(192))) else parentLimit
         val reminder = if (clipboardGuard.isVisible) dp(48) else 0
-        val bodyLimit = (limit - header.layoutParams.height - paddingTop - paddingBottom - reminder).coerceAtLeast(dp(144))
+        val preparationHeight = if (enginePreparation.isVisible) enginePreparation.preferredHeight else 0
+        val bodyLimit = (limit - header.layoutParams.height - paddingTop - paddingBottom - reminder - preparationHeight)
+            .coerceAtLeast(dp(144))
         if (landscape && bodyLimit != lastViewport) {
             lastViewport = bodyLimit
             maximumContentHeight = bodyLimit
@@ -249,9 +255,10 @@ class ZeroInputView @JvmOverloads constructor(
 
     /** Retire both public bindings and callbacks before replacing the themed view. */
     fun release() {
+        enginePreparation.render(InputEngineStatus.HIDDEN)
         cancelPendingGestures()
         onKeyboardAction = {}
-        onCandidateSelected = {}
+        onCandidateSelected = { _, _ -> }
         onCandidatePageChanged = {}
         onEmojiSelected = {}
         onExpressionFavoriteRequested = { _, _ -> }
@@ -332,7 +339,7 @@ class ZeroInputView @JvmOverloads constructor(
                 true
             } else onClearCompositionRequested()
         }
-        candidateStrip.onCandidateSelected = { onCandidateSelected(it) }
+        candidateStrip.onCandidateSelected = ::selectVisibleCandidate
         candidateStrip.onUndoSelectionRequested = { onUndoSelectionRequested() }
         candidateStrip.onSyllableRequested = { onSyllableRequested() }
         candidateStrip.onExpandRequested = {
@@ -341,7 +348,7 @@ class ZeroInputView @JvmOverloads constructor(
         }
         candidateStrip.onRetryRequested = { onEngineRetryRequested() }
         candidateStrip.onToolsRequested = { onUserInteraction(); manualTools = true; refreshHeader() }
-        expandedCandidates.onCandidateSelected = { onCandidateSelected(it) }
+        expandedCandidates.onCandidateSelected = ::selectVisibleCandidate
         expandedCandidates.onPageChanged = { onCandidatePageChanged(it) }
         emoji.onEmojiSelected = { onEmojiSelected(it) }
         emoji.onFavoriteRequested = { entry, selected -> onExpressionFavoriteRequested(entry, selected) }
@@ -381,8 +388,15 @@ class ZeroInputView @JvmOverloads constructor(
                 else -> onKeyboardAction(action)
             }
         } else {
+            if (action is KeyboardAction.Text && currentLanguage == InputLanguage.CHINESE && !sensitive) {
+                enginePreparation.onInputAttempt()
+            }
             onKeyboardAction(action)
         }
+    }
+
+    private fun selectVisibleCandidate(index: Int) {
+        currentSnapshot.candidates.getOrNull(index)?.let { onCandidateSelected(index, it.id) }
     }
 
     private fun toggleMode(target: PanelMode) {
@@ -419,8 +433,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun refreshHeader() {
         reconvertButton.visibility = if (canReconvert && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         val hasCandidates = currentSnapshot.isComposing || currentSnapshot.candidates.isNotEmpty()
-        val needsStatus = engineStatus == InputEngineStatus.PREPARING ||
-            engineStatus == InputEngineStatus.PENDING_CONFIGURATION ||
+        val needsStatus = engineStatus == InputEngineStatus.PENDING_CONFIGURATION ||
             engineStatus == InputEngineStatus.FAILED
         val showCandidates = (mode == PanelMode.KEYBOARD || mode == PanelMode.CANDIDATES) &&
             !manualTools && (hasCandidates || needsStatus)

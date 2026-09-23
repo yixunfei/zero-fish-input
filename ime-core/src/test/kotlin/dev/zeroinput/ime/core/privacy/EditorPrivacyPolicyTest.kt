@@ -92,7 +92,7 @@ class EditorPrivacyPolicyTest {
     }
 
     @Test
-    fun `no suggestions flag bypasses engines and personalization`() {
+    fun `no suggestions flag preserves conversion but disables personalization`() {
         val editor = EditorInfo().apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
@@ -100,9 +100,24 @@ class EditorPrivacyPolicyTest {
         val result = policy.evaluate(editor, PrivacyConfiguration())
 
         assertFalse(result.isSensitive)
-        assertFalse(result.suggestionsAllowed)
+        assertTrue(result.suggestionsAllowed)
         assertFalse(result.learningAllowed)
         assertFalse(result.personalizationAllowed)
+        assertFalse(result.predictionsAllowed)
+    }
+
+    @Test
+    fun `no suggestions flag never permits conversion in password or unknown editors`() {
+        for (variation in listOf(InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD, 0x0ff0)) {
+            val editor = EditorInfo().apply {
+                inputType = InputType.TYPE_CLASS_TEXT or variation or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            }
+            val result = policy.evaluate(editor, PrivacyConfiguration())
+            assertTrue(result.isSensitive)
+            assertFalse(result.suggestionsAllowed)
+            assertFalse(result.personalizationAllowed)
+        }
     }
 
     @Test
@@ -115,5 +130,6 @@ class EditorPrivacyPolicyTest {
         val result = policy.evaluate(editor, PrivacyConfiguration())
 
         assertFalse(result.personalizationAllowed)
+        assertTrue(result.predictionsAllowed)
     }
 }

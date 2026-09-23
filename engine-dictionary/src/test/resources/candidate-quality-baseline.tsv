@@ -1,0 +1,33 @@
+# fixture_sha256=5b60f8e1dde2928452f5e79d84055e294686c19f480b71c084dcdde197dabdb0
+# corpus_sha256=638bb75e9dcbfd8e5cc69810f1fe2070df2b8585df2f1bdf12bc4e58fe1ad9c7
+id	language	category	positive	returned	first_acceptable_rank	acceptable_returned
+zh001	CHINESE	single	true	6	1	2
+zh002	CHINESE	single	true	3	1	1
+zh003	CHINESE	single	true	8	1	2
+zh004	CHINESE	single	true	8	1	1
+zh005	CHINESE	word	true	1	1	1
+zh006	CHINESE	apostrophe	true	1	1	1
+zh007	CHINESE	word	true	1	1	1
+zh008	CHINESE	word	true	1	1	1
+zh009	CHINESE	word	true	2	1	1
+zh010	CHINESE	word	true	1	1	1
+zh011	CHINESE	word	true	1	1	1
+zh012	CHINESE	word	true	1	1	1
+zh013	CHINESE	word	true	1	1	1
+zh014	CHINESE	word	true	1	1	1
+zh015	CHINESE	word	true	1	1	1
+zh016	CHINESE	word	true	1	1	1
+zh017	CHINESE	word	true	1	1	1
+zh018	CHINESE	word	true	1	1	1
+zh019	CHINESE	word	true	1	1	1
+zh020	CHINESE	word	true	1	1	1
+zh021	CHINESE	word	true	1	1	1
+zh022	CHINESE	word	true	1	1	1
+zh023	CHINESE	prefix	true	3	1	2
+zh024	CHINESE	prefix	true	3	1	1
+zh025	CHINESE	abstention	false	0	0	0
+zh026	CHINESE	abstention	false	0	0	0
+zh027	CHINESE	abstention	false	0	0	0
+zh028	CHINESE	abstention	false	0	0	0
+zh029	CHINESE	abstention	false	0	0	0
+zh030	CHINESE	abstention	false	0	0	0

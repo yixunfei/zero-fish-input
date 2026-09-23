@@ -1,9 +1,11 @@
 package dev.zeroinput.ime.personalization
 
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -228,6 +230,64 @@ class QueuedPersonalizationStoreTest {
         } finally {
             store.close()
         }
+    }
+
+    @Test
+    fun `frequency lookup is non-blocking and serves the prepared cache after the worker fills it`() {
+        val executor = TestExecutorService()
+        val store = QueuedPersonalizationStore(FrequencyFakeStore(), preload = {}, executor = executor)
+        try {
+            // Nothing is ready: the caller gets an empty answer and only a
+            // preload is queued, never a delegate call on this thread.
+            assertTrue(store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE).isEmpty())
+            executor.runNext() // preload
+            // First cache miss queues a worker query and stays empty.
+            assertTrue(store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE).isEmpty())
+            executor.runNext() // frequency query
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
+    fun `frequency lookup caches absence once and keeps working after a write invalidates the view`() {
+        val executor = TestExecutorService()
+        // A delegate without the optional port resolves every word as absent.
+        val store = QueuedPersonalizationStore(FakeStore(), preload = {}, executor = executor)
+        try {
+            store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE)
+            executor.runNext() // preload
+            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
+            executor.runNext() // frequency query caches zero
+            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
+            // The zero entry is served from the cache: no new worker task.
+            assertFalse(executor.hasTasks())
+
+            // A queued learn invalidates the prepared view; the next lookup
+            // returns empty without stale data and re-queries once on the worker.
+            store.learn("weizhi", "未知词", InputLanguage.CHINESE, learningAllowed = true)
+            while (executor.hasTasks()) executor.runNext()
+            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
+            executor.runNext() // re-query after invalidation
+            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
+        } finally {
+            store.close()
+        }
+    }
+
+    private class FrequencyFakeStore : PersonalFrequencyStore {
+        override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> =
+            mapOf("世界" to 7)
+
+        override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+            emptyList<PersonalSuggestion>()
+
+        override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+
+        override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+
+        override fun clear() = Unit
     }
 
     private class FakeStore : PersonalizationStore {

@@ -32,6 +32,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     private var primaryTextColor = 0
     private var onSurfaceTextColor = 0
     private var selectedBackgroundColor = 0
+    private val iconButtons = mutableListOf<AppCompatImageButton>()
     private val adapter = EmojiAdapter({ onEmojiSelected(it) }, { entry, selected -> onFavoriteRequested(entry, selected) },
         { onManageRequested(it) }, { onUserInteraction() })
     private val queryLabel = TextView(context).apply {
@@ -188,6 +189,10 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         // A re-attach can carry a new theme; resolve the tab colors again.
         colorsResolved = false
         super.onAttachedToWindow()
+        ensureColors()
+        iconButtons.forEach { it.imageTintList = android.content.res.ColorStateList.valueOf(onSurfaceTextColor) }
+        categoryButtons.forEach { (category, button) -> select(button, category == state.category) }
+        groupButtons.forEach { (group, button) -> select(button, group == state.group) }
     }
 
     private fun select(button: MaterialButton, selected: Boolean) {
@@ -220,10 +225,12 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     }
 
     private fun icon(drawable: Int, label: Int, action: () -> Unit) = AppCompatImageButton(context).apply {
+        ensureColors()
         setImageResource(drawable)
         contentDescription = context.getString(label)
         tooltipText = contentDescription
-        imageTintList = android.content.res.ColorStateList.valueOf(color(com.google.android.material.R.attr.colorOnSurface))
+        imageTintList = android.content.res.ColorStateList.valueOf(onSurfaceTextColor)
+        iconButtons += this
         setBackgroundColor(Color.TRANSPARENT)
         setPadding(dp(12), dp(12), dp(12), dp(12))
         layoutParams = LayoutParams(dp(48), dp(48))

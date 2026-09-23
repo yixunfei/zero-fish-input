@@ -1,16 +1,16 @@
-# zero finish input
+# zero fish input
 
 <p align="center">
-  <img src="logo.jpg" width="360" alt="zero finish input 项目 logo" />
+  <img src="logo.jpg" width="360" alt="zero fish input 项目 logo" />
 </p>
 
 **离线中文与英文输入法，面向 Android 8.0 及以上设备。**
 
-[下载 v0.2.0 测试版](https://github.com/yixunfei/zero-finish-input/releases/tag/v0.2.0) ·
-[提交问题](https://github.com/yixunfei/zero-finish-input/issues) ·
+[下载 v0.2.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.2.0) ·
+[提交问题](https://github.com/yixunfei/zero-fish-input/issues) ·
 [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [Apache-2.0](LICENSE)
 
-zero finish input（原工程名 ZeroInput）以隐私、安全、离线和可扩展性为核心。当前版本为
+zero fish input（原工程名 ZeroInput）以隐私、安全、离线和可扩展性为核心。当前版本为
 `v0.2.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
 以及需要系统身份认证的安全剪贴板。另提供默认关闭的本地 AI 短词候选排序实验，使用
 UER RoBERTa-Mini WWM INT8 模型，全程在设备端运行。
@@ -20,20 +20,30 @@ personalization, a private authenticated snippet vault, and optional offline
 RoBERTa-Mini INT8 candidate ranking. Android 8.0+;
 Apache-2.0 project code. Version 0.2.0 is a debug-signed testing prerelease.
 
-项目展示及应用显示名称使用 `zero finish input`。Logo 保留所提供原图，图中文字为
+项目展示及应用显示名称使用 `zero fish input`。Logo 保留所提供原图，图中文字为
 `ZERO FISH INPUT`；Android 启动图标使用该图的主体裁切。内部包名和数据标识保留 `zeroinput`。
+
+当前源码已修正误写的 `finish`，测试打包脚本生成 `zero-fish-input-<版本>-<ABI>.apk`
+及同名前缀的许可压缩包。远程仓库已更名为 [yixunfei/zero-fish-input](https://github.com/yixunfei/zero-fish-input)。`v0.2.0` 已发布附件仍使用旧文件名，以下下载说明与发布页一致。
 
 ## 安装与启用
 
-1. 从 [Release 页面](https://github.com/yixunfei/zero-finish-input/releases/tag/v0.2.0)
+以下链接指向已发布的 `v0.2.0` 测试包。当前源码另包含中文引擎就绪校验、准备进度提示、
+`NO_SUGGESTIONS` 输入策略及名称修正；这些更新尚未替换发布页附件。
+需要验证当前修复时，请按下方构建说明运行 `./tools/package-test-apk.ps1` 生成新包。
+
+1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.2.0)
    下载 `zero-finish-input-0.2.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
    `x86_64` 三种架构，要求 Android 8.0（API 26）或更新版本。
 2. 对照同页 `SHA256SUMS.txt` 校验下载；Windows 可运行
    `Get-FileHash .\zero-finish-input-0.2.0-debug-universal.apk -Algorithm SHA256`。
-3. 安装后打开 **zero finish input**，在系统输入法设置中启用，然后选择为当前键盘。
+3. 安装后打开 **zero fish input**，在系统输入法设置中启用，然后选择为当前键盘。
    Android 会显示针对所有第三方输入法的系统提醒；项目的隐私边界见下文。
 4. 在普通输入框中输入 `nihao` 并选取“你好”，通过语言切换键切换英文。
-   首次启动会在设备上准备 Rime 数据，无需联网。
+   首次启动会在设备上准备 Rime 数据，无需联网；键盘内持续显示醒目的准备进度，首次尝试
+   中文输入时提醒一次，不阻断按键。进度不显示估算百分比。准备期间可用内置基础词表输入，例如
+   `nihao` 选取“你好”。准备失败会显示“中文加载失败”，可重试；仅在验证中文转换和选词
+   可用后才切换到 Rime。普通输入框请求禁止预测建议时保留中文转换、关闭英文预测，且不读取或学习个人数据。
 
 本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.2.0-debug`，
 可调试，仅用于体验和反馈。尚未配置维护者正式发布签名，不建议用此测试包保存真实秘密。
@@ -76,6 +86,7 @@ v0.2.0 新增连续候选浏览、逐段选字/撤销选段和上屏后重选上
 | 中文 | 真实 librime 1.13.1，全拼、简拼、简繁、模糊音、全键盘与九键 |
 | 本地 AI 排序 | RoBERTa-Mini WWM INT8，默认关闭，仅对 Rime 全键盘的合格两字词候选评分 |
 | 英文 | 内置离线候选，无云端补全 |
+| 词联想（当前源码） | 默认开启，中英文成功上屏后提供最多 8 个公开词对续词，点选可继续联想 |
 | 键盘外观 | 经典、极简灰、薄荷绿、樱花粉；深浅模式与三档按键高度 |
 | 个性化 | 本地加密词组与词频，支持隐身模式和禁用学习 |
 | 表情与颜文字 | 扩充 emoji、颜文字情绪子标签、中英文及拼音关键词搜索、加密最近记录与收藏、自定义颜文字管理 |
@@ -86,6 +97,22 @@ v0.2.0 新增连续候选浏览、逐段选字/撤销选段和上屏后重选上
 
 目前没有云同步、语音输入、手写识别或联网语言包市场。ARM 真机、厂商输入框以及真实系统
 身份认证流程仍需扩大验收；模拟器测试通过不等同于所有设备均已验证。
+
+## 词联想（当前源码，尚未发布）
+
+设置 → 输入中的 **“词联想”** 默认开启。普通文本输入框中选中“谢谢”后可点“你”，再点
+“的帮助”；英文输入 `thank` 并按空格后可点 `you`、`very`、`much`，自动补齐必要的单词间空格。
+联想显示在候选条中，仅点选才上屏；空格正常输入空格，回车正常换行或执行输入框操作。
+继续输入时恢复普通拼音或英文候选。没有匹配词对时不显示联想。
+
+当前内置 1,698 组自编公开词对，覆盖问候、日程、工作、出行、餐饮、学习和健康等常用场景，
+支持“联系 → 方式”和 `could → you → please → help` 等连续点选。覆盖仍有限，不是自由续写
+或训练好的语言模型。它只使用本次
+输入法成功上屏的短上下文，不读输入框已有正文或私人历史，也不记录点选频率。密码、邮箱、
+网址、隐身、关闭学习等场景禁用；切换输入框、移动光标、删除、切换面板或设置会清空上下文。
+关闭再开启不会恢复旧联想。实现与验收见[词联想验证](docs/word-association-validation.md)。
+新增[固定样例效果评估](docs/word-association-quality.md)，分别记录覆盖、首选命中及误触发；
+这些是公开构造的开发验收样例，不能代替真实输入效果评测。
 
 ## 本地 AI：短词智能排序（实验）
 
@@ -156,6 +183,10 @@ ONNX Runtime 使用 MIT 许可；模型采用项目已确认的 UER Apache-2.0 �
 
 ## 隐私与安全边界
 
+当前源码已补齐安全存储失败处理：清除未完成会阻止保险库继续读写，重新清除成功后才恢复；
+密钥丢失或文件提交失败会报告失败，旧的排队操作不能恢复已清除内容。认证流程和存储格式
+保持不变，验证与尚未覆盖的设备边界见[安全存储验证](docs/security-storage-validation.md)。
+
 - 应用不声明 `INTERNET` 权限，不包含广告、统计或崩溃上报 SDK，离线可完整输入。
 - 默认不访问系统剪贴板。仅在用户主动开启“系统剪贴板防护”的监听后，专用适配器才检查变化
   时间戳，并按所选策略提醒或清空，不读取正文。设置页文本框仍支持 Android 在用户明确执行
@@ -185,7 +216,7 @@ ONNX Runtime 使用 MIT 许可；模型采用项目已确认的 UER Apache-2.0 �
   隐私策略改变后，旧上下文中尚未执行的学习任务会失效。
 - 输入框打开时先显示轻量降级键盘，Rime 和语言包在后台预热完成后自动切换；切换应用、输入框
   或隐私状态时，旧预热结果会被丢弃，不会阻塞按键响应。
-- 系统设置中的输入法名称为 `zero finish input`，提供 `中文`（`zh-CN`）和 `English`（`en-US`）
+- 系统设置中的输入法名称为 `zero fish input`，提供 `中文`（`zh-CN`）和 `English`（`en-US`）
   两个子类型；切换后即使设备报告了硬件键盘配置，触摸键盘仍会创建并显示。
 
 详细控制和限制见 [威胁模型](docs/threat-model.md)。
@@ -289,8 +320,8 @@ Gradle 8.14 由仓库 Wrapper 提供，无需单独安装 Gradle。首次获取�
 应用安装后的输入功能完全离线。
 
 ```powershell
-git clone https://github.com/yixunfei/zero-finish-input.git
-cd zero-finish-input
+git clone https://github.com/yixunfei/zero-fish-input.git
+cd zero-fish-input
 ```
 
 配置 `JAVA_HOME` 指向 JDK 17，`ANDROID_SDK_ROOT` 指向 Android SDK，或在本机
@@ -377,7 +408,7 @@ APK、第三方许可证压缩包及 SHA-256 清单位于 `app/build/outputs/tes
 
 测试覆盖完整和分段选词、空格/回车提交、翻页/退格/重置，以及深浅主题、320/411/800 dp 宽度、
 系统导航栏避让、面板返回和横屏 emoji 搜索。脚本按设备 ABI 构建并覆盖安装测试 APK，不清除
-应用数据。如果当前键盘是 zero finish input，会临时切换到系统键盘以隔离全局 native 运行时，并在结束
+应用数据。如果当前键盘是 zero fish input，会临时切换到系统键盘以隔离全局 native 运行时，并在结束
 或失败后恢复原键盘。多台设备时传入 `-Serial`。
 
 新增设备测试覆盖简繁候选及个人文本转换、简拼开关与混输、各模糊音项、标点模式、候选页大小、
@@ -391,7 +422,7 @@ APK、第三方许可证压缩包及 SHA-256 清单位于 `app/build/outputs/tes
 九键验收时还应检查读音选择/撤回、分段选词、数字直输，以及输入中切换布局/引擎后设置延迟到
 组合结束生效。第二引擎仅测试有限词典覆盖的词语，例如 `nihao`、`zhongguo`、`shurufa`。
 
-1. 安装与设备 ABI 匹配的已签名 APK，启用 zero finish input，并确认中英文子类型可切换。
+1. 安装与设备 ABI 匹配的已签名 APK，启用 zero fish input，并确认中英文子类型可切换。
 2. 在飞行模式下验证中文全拼、候选翻页、英文联想、退格、空格和回车动作。
    中文模式下输入 `nihao` 后，点击“你好”或按空格应一次上屏且不带多余空格；下一段输入不能
    覆盖已提交文本。切换语言、旋转屏幕和切换输入框后，确认选中的语言保持一致。

@@ -148,6 +148,58 @@ class SystemClipboardPlatformTest {
     }
 
     @Test
+    fun keyboardPrivateCopyPreservesTheCurrentItemWithoutAutomaticMode() {
+        val context = instrumentation.targetContext
+        val graph = (context.applicationContext as ZeroInputApplication).graph
+        val original = graph.clipboardGuardPreferences.options
+        assumeTrue("Run with the real guard disabled", !original.listening)
+        assumeTrue("Select ZeroInput as the test device's default IME", ComponentName.unflattenFromString(
+            Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty(),
+        ) == ComponentName(context, ZeroInputService::class.java))
+        val port = AndroidSystemClipboard(context)
+        var fixtureTimestamp: Long? = null
+        val activity = instrumentation.startActivitySync(Intent(context, InputFixtureActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
+        try {
+            device.showFixtureKeyboard(activity)
+            val manager = context.getSystemService(ClipboardManager::class.java)
+            assumeTrue("Never replace an existing clipboard", manager.primaryClipDescription == null)
+            // Establish the current item before monitoring so confirm mode only
+            // records a baseline and cannot act on it without the user.
+            manager.setPrimaryClip(ClipData.newPlainText("", "public guard fixture"))
+            fixtureTimestamp = port.timestamp()
+            assertNotNull(fixtureTimestamp)
+            device.onMain { graph.clipboardGuardPreferences.options = ClipboardGuardOptions(
+                listening = true, clearMode = ClipboardClearMode.CONFIRM) }
+            await { graph.clipboardGuard.state.status == ClipboardGuardStatus.WAITING }
+            device.onMain { activity.editor.setText("public selection fixture"); activity.editor.selectAll() }
+            instrumentation.waitForIdleSync()
+            openSecureClipboardPanel()
+            val copyLabel = context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_copy_selection)
+            device.await("Copy-selection control must be enabled") {
+                var node = device.findText(copyLabel)
+                while (node != null && !node.isClickable) node = node.parent
+                node?.isEnabled == true
+            }
+            device.click(copyLabel)
+            val review = listOf(context.getString(R.string.clipboard_import_authenticate),
+                context.getString(R.string.enable_secure_clipboard))
+            device.await("The private import review page must appear") {
+                review.any { device.findText(it)?.window?.isFocused == true }
+            }
+            assertEquals("A private copy must not touch the system clipboard without automatic mode",
+                fixtureTimestamp, port.timestamp())
+        } finally {
+            device.shell("input keyevent KEYCODE_BACK")
+            device.onMain { graph.clipboardGuardPreferences.options = original }
+            await { graph.clipboardGuard.state.status == ClipboardGuardStatus.OFF }
+            if (fixtureTimestamp != null && port.timestamp() == fixtureTimestamp) port.clear()
+            device.onMain { activity.finish() }
+            ClipboardDeviceTestSupport.flushGuardPreferences()
+        }
+    }
+
+    @Test
     fun publicFixtureTriggersMetadataCallbackAndCanBeClearedWithoutReadingItsBody() {
         val context = instrumentation.targetContext
         assumeTrue("Run with the real guard disabled", !ClipboardGuardPreferences(context).options.listening)
@@ -180,6 +232,22 @@ class SystemClipboardPlatformTest {
             if (fixtureTimestamp != null && port.timestamp() == fixtureTimestamp) port.clear()
             instrumentation.runOnMainSync { activity.finish() }
             ClipboardDeviceTestSupport.flushGuardPreferences()
+        }
+    }
+
+    private fun openSecureClipboardPanel() {
+        val description = instrumentation.targetContext.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)
+        device.await("Secure clipboard panel control must be visible") {
+            device.roots().any { findDescription(it, description) != null }
+        }
+        val button = checkNotNull(device.roots().firstNotNullOfOrNull { findDescription(it, description) })
+        assertTrue(button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+    }
+
+    private fun findDescription(node: AccessibilityNodeInfo, description: String): AccessibilityNodeInfo? {
+        if (node.contentDescription?.toString() == description) return node
+        return (0 until node.childCount).firstNotNullOfOrNull {
+            node.getChild(it)?.let { child -> findDescription(child, description) }
         }
     }
 

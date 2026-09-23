@@ -1,0 +1,1704 @@
+# Project-authored common phrase continuations; Apache-2.0.
+# Language, preceding text, suggested continuation. File order defines priority.
+zh	你好	世界
+zh	你好	朋友
+zh	你好	呀
+zh	谢谢	你
+zh	谢谢	大家
+zh	谢谢	支持
+zh	谢谢	帮助
+zh	谢谢你	的帮助
+zh	谢谢你	的支持
+zh	不客气	下次见
+zh	早上	好
+zh	晚上	好
+zh	晚安	好梦
+zh	新年	快乐
+zh	生日	快乐
+zh	节日	快乐
+zh	周末	愉快
+zh	周末	快乐
+zh	工作	顺利
+zh	工作	计划
+zh	工作	时间
+zh	学习	进步
+zh	学习	计划
+zh	学习	方法
+zh	身体	健康
+zh	一路	平安
+zh	一路	顺风
+zh	欢迎	光临
+zh	欢迎	回来
+zh	欢迎	加入
+zh	再见	朋友
+zh	明天	见
+zh	明天	早上
+zh	明天	下午
+zh	明天	晚上
+zh	今天	下午
+zh	今天	晚上
+zh	今天	天气
+zh	下午	好
+zh	下午	见
+zh	时间	安排
+zh	时间	到了
+zh	天气	不错
+zh	天气	很好
+zh	天气	预报
+zh	心情	很好
+zh	心情	不错
+zh	注意	安全
+zh	注意	休息
+zh	注意	身体
+zh	辛苦	了
+zh	收到	谢谢
+zh	好的	谢谢
+zh	好的	没问题
+zh	没关系	下次
+zh	没问题	谢谢
+zh	可以	的
+zh	可以	吗
+zh	请	稍等
+zh	请	问
+zh	请	确认
+zh	请问	一下
+zh	稍等	一下
+zh	麻烦	你
+zh	麻烦	了
+zh	不好意思	打扰了
+zh	对不起	打扰了
+zh	我	想
+zh	我	是
+zh	我	在
+zh	我想	知道
+zh	我想	问
+zh	我想	去
+zh	我们	一起
+zh	我们	明天
+zh	我们	可以
+zh	一起	去
+zh	一起	吃饭
+zh	一起	学习
+zh	去	哪里
+zh	去	看看
+zh	吃饭	了吗
+zh	下次	再见
+zh	下次	一起
+zh	非常	感谢
+zh	非常	好
+zh	非常	开心
+zh	感谢	支持
+zh	感谢	帮助
+zh	感谢	大家
+zh	祝你	生日快乐
+zh	祝你	工作顺利
+zh	祝你	身体健康
+zh	希望	如此
+zh	希望	你
+zh	希望	大家
+zh	现在	开始
+zh	现在	可以
+zh	现在	就去
+zh	开始	工作
+zh	开始	学习
+zh	已经	收到
+zh	已经	完成
+zh	正在	处理
+zh	正在	准备
+zh	准备	好了
+zh	准备	出发
+zh	会议	时间
+zh	会议	开始
+zh	会议	记录
+zh	项目	进度
+zh	项目	计划
+zh	问题	解决
+zh	问题	反馈
+zh	解决	问题
+zh	解决	方案
+zh	手机	号码
+zh	手机	输入法
+zh	输入	文字
+zh	输入	内容
+zh	离线	输入
+zh	离线	使用
+zh	保护	隐私
+zh	保护	安全
+zh	明天见	再见
+zh	謝謝	你
+zh	謝謝	大家
+zh	謝謝	支持
+zh	謝謝	幫助
+zh	謝謝你	的幫助
+zh	謝謝你	的支持
+zh	歡迎	光臨
+zh	歡迎	回來
+zh	歡迎	加入
+zh	身體	健康
+zh	學習	進步
+zh	學習	計劃
+zh	學習	方法
+zh	節日	快樂
+zh	我們	一起
+zh	我們	明天
+zh	我們	可以
+zh	準備	好了
+zh	準備	出發
+zh	已經	收到
+zh	已經	完成
+zh	會議	時間
+zh	會議	開始
+zh	會議	記錄
+zh	問題	解決
+zh	問題	反饋
+zh	離線	輸入
+zh	離線	使用
+zh	輸入	文字
+zh	輸入	內容
+zh	保護	隱私
+zh	保護	安全
+en	hello	world
+en	hello	there
+en	good	morning
+en	good	night
+en	good	afternoon
+en	good	evening
+en	good	luck
+en	good	idea
+en	thank	you
+en	thank you	very
+en	thank you	for
+en	very	much
+en	very	good
+en	very	well
+en	you	are
+en	you	can
+en	you	have
+en	you are	welcome
+en	you are	right
+en	how	are
+en	how	about
+en	how are	you
+en	i	am
+en	i	will
+en	i	have
+en	i	think
+en	i	want
+en	i am	fine
+en	i am	ready
+en	i am	sorry
+en	i will	be
+en	i will	send
+en	i will	check
+en	i have	a
+en	i have	an
+en	i have	the
+en	i want	to
+en	want to	know
+en	want to	go
+en	want to	see
+en	would	you
+en	would	like
+en	would you	like
+en	please	send
+en	please	check
+en	please	confirm
+en	please	wait
+en	see	you
+en	see you	tomorrow
+en	see you	soon
+en	see you	later
+en	talk	to
+en	talk to	you
+en	have	a
+en	have	the
+en	have a	nice
+en	have a	good
+en	have a	great
+en	nice	day
+en	nice	weekend
+en	great	day
+en	great	work
+en	great	idea
+en	happy	birthday
+en	happy	holidays
+en	new	year
+en	new	project
+en	new year	wishes
+en	best	wishes
+en	best	regards
+en	take	care
+en	no	problem
+en	no	worries
+en	sounds	good
+en	sounds	great
+en	let	me
+en	let me	know
+en	let me	check
+en	looking	forward
+en	looking forward	to
+en	on	the
+en	on	my
+en	on my	way
+en	in	the
+en	in	a
+en	at	the
+en	at	home
+en	for	your
+en	for	the
+en	for your	help
+en	for your	time
+en	for your	support
+en	your	help
+en	your	time
+en	your	message
+en	the	meeting
+en	the	project
+en	the	time
+en	meeting	tomorrow
+en	meeting	today
+en	we	can
+en	we	will
+en	we	are
+en	we can	meet
+en	we can	start
+en	we are	ready
+en	this	is
+en	this is	great
+en	this is	good
+en	it	is
+en	it	was
+en	it is	ready
+en	it is	done
+en	what	is
+en	what	time
+en	what time	is
+en	can	you
+en	can	we
+en	can you	help
+en	can you	check
+en	can you	send
+en	thank you very	much
+en	welcome	back
+en	welcome back	home
+en	well	done
+en	see you tomorrow	morning
+en	tomorrow	morning
+en	tomorrow	afternoon
+en	tomorrow	evening
+# Chinese everyday phrase coverage; project-authored, Apache-2.0.
+zh	午安	朋友
+zh	午安	大家
+zh	好久	不见
+zh	认识你	很高兴
+zh	认识你	很开心
+zh	很高兴	认识你
+zh	很高兴	见到你
+zh	见到你	很开心
+zh	见到你	真好
+zh	新的一年	平安喜乐
+zh	新的一年	万事顺意
+zh	新的一天	加油
+zh	新的一天	开始了
+zh	万事	如意
+zh	万事	顺利
+zh	一切	顺利
+zh	一切	都好
+zh	一切	正常
+zh	祝福	你
+zh	祝福	大家
+zh	祝大家	节日快乐
+zh	祝大家	身体健康
+zh	节日快乐	谢谢
+zh	节日快乐	同乐
+zh	生日快乐	天天开心
+zh	生日快乐	心想事成
+zh	心想	事成
+zh	周末愉快	好好休息
+zh	下周	见
+zh	下周	再聊
+zh	下周	一
+zh	下周	二
+zh	下周	三
+zh	下周	四
+zh	下周	五
+zh	这周	有空吗
+zh	这周	末
+zh	这周	工作
+zh	这个周末	有空吗
+zh	这个周末	一起吃饭
+zh	有时间	吗
+zh	有时间	再聊
+zh	有时间	一起吃饭
+zh	有空	吗
+zh	有空	再聊
+zh	什么时候	方便
+zh	什么时候	有空
+zh	什么时候	出发
+zh	方便	吗
+zh	方便	联系
+zh	约个	时间
+zh	约个	地方
+zh	约好	时间
+zh	约好	地点
+zh	周一	见
+zh	周一	上午
+zh	周一	下午
+zh	周二	见
+zh	周二	上午
+zh	周二	下午
+zh	周三	见
+zh	周三	上午
+zh	周三	下午
+zh	周四	见
+zh	周四	上午
+zh	周四	下午
+zh	周五	见
+zh	周五	下午
+zh	周五	晚上
+zh	周六	见
+zh	周六	上午
+zh	周六	下午
+zh	周六	晚上
+zh	周日	见
+zh	周日	上午
+zh	周日	下午
+zh	周日	晚上
+zh	上午	好
+zh	上午	见
+zh	上午	有空
+zh	中午	好
+zh	中午	见
+zh	中午	吃什么
+zh	待会	见
+zh	待会	再聊
+zh	待会	联系
+zh	一会儿	见
+zh	一会儿	联系
+zh	一会儿	再聊
+zh	等一下	马上就好
+zh	等一下	再说
+zh	等你	消息
+zh	等你	回来
+zh	等你	回复
+zh	到了	告诉我
+zh	到了	联系我
+zh	出发	了
+zh	出发	吧
+zh	出发	时间
+zh	准备出发	了
+zh	准备出发	吧
+zh	请查收	附件
+zh	请查收	邮件
+zh	请查收	文件
+zh	查收	邮件
+zh	查收	附件
+zh	邮件	收到
+zh	邮件	附件
+zh	邮件	地址
+zh	附件	已发送
+zh	附件	请查收
+zh	文件	已收到
+zh	文件	发送
+zh	文件	整理
+zh	发送	成功
+zh	发送	文件
+zh	发送	邮件
+zh	请确认	时间
+zh	请确认	信息
+zh	请确认	地址
+zh	确认一下	时间
+zh	确认一下	地址
+zh	确认一下	信息
+zh	确认收到	谢谢
+zh	反馈	意见
+zh	反馈	问题
+zh	反馈	结果
+zh	意见	反馈
+zh	意见	建议
+zh	保持	联系
+zh	保持	沟通
+zh	保持	安静
+zh	沟通	交流
+zh	沟通	进度
+zh	沟通	方案
+zh	截止	时间
+zh	截止	日期
+zh	工作安排	如下
+zh	工作安排	已确认
+zh	工作进度	更新
+zh	工作进度	汇报
+zh	项目进度	更新
+zh	项目进度	汇报
+zh	会议时间	已确认
+zh	会议时间	待定
+zh	会议结束	了
+zh	会议结束	后
+zh	开会	时间
+zh	开会	通知
+zh	讨论	一下
+zh	讨论	方案
+zh	讨论	问题
+zh	商量	一下
+zh	商量	时间
+zh	安排	好了
+zh	安排	时间
+zh	安排	会议
+zh	今天的	安排
+zh	今天的	计划
+zh	今天的	工作
+zh	本周	计划
+zh	本周	总结
+zh	本周	安排
+zh	下周的	计划
+zh	下周的	安排
+zh	下周的	会议
+zh	任务	完成
+zh	任务	进度
+zh	任务	安排
+zh	完成	了
+zh	完成	任务
+zh	完成	工作
+zh	完成了	谢谢
+zh	完成了	请查收
+zh	计划	安排
+zh	计划	完成
+zh	计划	调整
+zh	更新	进度
+zh	更新	内容
+zh	更新	计划
+zh	记录	下来
+zh	记录	一下
+zh	记录	时间
+zh	总结	经验
+zh	总结	一下
+zh	总结	报告
+zh	辛苦了	谢谢
+zh	辛苦了	早点休息
+zh	合作	愉快
+zh	合作	顺利
+zh	合作	伙伴
+zh	期待合作	谢谢
+zh	路上	小心
+zh	路上	注意安全
+zh	路上	堵车
+zh	路上小心	到了联系
+zh	到家	了吗
+zh	到家	了
+zh	到家	再联系
+zh	到家了	报个平安
+zh	到家了	早点休息
+zh	快到	了
+zh	快到	家了
+zh	快到了	稍等
+zh	快到了	马上就到
+zh	马上	到了
+zh	马上	出发
+zh	马上	回来
+zh	我在路上	马上到
+zh	我在路上	稍等
+zh	稍等一下	马上就好
+zh	稍等一下	谢谢
+zh	地铁	站
+zh	地铁	到了
+zh	地铁	线路
+zh	公交	车
+zh	公交	站
+zh	公交	线路
+zh	公交车	站
+zh	公交车	到了
+zh	火车	站
+zh	火车	票
+zh	火车	到了
+zh	高铁	站
+zh	高铁	票
+zh	高铁	到了
+zh	车票	买好了
+zh	车票	时间
+zh	车票	信息
+zh	机场	接你
+zh	机场	见面
+zh	机场	出发
+zh	航班	信息
+zh	航班	延误
+zh	航班	时间
+zh	导航	路线
+zh	导航	地址
+zh	路线	规划
+zh	路线	确认
+zh	地址	发我
+zh	地址	确认
+zh	地址	信息
+zh	发个	地址
+zh	发个	位置
+zh	发个	消息
+zh	位置	发你
+zh	位置	共享
+zh	位置	确认
+zh	旅途	愉快
+zh	旅途	顺利
+zh	旅途愉快	一路平安
+zh	交通	安全
+zh	交通	情况
+zh	交通	规则
+zh	注意交通	安全
+zh	安全	第一
+zh	安全	到家
+zh	安全	出行
+zh	注意安全	到了联系
+zh	注意安全	一路平安
+zh	慢点	开
+zh	慢点	走
+zh	慢点	来
+zh	到了以后	联系我
+zh	到了以后	告诉我
+zh	出门	注意安全
+zh	出门	带伞
+zh	下雨	了
+zh	下雨	带伞
+zh	带上	雨伞
+zh	带上	外套
+zh	带上	证件
+zh	天气预报	说明天
+zh	天气预报	有雨
+zh	一起吃饭	吧
+zh	一起吃饭	怎么样
+zh	吃什么	好
+zh	吃什么	都可以
+zh	想吃	什么
+zh	想吃	面条
+zh	想吃	米饭
+zh	早餐	吃了吗
+zh	早餐	吃什么
+zh	早餐	时间
+zh	午饭	吃什么
+zh	午饭	吃了吗
+zh	午饭	时间
+zh	晚饭	吃什么
+zh	晚饭	吃了吗
+zh	晚饭	一起吃
+zh	吃点	东西
+zh	吃点	水果
+zh	喝点	水
+zh	喝点	茶
+zh	喝点	咖啡
+zh	一杯	咖啡
+zh	一杯	茶
+zh	一杯	水
+zh	两杯	咖啡
+zh	两杯	茶
+zh	两杯	水
+zh	少放	盐
+zh	少放	辣椒
+zh	少放	糖
+zh	不要	着急
+zh	不要	太累
+zh	多喝	水
+zh	多喝	热水
+zh	多吃	水果
+zh	多吃	蔬菜
+zh	不吃	辣
+zh	不吃	了
+zh	好吃	吗
+zh	好吃	的
+zh	味道	不错
+zh	味道	很好
+zh	点个	外卖
+zh	点个	菜
+zh	外卖	到了
+zh	外卖	下单
+zh	外卖	地址
+zh	订个	餐厅
+zh	订个	位置
+zh	订个	房间
+zh	餐厅	地址
+zh	餐厅	位置
+zh	餐厅	推荐
+zh	吃完	饭
+zh	吃完	再说
+zh	饭后	散步
+zh	饭后	休息
+zh	每天	学习
+zh	每天	运动
+zh	每天	坚持
+zh	阅读	理解
+zh	阅读	计划
+zh	阅读	时间
+zh	复习	功课
+zh	复习	计划
+zh	复习	资料
+zh	考试	顺利
+zh	考试	加油
+zh	考试	时间
+zh	认真	学习
+zh	认真	听讲
+zh	认真	思考
+zh	查阅	资料
+zh	查阅	文献
+zh	笔记	整理
+zh	笔记	记录
+zh	笔记	本
+zh	整理	资料
+zh	整理	笔记
+zh	整理	文件
+zh	练习	一下
+zh	练习	发音
+zh	练习	写作
+zh	练习一下	发音
+zh	练习一下	写作
+zh	学习英语	加油
+zh	学习英语	每天坚持
+zh	英语	学习
+zh	英语	练习
+zh	英语	单词
+zh	单词	记忆
+zh	单词	练习
+zh	单词	复习
+zh	课程	安排
+zh	课程	时间
+zh	课程	内容
+zh	上课	时间
+zh	上课	了
+zh	作业	完成了
+zh	作业	写完了
+zh	作业	检查
+zh	写完	作业
+zh	写完	了
+zh	不懂	就问
+zh	不懂	的地方
+zh	互相	学习
+zh	互相	帮助
+zh	互相	理解
+zh	坚持	下去
+zh	坚持	学习
+zh	坚持	运动
+zh	继续	努力
+zh	继续	学习
+zh	继续	加油
+zh	加油	努力
+zh	加油	你可以的
+zh	加油努力	坚持下去
+zh	早点	休息
+zh	早点	睡觉
+zh	早点	回来
+zh	按时	吃饭
+zh	按时	休息
+zh	按时	吃药
+zh	好好	休息
+zh	好好	学习
+zh	好好	吃饭
+zh	保重	身体
+zh	运动	健康
+zh	运动	时间
+zh	运动	计划
+zh	适当	休息
+zh	适当	运动
+zh	注意保暖	多喝水
+zh	注意休息	早点睡
+zh	注意休息	别太累
+zh	休息	一下
+zh	休息	好了
+zh	休息	时间
+zh	早点休息	晚安
+zh	早点休息	好梦
+zh	好好休息	早日康复
+zh	早日	康复
+zh	健康	平安
+zh	健康	生活
+zh	别太	累
+zh	别太	担心
+zh	放松	一下
+zh	放松	心情
+zh	开心	每一天
+zh	开心	就好
+zh	希望你	开心
+zh	希望你	早日康复
+zh	希望你	一切顺利
+zh	帮我	看看
+zh	帮我	一下
+zh	帮我	确认一下
+zh	帮忙	看一下
+zh	帮忙	确认一下
+zh	帮忙	处理一下
+zh	需要	帮助
+zh	需要	确认
+zh	需要	准备
+zh	需要帮助	吗
+zh	需要帮助	请联系
+zh	联系	方式
+zh	联系	电话
+zh	联系	我们
+zh	请联系	我们
+zh	请联系	客服
+zh	稍后	回复
+zh	稍后	联系
+zh	稍后	再试
+zh	稍后回复	你
+zh	稍后回复	消息
+zh	不着急	慢慢来
+zh	不着急	等你
+zh	慢慢	来
+zh	慢慢	说
+zh	慢慢来	不着急
+zh	慢慢来	没关系
+zh	期待	见面
+zh	期待	合作
+zh	期待	回复
+zh	欢迎回来	朋友
+zh	欢迎回来	继续
+zh	欢迎加入	我们
+zh	欢迎加入	团队
+zh	没收到	消息
+zh	没收到	邮件
+zh	没收到	文件
+zh	看一下	邮件
+zh	看一下	附件
+zh	看一下	时间
+zh	请稍等	一下
+zh	请稍等	马上就好
+zh	稍等片刻	马上就好
+zh	可以帮我	一下吗
+zh	可以帮我	看看吗
+zh	有问题	随时联系
+zh	有问题	请告诉我
+zh	随时	联系
+zh	随时	欢迎
+zh	随时联系	我
+zh	随时联系	我们
+zh	告诉我	一声
+zh	告诉我	一下
+zh	没事	的
+zh	没事	慢慢来
+zh	不用	客气
+zh	不用	着急
+zh	不用	担心
+zh	不用担心	没问题
+zh	谢谢你的	帮助
+zh	谢谢你的	支持
+zh	谢谢你的	理解
+zh	谢谢你的	耐心
+zh	感谢你的	帮助
+zh	感谢你的	支持
+zh	感谢你的	理解
+zh	感谢大家	支持
+zh	感谢大家	帮助
+zh	感谢大家	配合
+zh	谢谢大家	支持
+zh	谢谢大家	帮助
+zh	谢谢大家	配合
+zh	理解	万岁
+zh	理解	你
+zh	辛苦你	了
+zh	麻烦你	了
+zh	麻烦你	看一下
+zh	不好意思打扰	一下
+zh	不好意思打扰	了
+zh	打扰	一下
+zh	打扰	了
+zh	请多	指教
+zh	请多	关照
+zh	多多	指教
+zh	多多	关照
+zh	请多指教	谢谢
+zh	下次见	再聊
+zh	下次见	朋友
+zh	再联系	你
+zh	再联系	我
+zh	晚点	联系
+zh	晚点	再聊
+zh	晚点	回复
+zh	回头	见
+zh	回头	聊
+zh	回头	联系
+zh	今天辛苦了	早点休息
+zh	今天辛苦了	谢谢
+# English everyday phrase coverage; project-authored, Apache-2.0.
+en	good morning	everyone
+en	good morning	there
+en	good night	everyone
+en	good night	dear
+en	good afternoon	everyone
+en	good evening	everyone
+en	nice to	meet
+en	nice to	see
+en	nice to meet	you
+en	nice to see	you
+en	long time	no
+en	long time no	see
+en	how have you	been
+en	how is	everything
+en	how is	it
+en	how is it	going
+en	how was	your
+en	how was	the
+en	welcome to	the
+en	welcome to	our
+en	happy new	year
+en	happy birthday	to
+en	happy birthday to	you
+en	wish you	a
+en	wish you	all
+en	wishing you	a
+en	wishing you	all
+en	have a nice	day
+en	have a nice	weekend
+en	have a nice	trip
+en	have a great	day
+en	have a great	weekend
+en	have a great	time
+en	have a good	day
+en	have a good	night
+en	have a good	time
+en	all the	best
+en	all the	time
+en	best of	luck
+en	good luck	with
+en	good luck	tomorrow
+en	good to	know
+en	good to	hear
+en	good to	see
+en	glad to	hear
+en	glad to	help
+en	glad to	meet
+en	next	week
+en	next	time
+en	next	month
+en	next	year
+en	next week	works
+en	next week	sounds
+en	this weekend	works
+en	this weekend	sounds
+en	this week	works
+en	this week	sounds
+en	are you	free
+en	are you	ready
+en	are you	available
+en	are you	there
+en	are you free	tomorrow
+en	are you free	tonight
+en	are you available	tomorrow
+en	are you available	tonight
+en	when are you	free
+en	when are you	available
+en	when can we	meet
+en	when can we	start
+en	let us	meet
+en	let us	start
+en	let us	know
+en	we should	meet
+en	we should	try
+en	we should	start
+en	we could	meet
+en	we could	try
+en	we could	start
+en	see you next	week
+en	see you next	time
+en	see you next	month
+en	see you on	monday
+en	see you on	friday
+en	see you on	saturday
+en	see you on	sunday
+en	see you in	the
+en	see you in	a
+en	talk to you	later
+en	talk to you	soon
+en	talk to you	tomorrow
+en	talk to you later	today
+en	talk to you later	then
+en	does that	work
+en	does that	sound
+en	does that work	for
+en	work for	you
+en	work for	me
+en	work for	us
+en	works for	me
+en	works for	you
+en	works for	us
+en	that works	for
+en	that works	well
+en	let me know	when
+en	let me know	if
+en	let me know	please
+en	let us know	when
+en	let us know	if
+en	let us know	please
+en	how about	tomorrow
+en	how about	tonight
+en	how about	lunch
+en	what about	lunch
+en	what about	dinner
+en	what about	tomorrow
+en	please find	the
+en	please find	attached
+en	please find the	attached
+en	please find the	document
+en	please find the	file
+en	please find attached	the
+en	please find attached	a
+en	the attached	file
+en	the attached	document
+en	the attached	report
+en	attached	file
+en	attached	document
+en	attached	report
+en	project	update
+en	project	plan
+en	project	status
+en	status	update
+en	status	report
+en	progress	update
+en	progress	report
+en	weekly	update
+en	weekly	report
+en	weekly	meeting
+en	meeting	notes
+en	meeting	agenda
+en	meeting notes	attached
+en	meeting notes	below
+en	meeting agenda	attached
+en	meeting agenda	below
+en	looking forward to	your
+en	looking forward to	hearing
+en	looking forward to	seeing
+en	looking forward to hearing	from
+en	hearing from	you
+en	keep me	posted
+en	keep me	updated
+en	keep us	posted
+en	keep us	updated
+en	please check	the
+en	please check	your
+en	please check	this
+en	please confirm	the
+en	please confirm	your
+en	please confirm	receipt
+en	please send	the
+en	please send	me
+en	please send	your
+en	send me	the
+en	send me	a
+en	send me	your
+en	send you	the
+en	send you	a
+en	send you	an
+en	check the	file
+en	check the	details
+en	check the	schedule
+en	confirm the	time
+en	confirm the	details
+en	confirm the	address
+en	review the	document
+en	review the	file
+en	review the	report
+en	share the	file
+en	share the	details
+en	share the	link
+en	update the	document
+en	update the	file
+en	update the	schedule
+en	finish the	task
+en	finish the	report
+en	finish the	work
+en	working on	the
+en	working on	a
+en	working on	it
+en	i am working on	the
+en	i am working on	it
+en	i will send	you
+en	i will send	the
+en	i will send	it
+en	i will check	the
+en	i will check	it
+en	we will	send
+en	we will	check
+en	we will	meet
+en	the next	step
+en	the next	meeting
+en	the next	time
+en	next steps	are
+en	next steps	include
+en	as soon as	possible
+en	as discussed	please
+en	as discussed	we
+en	as agreed	please
+en	as agreed	we
+en	for reference	please
+en	for your reference	please
+en	regarding the	meeting
+en	regarding the	project
+en	regarding the	schedule
+en	if you have	any
+en	if you have	a
+en	any questions	please
+en	please let me	know
+en	please let us	know
+en	arrived	at
+en	arrived	safely
+en	arrived	home
+en	drive	safely
+en	drive	carefully
+en	safe	travels
+en	safe	trip
+en	safe	journey
+en	train	station
+en	train	ticket
+en	bus	stop
+en	bus	station
+en	flight	details
+en	flight	number
+en	flight	time
+en	train station	entrance
+en	train station	exit
+en	at the	station
+en	at the	airport
+en	at the	office
+en	see you at	the
+en	see you at	home
+en	i am on	my
+en	i am on	the
+en	on the	way
+en	on the	train
+en	on the	bus
+en	on our	way
+en	on your	way
+en	on my way	home
+en	on my way	now
+en	almost	there
+en	almost	ready
+en	almost	done
+en	almost there	now
+en	be there	soon
+en	be there	shortly
+en	see you there	soon
+en	arrive at	the
+en	arrive at	noon
+en	at home	now
+en	at home	today
+en	get home	safely
+en	get home	soon
+en	traffic	jam
+en	traffic	delay
+en	please drive	safely
+en	please drive	carefully
+en	travel	safely
+en	travel	plans
+en	have a safe	trip
+en	have a safe	journey
+en	bring your	umbrella
+en	bring your	jacket
+en	bring your	ticket
+en	weather	forecast
+en	weather	update
+en	would you like	to
+en	would you like	some
+en	would you like	a
+en	would you like to	join
+en	would you like to	meet
+en	would you like to	try
+en	would you like some	coffee
+en	would you like some	tea
+en	would you like some	water
+en	a cup of	coffee
+en	a cup of	tea
+en	a cup of	water
+en	cup of	coffee
+en	cup of	tea
+en	cup of	water
+en	some	water
+en	some	coffee
+en	some	tea
+en	for	lunch
+en	for	dinner
+en	for	breakfast
+en	for lunch	today
+en	for lunch	tomorrow
+en	for dinner	tonight
+en	for dinner	tomorrow
+en	enjoy your	meal
+en	enjoy your	day
+en	enjoy your	weekend
+en	drink	water
+en	drink	tea
+en	drink	coffee
+en	lunch	break
+en	lunch	time
+en	lunch	tomorrow
+en	dinner	tonight
+en	dinner	plans
+en	dinner	time
+en	breakfast	time
+en	breakfast	tomorrow
+en	coffee	break
+en	coffee	time
+en	tea	break
+en	tea	time
+en	more	water
+en	more	time
+en	more	details
+en	less	sugar
+en	less	salt
+en	no sugar	please
+en	no salt	please
+en	without sugar	please
+en	order	food
+en	order	online
+en	order some	food
+en	order some	coffee
+en	something to	eat
+en	something to	drink
+en	ready to	go
+en	ready to	start
+en	ready to	order
+en	want to	learn
+en	learn	more
+en	learn	english
+en	learn	together
+en	learn more	about
+en	read	the
+en	read	more
+en	read	a
+en	practice	makes
+en	practice	every
+en	practice	daily
+en	practice makes	perfect
+en	take	notes
+en	take	time
+en	take notes	during
+en	take notes	please
+en	study	plan
+en	study	hard
+en	study	together
+en	study plan	for
+en	study together	tomorrow
+en	study together	today
+en	keep	learning
+en	keep	going
+en	keep	trying
+en	keep learning	every
+en	keep learning	together
+en	keep going	forward
+en	every	day
+en	every	week
+en	every	month
+en	every day	counts
+en	every day	matters
+en	step by	step
+en	one step at	a
+en	one step at a	time
+en	make	progress
+en	make	sure
+en	make	time
+en	make sure	you
+en	make sure	to
+en	do your	best
+en	do your	homework
+en	try your	best
+en	well done	everyone
+en	great job	everyone
+en	you can	do
+en	you can	try
+en	you can	start
+en	you can do	it
+en	you did	great
+en	you did	well
+en	you did	it
+en	take care	of
+en	take care of	yourself
+en	take care of	your
+en	take care of	the
+en	get	well
+en	get	some
+en	get	ready
+en	get well	soon
+en	get some	rest
+en	get some	water
+en	get some	sleep
+en	feel	better
+en	feel	free
+en	feel	good
+en	feel free to	ask
+en	feel free to	contact
+en	feel free to	share
+en	stay	safe
+en	stay	healthy
+en	stay	well
+en	stay safe	everyone
+en	i hope	you
+en	i hope	so
+en	i hope	that
+en	hope you	feel
+en	hope you	have
+en	hope you	are
+en	hope you feel	better
+en	hope you feel	well
+en	you feel	better
+en	you feel	well
+en	feel better	soon
+en	rest	well
+en	rest	today
+en	sleep	well
+en	sleep	tight
+en	sleep well	tonight
+en	take a	break
+en	take a	rest
+en	take a	look
+en	take a break	please
+en	drink more	water
+en	wish you a	speedy
+en	wish you a	happy
+en	wish you a	good
+en	a speedy	recovery
+en	could you	please
+en	could	you
+en	could	we
+en	could	be
+en	could we	meet
+en	could we	start
+en	could we	try
+en	could you	help
+en	could you	send
+en	could you	check
+en	could you please	help
+en	could you please	check
+en	could you please	send
+en	could you please	confirm
+en	happy to	help
+en	happy to	hear
+en	thanks for	your
+en	thanks for	the
+en	thanks for	help
+en	thank you for	your
+en	thank you for	the
+en	thank you for	help
+en	for your	patience
+en	for your	understanding
+en	your help	today
+en	your support	today
+en	i appreciate	your
+en	i appreciate	it
+en	i appreciate	the
+en	appreciate your	help
+en	appreciate your	time
+en	appreciate your	support
+en	thanks again	for
+en	thank you so	much
+en	so	much
+en	so	sorry
+en	so much	for
+en	sorry for	the
+en	sorry for	your
+en	sorry to	hear
+en	sorry to	bother
+en	sorry about	that
+en	sorry about	the
+en	no need to	worry
+en	no need to	rush
+en	take your	time
+en	take your time	please
+en	do not	worry
+en	do not	rush
+en	not a	problem
+en	let me help	you
+en	can i	help
+en	can i	ask
+en	can i	check
+en	can i help	you
+en	please contact	us
+en	please contact	me
+en	contact us	anytime
+en	contact us	please
+en	please try	again
+en	please try	later
+en	try again	later
+en	try again	please
+en	will do	thanks
+en	got it	thanks
+en	that is	great
+en	that is	fine
+en	that is	okay
+en	that sounds	good
+en	that sounds	great
+en	we appreciate	your
+en	we appreciate	it
+en	we appreciate your	help
+en	we appreciate your	support
+en	we appreciate your	patience
+en	thank you for your	help
+en	thank you for your	time
+en	thank you for your	support
+en	thank you for your	patience
+# Traditional Chinese input aliases; project-authored, Apache-2.0.
+zh	好久	不見
+zh	認識你	很高興
+zh	認識你	很開心
+zh	很高興	認識你
+zh	很高興	見到你
+zh	見到你	很開心
+zh	見到你	真好
+zh	新的一年	平安喜樂
+zh	新的一年	萬事順意
+zh	新的一天	開始了
+zh	萬事	如意
+zh	萬事	順利
+zh	祝大家	節日快樂
+zh	祝大家	身體健康
+zh	節日快樂	謝謝
+zh	節日快樂	同樂
+zh	生日快樂	天天開心
+zh	生日快樂	心想事成
+zh	週末	愉快
+zh	週末	快樂
+zh	週末愉快	好好休息
+zh	下週	見
+zh	下週	再聊
+zh	下週	一
+zh	下週	二
+zh	下週	三
+zh	下週	四
+zh	下週	五
+zh	這週	有空嗎
+zh	這週	末
+zh	這週	工作
+zh	這個週末	有空嗎
+zh	這個週末	一起吃飯
+zh	有時間	嗎
+zh	有時間	再聊
+zh	有時間	一起吃飯
+zh	有空	嗎
+zh	什麼時候	方便
+zh	什麼時候	有空
+zh	什麼時候	出發
+zh	約個	時間
+zh	約個	地方
+zh	約好	時間
+zh	約好	地點
+zh	週一	見
+zh	週一	上午
+zh	週一	下午
+zh	週二	見
+zh	週二	上午
+zh	週二	下午
+zh	週三	見
+zh	週三	上午
+zh	週三	下午
+zh	週四	見
+zh	週四	上午
+zh	週四	下午
+zh	週五	見
+zh	週五	下午
+zh	週五	晚上
+zh	週六	見
+zh	週六	上午
+zh	週六	下午
+zh	週六	晚上
+zh	週日	見
+zh	週日	上午
+zh	週日	下午
+zh	週日	晚上
+zh	待會	見
+zh	待會	再聊
+zh	待會	聯繫
+zh	一會兒	見
+zh	一會兒	聯繫
+zh	一會兒	再聊
+zh	準備出發	了
+zh	準備出發	吧
+zh	請查收	附件
+zh	請查收	郵件
+zh	請查收	文件
+zh	郵件	收到
+zh	郵件	附件
+zh	郵件	地址
+zh	發送	成功
+zh	發送	文件
+zh	發送	郵件
+zh	請確認	時間
+zh	請確認	資訊
+zh	請確認	地址
+zh	確認一下	時間
+zh	確認一下	地址
+zh	確認一下	資訊
+zh	確認收到	謝謝
+zh	反饋	意見
+zh	反饋	問題
+zh	反饋	結果
+zh	意見	反饋
+zh	意見	建議
+zh	溝通	交流
+zh	溝通	進度
+zh	溝通	方案
+zh	工作安排	已確認
+zh	工作進度	更新
+zh	工作進度	彙報
+zh	項目	進度
+zh	項目	計劃
+zh	項目進度	更新
+zh	項目進度	彙報
+zh	會議時間	已確認
+zh	會議時間	待定
+zh	會議結束	了
+zh	會議結束	後
+zh	開會	時間
+zh	開會	通知
+zh	討論	一下
+zh	討論	方案
+zh	討論	問題
+zh	商量	時間
+zh	今天的	計劃
+zh	本週	計劃
+zh	本週	總結
+zh	本週	安排
+zh	下週的	計劃
+zh	下週的	安排
+zh	下週的	會議
+zh	任務	完成
+zh	任務	進度
+zh	任務	安排
+zh	完成了	謝謝
+zh	完成了	請查收
+zh	計劃	安排
+zh	計劃	完成
+zh	計劃	調整
+zh	記錄	下來
+zh	記錄	一下
+zh	記錄	時間
+zh	總結	經驗
+zh	總結	一下
+zh	總結	報告
+zh	辛苦了	謝謝
+zh	辛苦了	早點休息
+zh	期待合作	謝謝
+zh	到家了	報個平安
+zh	到家了	早點休息
+zh	快到了	馬上就到
+zh	馬上	到了
+zh	馬上	出發
+zh	馬上	回來
+zh	我在路上	馬上到
+zh	稍等一下	馬上就好
+zh	稍等一下	謝謝
+zh	地鐵	站
+zh	地鐵	到了
+zh	地鐵	線路
+zh	公交車	站
+zh	公交車	到了
+zh	火車	站
+zh	火車	票
+zh	火車	到了
+zh	高鐵	站
+zh	高鐵	票
+zh	高鐵	到了
+zh	車票	買好了
+zh	車票	時間
+zh	車票	資訊
+zh	機場	接你
+zh	機場	見面
+zh	機場	出發
+zh	航班	資訊
+zh	航班	延誤
+zh	航班	時間
+zh	導航	路線
+zh	導航	地址
+zh	路線	規劃
+zh	路線	確認
+zh	發個	地址
+zh	發個	位置
+zh	發個	消息
+zh	到了以後	聯繫我
+zh	到了以後	告訴我
+zh	出門	注意安全
+zh	出門	帶傘
+zh	帶上	雨傘
+zh	帶上	外套
+zh	帶上	證件
+zh	天氣	不錯
+zh	天氣	很好
+zh	天氣	預報
+zh	一起吃飯	吧
+zh	一起吃飯	怎麼樣
+zh	吃飯	了嗎
+zh	吃什麼	好
+zh	吃什麼	都可以
+zh	想吃	什麼
+zh	想吃	麵條
+zh	想吃	米飯
+zh	午飯	吃什麼
+zh	午飯	吃了嗎
+zh	午飯	時間
+zh	晚飯	吃什麼
+zh	晚飯	吃了嗎
+zh	晚飯	一起吃
+zh	喝點	水
+zh	喝點	茶
+zh	喝點	咖啡
+zh	點個	外賣
+zh	點個	菜
+zh	外賣	到了
+zh	外賣	下單
+zh	外賣	地址
+zh	訂個	餐廳
+zh	訂個	位置
+zh	訂個	房間
+zh	餐廳	地址
+zh	餐廳	位置
+zh	餐廳	推薦
+zh	飯後	散步
+zh	飯後	休息
+zh	閱讀	理解
+zh	閱讀	計劃
+zh	閱讀	時間
+zh	複習	功課
+zh	複習	計劃
+zh	複習	資料
+zh	考試	順利
+zh	考試	加油
+zh	考試	時間
+zh	認真	學習
+zh	認真	聽講
+zh	認真	思考
+zh	查閱	資料
+zh	查閱	文獻
+zh	筆記	整理
+zh	筆記	記錄
+zh	筆記	本
+zh	練習	一下
+zh	練習	發音
+zh	練習	寫作
+zh	學習英語	加油
+zh	學習英語	每天堅持
+zh	英語	學習
+zh	英語	練習
+zh	英語	單詞
+zh	單詞	記憶
+zh	單詞	練習
+zh	單詞	複習
+zh	課程	安排
+zh	課程	時間
+zh	課程	內容
+zh	上課	時間
+zh	上課	了
+zh	作業	完成了
+zh	作業	寫完了
+zh	作業	檢查
+zh	練習一下	發音
+zh	練習一下	寫作
+zh	繼續	努力
+zh	繼續	學習
+zh	繼續	加油
+zh	早點	休息
+zh	早點	睡覺
+zh	早點	回來
+zh	按時	吃飯
+zh	按時	休息
+zh	按時	吃藥
+zh	運動	健康
+zh	運動	時間
+zh	運動	計劃
+zh	適當	休息
+zh	適當	運動
+zh	早點休息	晚安
+zh	早點休息	好夢
+zh	好好休息	早日康復
+zh	別太	累
+zh	別太	擔心
+zh	放鬆	一下
+zh	放鬆	心情
+zh	開心	每一天
+zh	開心	就好
+zh	幫我	看看
+zh	幫我	一下
+zh	幫我	確認一下
+zh	幫忙	看一下
+zh	幫忙	確認一下
+zh	幫忙	處理一下
+zh	聯繫	方式
+zh	聯繫	電話
+zh	聯繫	我們
+zh	請聯繫	我們
+zh	請聯繫	客服
+zh	稍後	回覆
+zh	稍後	聯繫
+zh	稍後	再試
+zh	稍後回覆	你
+zh	稍後回覆	消息
+zh	不著急	慢慢來
+zh	不著急	等你
+zh	歡迎回來	朋友
+zh	歡迎回來	繼續
+zh	歡迎加入	我們
+zh	歡迎加入	團隊
+zh	沒收到	消息
+zh	沒收到	郵件
+zh	沒收到	文件
+zh	請稍等	一下
+zh	請稍等	馬上就好
+zh	稍等片刻	馬上就好
+zh	可以幫我	一下嗎
+zh	可以幫我	看看嗎
+zh	有問題	隨時聯繫
+zh	有問題	請告訴我
+zh	隨時	聯繫
+zh	隨時	歡迎
+zh	隨時聯繫	我
+zh	隨時聯繫	我們
+zh	告訴我	一聲
+zh	告訴我	一下
+zh	沒事	的
+zh	沒事	慢慢來
+zh	不用擔心	沒問題
+zh	謝謝你的	幫助
+zh	謝謝你的	支持
+zh	謝謝你的	理解
+zh	謝謝你的	耐心
+zh	感謝你的	幫助
+zh	感謝你的	支持
+zh	感謝你的	理解
+zh	感謝大家	支持
+zh	感謝大家	幫助
+zh	感謝大家	配合
+zh	謝謝大家	支持
+zh	謝謝大家	幫助
+zh	謝謝大家	配合
+zh	麻煩你	了
+zh	麻煩你	看一下
+zh	不好意思打擾	一下
+zh	不好意思打擾	了
+zh	打擾	一下
+zh	打擾	了
+zh	請多	指教
+zh	請多	關照
+zh	多多	關照
+zh	請多指教	謝謝
+zh	下次見	再聊
+zh	下次見	朋友
+zh	再聯繫	你
+zh	再聯繫	我
+zh	晚點	聯繫
+zh	晚點	再聊
+zh	晚點	回覆
+zh	回頭	見
+zh	回頭	聊
+zh	回頭	聯繫
+# Date-qualified time phrases prefer arrangements over standalone greetings.
+zh	今天上午	见
+zh	今天上午	开会
+zh	今天上午	有空
+zh	今天下午	见
+zh	今天下午	有空
+zh	今天晚上	有空
+zh	今天晚上	见
+zh	明天上午	见
+zh	明天上午	开会
+zh	明天上午	有空
+zh	明天下午	见
+zh	明天下午	有空
+zh	明天晚上	有空
+zh	明天晚上	见
+zh	后天上午	见
+zh	后天上午	有空
+zh	后天下午	见
+zh	后天下午	有空
+zh	後天上午	見
+zh	後天上午	有空
+zh	後天下午	見
+zh	後天下午	有空

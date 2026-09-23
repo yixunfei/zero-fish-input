@@ -3,6 +3,7 @@ package dev.zeroinput.engine.rime
 import android.content.Context
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.InputEngine
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -70,32 +71,19 @@ class RimeRuntime(context: Context) : AutoCloseable {
         return try {
             val directories = RimeAssetInstaller(applicationContext).install()
             configurationInstaller = RimeConfigurationInstaller(directories)
-            isReady = NativeRimeBridge.nativeInitialize(
+            check(NativeRimeBridge.nativeInitialize(
                 directories.shared.absolutePath,
                 directories.user.absolutePath,
-            )
-            if (!isReady) {
-                runCatching { NativeRimeBridge.nativeFinalize() }
-                initializationError = IllegalStateException("Native Rime initialization returned false")
-                setState(RimeRuntimeState.FAILED)
-            } else {
-                val probeSession = NativeRimeBridge.nativeCreateSession()
-                if (probeSession == 0L) {
-                    runCatching { NativeRimeBridge.nativeFinalize() }
-                    isReady = false
-                    initializationError = IllegalStateException("Rime could not create an input session")
-                    setState(RimeRuntimeState.FAILED)
-                    return false
-                }
-                NativeRimeBridge.nativeDestroySession(probeSession)
-                runtimeVersion = runCatching { NativeRimeBridge.nativeVersion() }
-                    .getOrDefault("unavailable")
-                    .ifBlank { "unavailable" }
-                initializationError = null
-                preparedSchemaId = "zeroinput_pinyin"
-                setState(RimeRuntimeState.READY)
-            }
-            isReady
+            )) { "Native Rime initialization returned false" }
+            // A schema can create a session even when its translator has no
+            // usable dictionary. Validate conversion before publishing readiness.
+            RimeInputEngine().use { RimeSessionVerifier.verify(it) }
+            runtimeVersion = NativeRimeBridge.nativeVersion().ifBlank { "unavailable" }
+            initializationError = null
+            preparedSchemaId = "zeroinput_pinyin"
+            isReady = true
+            setState(RimeRuntimeState.READY)
+            true
         } catch (error: Throwable) {
             runCatching { NativeRimeBridge.nativeFinalize() }
             isReady = false
@@ -107,7 +95,7 @@ class RimeRuntime(context: Context) : AutoCloseable {
 
     fun version(): String = if (isReady) runtimeVersion else "unavailable"
 
-    internal fun createEngine(options: ChineseInputOptions): InputEngine? = synchronized(lock) {
+    internal fun createEngine(options: ChineseInputOptions, executor: java.util.concurrent.ExecutorService): InputEngine? = synchronized(lock) {
         check(isReady) { "Rime runtime is not initialized" }
         val id = PinyinAlgebra.schemaId(options)
         if (id != preparedSchemaId) {
@@ -127,22 +115,38 @@ class RimeRuntime(context: Context) : AutoCloseable {
                 markFailed(error)
                 return null
             }
-            setState(RimeRuntimeState.READY)
         }
         try {
-            val primary = RimeInputEngine(id, options, ::markFailed, ::releaseEngine,
-                if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) nineKeyReadings else null)
-                .also { activeEngines.incrementAndGet() }
-            if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) primary else {
-                try {
-                    val secondary = RimeInputEngine(id, options, ::markFailed, ::releaseEngine)
-                        .also { activeEngines.incrementAndGet() }
-                    ExpandingRimeEngine(primary, secondary, relatedReadings)
-                } catch (error: Exception) { primary.close(); throw error }
+            val primary = createVerifiedPrimary(id, options)
+            try {
+                val engine = if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) primary else {
+                    // Secondary sessions remain lazy and use the same serial worker.
+                    ExpandingRimeEngine(primary, relatedReadings, { context ->
+                        createSecondaryEngine(id, options, context)
+                    }, executor, ::markFailedIfReady)
+                }
+                if (state != RimeRuntimeState.READY) setState(RimeRuntimeState.READY)
+                engine
+            } catch (error: Throwable) {
+                primary.close()
+                throw error
             }
         } catch (error: Exception) {
             markFailed(error)
             null
+        }
+    }
+
+    private fun createVerifiedPrimary(id: String, options: ChineseInputOptions): RimeInputEngine {
+        val engine = RimeInputEngine(id, options, ::markFailed, ::releaseEngine,
+            if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) nineKeyReadings else null)
+            .also { activeEngines.incrementAndGet() }
+        try {
+            RimeSessionVerifier.verify(engine, options.keyboardLayout)
+            return engine
+        } catch (error: Throwable) {
+            engine.close()
+            throw error
         }
     }
 
@@ -152,6 +156,27 @@ class RimeRuntime(context: Context) : AutoCloseable {
             // Its release makes that preparation retryable without polling or waits.
             setState(RimeRuntimeState.READY)
         }
+    }
+
+    private fun createSecondaryEngine(
+        schemaId: String,
+        options: ChineseInputOptions,
+        context: EditorContext,
+    ): RimeInputEngine = synchronized(lock) {
+        check(isReady) { "Rime runtime is not initialized" }
+        val engine = RimeInputEngine(schemaId, options, ::markFailed, ::releaseEngine)
+            .also { activeEngines.incrementAndGet() }
+        try {
+            engine.start(context)
+            engine
+        } catch (error: Throwable) {
+            engine.close()
+            throw error
+        }
+    }
+
+    private fun markFailedIfReady(error: Throwable) = synchronized(lock) {
+        if (isReady) markFailed(error)
     }
 
     override fun close() = synchronized(lock) {

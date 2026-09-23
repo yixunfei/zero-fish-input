@@ -24,7 +24,7 @@
     <string name="clipboard_guard_cleared">已请求清理当前项；历史记录未删除</string>
     <string name="clipboard_guard_failed">剪贴板操作未完成</string>
     <string name="clipboard_guard_expired">请求已失效或剪贴板已变化，请重新确认</string>
-    <string name="clipboard_guard_automatic_warning">监听开启后，将尝试清空已有的当前项及之后检测到的新内容；防护恢复或回到本页时也会处理已有当前项。普通复制和粘贴可能失效。系统或其他输入法的历史、收藏和云端副本不在此清理范围内。无法撤回已被读取的内容，也可能清空刚复制的新内容。此操作不保存正文，无法撤销。</string>
+    <string name="clipboard_guard_automatic_warning">监听开启后，将尝试清空已有的当前项及之后检测到的新内容；防护恢复、回到本页或使用键盘私有复制时也会处理已有当前项。普通复制和粘贴可能失效。系统或其他输入法的历史、收藏和云端副本不在此清理范围内。无法撤回已被读取的内容，也可能清空刚复制的新内容。此操作不保存正文，无法撤销。</string>
     <string name="clipboard_guard_enable_automatic">启用自动清理</string>
     <string name="clipboard_guard_confirmation_warning">仅清理当前剪贴板项。系统或其他输入法保存的历史、收藏和云端副本不会被删除，请在对应应用中处理。\n\n此操作无法撤销。检查与清空之间仍可能出现新内容，因此也可能清空您刚复制的内容。不会保存正文或撤回已有副本。</string>
     <string name="clipboard_guard_confirm_action">仅清空当前项</string>
@@ -56,8 +56,8 @@
     <string name="clipboard_guard_dismiss">关闭提醒</string>
     <string name="clipboard_guard_go_clear">前往清理</string>
     <string name="clipboard_guard_open_status">查看状态</string>
-    <string name="app_name">zero finish input</string>
-    <string name="input_method_name">zero finish input</string>
+    <string name="app_name">zero fish input</string>
+    <string name="input_method_name">zero fish input</string>
     <string name="subtype_chinese">中文</string>
     <string name="subtype_english">English</string>
     <string name="secure_clipboard">安全剪贴板</string>
@@ -182,4 +182,5 @@
     <string name="keyboard_height">键盘高度</string>
     <string name="keyboard_preview">预览</string>
     <string name="clipboard_selection_unavailable">请先在普通输入框中选中文字，再点击复制（最多 8192 字符）</string>
+    <string name="setting_word_associations">词联想</string>
 </resources>

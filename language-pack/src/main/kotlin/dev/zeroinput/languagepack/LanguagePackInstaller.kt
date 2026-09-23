@@ -153,7 +153,9 @@ class LanguagePackInstaller(
         require(!manifestEntry.isDirectory && manifestEntry.size in 1..MAX_MANIFEST_BYTES) {
             "Invalid language pack manifest"
         }
-        val manifestJson = zip.getInputStream(manifestEntry).bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
+        val manifestJson = zip.getInputStream(manifestEntry).use {
+            LanguagePackManifestReader.read(it, MAX_MANIFEST_BYTES.toInt())
+        }
         val manifest = LanguagePackParser.parse(manifestJson)
         validateArchiveEntries(zip, manifest)
 
@@ -267,7 +269,9 @@ class LanguagePackInstaller(
         val manifestFile = File(directory, MANIFEST_PATH)
         require(manifestFile.isFile) { "Language pack manifest is missing" }
         require(manifestFile.length() in 1..MAX_MANIFEST_BYTES) { "Invalid language pack manifest" }
-        val manifest = LanguagePackParser.parse(manifestFile.readText(StandardCharsets.UTF_8))
+        val manifest = manifestFile.inputStream().use {
+            LanguagePackParser.parse(LanguagePackManifestReader.read(it, MAX_MANIFEST_BYTES.toInt()))
+        }
         require(directory.name == manifest.version && directory.parentFile?.name == manifest.id) {
             "Language pack directory does not match its manifest"
         }

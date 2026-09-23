@@ -164,7 +164,7 @@ function Install-TestApk {
     }
 
     Invoke-CheckedCommand $Adb @("-s", $target, "install", "-r", $ApkPath)
-    Write-Output "Installed on $target. Enable zero finish input from Android input method settings."
+    Write-Output "Installed on $target. Enable zero fish input from Android input method settings."
 }
 
 if ($Serial -and -not $Install) { throw "-Serial requires -Install." }
@@ -216,11 +216,11 @@ $metadata = Assert-TestApk $sourceApk $androidTools $expectedAbis
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $artifactDirectory = Join-Path $artifactRoot $timestamp
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
-$artifactName = "zero-finish-input-$($metadata.VersionName)-$Abi.apk"
+$artifactName = "zero-fish-input-$($metadata.VersionName)-$Abi.apk"
 $artifactApk = Join-Path $artifactDirectory $artifactName
 Copy-Item -LiteralPath $sourceApk -Destination $artifactApk
 
-$noticesName = "zero-finish-input-$($metadata.VersionName)-notices.zip"
+$noticesName = "zero-fish-input-$($metadata.VersionName)-notices.zip"
 $noticesArchive = Join-Path $artifactDirectory $noticesName
 $noticePaths = @("LICENSE", "NOTICE", "THIRD_PARTY.md", "SOURCES.md", "LICENSES") |
     ForEach-Object { Join-Path $repositoryRoot $_ }

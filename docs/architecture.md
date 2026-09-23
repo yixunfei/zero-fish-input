@@ -1,6 +1,6 @@
 # Architecture
 
-The public project and application display name is `zero finish input`.
+The public project and application display name is `zero fish input`.
 `dev.zeroinput.ime`, Kotlin namespaces, engine resource identifiers, encrypted file
 names and Keystore aliases retain their existing identity. Debug uses the separate
 `dev.zeroinput.ime.debug` package. App build assets include offline license texts
@@ -46,10 +46,12 @@ prepared on the existing serial worker and never decrypt on key dispatch.
    会话初始语言优先读取 `InputMethodManager` 提供的当前 ZeroInput 子类型（`zh-CN`/`en-US`），
    再回退到本地设置；这样即使 Android 调整 subtype 回调时序，系统选择也不会被旧设置覆盖。
    键盘上的中英文切换同时更新 Android 当前子类型，避免旋转或切换输入框时恢复旧语言。
-   `EngineWarmupCoordinator` 在共享的有界单线程队列中创建并启动目标引擎，结果携带会话令牌、
-   编辑器包名、语言包键和完整隐私快照；只有仍处于同一编辑器且没有组合文本时才转移所有权，
-   过期或拒绝的结果立即关闭。结果投递到 IME 所在线程前由独立的所有权交接器暂存，服务销毁或
-   Handler 拒绝/移除回调时会回收尚未交接的引擎，避免后台 native 句柄成为孤儿。
+  `EngineWarmupCoordinator` 在共享的有界单线程队列中创建并启动目标引擎，结果携带会话令牌、
+  编辑器包名、语言包键和完整隐私快照；只有仍处于同一编辑器且没有组合文本时才转移所有权，
+  过期或拒绝的结果立即关闭。结果投递到 IME 所在线程前由独立的所有权交接器暂存，服务销毁或
+  Handler 拒绝/移除回调时会回收尚未交接的引擎，避免后台 native 句柄成为孤儿。全拼引擎的
+  related-reading secondary 会话也只在首次请求关联读音扩展时由同一有界执行器创建，并由
+  会话代次和运行时锁保证过期任务不会留下 native 句柄。
 3. 引擎返回不可变 `EngineUpdate`，控制器负责通过 `InputConnection` 提交或组合文本。
 4. `PersonalizationStore` 是学习数据端口；加密实现位于 `user-data`，`ime-core` 不依赖具体仓库。
    应用层适配器负责在获得允许后按需后台预热和串行学习写入，输入主线程只读取内存缓存。
@@ -69,8 +71,59 @@ prepared on the existing serial worker and never decrypt on key dispatch.
 
 librime 自身的用户词典被禁用。中文候选选择的拼音输入码和使用频率由 ZeroInput 的加密仓库
 统一保存，从而让全局关闭学习、隐私模式和编辑器的无个性化请求作用于所有引擎。
+`TYPE_TEXT_FLAG_NO_SUGGESTIONS` keeps public conversion candidates available in
+known, non-sensitive text editors; it still disables personal reads, learning,
+model ranking and next-word predictions. Password and unknown-editor checks run
+first and continue to bypass engines entirely.
+`SessionPrivacy.predictionsAllowed` is passed through `EditorContext` for both
+immediate and worker-prepared engines. Built-in English and English language packs
+preserve typed composition but do not offer completions when it is false. Chinese
+conversion remains available. `IME_FLAG_NO_PERSONALIZED_LEARNING` alone still permits
+public completions; prediction permission is part of preparation identity.
+
+Rime readiness requires a worker-only public `nihao` conversion and candidate
+commit probe, not just a nonzero native session handle. Each prepared primary
+session is checked using its configured layout before ownership reaches the IME.
+The probe has no editor connection or personalization store and resets its state.
+Initialization or probe failure leaves the immediate fallback active and exposes
+FAILED; pending initialization keeps PREPARING until a validated engine is adopted.
+The keyboard displays a separate, high-contrast indeterminate progress strip
+throughout PREPARING, including while tools or candidates are displayed. A first
+Chinese key triggers one non-blocking reminder per editor/preparation attempt.
+It does not buffer or replay keys. Ready/failed/hidden states cancel the reminder;
+editor changes, window hiding and view disposal also cancel its Toast. The existing
+failure state retains the retry control. No native progress percentage is invented.
 内置全拼使用 `express_editor`：选中覆盖全部输入的候选后直接提交，分段选择继续保留剩余组合；
 `Return` 显式绑定 `commit_composition`。随包资源版本变化会重新部署配置，不改变加密用户数据格式。
+
+## Offline next-word suggestions
+
+`NextWordPredictor` is an independent memory-only port in `engine-api`.
+`engine-dictionary/WordAssociationIndex` loads bounded, project-authored public
+phrase pairs on the existing engine worker. A volatile immutable provider is
+published once; there are no asynchronous private-context tasks or delivery
+callbacks. Queries before readiness return no candidates.
+
+The public corpus currently has 1,698 pairs and 723 distinct language/prefix
+keys. A query still performs at most 32 suffix probes and returns at most eight
+words. Multi-character Chinese suffixes use longest matching; one-character
+Chinese keys require a full-context match to avoid completing an unrelated word
+ending in that character. English retains word-boundary matching. Public data
+and synthetic evaluation fixtures live in separate main/test resources.
+
+`ime-core/WordAssociationSession` owns a 32-unit wipeable buffer of successful
+IME commits and at most eight public continuations. Editor acceptance is reported
+by `EditorConnection.commitText`; failed writes do not seed associations or
+learning. Empty-composition predictions have `NEXT_WORD` routes, independent of
+engine paging and personal-candidate overlays. Click identities are rechecked,
+and Space/Enter never accept a prediction. English spacing and Chinese script
+normalization happen before committing the selected public word.
+
+The default-on setting remains subject to conservative editor and personalization
+policies. Lifecycle, cursor, settings, direct insertion and engine boundaries
+wipe the buffer and invalidate routes. No new module, network access, persistence
+format or private-history query is introduced. See
+[ADR 0013](adr/0013-offline-word-associations.md) for limits and alternatives.
 
 ## Private text collection
 
@@ -106,11 +159,35 @@ The authentication Activity completes the broker handoff after its destruction,
 so a successful prompt cannot bind a source editor while authentication navigation
 is still exiting. Cancellation and timeouts remain valid during that handoff.
 
-`user-data/SecureClipboardVault` still owns the encrypted format and serializes
-reads/writes. It accepts the existing security EncryptedStore port for isolated
-tests. Additions capture a deletion generation before queuing and check it and
-cancellation under the vault lock before reading and before committing. No IME,
-engine or system clipboard dependency is introduced. See [ADR 0006](adr/0006-private-text-import.md).
+`user-data/SecureClipboardVault` owns the encrypted format and serializes reads
+and writes through the existing `EncryptedStore` port. Additions, metadata loads
+and removals carry a deletion generation captured before queuing; management
+Save captures it before authentication. Operations recheck under the lock and
+after storage work. Clear advances the generation before waiting for the lock,
+invalidates cached summaries and attempts both body and index deletion, including
+their separate keys. Incomplete deletion blocks access in this vault instance
+until an explicit clear retry succeeds. A failed index refresh hides cached rows
+until authenticated reconciliation. No IME, engine or system clipboard dependency
+is introduced. See [ADR 0006](adr/0006-private-text-import.md).
+
+## Security storage primitives
+
+`security/AesGcmEnvelope` owns the internal format 1 framing and standard JCE
+AES-GCM operations; `AesGcmKeyStore` owns Android key access. Reads require an
+existing key and never create a replacement for an unreadable file. Writes retain
+the existing key creation policy, aliases, AAD and envelope layout.
+`AuthenticationLifetime` is the internal, platform-independent one-use policy;
+`AuthenticationGrant` still uses the monotonic Android clock and the existing
+authentication broker. A caller may shorten, but cannot extend, its 30-second limit.
+
+`EncryptedFileStore` distinguishes a missing file from an unreadable existing
+path, checks AtomicFile commit/delete postconditions and wipes owned temporary
+buffers. A failed file deletion still attempts dedicated key deletion. These
+checks detect silent rename/delete failures; they do not prove power-loss
+durability. Vault body and index remain independently atomic files. Repair and
+deletion-pending flags are process-local, not a persisted transaction journal:
+after restart a stale body-free index may need authenticated reconciliation, and
+a failed clear must be retried. See [storage validation](security-storage-validation.md).
 
 ## Opt-in system clipboard guard
 

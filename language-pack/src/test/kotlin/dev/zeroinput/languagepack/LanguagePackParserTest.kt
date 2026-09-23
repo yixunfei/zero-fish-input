@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.nio.charset.CharacterCodingException
 import dev.zeroinput.engine.api.InputLanguage
 
 class LanguagePackParserTest {
@@ -51,6 +53,24 @@ class LanguagePackParserTest {
                 }
                 """.trimIndent(),
             )
+        }
+    }
+
+    @Test
+    fun `manifest reader rejects bytes beyond the archive limit`() {
+        val input = ByteArrayInputStream(ByteArray(9) { 'x'.code.toByte() })
+
+        assertThrows(IllegalArgumentException::class.java) {
+            LanguagePackManifestReader.read(input, maxBytes = 8)
+        }
+    }
+
+    @Test
+    fun `manifest reader rejects malformed UTF-8 instead of replacing it`() {
+        val input = ByteArrayInputStream(byteArrayOf('{'.code.toByte(), 0xC3.toByte(), 0x28))
+
+        assertThrows(CharacterCodingException::class.java) {
+            LanguagePackManifestReader.read(input, maxBytes = 32)
         }
     }
 }

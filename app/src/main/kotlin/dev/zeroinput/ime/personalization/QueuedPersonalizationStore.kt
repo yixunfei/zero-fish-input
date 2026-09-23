@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.personalization
 
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.PagedPersonalizationStore
@@ -21,7 +22,7 @@ internal class QueuedPersonalizationStore(
         name = "zeroinput-personalization",
         queueCapacity = MAX_PENDING_OPERATIONS,
     ),
-) : PagedPersonalizationStore, AutoCloseable {
+) : PagedPersonalizationStore, PersonalFrequencyStore, AutoCloseable {
     private val closed = AtomicBoolean(false)
     private val generation = AtomicLong(0L)
     private val dataRevision = AtomicLong(0L)
@@ -41,6 +42,15 @@ internal class QueuedPersonalizationStore(
         ): Boolean = size > MAX_CACHED_QUERIES
     }
     private val pendingQueries = HashMap<QueryKey, QueryStamp>()
+    private val frequencyCache = object : LinkedHashMap<FrequencyKey, Int>(
+        MAX_CACHED_FREQUENCIES,
+        0.75f,
+        true,
+    ) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<FrequencyKey, Int>?): Boolean =
+            size > MAX_CACHED_FREQUENCIES
+    }
+    private val pendingFrequencyQueries = HashMap<FrequencyKey, QueryStamp>()
     private var preloadGeneration: Long? = null
     private val suggestionListeners = CopyOnWriteArrayList<() -> Unit>()
 
@@ -71,6 +81,39 @@ internal class QueuedPersonalizationStore(
         // it from the IME key path.
         scheduleSuggestionQuery(key, dataRevision.get())
         return PersonalSuggestionPage(ready = false, revision = revision)
+    }
+
+    /**
+     * Answers from the prepared frequency cache only.  Misses schedule a
+     * worker query and stay absent for this call, so the association strip
+     * keeps its editorial order instead of blocking the input thread.
+     * Known-absent words are cached as zero to avoid repeat queries.
+     */
+    override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
+        if (closed.get()) return emptyMap()
+        val wanted = words.asSequence().map(String::trim).filter(String::isNotEmpty)
+            .distinct().take(PersonalFrequencyStore.MAX_LOOKUP).toList()
+        if (wanted.isEmpty()) return emptyMap()
+        schedulePreload()
+        if (!ready) return emptyMap()
+        // Cache contents and the data revision are read under the same lock
+        // so a completed write cannot mix old entries into a new view.
+        val (result, misses, revision) = synchronized(stateLock) {
+            val found = HashMap<String, Int>(wanted.size)
+            val missing = ArrayList<String>(wanted.size)
+            for (word in wanted) {
+                val key = FrequencyKey(language, word)
+                if (frequencyCache.containsKey(key)) {
+                    val frequency = frequencyCache.getValue(key)
+                    if (frequency > 0) found[word] = frequency
+                } else {
+                    missing += word
+                }
+            }
+            Triple(found, missing, dataRevision.get())
+        }
+        if (misses.isNotEmpty()) scheduleFrequencyQuery(misses, language, revision)
+        return result
     }
 
     override fun learn(
@@ -156,6 +199,8 @@ internal class QueuedPersonalizationStore(
             synchronized(stateLock) {
                 suggestionCache.clear()
                 pendingQueries.clear()
+                frequencyCache.clear()
+                pendingFrequencyQueries.clear()
                 preloadGeneration = null
             }
             suggestionListeners.clear()
@@ -348,6 +393,40 @@ internal class QueuedPersonalizationStore(
         !closed.get() && ready &&
             queryGeneration == generation.get() && queryRevision == dataRevision.get()
 
+    private fun scheduleFrequencyQuery(misses: List<String>, language: InputLanguage, queryRevision: Long) {
+        val queryGeneration = generation.get()
+        val queryStamp = QueryStamp(queryGeneration, queryRevision)
+        val accepted = ArrayList<String>(misses.size)
+        synchronized(stateLock) {
+            if (!isQueryCurrent(queryGeneration, queryRevision)) return
+            for (word in misses) {
+                val key = FrequencyKey(language, word)
+                if (frequencyCache.containsKey(key) || pendingFrequencyQueries[key] == queryStamp) continue
+                pendingFrequencyQueries[key] = queryStamp
+                accepted += word
+            }
+        }
+        if (accepted.isEmpty()) return
+        enqueue {
+            // A delegate without the frequency port resolves every word as
+            // absent (zero), which is the safe editorial-order fallback.
+            val values = runCatching {
+                withDelegate {
+                    (delegate as? PersonalFrequencyStore)?.frequenciesFor(accepted, language).orEmpty()
+                }
+            }.getOrDefault(emptyMap())
+            synchronized(stateLock) {
+                for (word in accepted) {
+                    val key = FrequencyKey(language, word)
+                    if (isQueryCurrent(queryGeneration, queryRevision)) {
+                        frequencyCache[key] = values[word] ?: 0
+                    }
+                    if (pendingFrequencyQueries[key] == queryStamp) pendingFrequencyQueries.remove(key)
+                }
+            }
+        }
+    }
+
     private fun isGenerationCurrent(operationGeneration: Long): Boolean =
         !closed.get() && operationGeneration == generation.get()
 
@@ -362,7 +441,11 @@ internal class QueuedPersonalizationStore(
         synchronized(stateLock) {
             viewRevision.incrementAndGet()
             suggestionCache.clear()
-            if (clearPending) pendingQueries.clear()
+            frequencyCache.clear()
+            if (clearPending) {
+                pendingQueries.clear()
+                pendingFrequencyQueries.clear()
+            }
         }
     }
 
@@ -370,6 +453,11 @@ internal class QueuedPersonalizationStore(
         val prefix: String,
         val language: InputLanguage,
         val offset: Int,
+    )
+
+    private data class FrequencyKey(
+        val language: InputLanguage,
+        val word: String,
     )
 
     private data class QueryStamp(
@@ -380,6 +468,7 @@ internal class QueuedPersonalizationStore(
     private companion object {
         const val MAX_PENDING_OPERATIONS = 64
         const val MAX_CACHED_QUERIES = 64
+        const val MAX_CACHED_FREQUENCIES = 256
         const val MAX_SUGGESTION_LIMIT = 50
     }
 }

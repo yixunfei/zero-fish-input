@@ -24,12 +24,15 @@ class UserLexiconBoundaryTest {
         val store = MemoryStore()
         val repository = UserLexiconRepository(store)
         val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        val factory = dev.zeroinput.engine.rime.RimeEngineFactory(context)
+        val factory = dev.zeroinput.engine.rime.RimeEngineFactory(
+            context,
+            java.util.concurrent.Executors.newSingleThreadExecutor(),
+        )
         val engine = factory.createFallback()
         val connection = object : dev.zeroinput.ime.core.EditorConnection {
             override fun setComposingText(text: String) = Unit
             override fun finishComposingText() = Unit
-            override fun commitText(text: String) = Unit
+            override fun commitText(text: String) = true
             override fun deleteBeforeCursor() = Unit
             override fun performEditorAction(actionId: Int) = false
             override fun sendEnterKey() = Unit

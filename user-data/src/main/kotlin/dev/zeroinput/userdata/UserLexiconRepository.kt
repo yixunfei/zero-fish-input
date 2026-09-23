@@ -3,6 +3,7 @@ package dev.zeroinput.userdata
 import android.content.Context
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.LearnedSuggestionSource
+import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.PagedPersonalizationStore
@@ -20,7 +21,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /** All methods that access the store must run on a background worker. */
-class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggestionSource, PagedPersonalizationStore {
+class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggestionSource, PagedPersonalizationStore, PersonalFrequencyStore {
     constructor(context: Context) : this(EncryptedFileStore(
         context = context,
         fileName = "user-lexicon.bin",
@@ -57,6 +58,29 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
                 .map { PersonalSuggestion(it.id, it.value, it.frequency, it.shortcut) }
                 .toList()
             PersonalSuggestionPage(values.take(limit), values.size > limit)
+        }
+
+    /**
+     * Exact-value frequency lookup for association reranking.  Like every
+     * other store access here it must run on a background worker; the IME
+     * input thread reaches this data only through the queued adapter's
+     * prepared cache.
+     */
+    override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> =
+        synchronized(lock) {
+            val wanted = words.asSequence().map(String::trim).filter(String::isNotEmpty)
+                .distinct().take(PersonalFrequencyStore.MAX_LOOKUP).toSet()
+            if (wanted.isEmpty()) {
+                emptyMap()
+            } else {
+                val totals = HashMap<String, Int>(wanted.size)
+                for (term in loadTerms()) {
+                    if (term.language == language && term.value in wanted) {
+                        totals.merge(term.value, term.frequency, Int::plus)
+                    }
+                }
+                totals
+            }
         }
 
     fun list(language: InputLanguage? = null): List<UserTerm> = synchronized(lock) {

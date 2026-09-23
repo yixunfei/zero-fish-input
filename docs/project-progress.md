@@ -2,9 +2,37 @@
 
 Date: 2026-09-06
 
+## Association coverage follow-up (2026-09-21)
+
+The approved priority is association coverage and evaluation. The project-authored
+Chinese/English corpus grows from 286 to 1,698 pairs, including traditional-input
+aliases and longer scheduling/help-request chains. Single-character Chinese
+suffixes no longer trigger inside unrelated words. Public input fixtures expose
+and guard both ranked output and complete editor commit chains. The frozen set
+is a development/acceptance benchmark, not a blind quality estimate; broader
+independent and physical-device evaluation remains open. See
+[word-association-quality.md](word-association-quality.md).
+
+## Storage reliability follow-up (2026-09-21)
+
+The approved security-storage batch added ten JVM security tests and dedicated
+device regressions for lost keys, corrupt bodies, silent AtomicFile failures,
+clear/retry and concurrent metadata/removal. Reads no longer create replacement
+keys; incomplete clear blocks access in the current vault instance and attempts
+both dedicated resources. Queued management actions carry deletion generations,
+and failed index refresh hides stale cached rows. Grant expiry cannot exceed
+30 seconds. Authentication flow, aliases and persisted formats are unchanged.
+
+The current verification, reproduced failures and limitations are recorded in
+[security-storage-validation.md](security-storage-validation.md). Body/index
+atomicity is per file; process-local failure state does not guarantee recovery
+after process death. Hardware-bound authentication remains a separate design
+decision, with API 26/ARM and physical authentication acceptance outstanding.
+The original assessment below remains dated evidence, not the current test count.
+
 ## Initial public prerelease
 
-The public name is now `zero finish input`; internal identifiers and encrypted
+The public name is now `zero fish input`; internal identifiers and encrypted
 data formats retain their existing identity. The v0.1.0 prerelease adds the supplied
 logo and launcher artwork, installation/contribution documentation, private GitHub
 security reporting and packaged license/source notices. Validation and outstanding
@@ -74,13 +102,26 @@ changes were introduced. See [ADR 0005](adr/0005-user-lexicon-boundary.md).
 
 ## Next priorities
 
-- Apply equivalent bounded streaming validation to language-pack manifests and
-  verify actual expanded manifest bytes rather than trusting ZIP size metadata.
-- Expand authentication cancellation and delayed/double-callback tests for the
-  private clipboard, including settings changes and editor switches. These remain
-  predominantly manual acceptance scenarios; this iteration did not change them.
+- The next-word suggestion baseline now uses bundled public Chinese/English
+  phrase pairs, a memory-only prediction port and a bounded editor-local context.
+  It supports tap-to-chain continuations with a separate default-on switch and
+  conservative privacy gating. Coverage expansion and representative quality
+  evaluation remain open. See [verification](word-association-validation.md)
+  and [ADR 0013](adr/0013-offline-word-associations.md).
+
+- Language-pack manifests now use bounded byte streaming with strict UTF-8
+  decoding both during import and installed-package discovery; declared ZIP
+  sizes remain an early bound, while extraction still verifies actual bytes and
+  SHA-256 before activation.
+- Continue physical biometric/credential and delayed callback acceptance.
+  Automated consent, storage generation and grant-race coverage now exists;
+  tests requiring a configured device PIN must be reported separately from the
+  synthetic authorization tests. See the current storage validation report.
 - Measure Chinese typing and touch latency on physical ARM devices and target
   applications. Emulator timings are not evidence of OEM/device performance.
+- The full-pinyin secondary Rime session is now created only when related-reading
+  expansion is first requested. Lifecycle generation checks close queued native
+  work after a session ends; physical memory measurements are still required.
 - Continue localizing the remaining management pages and handling their worker
   failures consistently. Avoid adding more engine features before these checks.
 

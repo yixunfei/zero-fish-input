@@ -117,7 +117,7 @@ class ModelSessionPrivacyTest {
         override fun close() = Unit
     }
     private class Editor : EditorConnection {
-        override fun commitText(text: String) = Unit
+        override fun commitText(text: String) = true
         override fun setComposingText(text: String) = Unit
         override fun finishComposingText() = Unit
         override fun deleteBeforeCursor() = Unit

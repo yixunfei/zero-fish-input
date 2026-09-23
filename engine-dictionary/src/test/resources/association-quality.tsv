@@ -1,0 +1,159 @@
+# Project-authored public synthetic acceptance fixtures; Apache-2.0.
+# Frozen before the coverage expansion. This is not a blind or real-user benchmark.
+# id language category context acceptable-next-words (pipe-separated; - means abstain)
+zh001	zh	greeting	你好	世界|朋友|呀
+zh002	zh	greeting	非常感谢	支持|帮助|大家
+zh003	zh	greeting	祝你生日	快乐
+zh004	zh	greeting	早上	好
+zh005	zh	greeting	午安	朋友|大家|好梦
+zh006	zh	greeting	好久	不见
+zh007	zh	greeting	认识你	很高兴|很开心
+zh008	zh	greeting	一路	平安|顺风
+zh009	zh	arrangement	我们明天	见|早上|下午|晚上
+zh010	zh	arrangement	今天下午	见|好|有空
+zh011	zh	arrangement	下周	见|一|二|三|四|五|再聊
+zh012	zh	arrangement	有时间	吗|再聊|一起吃饭
+zh013	zh	arrangement	约个	时间|地方
+zh014	zh	arrangement	周六	见|下午|上午|晚上
+zh015	zh	arrangement	明天上午	见|开会|有空
+zh016	zh	arrangement	待会	见|再聊|联系
+zh017	zh	work	解决	问题|方案
+zh018	zh	work	会议	时间|开始|记录
+zh019	zh	work	请查收	附件|邮件|文件
+zh020	zh	work	邮件	收到|附件|地址
+zh021	zh	work	反馈	意见|问题|结果
+zh022	zh	work	确认一下	时间|地址|信息
+zh023	zh	work	保持	联系|沟通|安静
+zh024	zh	work	截止	时间|日期
+zh025	zh	travel	准备	好了|出发
+zh026	zh	travel	路上	小心|注意安全|堵车
+zh027	zh	travel	到家	了吗|了|再联系
+zh028	zh	travel	快到	了|家了
+zh029	zh	travel	地铁	站|到了|线路
+zh030	zh	travel	导航	路线|地址
+zh031	zh	travel	旅途	愉快|顺利
+zh032	zh	travel	注意交通	安全
+zh033	zh	food	一起吃饭	了吗|吧|怎么样
+zh034	zh	food	早餐	吃了吗|吃什么|时间
+zh035	zh	food	午饭	吃什么|吃了吗|时间
+zh036	zh	food	晚饭	吃什么|吃了吗|一起吃
+zh037	zh	food	喝点	水|茶|咖啡
+zh038	zh	food	一杯	咖啡|茶|水
+zh039	zh	food	少放	盐|辣椒|糖
+zh040	zh	food	多喝	水|热水
+zh041	zh	study	学习	进步|计划|方法
+zh042	zh	study	每天	学习|运动|坚持
+zh043	zh	study	阅读	理解|计划|时间
+zh044	zh	study	复习	功课|计划|资料
+zh045	zh	study	考试	顺利|加油|时间
+zh046	zh	study	认真	学习|听讲|思考
+zh047	zh	study	查阅	资料|文献
+zh048	zh	study	笔记	整理|记录|本
+zh049	zh	health	注意	安全|休息|身体
+zh050	zh	health	早点	休息|睡觉|回来
+zh051	zh	health	按时	吃饭|休息|吃药
+zh052	zh	health	好好	休息|学习|吃饭
+zh053	zh	health	保重	身体
+zh054	zh	health	运动	健康|时间|计划
+zh055	zh	health	心情	很好|不错
+zh056	zh	health	一切	顺利|都好|正常
+zh057	zh	support	请问	一下
+zh058	zh	support	帮我	看看|一下|确认一下
+zh059	zh	support	需要	帮助|确认|准备
+zh060	zh	support	联系	方式|电话|我们
+zh061	zh	support	稍后	回复|联系|再试
+zh062	zh	support	不着急	慢慢来|等你
+zh063	zh	support	期待	见面|合作|回复
+zh064	zh	support	欢迎回来	朋友|继续
+zh065	zh	traditional	謝謝你	的幫助|的支持
+zh066	zh	traditional	請查收	附件|郵件|文件
+zh067	zh	traditional	聯繫	方式|電話|我們
+zh068	zh	traditional	旅途	愉快|順利
+zh069	zh	traditional	考試	順利|加油|時間
+zh070	zh	traditional	準備出發	了|吧
+zh071	zh	traditional	約個	時間|地方
+zh072	zh	traditional	按時	吃飯|休息|吃藥
+en001	en	greeting	hello	world|there
+en002	en	greeting	GOOD	morning|night|afternoon|evening|luck|idea
+en003	en	greeting	happy	birthday|holidays
+en004	en	greeting	thank you very	much
+en005	en	greeting	good morning	everyone|there
+en006	en	greeting	good night	everyone|dear
+en007	en	greeting	nice to	meet|see
+en008	en	greeting	long time	no
+en009	en	arrangement	see you tomorrow	morning|afternoon|evening
+en010	en	arrangement	next	week|time|month|year
+en011	en	arrangement	this weekend	works|sounds
+en012	en	arrangement	are you	free|ready|available|there
+en013	en	arrangement	what time	is|works
+en014	en	arrangement	let us	meet|start|know
+en015	en	arrangement	sounds	good|great
+en016	en	arrangement	see you next	week|time|month
+en017	en	work	please	send|check|confirm|wait
+en018	en	work	please find	the|attached
+en019	en	work	please find the	attached|document|file
+en020	en	work	the attached	file|document|report
+en021	en	work	project	update|plan|status
+en022	en	work	status	update|report
+en023	en	work	looking forward to	your|hearing|seeing
+en024	en	work	keep me	posted|updated
+en025	en	travel	on my	way
+en026	en	travel	i am on my	way
+en027	en	travel	arrived	at|safely|home
+en028	en	travel	drive	safely|carefully
+en029	en	travel	safe	travels|trip|journey
+en030	en	travel	train	station|ticket
+en031	en	travel	bus	stop|station
+en032	en	travel	see you at	the|home
+en033	en	food	have a	nice|good|great
+en034	en	food	would you like	to|some|a
+en035	en	food	a cup of	coffee|tea|water
+en036	en	food	for	lunch|dinner|breakfast|your|the
+en037	en	food	what about	lunch|dinner|tomorrow
+en038	en	food	enjoy your	meal|day|weekend
+en039	en	food	drink	water|tea|coffee
+en040	en	food	lunch	break|time|tomorrow
+en041	en	study	i want to	know|go|see|learn
+en042	en	study	learn	more|english|together
+en043	en	study	read	the|more|a
+en044	en	study	practice	makes|every|daily
+en045	en	study	practice makes	perfect
+en046	en	study	take	notes|care|time
+en047	en	study	study	plan|hard|together
+en048	en	study	good luck	with|tomorrow
+en049	en	health	take care	of
+en050	en	health	get	well|some|ready
+en051	en	health	get well	soon
+en052	en	health	feel	better|free|good
+en053	en	health	stay	safe|healthy|well
+en054	en	health	i hope	you|so|that
+en055	en	health	you feel	better|well
+en056	en	health	all the	best|time
+en057	en	support	can you	help|check|send
+en058	en	support	could you	please|help|send|check
+en059	en	support	please let me	know
+en060	en	support	happy to	help|hear
+en061	en	support	thanks for	your|the|help
+en062	en	support	thanks for your	help|time|support|patience
+en063	en	support	no	problem|worries
+en064	en	support	i appreciate	your|it|the
+zh073	zh	abstention	忘我	-
+zh074	zh	abstention	自我	-
+zh075	zh	abstention	无我	-
+zh076	zh	abstention	舍我	-
+zh077	zh	abstention	陌生前缀	-
+zh078	zh	abstention	量子隧穿	-
+zh079	zh	abstention	椭圆曲线	-
+zh080	zh	abstention	星际尘埃	-
+zh081	zh	abstention	hello	-
+zh082	zh	abstention	thank you	-
+en065	en	abstention	xhello	-
+en066	en	abstention	notgood	-
+en067	en	abstention	xthankyou	-
+en068	en	abstention	xonmy	-
+en069	en	abstention	lattice	-
+en070	en	abstention	quaternion	-
+en071	en	abstention	nebula	-
+en072	en	abstention	xylophone	-
+en073	en	abstention	你好	-
+en074	en	abstention	谢谢	-

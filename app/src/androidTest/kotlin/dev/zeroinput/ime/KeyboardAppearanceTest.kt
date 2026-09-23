@@ -24,6 +24,27 @@ import org.junit.runner.RunWith
 class KeyboardAppearanceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun attachedPublicAssociationsRenderInBothModes() {
+        for (night in listOf(false, true)) {
+            val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardPreviewFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("night", night)) as KeyboardPreviewFixtureActivity
+            try {
+                instrumentation.waitForIdleSync()
+                var height = 0
+                onMain {
+                    height = activity.keyboard.height
+                    activity.keyboard.renderSession(InputSessionState(snapshot = EngineSnapshot(candidates =
+                        listOf("世界", "朋友", "呀").mapIndexed { index, word -> Candidate("association:$index", word,
+                            kind = dev.zeroinput.engine.api.CandidateKind.NEXT_WORD) })))
+                }
+                instrumentation.waitForIdleSync()
+                SystemClock.sleep(150)
+                onMain { assertEquals(height, activity.keyboard.height) }
+                capture("associations-${if (night) "dark" else "light"}.png", activity.keyboard)
+            } finally { onMain { activity.finish() } }
+        }
+    }
+
     @Test fun appearanceSelectionPersistsAndUpdatesTheActualPreviewGeometry() {
         val settings = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph.settings
         val original = settings.keyboardAppearance

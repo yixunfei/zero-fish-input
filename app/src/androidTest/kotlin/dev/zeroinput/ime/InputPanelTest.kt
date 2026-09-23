@@ -33,6 +33,34 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class InputPanelTest {
     @Test
+    fun associationsKeepKeyboardSizeAndCandidateIdentityAcrossThemesAndOrientations() = onMain {
+        for (night in listOf(false, true)) for (width in listOf(320, 411, 800)) {
+            val landscape = width == 800
+            val panel = panel(night, landscape)
+            measure(panel, width)
+            val height = panel.measuredHeight
+            val candidates = listOf(Candidate("association:1:0", "世界",
+                kind = dev.zeroinput.engine.api.CandidateKind.NEXT_WORD))
+            panel.renderSession(InputSessionState(snapshot = EngineSnapshot(candidates = candidates)))
+            measure(panel, width)
+            assertTrue("Associations must preserve keyboard height", panel.measuredHeight == height)
+            assertTrue(visible(panel).any { it is KeyboardPanel })
+            assertTrue(visible(panel).filterIsInstance<TextView>().any {
+                it.text == panel.context.getString(dev.zeroinput.ime.ui.R.string.word_associations)
+            })
+            assertFalse(visible(panel).any {
+                it.contentDescription == panel.context.getString(dev.zeroinput.ime.ui.R.string.expand_candidates)
+            })
+            var selectedId = ""
+            panel.onCandidateSelected = { _, id -> selectedId = id }
+            button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.candidate_description, "世界")).performClick()
+            assertTrue(selectedId == candidates.single().id)
+            assertLabelsFit(panel)
+            panel.release()
+        }
+    }
+
+    @Test
     fun compositionAndLoadingStatusDoNotTakeWidthFromCandidates() = onMain {
         val panel = panel(false)
         panel.renderEngineStatus(InputEngineStatus.PREPARING)
@@ -57,7 +85,7 @@ class InputPanelTest {
         var pageRequests = 0
         var selection = -1
         panel.onCandidatePageChanged = { pageRequests++ }
-        panel.onCandidateSelected = { selection = it }
+        panel.onCandidateSelected = { index, _ -> selection = index }
         measure(panel, 320)
         val height = panel.height
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expand_candidates)).performClick()
@@ -86,7 +114,7 @@ class InputPanelTest {
         panel.renderSession(candidateState())
         measure(panel, 320)
         var selected = false
-        panel.onCandidateSelected = { selected = true }
+        panel.onCandidateSelected = { _, _ -> selected = true }
         val target = button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.candidate_description, "你好"))
         touch(target, MotionEvent.ACTION_DOWN)
         panel.renderSession(InputSessionState(snapshot = EngineSnapshot("hao", "hao", listOf(Candidate("changed", "好")))))

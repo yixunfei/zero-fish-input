@@ -74,6 +74,13 @@ class SettingsPanelTest {
             View.MeasureSpec.makeMeasureSpec(width * 2, View.MeasureSpec.EXACTLY))
         panel.layout(0, 0, panel.measuredWidth, panel.measuredHeight)
         val all = descendants(panel)
+        val association = all.filterIsInstance<com.google.android.material.materialswitch.MaterialSwitch>()
+            .single { it.text == context.getString(R.string.setting_word_associations) }
+        assertTrue(association.isChecked)
+        var enabled = true
+        panel.onWordAssociationsChanged = { enabled = it }
+        association.performClick()
+        assertTrue(!enabled)
         val groups = all.filterIsInstance<MaterialButtonToggleGroup>()
         assertEquals(3, groups.size)
         for (group in groups) {

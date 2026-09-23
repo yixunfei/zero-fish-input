@@ -10,6 +10,12 @@ gradlew text eol=lf
 *.xml text eol=lf
 *.md text eol=lf
 
+# Keep the public association corpus and frozen evaluation hashes reproducible.
+engine-dictionary/src/main/resources/word-associations.tsv text eol=lf
+engine-dictionary/src/test/resources/association-quality*.tsv text eol=lf
+engine-dictionary/src/main/resources/reference-pinyin.tsv text eol=lf
+engine-dictionary/src/test/resources/candidate-quality*.tsv text eol=lf
+
 # Preserve exact upstream bytes used by the bootstrap SHA-256 checks.
 engine-rime/src/main/assets/rime/luna_pinyin.dict.yaml -text
 engine-rime/src/main/assets/rime/essay.txt -text

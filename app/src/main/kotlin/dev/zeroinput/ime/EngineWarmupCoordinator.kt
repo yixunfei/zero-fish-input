@@ -112,6 +112,7 @@ internal class EngineWarmupCoordinator(
                     isSensitive = request.privacy.isSensitive,
                     learningAllowed = request.privacy.learningAllowed,
                     packageName = request.packageName,
+                    predictionsAllowed = request.privacy.predictionsAllowed,
                 ),
             )
             PreparedInputEngine(

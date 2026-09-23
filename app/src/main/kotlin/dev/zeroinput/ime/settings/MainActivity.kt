@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         screen.onSecureClipboardChanged = ::setSecureClipboardEnabled
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
+        screen.onWordAssociationsChanged = { graph.settings.wordAssociationsEnabled = it; render() }
         screen.onAppearanceRequested = { startActivity(Intent(this, KeyboardAppearanceActivity::class.java)) }
         screen.onChineseOptionsChanged = { graph.settings.chineseInputOptions = it; render() }
         screen.onModelRankingChanged = { graph.settings.experimentalModelRanking = it; render() }
@@ -226,6 +227,7 @@ class MainActivity : AppCompatActivity() {
                 incognitoMode = graph.settings.incognitoMode,
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,
+                wordAssociationsEnabled = graph.settings.wordAssociationsEnabled,
                 engineStatus = engine,
                 chineseOptions = graph.settings.chineseInputOptions,
                 experimentalModelRanking = graph.settings.experimentalModelRanking,

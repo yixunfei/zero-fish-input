@@ -111,7 +111,7 @@ class ModelRankingTest {
 
     private class Editor : EditorConnection {
         var committed = ""
-        override fun commitText(text: String) { committed += text }
+        override fun commitText(text: String): Boolean { committed += text; return true }
         override fun setComposingText(text: String) = Unit
         override fun finishComposingText() = Unit
         override fun deleteBeforeCursor() = Unit

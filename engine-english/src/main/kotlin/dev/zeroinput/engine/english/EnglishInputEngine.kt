@@ -20,6 +20,12 @@ class EnglishInputEngine(
     private val buffer = StringBuilder()
     private var currentSnapshot = EngineSnapshot.Empty
     private var learnedSuggestionsAllowed = true
+    private var predictionsAllowed = true
+    // InputEngine calls are serialized by the session controller. These
+    // scratch collections therefore belong to this engine instance and can be
+    // reused for every snapshot without exposing mutable state in a snapshot.
+    private val seenWords = HashSet<String>(MAX_CANDIDATES * 2)
+    private val scoredWords = ArrayList<ScoredWord>(MAX_CANDIDATES * 2)
 
     override val snapshot: EngineSnapshot
         get() = currentSnapshot
@@ -28,7 +34,8 @@ class EnglishInputEngine(
         // Learned terms are personal data.  The engine must apply the same
         // session privacy decision as the controller before querying its
         // optional learned-suggestion source.
-        learnedSuggestionsAllowed = context.learningAllowed && !context.isSensitive
+        predictionsAllowed = context.predictionsAllowed && !context.isSensitive
+        learnedSuggestionsAllowed = context.learningAllowed && predictionsAllowed
         return reset()
     }
 
@@ -88,6 +95,7 @@ class EnglishInputEngine(
     private fun createSnapshot(): EngineSnapshot {
         val typed = buffer.toString()
         if (typed.isEmpty()) return EngineSnapshot.Empty
+        if (!predictionsAllowed) return EngineSnapshot(rawInput = typed, composition = typed)
 
         val normalized = typed.lowercase()
         val learned = if (learnedSuggestionsAllowed) {
@@ -99,13 +107,13 @@ class EnglishInputEngine(
         // iterator and a lambda for every stage on each keystroke, while the
         // lexicon is small enough that loops are allocation-light.  Keeping
         // the first occurrence of a word mirrors the previous distinctBy.
-        val seen = HashSet<String>(MAX_CANDIDATES * 2)
-        val scored = ArrayList<Pair<String, Int>>(MAX_CANDIDATES * 2)
+        seenWords.clear()
+        scoredWords.clear()
         fun collect(word: String, score: Int) {
-            if (seen.add(word.lowercase())) scored.add(word to score)
+            if (seenWords.add(word.lowercase())) scoredWords.add(ScoredWord(word, score))
         }
         collect(typed, Int.MAX_VALUE)
-        learned.forEach { collect(it.text, 10_000 + it.weight) }
+        for (term in learned) collect(term.text, 10_000 + term.weight)
         var matched = 0
         for (word in lexicon) {
             if (matched >= MAX_CANDIDATES) break
@@ -114,15 +122,15 @@ class EnglishInputEngine(
                 matched++
             }
         }
-        scored.sortByDescending { it.second }
-        val limit = minOf(scored.size, MAX_CANDIDATES)
+        scoredWords.sortWith(SCORED_WORD_COMPARATOR)
+        val limit = minOf(scoredWords.size, MAX_CANDIDATES)
         val candidates = ArrayList<Candidate>(limit)
         for (index in 0 until limit) {
-            val (word, score) = scored[index]
+            val scored = scoredWords[index]
             candidates += Candidate(
-                id = "english:$index:$word",
-                text = preserveCase(typed, word),
-                score = score,
+                id = "english:$index:${scored.word}",
+                text = preserveCase(typed, scored.word),
+                score = scored.score,
             )
         }
 
@@ -143,6 +151,7 @@ class EnglishInputEngine(
 
     companion object {
         private const val MAX_CANDIDATES = 8
+        private val SCORED_WORD_COMPARATOR = compareByDescending<ScoredWord> { it.score }
 
         val Descriptor = EngineDescriptor(
             id = "zeroinput.english",
@@ -151,4 +160,6 @@ class EnglishInputEngine(
             languages = setOf(InputLanguage.ENGLISH),
         )
     }
+
+    private data class ScoredWord(val word: String, val score: Int)
 }

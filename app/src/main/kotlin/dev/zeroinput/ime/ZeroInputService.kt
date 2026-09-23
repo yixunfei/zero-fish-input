@@ -110,20 +110,21 @@ class ZeroInputService : InputMethodService() {
     private var nativeRetryRequested = false
 
     // Settings-derived values mirrored in memory so the per-keystroke engine
-    // probe does not re-read SharedPreferences.  Refreshed synchronously by the
-    // settings observer below, before its posted main-thread turn, so a
-    // privacy tightening is visible to the next key dispatch without delay.
-    // @Volatile: a commit() write could invoke the observer off the IME looper.
+    // probe does not re-read SharedPreferences. Refreshed synchronously by the
+    // settings observer before its posted main-thread turn; this preserves the
+    // immediate privacy-tightening boundary for the next key dispatch.
     @Volatile private var configuredChineseOptions = ChineseInputOptions()
     @Volatile private var configuredChineseEngine = ChineseEngineChoice.RIME
     @Volatile private var configuredPrivacy = PrivacyConfiguration()
     @Volatile private var configuredHapticFeedback = true
+    @Volatile private var configuredWordAssociations = true
 
     private fun refreshConfiguredSettings() {
         configuredChineseOptions = graph.settings.chineseInputOptions
         configuredChineseEngine = graph.settings.chineseEngine
         configuredPrivacy = graph.settings.privacyConfiguration()
         configuredHapticFeedback = graph.settings.hapticFeedbackEnabled
+        configuredWordAssociations = graph.settings.wordAssociationsEnabled
     }
     @Volatile
     private var secureClipboardRequest: SecureClipboardRequest? = null
@@ -198,8 +199,7 @@ class ZeroInputService : InputMethodService() {
             // turn below. Advance the generation immediately so a queued
             // personal-data write cannot win a race with a privacy change.
             invalidatePendingPersonalization()
-            // Refresh the mirrored settings here, still synchronously, so the
-            // next key dispatch on the IME looper observes the new values.
+            // Publish all mirrored settings before the posted UI reconciliation.
             refreshConfiguredSettings()
             mainHandler.post {
                 // Settings can be changed while the authentication activity
@@ -251,6 +251,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        controller?.invalidateWordAssociations()
         modelRanking.invalidate()
         inputView?.release()
         val appearance = graph.settings.keyboardAppearance
@@ -290,10 +291,13 @@ class ZeroInputService : InputMethodService() {
             graph.settings.lastLanguagePackKey = null
         }
         val initialPackKey = graph.settings.lastLanguagePackKey
-        sessionChineseOptions = graph.settings.chineseInputOptions
-        sessionChineseEngine = graph.settings.chineseEngine
+        sessionChineseOptions = configuredChineseOptions
+        sessionChineseEngine = configuredChineseEngine
         val editor = AndroidEditorConnection(attribute.initialSelStart, attribute.initialSelEnd,
-            onCommitted = modelRanking::committed, onContextInvalidated = modelRanking::invalidate) {
+            onCommitted = modelRanking::committed, onContextInvalidated = {
+                modelRanking.invalidate()
+                if (activeSession?.token == token) controller?.invalidateWordAssociations()
+            }) {
             if (activeSession?.token == token) connectionBinding.resolve(currentInputConnection) else null
         }
         editorConnection = editor
@@ -319,6 +323,10 @@ class ZeroInputService : InputMethodService() {
             languagePackProvider = { null },
             languagePackDiscoveryComplete = graph::isLanguagePackDiscoveryComplete,
             deferHeavyEngineCreation = true,
+            nextWordPredictor = graph.nextWordPredictor,
+            wordAssociationsEnabled = { inputViewActive && configuredWordAssociations &&
+                configuredPrivacy.learningEnabled && !configuredPrivacy.incognitoMode &&
+                activeSession?.token == token && connectionBinding.resolve(currentInputConnection) != null },
         )
         val session = InputSession(token, newController, connectionBinding, attribute.packageName)
         activeSession = session
@@ -327,7 +335,7 @@ class ZeroInputService : InputMethodService() {
         newController.start(
             editorInfo = attribute,
             initialLanguage = initialLanguage,
-            privacyConfiguration = graph.settings.privacyConfiguration(),
+            privacyConfiguration = configuredPrivacy,
             languagePackKey = initialPackKey,
         )
         scheduleEngineWarmup(session, force = true)
@@ -368,6 +376,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        controller?.invalidateWordAssociations()
         modelRanking.invalidate()
         controller?.clearModelRanking()
         controller?.invalidateReconversion()
@@ -518,7 +527,7 @@ class ZeroInputService : InputMethodService() {
         view.onEngineRetryRequested = ::retryEngine
         view.onScriptSwitchRequested = {
             registerInteraction()
-            val current = graph.settings.chineseInputOptions
+            val current = configuredChineseOptions
             graph.settings.chineseInputOptions = current.copy(script =
                 if (current.script == dev.zeroinput.engine.api.ChineseScript.SIMPLIFIED)
                     dev.zeroinput.engine.api.ChineseScript.TRADITIONAL
@@ -526,14 +535,14 @@ class ZeroInputService : InputMethodService() {
             refreshConfiguredSettings()
             reconcileChineseOptions()
         }
-        view.onCandidateSelected = { handleControllerCommand(InputCommand.SelectCandidate(it)) }
+        view.onCandidateSelected = { index, id -> handleControllerCommand(InputCommand.SelectCandidate(index, id)) }
         view.onReconvertRequested = { handleControllerCommand(InputCommand.ReconvertLast) }
         view.onUndoSelectionRequested = { handleControllerCommand(InputCommand.UndoSelection) }
         view.onSyllableRequested = { handleControllerCommand(InputCommand.SelectSyllable) }
         view.onReadingSelected = { handleControllerCommand(InputCommand.SelectReading(it)) }
         view.onLayoutSwitchRequested = {
             registerInteraction()
-            val options = graph.settings.chineseInputOptions
+            val options = configuredChineseOptions
             graph.settings.chineseInputOptions = options.copy(keyboardLayout =
                 if (options.keyboardLayout == ChineseKeyboardLayout.FULL) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL)
             refreshConfiguredSettings()
@@ -565,7 +574,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun handleKeyboardAction(action: KeyboardAction) {
-        registerInteraction()
+        registerInteraction(preserveWordAssociations = true)
         syncSessionPrivacy()
         maybeReloadLanguagePack()
         if (action is KeyboardAction.Text || action == KeyboardAction.Backspace) modelRanking.typing()
@@ -602,7 +611,7 @@ class ZeroInputService : InputMethodService() {
     private fun handleControllerCommand(command: InputCommand) {
         if (command == InputCommand.ReconvertLast || command == InputCommand.UndoSelection ||
             command is InputCommand.SelectReading || command == InputCommand.SelectSyllable) modelRanking.invalidate()
-        registerInteraction(preserveReconversion = command == InputCommand.ReconvertLast)
+        registerInteraction(preserveReconversion = command == InputCommand.ReconvertLast, preserveWordAssociations = true)
         syncSessionPrivacy()
         maybeReloadLanguagePack()
         controller?.handle(command)
@@ -818,12 +827,30 @@ class ZeroInputService : InputMethodService() {
                     startActivity(Intent(this, dev.zeroinput.ime.clipboard.ClipboardSelectionImportActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         .putExtra(dev.zeroinput.ime.clipboard.ClipboardSelectionImportActivity.EXTRA_TOKEN, token))
+                    protectSystemClipAfterPrivateCopy(session)
                 } catch (_: RuntimeException) {
                     transfer.close()
                     Toast.makeText(this, R.string.operation_failed, Toast.LENGTH_SHORT).show()
                 }
             }
         }
+    }
+
+    /**
+     * An explicit private copy is a foreground authorization moment for
+     * automatic-mode current-item protection (ADR 0012): once the selection
+     * is captured for the private vault, a stale system clip left behind by
+     * a source-app copy is cleared when the user opted into listening plus
+     * automatic clearing. The session lease revokes the queued operation if
+     * the editing context changes first; the guard never reads the payload.
+     */
+    private fun protectSystemClipAfterPrivateCopy(session: InputSession) {
+        val options = graph.clipboardGuardPreferences.options
+        if (!options.listening ||
+            options.clearMode != dev.zeroinput.ime.clipboardguard.ClipboardClearMode.AUTOMATIC ||
+            graph.clipboardGuard.state.options != options
+        ) return
+        graph.clipboardGuard.inspectCurrent(isActive = { activeSession === session }, result = {}, automatic = true)
     }
 
     private fun renderLocalPanels(view: ZeroInputView) {
@@ -1060,6 +1087,7 @@ class ZeroInputService : InputMethodService() {
         activeSession = null
         controller = null
         editorConnection = null
+        inputView?.renderEngineStatus(InputEngineStatus.HIDDEN)
         mainHandler.removeCallbacks(reconversionExpiry)
         reconversionExpiryScheduled = false
         languagePackReloadPending = false
@@ -1191,7 +1219,9 @@ class ZeroInputService : InputMethodService() {
 
     /** Records an interaction and cancels work that was authorized in an
      * older UI state.  All callers run on the IME main thread. */
-    private fun registerInteraction(preserveReconversion: Boolean = false, preservePasteConsent: Boolean = false) {
+    private fun registerInteraction(preserveReconversion: Boolean = false, preservePasteConsent: Boolean = false,
+        preserveWordAssociations: Boolean = false) {
+        if (!preserveWordAssociations) controller?.invalidateWordAssociations()
         modelRanking.interaction()
         interactionSequence++
         if (!preservePasteConsent) cancelPasteConsent()

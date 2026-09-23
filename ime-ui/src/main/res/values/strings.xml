@@ -6,7 +6,7 @@
     <string name="select_single_syllable">逐字选字</string>
     <string name="clipboard_guard_open">系统剪贴板防护</string>
     <string name="clipboard_guard_changed">系统剪贴板已变化</string>
-    <string name="keyboard_settings">zero finish input 设置</string>
+    <string name="keyboard_settings">zero fish input 设置</string>
     <string name="secure_clipboard_item">%1$s</string>
     <string name="secure_clipboard_item_description">认证并粘贴 %1$s</string>
     <string name="candidate_description">候选 %1$s</string>
@@ -16,6 +16,8 @@
     <string name="next_candidates">下一页候选</string>
     <string name="retry_engine">重试中文输入</string>
     <string name="engine_preparing">中文准备中</string>
+    <string name="engine_preparing_basic">中文准备中 · 基础输入可用</string>
+    <string name="engine_preparing_notice">中文仍在准备，当前仅支持基础输入，候选可能不全。准备完成后将自动启用。</string>
     <string name="engine_ready">中文已就绪</string>
     <string name="engine_pending_configuration">待本次输入结束后应用</string>
     <string name="engine_failed">中文加载失败</string>
@@ -100,4 +102,5 @@
     <string name="secure_clipboard_confirm_hint">请确认当前输入框，再粘贴所选片段</string>
     <string name="secure_clipboard_confirm_paste">确认粘贴</string>
     <string name="secure_clipboard_cancel_paste">取消粘贴</string>
+    <string name="word_associations">联想</string>
 </resources>

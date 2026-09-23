@@ -12,12 +12,20 @@ internal class ExpressionBrowserState {
     var personal = PersonalExpressionsUi()
         private set
     private var recent = emptyList<String>()
+    // visible() runs on every expression-panel keystroke.  The catalog is
+    // constant and personal data only changes through renderPersonal, so the
+    // concatenated list and the RECENT index are rebuilt only at that point
+    // instead of on every call.
+    private var allCache: List<EmojiEntry>? = null
+    private var recentIndexCache: Map<String, EmojiEntry>? = null
 
     fun renderPersonal(allowed: Boolean, data: PersonalExpressionsUi, values: List<String>) {
         if (!allowed && personalizationAllowed) clearQuery()
         personalizationAllowed = allowed
         personal = if (allowed) data else PersonalExpressionsUi()
-        recent = if (allowed) values.take(128) else emptyList()
+        recent = if (allowed) values.take(128).distinct() else emptyList()
+        allCache = null
+        recentIndexCache = null
     }
 
     fun append(value: String) {
@@ -35,11 +43,12 @@ internal class ExpressionBrowserState {
     fun clearQuery() { query = "" }
 
     fun visible(): List<EmojiEntry> {
-        val all = EmojiCatalog.entries + personal.custom
+        val all = allCache ?: (EmojiCatalog.entries + personal.custom).also { allCache = it }
         val source = when {
             category == EmojiCategory.RECENT -> {
-                val indexed = all.associateBy(EmojiEntry::value)
-                recent.distinct().mapNotNull(indexed::get)
+                val indexed = recentIndexCache
+                    ?: all.associateBy(EmojiEntry::value).also { recentIndexCache = it }
+                recent.mapNotNull(indexed::get)
             }
             category == EmojiCategory.FAVORITES -> all.filter { it.value in personal.favorites }
             category == EmojiCategory.CUSTOM -> personal.custom

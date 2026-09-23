@@ -11,7 +11,10 @@ import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.EngineUpdate
 import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.engine.api.NextWordPredictor
+import dev.zeroinput.engine.api.NextWordSuggestion
 import dev.zeroinput.engine.api.PageDirection
+import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.ReadingSelectionEngine
@@ -22,6 +25,50 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InputSessionControllerTest {
+    @Test fun `prediction restriction follows engine switches and clears on ordinary editor restart`() {
+        val contexts = mutableListOf<EditorContext>()
+        val controller = InputSessionController(RecordingConnection(), {
+            object : InputEngine by TestEngine() {
+                override fun start(context: EditorContext): EngineSnapshot {
+                    contexts += context
+                    return EngineSnapshot.Empty
+                }
+            }
+        }, RecordingPersonalization())
+        controller.start(textEditor().apply {
+            inputType = inputType or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }, InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.setLanguage(InputLanguage.ENGLISH)
+        assertEquals(listOf(InputLanguage.CHINESE, InputLanguage.ENGLISH), contexts.map { it.language })
+        assertTrue(contexts.none { it.predictionsAllowed || it.learningAllowed })
+        controller.start(textEditor().apply { imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING },
+            InputLanguage.ENGLISH, PrivacyConfiguration())
+        assertTrue(contexts.last().predictionsAllowed)
+        assertFalse(contexts.last().learningAllowed)
+        controller.close()
+    }
+
+    @Test fun `no suggestions editor keeps Chinese selection without reading or learning personal data`() {
+        for (command in listOf(InputCommand.SelectCandidate(0), InputCommand.Space, InputCommand.Enter)) {
+            val connection = ComposingRecordingConnection()
+            val personal = RecordingPersonalization()
+            val controller = controller(connection, personal)
+            controller.start(textEditor().apply {
+                inputType = inputType or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            }, InputLanguage.CHINESE, PrivacyConfiguration())
+            "nihao".forEach { controller.handle(InputCommand.Text(it.toString())) }
+            assertTrue(controller.state.snapshot.candidates.any { it.text == "你好" })
+            assertTrue(connection.commits.isEmpty())
+            controller.handle(command)
+            assertEquals(listOf("你好"), connection.commits)
+            assertFalse(controller.state.snapshot.isComposing)
+            assertEquals(0, personal.suggestionCalls)
+            assertTrue(personal.learned.isEmpty())
+            assertTrue(personal.usedIds.isEmpty())
+            controller.close()
+        }
+    }
+
     @Test fun `space and enter on a later personal page commit its visible selection`() {
         for (command in listOf(InputCommand.Space, InputCommand.Enter)) {
             val editor = RecordingConnection()
@@ -628,6 +675,132 @@ class InputSessionControllerTest {
         assertEquals("pack@1", controller.state.languagePackKey)
     }
 
+    @Test
+    fun `learning write failures are counted without breaking commits`() {
+        val connection = RecordingConnection()
+        val store = object : PersonalizationStore {
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) {
+                throw IllegalStateException("store unavailable")
+            }
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, store)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.handle(InputCommand.Space)
+        assertEquals(listOf("你好"), connection.commits)
+        assertEquals(1, controller.learningFailureCount)
+        controller.handle(InputCommand.Text("ni"))
+        controller.handle(InputCommand.Space)
+        assertEquals(listOf("你好", "你好"), connection.commits)
+        assertEquals(2, controller.learningFailureCount)
+        controller.close()
+    }
+
+    @Test
+    fun `recordUse failure is counted and the personal candidate still commits`() {
+        val connection = RecordingConnection()
+        val store = object : PersonalizationStore {
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                if (prefix.isEmpty()) emptyList() else listOf(PersonalSuggestion("fixture", "词组", 1))
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) {
+                throw IllegalStateException("store unavailable")
+            }
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, store)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        assertEquals("词组", controller.state.snapshot.candidates.first().text)
+        controller.handle(InputCommand.SelectCandidate(0))
+        assertEquals(listOf("词组"), connection.commits)
+        assertEquals(1, controller.learningFailureCount)
+        controller.close()
+    }
+
+    @Test
+    fun `association order follows personal frequency and an accepted click writes back`() {
+        val connection = RecordingConnection()
+        val learned = mutableListOf<Pair<String, String>>()
+        val store = object : PersonalFrequencyStore {
+            override fun frequenciesFor(words: List<String>, language: InputLanguage) = mapOf("世界" to 9)
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) {
+                learned += shortcut to value
+            }
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, store,
+            nextWordPredictor = NextWordPredictor { _, _, _ ->
+                listOf(NextWordSuggestion("朋友"), NextWordSuggestion("世界"))
+            })
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.handle(InputCommand.Space)
+        // The static table order 朋友→世界 is reranked by the learned frequency.
+        assertEquals(listOf("世界", "朋友"), controller.state.snapshot.candidates.map { it.text })
+        controller.handle(InputCommand.SelectCandidate(0))
+        assertEquals(listOf("你好", "世界"), connection.commits)
+        // The typed commit learns through apply(); the association click then
+        // writes itself back.  ADR 0014 phase 1: the Chinese value itself is
+        // the shortcut.
+        assertEquals(listOf("ni" to "你好", "世界" to "世界"), learned)
+        controller.close()
+    }
+
+    @Test
+    fun `association write-back failure is counted without breaking the commit`() {
+        val connection = RecordingConnection()
+        val store = object : PersonalizationStore {
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) {
+                // Only the association write-back fails; the typed commit's own
+                // learning succeeds so the counter isolates the click path.
+                if (value == "朋友") throw IllegalStateException("store unavailable")
+            }
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, store,
+            nextWordPredictor = NextWordPredictor { _, _, _ -> listOf(NextWordSuggestion("朋友")) })
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.handle(InputCommand.Space)
+        assertEquals(listOf("朋友"), controller.state.snapshot.candidates.map { it.text })
+        controller.handle(InputCommand.SelectCandidate(0))
+        assertEquals(listOf("你好", "朋友"), connection.commits)
+        assertEquals(1, controller.learningFailureCount)
+        controller.close()
+    }
+
+    @Test
+    fun `sensitive editors never query the frequency port for associations`() {
+        var lookups = 0
+        val connection = RecordingConnection()
+        val store = object : PersonalFrequencyStore {
+            override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
+                lookups++
+                return emptyMap()
+            }
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, store,
+            nextWordPredictor = NextWordPredictor { _, _, _ -> listOf(NextWordSuggestion("朋友")) })
+        controller.start(EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }, InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.handle(InputCommand.LiteralText("x"))
+        assertEquals(0, lookups)
+        controller.close()
+    }
+
     private fun controller(
         connection: EditorConnection,
         personalization: RecordingPersonalization,
@@ -678,8 +851,9 @@ class InputSessionControllerTest {
 
         override fun setComposingText(text: String) = Unit
         override fun finishComposingText() = Unit
-        override fun commitText(text: String) {
+        override fun commitText(text: String): Boolean {
             commits += text
+            return true
         }
         override fun deleteBeforeCursor() = Unit
         override fun performEditorAction(actionId: Int): Boolean { editorActions += actionId; return false }
@@ -751,9 +925,10 @@ class InputSessionControllerTest {
             composing = ""
         }
 
-        override fun commitText(text: String) {
+        override fun commitText(text: String): Boolean {
             composing = ""
             if (text.isNotEmpty()) commits += text
+            return true
         }
 
         override fun deleteBeforeCursor() = Unit

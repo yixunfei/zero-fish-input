@@ -62,8 +62,13 @@ class AppGraph(context: Context) : AutoCloseable {
     internal val clipboardSelectionTransfer = dev.zeroinput.ime.clipboard.ClipboardSelectionTransfer()
     val languagePacks = LanguagePackInstaller(applicationContext)
     val languagePackRegistry = LanguagePackRegistry(languagePacks)
-    val rime = RimeEngineFactory(applicationContext)
+    val rime = RimeEngineFactory(applicationContext, engineExecutor)
     private val dictionaryEngine = DictionaryEngineFactory()
+    @Volatile private var associationPredictor: dev.zeroinput.engine.api.NextWordPredictor =
+        dev.zeroinput.engine.api.NextWordPredictor.Empty
+    val nextWordPredictor = dev.zeroinput.engine.api.NextWordPredictor { language, context, limit ->
+        associationPredictor.suggest(language, context, limit)
+    }
 
     fun chineseEngineDescriptor(choice: ChineseEngineChoice): EngineDescriptor = when (choice) {
         ChineseEngineChoice.RIME -> rime.descriptor
@@ -92,6 +97,8 @@ class AppGraph(context: Context) : AutoCloseable {
         // operations stay on one background queue so they do not compete for
         // storage bandwidth during the first input session.
         engineExecutor.execute {
+            associationPredictor = runCatching { dev.zeroinput.engine.dictionary.WordAssociationIndex.loadBundled() }
+                .getOrDefault(dev.zeroinput.engine.api.NextWordPredictor.Empty)
             // A broken optional language pack must not prevent the core Rime
             // runtime from publishing its terminal READY/FAILED state.
             runCatching { rime.warmUp() }
@@ -129,7 +136,7 @@ class AppGraph(context: Context) : AutoCloseable {
         } else {
             when (request.language) {
                 InputLanguage.CHINESE -> when (request.chineseEngine) {
-                    ChineseEngineChoice.RIME -> rime.createNativeOrNull(request.chineseOptions)
+                    ChineseEngineChoice.RIME -> rime.createNativeOrNull(request.chineseOptions, engineExecutor)
                     ChineseEngineChoice.DICTIONARY_TEST -> dictionaryEngine.create(request.chineseOptions)
                 }
                 InputLanguage.ENGLISH -> english.create()

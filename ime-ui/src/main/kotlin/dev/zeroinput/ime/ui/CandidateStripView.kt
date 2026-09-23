@@ -79,7 +79,9 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         previousSnapshot = snapshot
         undo.visibility = if (snapshot.canUndoSelection) VISIBLE else GONE
         syllable.visibility = if (snapshot.canSelectSyllable && !snapshot.canUndoSelection) VISIBLE else GONE
-        composition.text = snapshot.composition.ifEmpty { snapshot.rawInput }
+        val associations = snapshot.candidates.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
+        composition.text = if (associations) context.getString(R.string.word_associations)
+            else snapshot.composition.ifEmpty { snapshot.rawInput }
         while (buttons.size < snapshot.candidates.size) {
             buttons += CandidateItemView(context).also { button ->
                 button.onSelected = { onCandidateSelected(it) }
@@ -91,7 +93,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             button.visibility = if (candidate == null) View.GONE else View.VISIBLE
             if (candidate != null) button.bind(candidate, index, index == snapshot.highlightedIndex) else button.clear()
         }
-        expand.visibility = if (snapshot.candidates.isEmpty()) View.INVISIBLE else View.VISIBLE
+        expand.visibility = if (snapshot.candidates.isEmpty() || associations) View.INVISIBLE else View.VISIBLE
         if (changedInput) scroll.scrollTo(0, 0)
         updateStatusVisibility()
     }

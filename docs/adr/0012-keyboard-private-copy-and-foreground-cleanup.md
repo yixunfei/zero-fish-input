@@ -41,8 +41,14 @@ background cleanup retain selected-IME and attached-service requirements.
 
 The explicit automatic-mode warning authorizes processing the current item on
 startup, when monitoring becomes eligible again and when the settings page gains
-focus, as well as later callbacks. Other modes retain their non-destructive
-startup baseline. Authentication remains incompatible with automatic mode.
+focus, as well as later callbacks. An explicit keyboard private-copy action is an
+equivalent authorization moment: after the selection snapshot is captured for the
+private vault, automatic mode silently inspects and clears a stale current item
+left behind by a source-app copy. That queued operation holds only an
+input-session lease, carries neither the captured text nor a grant, and is
+revoked when the editing context changes. Other modes retain their
+non-destructive startup baseline. Authentication remains incompatible with
+automatic mode.
 
 ### Return and confirm private paste
 

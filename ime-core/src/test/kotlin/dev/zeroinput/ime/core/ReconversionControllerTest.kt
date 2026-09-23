@@ -90,7 +90,7 @@ class ReconversionControllerTest {
         override fun invalidateReconversion() = Unit
         override fun setComposingText(text: String) = Unit
         override fun finishComposingText() = Unit
-        override fun commitText(text: String) { commits += text }
+        override fun commitText(text: String): Boolean { commits += text; return true }
         override fun deleteBeforeCursor() = Unit
         override fun performEditorAction(actionId: Int) = false
         override fun sendEnterKey() = Unit

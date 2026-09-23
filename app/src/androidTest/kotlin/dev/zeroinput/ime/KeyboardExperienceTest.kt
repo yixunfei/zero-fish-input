@@ -133,7 +133,7 @@ class KeyboardExperienceTest {
         val panel = panel()
         var actions = 0
         panel.onKeyboardAction = { actions++ }
-        panel.onCandidateSelected = { actions++ }
+        panel.onCandidateSelected = { _, _ -> actions++ }
         panel.onSettingsRequested = { actions++ }
         panel.renderSession(InputSessionState(snapshot = EngineSnapshot("ni", "ni", listOf(Candidate("fixture", "你")))))
         measure(panel)

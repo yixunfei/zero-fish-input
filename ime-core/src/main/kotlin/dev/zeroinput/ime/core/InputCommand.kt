@@ -19,7 +19,7 @@ sealed interface InputCommand {
     data object UndoSelection : InputCommand
     data object SelectSyllable : InputCommand
 
-    data class SelectCandidate(val visibleIndex: Int) : InputCommand
+    data class SelectCandidate(val visibleIndex: Int, val candidateId: String? = null) : InputCommand
 
     data class SelectReading(val index: Int) : InputCommand
 

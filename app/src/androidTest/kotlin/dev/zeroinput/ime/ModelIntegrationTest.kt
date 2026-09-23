@@ -77,11 +77,11 @@ class ModelIntegrationTest {
             override fun commitText(text: CharSequence?, newCursorPosition: Int) = succeeds
         }
         val adapter = AndroidEditorConnection(0, 0, { committed += it }, { invalidations++ }) { connection }
-        adapter.commitText("知识")
+        assertTrue(adapter.commitText("知识"))
         assertFalse(adapter.updateSelection(2, 2))
         assertEquals(0, invalidations)
         succeeds = false
-        adapter.commitText("芝士")
+        assertFalse(adapter.commitText("芝士"))
         assertEquals(listOf("知识", null), committed)
         assertTrue(adapter.updateSelection(0, 0))
         adapter.deleteBeforeCursor()
@@ -89,7 +89,7 @@ class ModelIntegrationTest {
         assertEquals(3, invalidations)
     }
 
-    @Test fun enabledImeSpaceCommitsItsVisibleFirstChoice() {
+    @Test fun enabledImeSpaceCommitsItsVisibleHighlightedChoice() {
         val original = shell("settings get secure default_input_method").trim()
         val graph = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
         val settings = graph.settings
@@ -135,7 +135,13 @@ class ModelIntegrationTest {
             await { visibleWords().isNotEmpty() }
             SystemClock.sleep(120)
             var chosen = ""
-            onMain { chosen = visibleWords().first(); panel().onKeyboardAction(KeyboardAction.Space) }
+            onMain {
+                // A learned personal row can precede the engine highlight on repeat runs.
+                chosen = views(panel()).filterIsInstance<TextView>().single {
+                    it.isShown && it.javaClass.simpleName == "CandidateItemView" && it.isSelected
+                }.text.toString()
+                panel().onKeyboardAction(KeyboardAction.Space)
+            }
             await { activity.editor.text.toString() == "老师正在传授" + chosen }
             onMain { settings.experimentalModelRanking = false }
         } finally {

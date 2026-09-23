@@ -24,6 +24,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EngineWarmupCoordinatorTest {
+    @Test fun `prepared engines receive the editor prediction restriction`() {
+        val executor = worker()
+        val delivered = CountDownLatch(1)
+        val engine = TrackingEngine()
+        val coordinator = EngineWarmupCoordinator(executor, { engine }, {
+            (it as EngineWarmupResult.Prepared).engine.close()
+            delivered.countDown()
+        })
+        try {
+            val original = request()
+            coordinator.request(original.copy(privacy = original.privacy.copy(predictionsAllowed = false)))
+            assertTrue(delivered.await(2, TimeUnit.SECONDS))
+            assertEquals(false, engine.startedContext?.predictionsAllowed)
+        } finally {
+            coordinator.close()
+            executor.shutdownNow()
+        }
+    }
+
     @Test
     fun `changing phonetic options retires a prepared engine from the old configuration`() {
         val original = request()
@@ -273,6 +292,7 @@ class EngineWarmupCoordinatorTest {
         val closed = CountDownLatch(1)
         val closeCalls = AtomicInteger()
         var startedThread: String? = null
+        var startedContext: EditorContext? = null
 
         override val descriptor = EngineDescriptor(
             id = "tracking",
@@ -286,6 +306,7 @@ class EngineWarmupCoordinatorTest {
 
         override fun start(context: EditorContext): EngineSnapshot {
             startedThread = Thread.currentThread().name
+            startedContext = context
             return EngineSnapshot.Empty
         }
 

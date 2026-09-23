@@ -31,14 +31,15 @@ class AndroidEditorConnection(
         selection.finishComposition()
     }
 
-    override fun commitText(text: String) {
+    override fun commitText(text: String): Boolean {
         val connection = current()
         committedConnection = null
         if (connection?.commitText(text, 1) == true) {
             selection.replaced(text.length, composing = false)
             committedConnection = connection
             onCommitted(text)
-        } else { selection.unknown(); onCommitted(null) }
+            return true
+        } else { selection.unknown(); onCommitted(null); return false }
     }
 
     override fun invalidateReconversion() { selection.invalidate(); committedConnection = null }
