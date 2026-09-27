@@ -81,6 +81,12 @@ preserve typed composition but do not offer completions when it is false. Chines
 conversion remains available. `IME_FLAG_NO_PERSONALIZED_LEARNING` alone still permits
 public completions; prediction permission is part of preparation identity.
 
+Debug builds expose a display-only editor diagnostic in `ime-ui`. It captures only the package
+name, input type/class/variation, IME options and subtype, then combines them with the current
+privacy, language, engine and Rime state. The line remains visible before composition, during
+composition and when no candidates exist. It is cleared at session end and never logged,
+persisted or sent off device; Release builds do not render it.
+
 Rime readiness requires a worker-only public `nihao` conversion and candidate
 commit probe, not just a nonzero native session handle. Each prepared primary
 session is checked using its configured layout before ownership reaches the IME.

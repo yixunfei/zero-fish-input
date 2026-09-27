@@ -29,7 +29,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         textSize = 12f
         gravity = Gravity.CENTER_VERTICAL
         setSingleLine()
-        ellipsize = TextUtils.TruncateAt.END
+        ellipsize = TextUtils.TruncateAt.MARQUEE
+        marqueeRepeatLimit = -1
+        isSelected = true
+        setHorizontallyScrolling(true)
     }
     private val progress = ProgressBar(context, null, android.R.attr.progressBarStyleSmall)
     private val candidates = LinearLayout(context).apply { orientation = HORIZONTAL }
@@ -47,6 +50,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private var previousSnapshot: EngineSnapshot? = null
     private var expanded = false
     private var lastStatus: InputEngineStatus? = null
+    private var diagnostics: String? = null
 
     init {
         val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -54,9 +58,9 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(if (landscape) 48 else 72))
         val statusRow = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(composition, LayoutParams(0, dp(24), 1f))
+            addView(composition, LayoutParams(0, dp(24), 0.55f))
             addView(progress, LayoutParams(dp(18), dp(18)))
-            addView(status, LayoutParams(LayoutParams.WRAP_CONTENT, dp(24)).apply { marginEnd = dp(8) })
+            addView(status, LayoutParams(0, dp(24), 0.45f).apply { marginEnd = dp(8) })
         }
         addView(statusRow, if (landscape) LayoutParams(0, dp(48), 1f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(24)))
         addView(LinearLayout(context).apply {
@@ -115,14 +119,29 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             InputEngineStatus.READY -> R.string.engine_ready
             InputEngineStatus.HIDDEN -> null
         }
-        status.text = label?.let(context::getString).orEmpty()
+        status.text = diagnostics ?: label?.let(context::getString).orEmpty()
         progress.visibility = if (value == InputEngineStatus.PREPARING) View.VISIBLE else View.GONE
         retry.visibility = if (value == InputEngineStatus.FAILED) View.VISIBLE else View.GONE
         updateStatusVisibility()
     }
 
+    /** Shows the Debug-only editor metadata diagnostic while preserving the composition text. */
+    fun renderDiagnostics(value: String?) {
+        if (diagnostics == value) return
+        diagnostics = value
+        val label = when (lastStatus) {
+            InputEngineStatus.PREPARING -> R.string.engine_preparing
+            InputEngineStatus.PENDING_CONFIGURATION -> R.string.engine_pending_configuration
+            InputEngineStatus.FAILED -> R.string.engine_failed
+            InputEngineStatus.READY -> R.string.engine_ready
+            InputEngineStatus.HIDDEN, null -> null
+        }
+        status.text = value ?: label?.let(context::getString).orEmpty()
+        updateStatusVisibility()
+    }
+
     private fun updateStatusVisibility() {
-        status.visibility = if (lastStatus == InputEngineStatus.READY && previousSnapshot?.isComposing == true)
+        status.visibility = if (diagnostics == null && lastStatus == InputEngineStatus.READY && previousSnapshot?.isComposing == true)
             View.GONE else View.VISIBLE
     }
 

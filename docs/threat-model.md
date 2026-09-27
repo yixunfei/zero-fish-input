@@ -65,6 +65,9 @@
   通过有界字节流严格按 UTF-8 解码，实际读取字节仍会在激活前复核，防止 zip slip、zip
   bomb 和压缩条目元数据失真。
 - release 构建关闭调试，源码不得记录输入文本。
+- Debug-only 输入诊断只显示编辑器包名、公开 `EditorInfo` 类型/选项、subtype 及当前会话的
+  隐私、语言和引擎状态；不显示输入文本、拼音、候选词、周边文本或异常堆栈，不写入日志/文件，
+  会话结束时清除。Release 构建不渲染该诊断。
 
 ## Encrypted storage failure boundaries
 

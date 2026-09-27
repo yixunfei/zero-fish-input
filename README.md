@@ -364,6 +364,18 @@ APK、第三方许可证压缩包及 SHA-256 清单位于 `app/build/outputs/tes
 `./tools/package-test-apk.ps1 -Install` 可在验证通过后直接覆盖安装 Debug 测试版。Debug 版使用
 独立包名 `dev.zeroinput.ime.debug`，不会覆盖正式版。
 
+### QQ 等应用的中文输入排查
+
+Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前、拼音组合中和无候选的状态。
+内容仅包括当前编辑器包名、`inputType`/类别/变体、`imeOptions`、系统 subtype、隐私策略、
+语言、引擎标识和 Rime 状态，不包含输入文本、拼音、候选词、周边文本或异常堆栈，也不会写入
+日志或文件；Release 包不显示该行。
+
+在 QQ 普通聊天输入框中切换到 zero fish input，输入公开样例 `nihao`，再切换中英文，记录
+诊断字段和现象（是否有组合区、候选、以及上屏是否只有字母），不要提交真实聊天内容。
+`cls=unknown` 或 `privacy=...` 表示编辑器按敏感策略处理；`lang=ENGLISH` 表示当前语言为英文；
+`engine=none` 或 `rime=FAILED` 表示中文引擎尚未接管或启动失败。
+
 正式构建会强制检查 native Rime，并生成三个独立 ABI 包：
 
 ```powershell

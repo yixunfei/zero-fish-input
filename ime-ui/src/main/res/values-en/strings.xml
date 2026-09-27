@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="input_diagnostics_format">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
     <string name="related_candidate">%1$s · Similar</string>
     <string name="reconvert_last_word">Reselect last word</string>
     <string name="undo_segment">Undo segment selection</string>

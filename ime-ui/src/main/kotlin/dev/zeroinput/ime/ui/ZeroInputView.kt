@@ -79,6 +79,7 @@ class ZeroInputView @JvmOverloads constructor(
     private var maximumContentHeight = Int.MAX_VALUE
     private var lastViewport = -1
     private var engineStatus = InputEngineStatus.HIDDEN
+    private var diagnosticsVisible = false
     private val languageButton = toolbarButton("中", "切换中英文") {
         dispatchKeyboardAction(KeyboardAction.SwitchLanguage)
     }
@@ -193,6 +194,13 @@ class ZeroInputView @JvmOverloads constructor(
         refreshHeader()
     }
 
+    /** Renders a non-sensitive Debug diagnostic in the candidate header. */
+    fun renderDiagnostics(value: String?) {
+        diagnosticsVisible = !value.isNullOrBlank()
+        candidateStrip.renderDiagnostics(value)
+        refreshHeader()
+    }
+
     fun startEditor(options: EditorInputOptions) {
         enginePreparation.resetEditor()
         editorOptions = options
@@ -284,6 +292,8 @@ class ZeroInputView @JvmOverloads constructor(
         onSyllableRequested = {}
         currentSnapshot = EngineSnapshot.Empty
         candidateStrip.render(currentSnapshot)
+        diagnosticsVisible = false
+        candidateStrip.renderDiagnostics(null)
         expandedCandidates.clear()
         readings.render(currentSnapshot)
         emoji.clearSession()
@@ -435,8 +445,8 @@ class ZeroInputView @JvmOverloads constructor(
         val hasCandidates = currentSnapshot.isComposing || currentSnapshot.candidates.isNotEmpty()
         val needsStatus = engineStatus == InputEngineStatus.PENDING_CONFIGURATION ||
             engineStatus == InputEngineStatus.FAILED
-        val showCandidates = (mode == PanelMode.KEYBOARD || mode == PanelMode.CANDIDATES) &&
-            !manualTools && (hasCandidates || needsStatus)
+        val showCandidates = diagnosticsVisible || ((mode == PanelMode.KEYBOARD || mode == PanelMode.CANDIDATES) &&
+            !manualTools && (hasCandidates || needsStatus))
         candidateStrip.visibility = if (showCandidates) VISIBLE else GONE
         toolbar.visibility = if (showCandidates) GONE else VISIBLE
         returnButton.visibility = if (mode != PanelMode.KEYBOARD || manualTools) VISIBLE else GONE

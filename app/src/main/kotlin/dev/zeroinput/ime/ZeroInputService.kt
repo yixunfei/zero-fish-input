@@ -108,6 +108,7 @@ class ZeroInputService : InputMethodService() {
     private var sessionChineseOptions = ChineseInputOptions()
     private var sessionChineseEngine = ChineseEngineChoice.RIME
     private var nativeRetryRequested = false
+    private var diagnosticEditor: InputDiagnostics.EditorMetadata? = null
 
     // Settings-derived values mirrored in memory so the per-keystroke engine
     // probe does not re-read SharedPreferences. Refreshed synchronously by the
@@ -280,6 +281,11 @@ class ZeroInputService : InputMethodService() {
         val connectionBinding = SessionConnectionBinding(currentInputConnection)
         val currentSubtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
         val subtypeLanguage = languageForSubtype(currentSubtype)
+        diagnosticEditor = if (BuildConfig.DEBUG) {
+            InputDiagnostics.capture(attribute, currentSubtype)
+        } else {
+            null
+        }
         val initialLanguage = subtypeLanguage ?: graph.settings.lastLanguage
         if (subtypeLanguage != null && subtypeLanguage != graph.settings.lastLanguage) {
             // Android can deliver the subtype callback before this lifecycle
@@ -310,6 +316,7 @@ class ZeroInputService : InputMethodService() {
             personalization = graph.personalization,
             onStateChanged = { state ->
                 inputView?.renderSession(state)
+                renderInputDiagnostics(state)
                 if (!state.canReconvert) {
                     mainHandler.removeCallbacks(reconversionExpiry)
                     reconversionExpiryScheduled = false
@@ -338,6 +345,7 @@ class ZeroInputService : InputMethodService() {
             privacyConfiguration = configuredPrivacy,
             languagePackKey = initialPackKey,
         )
+        renderInputDiagnostics(newController.state)
         scheduleEngineWarmup(session, force = true)
         inputView?.let(::renderLocalPanels)
     }
@@ -485,6 +493,8 @@ class ZeroInputService : InputMethodService() {
         registerInteraction()
         invalidatePendingPersonalization()
         languageForSubtype(newSubtype)?.let(::switchTo)
+        diagnosticEditor = diagnosticEditor?.copy(subtype = InputDiagnostics.subtypeLabel(newSubtype))
+        activeSession?.controller?.state?.let(::renderInputDiagnostics)
         activeSession?.let { scheduleEngineWarmup(it, force = true) }
     }
 
@@ -1088,6 +1098,8 @@ class ZeroInputService : InputMethodService() {
         controller = null
         editorConnection = null
         inputView?.renderEngineStatus(InputEngineStatus.HIDDEN)
+        diagnosticEditor = null
+        InputDiagnostics.clear(inputView)
         mainHandler.removeCallbacks(reconversionExpiry)
         reconversionExpiryScheduled = false
         languagePackReloadPending = false
@@ -1206,6 +1218,27 @@ class ZeroInputService : InputMethodService() {
         inputView?.renderEngineStatus(status)
         inputView?.renderChineseOptions(configuredChineseOptions)
         inputView?.renderActiveLayout(sessionChineseOptions.keyboardLayout)
+        state?.let(::renderInputDiagnostics)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun renderInputDiagnostics(state: dev.zeroinput.ime.core.InputSessionState) {
+        if (!BuildConfig.DEBUG) return
+        val editor = diagnosticEditor ?: return
+        val text = getString(
+            dev.zeroinput.ime.ui.R.string.input_diagnostics_format,
+            editor.packageName,
+            editor.inputType,
+            editor.inputClass,
+            editor.variation,
+            editor.imeOptions,
+            editor.subtype,
+            state.privacy.reason.name,
+            state.language.name,
+            state.engineDescriptor?.id ?: "none",
+            graph.rime.runtime.state.name,
+        )
+        InputDiagnostics.render(inputView, text)
     }
 
     private fun retryEngine() {
