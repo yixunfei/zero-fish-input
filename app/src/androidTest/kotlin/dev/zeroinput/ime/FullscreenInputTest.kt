@@ -168,13 +168,25 @@ class FullscreenInputTest {
         val desired = if (orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
             android.content.res.Configuration.ORIENTATION_LANDSCAPE else android.content.res.Configuration.ORIENTATION_PORTRAIT
         val deadline = SystemClock.uptimeMillis() + 15_000
+        var previous: ZeroInputView? = null
+        var geometry = emptyList<Int>()
+        var stableSince = 0L
         while (SystemClock.uptimeMillis() < deadline) {
             var panel: ZeroInputView? = null
+            var measured = emptyList<Int>()
             onMain {
                 panel = WindowInspector.getGlobalWindowViews().flatMap(::descendants).filterIsInstance<ZeroInputView>()
-                    .firstOrNull { it.isShown && it.height > 0 && it.resources.configuration.orientation == desired }
+                    .firstOrNull { it.isShown && it.isAttachedToWindow && !it.isLayoutRequested &&
+                        it.height > 0 && it.resources.configuration.orientation == desired }
+                panel?.let { measured = listOf(it.width, it.height, it.rootView.width, it.rootView.height) }
             }
-            panel?.let { SystemClock.sleep(300); return it }
+            val now = SystemClock.uptimeMillis()
+            // Rotation updates Resources before replacing the IME view. Reacquire
+            // the attached view until its identity and geometry settle.
+            if (panel !== previous || measured != geometry) stableSince = now
+            if (panel != null && now - stableSince >= 300) return checkNotNull(panel)
+            previous = panel
+            geometry = measured
             SystemClock.sleep(100)
         }
         error("Fullscreen fixture keyboard unavailable")

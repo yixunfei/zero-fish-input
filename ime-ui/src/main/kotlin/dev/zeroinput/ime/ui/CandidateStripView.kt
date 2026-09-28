@@ -18,6 +18,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     var onRetryRequested: () -> Unit = {}
     var onToolsRequested: () -> Unit = {}
     var onAiRequested: () -> Unit = {}
+    var onReconvertRequested: () -> Unit = {}
     var onUndoSelectionRequested: () -> Unit = {}
     var onSyllableRequested: () -> Unit = {}
     var onPageChanged: (PageDirection) -> Unit = {}
@@ -56,6 +57,9 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         addView(scroll)
     }
     private val tools = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.keyboard_tools) { onToolsRequested() }
+    private val reconvert = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.reconvert_last_word) {
+        onReconvertRequested()
+    }.apply { visibility = GONE }
     private val ai = aiEntryButton(context) { onAiRequested() }
         .apply { visibility = GONE }
     private val undo = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.undo_segment) { onUndoSelectionRequested() }
@@ -80,6 +84,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         addView(statusRow, if (landscape) LayoutParams(0, dp(48), 1f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(24)))
         addView(LinearLayout(context).apply {
             addView(tools, LayoutParams(dp(48), dp(48)))
+            addView(reconvert, LayoutParams(dp(48), dp(48)))
             addView(ai, LayoutParams(dp(48), dp(48)))
             addView(undo, LayoutParams(dp(48), dp(48)))
             addView(syllable, LayoutParams(dp(48), dp(48)))
@@ -135,6 +140,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     fun renderAiEntry(available: Boolean, visible: Boolean) {
         ai.visibility = if (visible) VISIBLE else GONE
         ai.renderAiEntryAvailability(available)
+    }
+
+    fun renderReconversion(available: Boolean) {
+        reconvert.visibility = if (available) VISIBLE else GONE
     }
 
     fun renderStatus(value: InputEngineStatus) {

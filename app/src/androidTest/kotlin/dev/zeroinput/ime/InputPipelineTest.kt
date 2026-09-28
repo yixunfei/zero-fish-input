@@ -126,8 +126,7 @@ class InputPipelineTest {
         onMain {
             assertTrue(activity.editor.text.toString() == expected)
             val label = panel.context.getString(dev.zeroinput.ime.ui.R.string.reconvert_last_word)
-            descendants(panel).firstOrNull { it.isShown && it.contentDescription == label }?.performClick()
-                ?: panel.onReconvertRequested()
+            descendants(panel).first { it.isShown && it.contentDescription == label }.performClick()
         }
         instrumentation.waitForIdleSync()
         onMain {

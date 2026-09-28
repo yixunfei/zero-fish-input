@@ -184,7 +184,12 @@ class ZeroInputView @JvmOverloads constructor(
         setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface, 0xfffafafa.toInt()))
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            view.setPadding(bars.left, 0, bars.right, bars.bottom)
+            if (view.paddingLeft != bars.left || view.paddingRight != bars.right || view.paddingBottom != bars.bottom) {
+                view.setPadding(bars.left, 0, bars.right, bars.bottom)
+                // Insets can arrive after InputMethodService has measured its
+                // WRAP_CONTENT child. Re-run measurement with the new budget.
+                view.requestLayout()
+            }
             insets
         }
         addView(enginePreparation, LayoutParams(LayoutParams.MATCH_PARENT, enginePreparation.preferredHeight))
@@ -274,15 +279,20 @@ class ZeroInputView @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val available = dp(resources.configuration.screenHeightDp)
+        val measuredRootHeight = rootView.takeIf { it !== this }?.height ?: 0
         val requestedLimit = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) available
             else MeasureSpec.getSize(heightMeasureSpec)
-        // During immersive/fullscreen transitions Android can briefly report
-        // the display height instead of the IME window height. Respect the
-        // attached root when it is already laid out so content never extends
-        // below the host window.
-        val rootLimit = rootView.height.takeIf { it > 0 } ?: requestedLimit
-        val parentLimit = minOf(requestedLimit, rootLimit)
-        val limit = if (landscape && available > 0) minOf(parentLimit, (available - dp(48)).coerceAtLeast(dp(192))) else parentLimit
+        val parentLimit = if (measuredRootHeight > 0) minOf(requestedLimit, measuredRootHeight)
+            else requestedLimit
+        // Insets are part of this view's measured size. Reserve them before
+        // measuring children so the keyboard cannot extend below the IME window.
+        val insetHeight = paddingTop + paddingBottom
+        val contentLimit = (parentLimit - insetHeight).coerceAtLeast(dp(192))
+        val limit = if (landscape && available > 0) {
+            minOf(contentLimit, (available - dp(48)).coerceAtLeast(dp(192)))
+        } else {
+            contentLimit
+        }
         val reminder = if (clipboardGuard.isVisible) dp(48) else 0
         val preparationHeight = if (enginePreparation.isVisible) enginePreparation.preferredHeight else 0
         val bodyLimit = (limit - header.layoutParams.height - paddingTop - paddingBottom - reminder - preparationHeight)
@@ -294,10 +304,12 @@ class ZeroInputView @JvmOverloads constructor(
             readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
             updatePanelLayout()
         }
-        // The IME window may provide an AT_MOST height while its inset-adjusted
-        // root is shorter than the unadjusted display. Pin the panel to the
-        // computed limit so children cannot extend below the IME window.
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(limit, MeasureSpec.EXACTLY))
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(limit, MeasureSpec.AT_MOST))
+        // FrameLayout may retain a larger WRAP_CONTENT child measurement while
+        // the IME window is resized for navigation-bar insets. Clamp the final
+        // outer size as well as the child budget to avoid stale overflow.
+        val outerLimit = limit + insetHeight
+        if (measuredHeight > outerLimit) setMeasuredDimension(measuredWidth, outerLimit)
     }
 
     fun renderChineseOptions(options: ChineseInputOptions) {
@@ -494,6 +506,7 @@ class ZeroInputView @JvmOverloads constructor(
         }
         candidateStrip.onRetryRequested = { onEngineRetryRequested() }
         candidateStrip.onAiRequested = ::requestAi
+        candidateStrip.onReconvertRequested = { onReconvertRequested() }
         candidateStrip.onToolsRequested = {
             onUserInteraction()
             if (mode == PanelMode.AI) setAiCandidatesExpanded(false)
@@ -650,6 +663,7 @@ class ZeroInputView @JvmOverloads constructor(
         backNavigation.refresh()
         aiButton.renderAiEntryAvailability(aiAvailable)
         reconvertButton.visibility = if (canReconvert && mode == PanelMode.KEYBOARD) VISIBLE else GONE
+        candidateStrip.renderReconversion(canReconvert && mode == PanelMode.KEYBOARD)
         val visibleSnapshot = if (mode == PanelMode.AI) aiSnapshot else currentSnapshot
         val hasCandidates = visibleSnapshot.isComposing || visibleSnapshot.candidates.isNotEmpty()
         // Keep the idle entry discoverable without reducing the four-candidate
