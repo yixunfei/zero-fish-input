@@ -72,6 +72,7 @@ if (-not (Test-Path (Join-Path $boostRoot "CMakeLists.txt"))) {
         throw "Boost archive checksum mismatch"
     }
     tar -xf $boostArchive -C $thirdPartyRoot
+    if ($LASTEXITCODE -ne 0) { throw "Unable to extract Boost" }
     Move-Item -LiteralPath (Join-Path $thirdPartyRoot "boost-1.89.0") -Destination $boostRoot
 }
 

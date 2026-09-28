@@ -119,14 +119,19 @@
     <string name="chinese_punctuation">中文标点</string>
     <string name="candidate_page_size">每页候选数量</string>
     <string name="fuzzy_pinyin">模糊拼音</string>
-    <string name="fuzzy_z_zh" translatable="false">z / zh</string>
-    <string name="fuzzy_c_ch" translatable="false">c / ch</string>
-    <string name="fuzzy_s_sh" translatable="false">s / sh</string>
-    <string name="fuzzy_n_l" translatable="false">n / l</string>
-    <string name="fuzzy_hu_fu" translatable="false">hu / fu</string>
-    <string name="fuzzy_an_ang" translatable="false">an / ang</string>
-    <string name="fuzzy_en_eng" translatable="false">en / eng</string>
-    <string name="fuzzy_in_ing" translatable="false">in / ing</string>
+    <string name="fuzzy_z_zh">z / zh</string>
+    <string name="fuzzy_c_ch">c / ch</string>
+    <string name="fuzzy_s_sh">s / sh</string>
+    <string name="fuzzy_n_l">n / l</string>
+    <string name="fuzzy_hu_fu">hu / fu</string>
+    <string name="fuzzy_an_ang">an / ang</string>
+    <string name="fuzzy_en_eng">en / eng</string>
+    <string name="fuzzy_in_ing">in / ing</string>
+    <string name="fuzzy_r_l">r / l</string>
+    <string name="fuzzy_h_f">h / f</string>
+    <string name="fuzzy_ian_iang">ian / iang</string>
+    <string name="fuzzy_uan_uang">uan / uang</string>
+    <string name="fuzzy_on_ong">on / ong</string>
     <string name="setting_learning">本地词频学习</string>
     <string name="setting_incognito">隐私模式</string>
     <string name="setting_haptics">按键振动</string>
@@ -183,4 +188,24 @@
     <string name="keyboard_preview">预览</string>
     <string name="clipboard_selection_unavailable">请先在普通输入框中选中文字，再点击复制（最多 8192 字符）</string>
     <string name="setting_word_associations">词联想</string>
+    <string name="ai_title">AI 工作台</string>
+    <string name="ai_network_disabled">AI 网络功能未启用</string>
+    <string name="ai_enabled">启用 AI 功能</string>
+    <string name="ai_network">允许 AI 联网请求</string>
+    <string name="ai_configuration">AI 配置</string>
+    <string name="ai_settings">配置 Provider</string>
+    <string name="ai_clear_data">清除 AI 数据</string>
+    <string name="ai_disabled">未启用</string>
+    <string name="ai_key_missing">未配置 API key</string>
+    <string name="ai_settings_title">AI Provider 配置</string>
+    <string name="ai_endpoint_hint">HTTPS endpoint</string>
+    <string name="ai_model_hint">模型名称</string>
+    <string name="ai_key_hint">API key（留空保留现有值）</string>
+    <string name="ai_save_conversations">保存 AI 会话</string>
+    <string name="ai_settings_saved">AI 配置已保存</string>
+    <string name="ai_data_clear_message">将删除加密保存的 API key、AI 配置和会话，且无法恢复。</string>
+    <string name="ai_data_cleared">AI 配置与会话已清除</string>
+    <string name="ai_privacy_notice">开启后，仅在你点击提交或翻译时，将工作台文字和所选会话发送给配置的服务商。服务商可能保存这些内容，请只发送你愿意提供的文字。</string>
+    <string name="fuzzy_pinyin_enabled">启用模糊拼音</string>
+    <string name="fuzzy_pinyin_enabled_help">选择下面的规则后生效。关闭后保留规则选择，重新开启即可恢复。输入过程中切换将在本次组合结束后生效。</string>
 </resources>

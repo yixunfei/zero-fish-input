@@ -62,9 +62,16 @@ class AndroidEditorConnection(
     }
 
     override fun deleteBeforeCursor() {
+        val hasSelection = selection.selectedLength() != null
         onContextInvalidated()
         selection.unknown()
         val connection = current() ?: return
+        // deleteSurroundingText excludes the selection, so it would delete
+        // unrelated text before it. Replace the acknowledged selection directly.
+        if (hasSelection) {
+            if (!connection.commitText("", 1)) sendKey(connection, KeyEvent.KEYCODE_DEL)
+            return
+        }
         val before = connection.getTextBeforeCursor(2, 0)?.toString().orEmpty()
         val deleteLength = if (
             before.length >= 2 &&

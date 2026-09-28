@@ -32,7 +32,9 @@ class ChineseOptionsTest {
                 assertTrue("Deferring deployment must preserve runtime availability", graph.rime.runtime.isReady)
                 assertTrue("The original engine must still accept input", active.handle(EngineKey.Character("n")).snapshot.isComposing)
             }
-            checkNotNull(graph.rime.createNativeOrNull(ChineseInputOptions(fuzzyPinyinMask = 255))).close()
+            checkNotNull(graph.rime.createNativeOrNull(
+                ChineseInputOptions(fuzzyPinyinMask = ChineseInputOptions.MAX_FUZZY_PINYIN_MASK),
+            )).close()
             checkNotNull(graph.rime.createNativeOrNull()).close()
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             val root = java.io.File(context.noBackupFilesDir, "rime/user")
@@ -82,6 +84,11 @@ class ChineseOptionsTest {
             Triple(FuzzyPinyinPair.AN_ANG, "shanhai", "上海"),
             Triple(FuzzyPinyinPair.EN_ENG, "chengong", "成功"),
             Triple(FuzzyPinyinPair.IN_ING, "mintian", "明天"),
+            Triple(FuzzyPinyinPair.R_L, "len", "人"),
+            Triple(FuzzyPinyinPair.H_F, "huwu", "服务"),
+            Triple(FuzzyPinyinPair.IAN_IANG, "xian", "想"),
+            Triple(FuzzyPinyinPair.UAN_UANG, "huan", "黄"),
+            Triple(FuzzyPinyinPair.ON_ONG, "gon", "公"),
         )
         for ((pair, input, expected) in fixtures) {
             withEngine(ChineseInputOptions().withFuzzy(pair, true)) { engine ->

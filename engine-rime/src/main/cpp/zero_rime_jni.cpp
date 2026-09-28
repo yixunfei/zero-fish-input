@@ -164,7 +164,7 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeInitialize(
   // start as initialization failure and tear down the partially initialized
   // API so Kotlin can expose a terminal FAILED state and use its fallback
   // engine instead of reporting a permanently "initializing" runtime.
-  if (!api->start_maintenance(True)) {
+  if (!api->start_maintenance(true)) {
     api->finalize();
     api = nullptr;
     shared_directory.clear();

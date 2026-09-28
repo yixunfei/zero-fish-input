@@ -220,6 +220,17 @@ class InputSessionController(
         publish(EngineSnapshot.Empty)
     }
 
+    /** An external cursor move hands the visible preedit back to the editor, without learning. */
+    fun finishCompositionForCursorMove() {
+        if (!state.snapshot.isComposing) return
+        associations.clear()
+        candidateWindow.clear()
+        invalidateReconversion(publishState = false)
+        runCatching { engine?.reset() }.onFailure { closeEngine() }
+        connection.finishComposingText()
+        publish(EngineSnapshot.Empty)
+    }
+
     /**
      * Re-publishes the current engine state after an asynchronous personal
      * suggestion query completes.  This method never changes the composing
@@ -284,10 +295,10 @@ class InputSessionController(
                 apply(restored)
             } else {
                 activeEngine.reset()
+                recentComposition.clear()
                 publish(EngineSnapshot.Empty)
             }
         }
-        publish(rawEngineSnapshot)
     }
 
     override fun close() {
@@ -513,7 +524,7 @@ class InputSessionController(
         // The engine declined Enter. Commit the visible preedit before handing
         // the key to the editor, and always clear the engine state.
         val declinedSnapshot = update.snapshot.takeIf(EngineSnapshot::isComposing) ?: before
-        val rawComposition = declinedSnapshot.rawInput.ifBlank { declinedSnapshot.composition }
+        val rawComposition = fallbackComposition(declinedSnapshot)
         runCatching { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         commitRawComposition(rawComposition)
@@ -663,7 +674,7 @@ class InputSessionController(
         val effectiveSnapshot = snapshot?.takeIf(EngineSnapshot::isComposing)
             ?: beforeSnapshot.takeIf(EngineSnapshot::isComposing)
             ?: return
-        val rawComposition = effectiveSnapshot.rawInput.ifBlank { effectiveSnapshot.composition }
+        val rawComposition = fallbackComposition(effectiveSnapshot)
         runCatching { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         commitRawComposition(rawComposition)
@@ -684,6 +695,12 @@ class InputSessionController(
 
     private fun compositionInput(snapshot: EngineSnapshot): String =
         snapshot.rawInput.ifEmpty { snapshot.composition }
+
+    private fun fallbackComposition(snapshot: EngineSnapshot): String =
+        // Once a segment is selected, raw input still contains its original
+        // reading. Falling back to that reading would discard the user's choice.
+        if (snapshot.canUndoSelection && snapshot.composition.isNotEmpty()) snapshot.composition
+        else snapshot.rawInput.ifBlank { snapshot.composition }
 
     private fun commitRawComposition(rawComposition: String) {
         associations.clear()
@@ -730,7 +747,7 @@ class InputSessionController(
         val snapshot = state.snapshot.takeIf(EngineSnapshot::isComposing)
         if (engine === failedEngine) closeEngine() else closeSafely(failedEngine)
         if (snapshot != null) {
-            val raw = snapshot.rawInput.ifBlank { snapshot.composition }
+            val raw = fallbackComposition(snapshot)
             commitRawComposition(raw)
         } else {
             connection.clearComposingText()

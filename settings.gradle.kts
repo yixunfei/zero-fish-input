@@ -28,4 +28,5 @@ include(
     ":language-pack",
     ":security",
     ":user-data",
+    ":ai-api",
 )

@@ -47,6 +47,9 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
     private val fuzzySwitches = FuzzyPinyinPair.entries.associateWith { pair ->
         optionSwitch(fuzzyLabel(pair)) { update(options.withFuzzy(pair, it)) }
     }
+    private val fuzzyEnabled = optionSwitch(R.string.fuzzy_pinyin_enabled) {
+        update(options.copy(fuzzyPinyinEnabled = it))
+    }
 
     init {
         orientation = VERTICAL
@@ -61,6 +64,8 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         label(R.string.candidate_page_size)
         addView(pages)
         label(R.string.fuzzy_pinyin)
+        addView(fuzzyEnabled)
+        label(R.string.fuzzy_pinyin_enabled_help)
         fuzzySwitches.values.forEach(::addView)
     }
 
@@ -75,7 +80,9 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
             typoCorrection.isChecked = value.experimentalTypoCorrection
             typoCorrection.isEnabled = EngineCapability.TYPO_CORRECTION in capabilities && value.keyboardLayout == ChineseKeyboardLayout.FULL
             pages.check(pageButtons.getValue(value.candidatePageSize).id)
-            fuzzySwitches.forEach { (pair, view) -> view.isChecked = value.isFuzzyEnabled(pair) }
+            fuzzyEnabled.isChecked = value.fuzzyPinyinEnabled
+            fuzzyEnabled.isEnabled = EngineCapability.FUZZY_PINYIN in capabilities
+            fuzzySwitches.forEach { (pair, view) -> view.isChecked = value.isFuzzySelected(pair) }
             scriptButtons.values.forEach { it.isEnabled = EngineCapability.CHINESE_SCRIPT in capabilities }
             layoutButtons.values.forEach { it.isEnabled = EngineCapability.NINE_KEY_PINYIN in capabilities }
             abbreviated.isEnabled = EngineCapability.ABBREVIATED_PINYIN in capabilities
@@ -91,6 +98,10 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         if (rendering || value == options) return
         options = value
         onOptionsChanged(value)
+    }
+
+    fun showFuzzySettings() {
+        fuzzyEnabled.requestRectangleOnScreen(android.graphics.Rect(0, 0, fuzzyEnabled.width, fuzzyEnabled.height), true)
     }
 
     private fun modeButton(label: String) = MaterialButton(context).apply {
@@ -150,6 +161,11 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         FuzzyPinyinPair.AN_ANG -> R.string.fuzzy_an_ang
         FuzzyPinyinPair.EN_ENG -> R.string.fuzzy_en_eng
         FuzzyPinyinPair.IN_ING -> R.string.fuzzy_in_ing
+        FuzzyPinyinPair.R_L -> R.string.fuzzy_r_l
+        FuzzyPinyinPair.H_F -> R.string.fuzzy_h_f
+        FuzzyPinyinPair.IAN_IANG -> R.string.fuzzy_ian_iang
+        FuzzyPinyinPair.UAN_UANG -> R.string.fuzzy_uan_uang
+        FuzzyPinyinPair.ON_ONG -> R.string.fuzzy_on_ong
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

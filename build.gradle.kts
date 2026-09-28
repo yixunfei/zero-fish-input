@@ -24,6 +24,16 @@ fun systemClipboardViolation(path: String, text: String): String? {
     return null
 }
 
+fun networkViolation(path: String, text: String): String? {
+    val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http)|javax\.net\.|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|okhttp|retrofit|ktor\.client|Cronet)""")
+    val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
+    if (network.containsMatchIn(text) && path != provider) return "Runtime network transport is restricted to the AI provider"
+    if (text.contains("android.permission.INTERNET") && path != "app/src/main/AndroidManifest.xml") {
+        return "Only the approved app manifest may declare AI networking"
+    }
+    return null
+}
+
 tasks.register("testPrivacyBoundary") {
     group = "verification"
     description = "Checks that clipboard source exceptions cannot allow payload reads or arbitrary writes."
@@ -47,6 +57,15 @@ tasks.register("testPrivacyBoundary") {
         check(systemClipboardViolation(business, empty) != null)
         check(systemClipboardViolation("other/$adapter", empty) != null)
         check(systemClipboardViolation(adapter, "$empty\nmanager.setPrimaryClip(value)") != null)
+        val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
+        for (source in listOf("java.net.URL", "javax.net.ssl.HttpsURLConnection", "url.openConnection()",
+            "java.net.Socket", "okhttp3.OkHttpClient", "android.webkit.WebView")) {
+            check(networkViolation(business, source) != null)
+            check(networkViolation("other/$provider", source) != null)
+            check(networkViolation(provider, source) == null)
+        }
+        check(networkViolation(business, "java.net.URI") == null)
+        check(networkViolation(business, "android.permission.INTERNET") != null)
     }
 }
 
@@ -56,9 +75,6 @@ tasks.register("privacyCheck") {
     dependsOn("testPrivacyBoundary", ":app:processDebugMainManifest", ":app:processReleaseMainManifest")
 
     doLast {
-        val forbidden = listOf(
-            Regex("android\\.permission\\.INTERNET") to "Runtime networking is forbidden",
-        )
         val sourceRoots = subprojects.map { it.file("src") }
         val violations = mutableListOf<String>()
 
@@ -69,11 +85,7 @@ tasks.register("privacyCheck") {
                     val text = file.readText()
                     val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
                     systemClipboardViolation(path, text)?.let { violations += "$path: $it" }
-                    forbidden.forEach { (pattern, reason) ->
-                        if (pattern.containsMatchIn(text)) {
-                            violations += "${file.relativeTo(rootProject.projectDir)}: $reason"
-                        }
-                    }
+                    networkViolation(path, text)?.let { violations += "$path: $it" }
                 }
         }
 
@@ -99,6 +111,7 @@ tasks.register("privacyCheck") {
                     "android.permission.USE_FINGERPRINT",
                     "android.permission.POST_NOTIFICATIONS",
                     "android.permission.SYSTEM_ALERT_WINDOW",
+                    "android.permission.INTERNET",
                     "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
                 )
                 val permissionNames = buildSet {

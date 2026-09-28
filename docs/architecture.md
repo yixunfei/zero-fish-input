@@ -17,9 +17,12 @@ app -> ime-core --------> engine-api
  +-> engine-dictionary ----+
  +-> model-scoring --------+
  +-> user-data ------------+
+ +-> ai-api (independent contracts)
  +-> language-pack -----> engine-api
 
 user-data -> security
+user-data -> ai-api
+ime-ui -> ai-api
 language-pack -> security
 ```
 
@@ -68,6 +71,73 @@ prepared on the existing serial worker and never decrypt on key dispatch.
    发现、启用和实例化数据型引擎；完整性扫描及词典加载不会在设置页主线程执行，首次后台
    扫描完成前，设置页只读取内存快照。当前只接受明确映射为 `zh` 或 `en` 的 BCP-47 标签，并在
    激活安装前确认包内至少有一条可用词典数据，避免“导入成功但无法输入”的死包。
+
+## Panel navigation and composition handoff
+
+The view owns one-level Back handling for tools, expanded candidates, expression
+search, secondary panels and symbol pages. A lifecycle-bound predictive Back
+registration exists only while a secondary UI level is active; legacy Back keys
+use the same view operation through the IME service. The keyboard root retains
+the platform dismissal behavior. UI-only navigation still invokes the existing
+interaction invalidation boundary.
+
+Horizontal gesture ownership is shared by expression and candidate surfaces.
+The surface cancels child clicks before taking a drag, rejects vertical/multiple
+pointer gestures, and accepts DOWN even when its grid is empty. Candidate paging
+continues to use the bounded core window and engine routes. Explicit page loads
+reveal the newly loaded candidates; scrolling retains existing anchor behavior.
+
+The fuzzy master preference preserves the selected pair mask. Engines and schema
+identifiers use its effective mask; disabling selected rules resolves to the
+plain schema rather than reusing a compiled fuzzy variant. The shortcut follows
+existing deferred configuration, warm-up identity and privacy checks.
+
+Rime's single-syllable candidate navigation uses a temporary internal caret;
+ordinary typing/deletion resumes at the composition end. An acknowledged external
+editor cursor change finishes the displayed preedit without rewriting or learning
+it, clears engine/candidate state, and lets subsequent deletion use the editor's
+new selection. This handoff reads no surrounding text and retains no old connection.
+
+## Optional AI workbench
+
+See [assessment and implementation plan](ai-workbench-plan.md) and
+[ADR 0015](adr/0015-ai-workbench-boundary.md).
+
+`ai-api` contains the platform-free request, action, policy, stream-event and conversation
+contracts. `app` owns the Android composition root, `AiCoordinator` and the only network
+adapter, `OpenAiCompatibleProvider`; `user-data` owns separately encrypted AI configuration
+and optional conversation history. The provider accepts only HTTPS endpoints, disables redirects,
+uses bounded timeouts and response sizes, and sends data only after the user submits text from
+the keyboard AI panel. It never reads editor context, selections, the system clipboard or the
+private clipboard vault.
+
+AI is disabled by default and requires both the user enable switch and the explicit network
+switch. Sensitive/password/PIN/unknown, incognito and privacy-tightened sessions fail closed.
+The idle candidate header and the leading toolbar expose an AI icon without scrolling.
+During composition the existing candidate capacity is preserved; Tools exposes AI.
+In restricted editors it remains a dimmed explanation action, never a workbench
+entry. A tap refreshes session privacy before opening; it does not enable AI or
+networking, read editor content or submit a request.
+Streaming results remain in the panel; only a separate user tap can commit a result to the
+current `InputConnection`. AI text is composed in a separate memory-only draft session, so the
+question never becomes external editor composition. Request generations, session tokens and an
+independent AI data generation invalidate late callbacks and queued conversation writes when the
+editor, settings, service or stored AI data changes. Conversation persistence is disabled by
+default, exposes summaries before selection, and uses a dedicated Keystore alias under
+`noBackupFilesDir`.
+
+`AiConfigurationState` publishes loaded configuration and revokes it under the same
+short lock. Its revision is independent of editor/data generations: an editor
+privacy change cancels requests without discarding configuration initialization,
+and a delayed read or save cannot restore an endpoint after networking is revoked.
+Network cancellation disconnects on a bounded worker, avoiding TLS/IO locks on
+the IME thread. Streaming deltas share at most one pending UI callback.
+
+The provider settings dialog retains its bounded, view-owned draft while its
+Activity is temporarily stopped for an app switch. Saving is explicit; cancellation,
+page finish or destruction dismisses the dialog and clears the editable fields.
+The draft is not copied into saved instance state or persistent storage and is
+not restored after Activity recreation or process death.
 
 librime 自身的用户词典被禁用。中文候选选择的拼音输入码和使用频率由 ZeroInput 的加密仓库
 统一保存，从而让全局关闭学习、隐私模式和编辑器的无个性化请求作用于所有引擎。
@@ -164,6 +234,10 @@ count as new user confirmation, and never cause a paste. See ADR 0012.
 The authentication Activity completes the broker handoff after its destruction,
 so a successful prompt cannot bind a source editor while authentication navigation
 is still exiting. Cancellation and timeouts remain valid during that handoff.
+The broker retains the pending request until its owner-thread delivery is consumed.
+Cancellation removes that request even when success is already queued; duplicate
+completion cannot deliver a second result. Private management dialogs separately
+protect their windows and discard editable drafts on dismissal.
 
 `user-data/SecureClipboardVault` owns the encrypted format and serializes reads
 and writes through the existing `EncryptedStore` port. Additions, metadata loads
@@ -292,7 +366,7 @@ codes; the UI uses localized messages and never displays raw exceptions. See
 ## Chinese input configuration
 
 `ChineseInputOptions` is an immutable engine-api value (script, abbreviations,
-eight independent fuzzy pairs, punctuation, bounded page size, and keyboard layout). Optional
+thirteen independent fuzzy pairs, punctuation, bounded page size, and keyboard layout). Optional
 `ConfigurableChineseEngineFactory` and explicit `EngineCapability` declarations
 allow another Chinese engine to implement the same product settings without
 exposing Rime options to the controller. `CandidateTextNormalizer` applies the

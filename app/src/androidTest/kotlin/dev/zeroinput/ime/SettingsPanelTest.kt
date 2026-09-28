@@ -45,7 +45,14 @@ class SettingsPanelTest {
         val originalEngine = repository.chineseEngine
         val originalModel = repository.experimentalModelRanking
         try {
-            val changed = ChineseInputOptions(ChineseScript.TRADITIONAL, false, 255, false, 10, ChineseKeyboardLayout.NINE_KEY)
+            val changed = ChineseInputOptions(
+                ChineseScript.TRADITIONAL,
+                false,
+                ChineseInputOptions.MAX_FUZZY_PINYIN_MASK,
+                false,
+                10,
+                ChineseKeyboardLayout.NINE_KEY,
+            )
             repository.chineseInputOptions = changed
             repository.chineseEngine = ChineseEngineChoice.DICTIONARY_TEST
             repository.experimentalModelRanking = true
@@ -57,6 +64,21 @@ class SettingsPanelTest {
             repository.chineseEngine = originalEngine
             repository.experimentalModelRanking = originalModel
         }
+    }
+
+    @Test fun fuzzyMasterSwitchPersistsWithoutLosingSelectedRules() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = SettingsRepository(context)
+        val original = repository.chineseInputOptions
+        try {
+            val selected = ChineseInputOptions().withFuzzy(dev.zeroinput.engine.api.FuzzyPinyinPair.N_L, true)
+            repository.chineseInputOptions = selected.copy(fuzzyPinyinEnabled = false)
+            val restored = SettingsRepository(context).chineseInputOptions
+            assertEquals(selected.fuzzyPinyinMask, restored.fuzzyPinyinMask)
+            assertTrue(!restored.fuzzyPinyinEnabled)
+            repository.chineseInputOptions = restored.copy(fuzzyPinyinEnabled = true)
+            assertEquals(selected, SettingsRepository(context).chineseInputOptions)
+        } finally { repository.chineseInputOptions = original }
     }
 
     private fun verifyPanel(locale: Locale, night: Boolean) {
@@ -92,8 +114,13 @@ class SettingsPanelTest {
                 intArrayOf(android.R.attr.state_checked), 0) != tint.getColorForState(intArrayOf(), 0))
         }
         all.filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach {
-            assertTrue("Setting labels must fit a 320dp screen", it.width - it.compoundPaddingLeft -
-                it.compoundPaddingRight >= it.paint.measureText(it.text.toString()))
+            val available = it.width - it.compoundPaddingLeft - it.compoundPaddingRight
+            val required = it.paint.measureText(it.text.toString())
+            // This panel uses only built-in resource labels and synthetic state.
+            val diagnostic = "Setting labels must fit a 320dp screen: locale=${locale.toLanguageTag()}, " +
+                "night=$night, view=${it.javaClass.simpleName}, label=${it.text}, " +
+                "width=${it.width}, available=$available, required=$required"
+            assertTrue(diagnostic, available >= required)
         }
     }
 

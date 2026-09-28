@@ -102,6 +102,17 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         render()
     }
 
+    val canNavigateBack: Boolean get() = page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS
+
+    fun navigateBack(): Boolean {
+        if (!canNavigateBack) return false
+        onUserInteraction()
+        page = if (page == KeyboardPage.MORE_SYMBOLS) KeyboardPage.SYMBOLS
+            else if (editor.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC
+        render()
+        return true
+    }
+
     private fun specs(): List<List<KeySpec>> = (when (page) {
         KeyboardPage.LETTERS -> if (keyboardLayout == ChineseKeyboardLayout.NINE_KEY)
             KeyboardLayouts.nineKey(context, languageLabel) else KeyboardLayouts.letters(context, shift != Shift.OFF, languageLabel)

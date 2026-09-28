@@ -4,21 +4,21 @@
   <img src="logo.jpg" width="360" alt="zero fish input 项目 logo" />
 </p>
 
-**离线中文与英文输入法，面向 Android 8.0 及以上设备。**
+**以离线输入为核心、可选联网 AI 工作台的中文与英文输入法，面向 Android 8.0 及以上设备。**
 
-[下载 v0.3.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.3.0) ·
+[下载 v0.4.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.4.0) ·
 [提交问题](https://github.com/yixunfei/zero-fish-input/issues) ·
 [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [Apache-2.0](LICENSE)
 
 zero fish input（原工程名 ZeroInput）以隐私、安全、离线和可扩展性为核心。当前版本为
-`v0.3.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
-以及需要系统身份认证的安全剪贴板。另提供默认关闭的本地 AI 短词候选排序实验，使用
-UER RoBERTa-Mini WWM INT8 模型，全程在设备端运行。
+`v0.4.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
+以及需要系统身份认证的安全剪贴板。另提供默认关闭的本地 AI 短词候选排序实验和可选联网
+  AI 工作台；本地排序使用 UER RoBERTa-Mini WWM INT8 模型，全程在设备端运行。
 
 An offline Android keyboard for Chinese Pinyin and English, with encrypted local
 personalization, a private authenticated snippet vault, and optional offline
-RoBERTa-Mini INT8 candidate ranking. Android 8.0+;
-Apache-2.0 project code. Version 0.3.0 is a debug-signed testing prerelease.
+RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI workbench. Android 8.0+;
+ Apache-2.0 project code. Version 0.4.0 is a debug-signed testing prerelease.
 
 项目展示及应用显示名称使用 `zero fish input`。Logo 保留所提供原图，图中文字为
 `ZERO FISH INPUT`；Android 启动图标使用该图的主体裁切。内部包名和数据标识保留 `zeroinput`。
@@ -28,15 +28,15 @@ Apache-2.0 project code. Version 0.3.0 is a debug-signed testing prerelease.
 
 ## 安装与启用
 
-v0.3.0 包含中文引擎就绪校验、准备进度提示、离线词联想、安全存储可靠性改进、
-`NO_SUGGESTIONS` 输入策略及名称修正。完整变化见 [发布说明](docs/releases/v0.3.0.md)。
+v0.4.0 包含可选联网 AI 工作台、中文输入与编辑器生命周期修复、语言包边界强化、私有剪贴板安全修复、
+AI 流式响应校验和设置失败处理。完整变化见 [发布说明](docs/releases/v0.4.0.md)。
 也可按下方构建说明运行 `./tools/package-test-apk.ps1` 自行生成测试包。
 
-1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.3.0)
-   下载 `zero-fish-input-0.3.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
+1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.4.0)
+   下载 `zero-fish-input-0.4.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
    `x86_64` 三种架构，要求 Android 8.0（API 26）或更新版本。
 2. 对照同页 `SHA256SUMS.txt` 校验下载；Windows 可运行
-   `Get-FileHash .\zero-fish-input-0.3.0-debug-universal.apk -Algorithm SHA256`。
+   `Get-FileHash .\zero-fish-input-0.4.0-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，在系统输入法设置中启用，然后选择为当前键盘。
    Android 会显示针对所有第三方输入法的系统提醒；项目的隐私边界见下文。
 4. 在普通输入框中输入 `nihao` 并选取“你好”，通过语言切换键切换英文。
@@ -45,7 +45,7 @@ v0.3.0 包含中文引擎就绪校验、准备进度提示、离线词联想、�
    `nihao` 选取“你好”。准备失败会显示“中文加载失败”，可重试；仅在验证中文转换和选词
    可用后才切换到 Rime。普通输入框请求禁止预测建议时保留中文转换、关闭英文预测，且不读取或学习个人数据。
 
-本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.3.0-debug`，
+本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.4.0-debug`，
 可调试，仅用于体验和反馈。尚未配置维护者正式发布签名，不建议用此测试包保存真实秘密。
 Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地数据彼此独立。
 不同开发环境的 Debug 签名可能不同；遇到签名冲突不要直接卸载，以免丢失本地数据。
@@ -75,10 +75,10 @@ v0.2.0 已修复 Android 16 设备回归中输入法未绑定导致的剪贴板�
 测试文字导致的原生选字菜单不稳定；补充取消确认、关闭监听和服务未绑定的负向测试。
 详细结果见[模型与剪贴板验证](docs/model-integration-validation.md)和
 [v0.2.0 发布验证](docs/releases/v0.2.0-validation.md)。本次验证见
-[v0.3.0 发布验证](docs/releases/v0.3.0-validation.md)。
+[v0.4.0 发布验证](docs/releases/v0.4.0-validation.md)。
 
 当前源码还补充了键盘内选中文字复制、自动处理已有系统当前项，以及“认证后返回再确认粘贴”，
-并修复等待内容库期间继续编辑仍可能收到迟到粘贴的问题。这些修复已纳入 v0.3.0；
+并修复等待内容库期间继续编辑仍可能收到迟到粘贴的问题。这些修复已纳入 v0.4.0；
 相关验证记录见[剪贴板修复验证](docs/clipboard-device-validation.md#product-repair-and-authenticated-return-2026-09-09)。
 其中 iQOO 历史剪贴板删除仍未实现，不能把当前项清理成功当作历史已清空。
 
@@ -86,6 +86,7 @@ v0.2.0 已修复 Android 16 设备回归中输入法未绑定导致的剪贴板�
 | --- | --- |
 | 中文 | 真实 librime 1.13.1，全拼、简拼、简繁、模糊音、全键盘与九键 |
 | 本地 AI 排序 | RoBERTa-Mini WWM INT8，默认关闭，仅对 Rime 全键盘的合格两字词候选评分 |
+| AI 工作台 | 默认关闭，可选 HTTPS provider；支持提问、规划、润色、改写、翻译、流式回答与会话管理 |
 | 英文 | 内置离线候选，无云端补全 |
 | 离线词联想 | 默认开启，中英文成功上屏后提供最多 8 个公开词对续词，点选可继续联想 |
 | 键盘外观 | 经典、极简灰、薄荷绿、樱花粉；深浅模式与三档按键高度 |
@@ -96,7 +97,8 @@ v0.2.0 已修复 Android 16 设备回归中输入法未绑定导致的剪贴板�
 | 语言包 | 只含数据的离线包，目前仅接受中文或英文 |
 | 离线词典测试引擎 | 约 130 条参考词条，用于开发对照，不替代完整 Rime 词库 |
 
-目前没有云同步、语音输入、手写识别或联网语言包市场。ARM 真机、厂商输入框以及真实系统
+目前没有云同步、语音输入、手写识别或联网语言包市场。AI 工作台默认关闭，用户可配置兼容
+OpenAI API 的 HTTPS 服务并主动提交文本。ARM 真机、厂商输入框以及真实系统
 身份认证流程仍需扩大验收；模拟器测试通过不等同于所有设备均已验证。
 
 ## 离线词联想
@@ -114,6 +116,27 @@ v0.2.0 已修复 Android 16 设备回归中输入法未绑定导致的剪贴板�
 关闭再开启不会恢复旧联想。实现与验收见[词联想验证](docs/word-association-validation.md)。
 新增[固定样例效果评估](docs/word-association-quality.md)，分别记录覆盖、首选命中及误触发；
 这些是公开构造的开发验收样例，不能代替真实输入效果评测。
+
+## AI 工作台（可选联网）
+
+设置 → AI 工作台中配置 HTTPS 服务地址、模型与 API key，再开启 AI 和联网开关。
+配置期间临时切换到其他应用再返回，当前页面会保留未保存的内容；点击“保存”后才生效。
+取消或退出页面会丢弃草稿，页面被系统重建或进程被回收后不会恢复未保存内容。
+在普通输入框尚未组合文字时，直接点击键盘顶部左侧的 **AI 星芒图标**；输入拼音时保留候选容量，
+点击四宫格工具按钮即可在工具栏靠左首屏找到 AI，无需横向滚动。
+密码、隐身、关闭学习或编辑器禁止个性化等受限场景下，图标变淡，点击只显示不可用原因，不打开工作台。
+在独立草稿中输入中文或英文，选择提问、规划、润色、
+改写或翻译。点击翻译可直接处理当前草稿，目标语言按钮可切换中、英、日、韩、法、德、西、阿语。
+生成内容先留在面板，点击 **插入结果** 才会写入当前输入框。
+
+点击 **收起键盘** 浏览结果与会话列表，点击 **编辑** 继续输入；中文转换支持候选展开。
+会话保存默认关闭；开启后可新建、选择、继续或删除会话，设置页也可清除全部 AI 配置和会话。
+关闭面板、切换编辑器或收紧隐私设置会丢弃未保存草稿并取消旧请求。
+
+服务商会收到主动提交的文字及所选会话上下文，可能按其政策保存这些内容。AI 不读取编辑器
+已有内容、系统或安全剪贴板、个人词库及 emoji 历史。设置禁用或网络不可用时，普通输入继续离线工作。
+评估、实现边界和测试记录见 [AI 工作台计划](docs/ai-workbench-plan.md)与
+[验证记录](docs/ai-workbench-validation.md)。此功能属于当前源码变更，并非上述已发布测试包的功能承诺。
 
 ## 本地 AI：短词智能排序（实验）
 
@@ -188,7 +211,15 @@ ONNX Runtime 使用 MIT 许可；模型采用项目已确认的 UER Apache-2.0 �
 密钥丢失或文件提交失败会报告失败，旧的排队操作不能恢复已清除内容。认证流程和存储格式
 保持不变，验证与尚未覆盖的设备边界见[安全存储验证](docs/security-storage-validation.md)。
 
-- 应用不声明 `INTERNET` 权限，不包含广告、统计或崩溃上报 SDK，离线可完整输入。
+- 应用仅为用户主动开启的 AI 工作台声明 `INTERNET` 权限，不包含广告、统计或崩溃上报 SDK；
+  AI 默认关闭，中文、英文、词库、emoji 和安全剪贴板在无网络时仍可用。网络请求只来自唯一
+  的 OpenAI-compatible provider，强制 HTTPS、禁止明文、查询参数、片段和重定向，并限制请求、
+  超时、SSE 单行及整体响应大小。
+- AI 工作台只发送用户在键盘面板主动提交的文本，以及用户明确选择的会话历史。不读取编辑器
+  周边内容、选区、系统剪贴板、安全剪贴板、个人词库、emoji 历史或其他输入历史。密码、PIN、
+  邮箱、网址、隐身、未知或隐私收紧的输入拒绝 AI；流式结果必须点击“插入结果”才会写入编辑器。
+  AI 配置（含 API key）与可选会话历史使用相互独立的 AES-GCM/Keystore 加密存储，会话保存默认关闭；设置、
+  会话、服务销毁、编辑器切换或清除 AI 数据会使旧请求失效。
 - 默认不访问系统剪贴板。仅在用户主动开启“系统剪贴板防护”的监听后，专用适配器才检查变化
   时间戳，并按所选策略提醒或清空，不读取正文。设置页文本框仍支持 Android 在用户明确执行
   粘贴操作时提供的标准编辑行为；安全剪贴板不会与系统剪贴板同步。
@@ -268,10 +299,17 @@ Android 9 及以上使用系统清空接口；Android 8.x 写入空文本，不�
 
 ## 中文输入与操作
 
+- 模糊拼音支持设置页总开关和键盘工具栏“模糊”快捷入口。关闭只暂停已选规则，再次开启恢复原选择；未选规则时快捷入口直接定位到规则设置。正在输入时，配置在本次组合结束后生效。
+- 系统返回键、边缘返回手势和面板返回按钮按层级返回：先关闭表情搜索、工具栏或展开候选，再返回键盘；只有键盘根界面才交给系统收起。符号页也可逐级返回。
+- 表情内容区左右滑动切换分类，空分类同样可滑动；展开候选左右滑动浏览当前列表，到边缘继续载入上一页或下一页。单行候选保留横向浏览，到边缘再次滑动可继续翻页。
+- 逐字选词后直接输入或删除，会恢复到未提交组合的末尾，避免停在内部选词光标处。选词后追加的拼音优先删除，随后才撤销上一段选字。在应用正文中主动移动光标时，保留显示文字并结束组合，再按新位置编辑，旧候选不会覆盖正文。
+
+本轮回归范围与设备验收记录见 [交互便利性验证](docs/interaction-usability-validation.md)。
+
 - 默认输出简体。键盘工具栏的“简/繁”和设置页均可切换文字，个人候选也使用当前文字形式。
 - 简拼默认开启，支持 `zg`、`zhg`、`zhongg`、`zguo` 等全拼与首字母混输。
-- 模糊拼音默认关闭，可分别启用 `z/zh`、`c/ch`、`s/sh`、`n/l`、`hu/fu`、`an/ang`、
-  `en/eng`、`in/ing`。中文标点和每页候选数量（5、8、10）可在设置页调整。
+- 模糊拼音默认关闭，可分别启用 `z/zh`、`c/ch`、`s/sh`、`n/l`、`hu/fu`、`r/l`、`h/f`、
+  `an/ang`、`en/eng`、`in/ing`、`ian/iang`、`uan/uang`、`on/ong`。中文标点和每页候选数量（5、8、10）可在设置页调整。
 - 初次使用或重建配置时，键盘显示准备状态；失败时可主动重试。准备期间提供基础输入，
   本次拼音组合结束后才切换引擎或应用普通设置，避免丢弃正在输入的内容。
 - 拼音与候选分行显示，候选右侧箭头展开多行面板，面板底部支持翻页；展开不改变键盘高度。
@@ -318,7 +356,8 @@ Android 9 及以上使用系统清空接口；Android 8.x 写入空文本，不�
 已验证环境为 Windows + PowerShell。需要 Git、`tar`、JDK 17、Android SDK Platform 36、
 Build Tools 36.0.0、NDK `28.2.13676358` 和 CMake（Android SDK 3.22.1 或本机可用版本）。
 Gradle 8.14 由仓库 Wrapper 提供，无需单独安装 Gradle。首次获取构建工具、依赖和源码需要网络，
-应用安装后的输入功能完全离线。
+应用安装后的核心输入、词库、个性化和安全剪贴板完全离线；AI 工作台只有在用户主动打开
+联网开关并提交文本时才访问所配置的 HTTPS provider。
 
 ```powershell
 git clone https://github.com/yixunfei/zero-fish-input.git
@@ -398,12 +437,15 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
 - `engine-api`：稳定的输入引擎和个性化端口。
 - `engine-rime`：可替换的 librime/JNI 适配器、全拼数据和降级实现。
 - `engine-english`：离线英文候选引擎。
+- `ai-api`：与平台无关的 AI 请求、动作、策略、流式事件和会话契约。
 - `engine-dictionary`：独立的离线有限词典中文测试引擎，默认不启用。
 - `ime-core`：输入会话、编辑器交互和隐私策略。
 - `model-scoring`：可选的离线 Mini INT8 候选评分、模型校验和推理资源管理。
 - `ime-ui`：键盘、候选栏、安全剪贴板入口和 emoji 面板。
+- `app` 中的 `AiCoordinator` 与 `OpenAiCompatibleProvider`：AI 面板编排和唯一网络适配器；
+  provider 只接受 HTTPS 并使用有界流式响应。
 - `security`：Android Keystore、AES-GCM 与认证授权。
-- `user-data`：用户词组、词频、emoji 历史和安全剪贴板。
+- `user-data`：用户词组、词频、emoji 历史、安全剪贴板以及独立加密的 AI 配置/可选会话。
 - `language-pack`：只允许数据文件的语言包格式、校验和安装边界，并提供已安装包的发现、启用、
   删除及数据型引擎注册。
 
@@ -459,7 +501,11 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
    分别取消认证、取消保存、旋转页面、切换应用、重复启动入口以及更改设置，确认旧请求不能
    保存。系统认证返回后仍须主动确认；超过认证有效期需从来源重新发起。检查锁屏与生物识别
    两种认证方式、深浅主题、中英文与横竖屏。厂商菜单覆盖与成功认证流程需真机手工验收。
-9. 使用 `aapt2 dump permissions` 核对最终 APK 不含 `INTERNET`，并检查每个包只含对应 ABI。
+9. 默认关闭 AI 时验证键盘在飞行模式下完整可用；打开 AI 总开关和联网开关后，使用构造文本
+   验证 HTTPS provider 的提问、规划、润色、改写、翻译、流式显示和会话切换。确认 AI 不读取
+   编辑器周边内容、系统/安全剪贴板或个人历史，敏感输入拒绝请求，且必须点击“插入结果”才
+   能提交。使用 `aapt2 dump permissions` 核对最终 APK 仅含预期的 `INTERNET`、生物识别、通知
+   和悬浮窗权限，检查 `allowBackup=false`、禁止明文流量及每个包只含对应 ABI。
 
 已在 Android Studio 的 x86_64 模拟器上执行 Rime 和输入面板回归，并进行实际 IME 操作检查。
 真机的系统身份认证、厂商输入框行为及 ARM 设备运行仍需按上述清单在正式发布前验收。
@@ -475,5 +521,7 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
 [源码获取说明](SOURCES.md)。分发 APK 时请同时保留上述许可与来源说明。
 
 下一阶段优先扩大 ARM 真机和系统认证验收、测量实际输入延迟，并持续改进输入正确性。
+本次代码复核的修复、测试命令与未验证范围见
+[2026-09-28 复核记录](docs/code-audit-followup-2026-09-28.md)。
 当前进展见 [项目推进记录](docs/project-progress.md)，本版说明见
 [v0.3.0](docs/releases/v0.3.0.md)，首发记录见 [v0.1.0](docs/releases/v0.1.0.md)。

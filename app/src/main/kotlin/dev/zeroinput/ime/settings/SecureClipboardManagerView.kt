@@ -48,6 +48,11 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
 
     init {
         orientation = VERTICAL
+        isSaveEnabled = false
+        importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+        }
         addView(toolbar, LayoutParams(LayoutParams.MATCH_PARENT, dp(56)))
         addView(FrameLayout(context).apply {
             addView(list)

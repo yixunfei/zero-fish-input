@@ -14,6 +14,7 @@ import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.ime.ui.KeyboardAction
+import dev.zeroinput.ime.ui.InputEngineStatus
 import dev.zeroinput.ime.ui.ZeroInputView
 import org.junit.Assert.*
 import org.junit.Test
@@ -53,7 +54,7 @@ class ChineseInputAvailabilityTest {
                 }
                 await { activity.editor.text.toString() == "你好" }
                 release.countDown()
-                await { hasStatus(UiR.string.engine_ready) }
+                await { panel().renderedEngineStatus == InputEngineStatus.READY }
                 onMain { assertFalse(hasVisibleStatus(UiR.string.engine_preparing_basic)) }
                 typePinyin()
                 await { candidate() != null }
@@ -68,7 +69,7 @@ class ChineseInputAvailabilityTest {
 
     @Test fun noSuggestionsEditorConvertsWithCandidateSpaceAndEnter() {
         withEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) { activity ->
-            await { hasStatus(UiR.string.engine_ready) }
+            await { panel().renderedEngineStatus == InputEngineStatus.READY }
             for (index in 1..3) {
                 typePinyin()
                 await { candidate() != null }
@@ -151,9 +152,6 @@ class ChineseInputAvailabilityTest {
 
     private fun candidate(): TextView? = views(panel()).filterIsInstance<TextView>().firstOrNull {
         it.isShown && it.javaClass.simpleName == "CandidateItemView" && it.text.toString() == "你好"
-    }
-    private fun hasStatus(resource: Int): Boolean = views(panel()).filterIsInstance<TextView>().any {
-        it.text.toString() == it.context.getString(resource)
     }
     private fun hasVisibleStatus(resource: Int): Boolean = views(panel()).filterIsInstance<TextView>().any {
         it.isShown && it.width > 0 && it.height > 0 && it.text.toString() == it.context.getString(resource)

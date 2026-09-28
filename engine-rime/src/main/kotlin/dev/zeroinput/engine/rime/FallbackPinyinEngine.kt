@@ -3,7 +3,15 @@ package dev.zeroinput.engine.rime
 import dev.zeroinput.engine.api.*
 
 /** Small, immediately available engine used while the public native dictionary warms up. */
-internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
+internal class FallbackPinyinEngine(
+    options: ChineseInputOptions = ChineseInputOptions(),
+) : InputEngine, CompositionEditingEngine {
+    private val pageSize = options.candidatePageSize
+    private val readingIndex = buildReadings(options)
+    private val completionIndex = buildCompletions(readingIndex)
+    private val syllableIndex = readingIndex.mapValues { (_, entries) ->
+        entries.filter { (reading, _) -> reading !in compoundReadings }
+    }.filterValues { it.isNotEmpty() }
     private val input = StringBuilder()
     private val segments = ArrayDeque<Segment>()
     private var page = 0
@@ -15,10 +23,14 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
     override val descriptor = EngineDescriptor(
         id = "zeroinput.pinyin-fallback",
         displayName = "内置全拼（降级）",
-        version = "2",
+        version = "3",
         languages = setOf(InputLanguage.CHINESE),
         isFallback = true,
-        capabilities = setOf(EngineCapability.SEGMENT_SELECTION, EngineCapability.CANDIDATE_PAGE_SIZE),
+        capabilities = setOf(
+            EngineCapability.SEGMENT_SELECTION,
+            EngineCapability.CANDIDATE_PAGE_SIZE,
+            EngineCapability.FUZZY_PINYIN,
+        ),
     )
 
     override fun start(context: EditorContext): EngineSnapshot = reset()
@@ -33,8 +45,8 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
 
     override fun selectCandidate(index: Int): EngineUpdate {
         if (index !in snapshot.candidates.indices) return EngineUpdate(snapshot, consumed = false)
-        val choice = choices.getOrNull(page * PAGE_SIZE + index) ?: return EngineUpdate(snapshot, consumed = false)
-        segments.addLast(Segment(choice.text, choice.reading, choice.consumed))
+        val choice = choices.getOrNull(page * pageSize + index) ?: return EngineUpdate(snapshot, consumed = false)
+        segments.addLast(Segment(choice.text, choice.reading, choice.consumed, input.length))
         if (consumedLength() >= input.length) {
             val text = segments.joinToString("") { it.text }
             val reading = segments.joinToString("") { it.reading }
@@ -46,7 +58,7 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
 
     override fun changePage(direction: PageDirection): EngineUpdate {
         val target = page + if (direction == PageDirection.NEXT) 1 else -1
-        if (target < 0 || target * PAGE_SIZE >= choices.size) return EngineUpdate(snapshot, consumed = false)
+        if (target < 0 || target * pageSize >= choices.size) return EngineUpdate(snapshot, consumed = false)
         page = target
         return render()
     }
@@ -98,7 +110,7 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
 
     private fun backspace(): EngineUpdate {
         if (input.isEmpty()) return EngineUpdate(snapshot, consumed = false)
-        if (segments.isNotEmpty()) return undoSelection()
+        if (segments.lastOrNull()?.inputLength == input.length) return undoSelection()
         input.deleteCharAt(input.lastIndex)
         syllableOnly = false
         return refresh()
@@ -119,16 +131,21 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
         val found = ArrayList<Choice>()
         if (!syllableOnly) {
             val compact = raw.replace("'", "")
-            for ((reading, words) in completions[compact].orEmpty()) {
+            for ((reading, words) in completionIndex[compact].orEmpty()) {
                 words.forEach { found += Choice(it, reading, remaining.length) }
             }
         }
-        val prefixes = (1..raw.length).filter { raw.substring(0, it) in phrases }
+        // A completion may consume the whole input, but only a complete
+        // reading may consume a segment and leave a suffix to be converted.
+        val prefixIndex = if (syllableOnly) syllableIndex else readingIndex
+        val prefixes = (1..raw.length).filter { raw.substring(0, it).replace("'", "") in prefixIndex }
         val lengths = if (syllableOnly) prefixes.take(1) else prefixes.reversed()
         for (length in lengths) {
-            val reading = raw.substring(0, length)
+            val prefix = raw.substring(0, length).replace("'", "")
             val trailing = raw.drop(length).takeWhile { it == '\'' }.length
-            phrases.getValue(reading).forEach { found += Choice(it, reading, leading + length + trailing) }
+            for ((reading, words) in prefixIndex.getValue(prefix)) {
+                words.forEach { found += Choice(it, reading, leading + length + trailing) }
+            }
         }
         choices = found.distinctBy { it.text to it.consumed }
         return render()
@@ -139,22 +156,21 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
         snapshot = EngineSnapshot(
             rawInput = raw,
             composition = segments.joinToString("") { it.text } + raw.drop(consumedLength()),
-            candidates = choices.drop(page * PAGE_SIZE).take(PAGE_SIZE).mapIndexed { index, choice ->
-                Candidate("fallback:${page * PAGE_SIZE + index}", choice.text, choice.reading, input = choice.reading)
+            candidates = choices.drop(page * pageSize).take(pageSize).mapIndexed { index, choice ->
+                Candidate("fallback:${page * pageSize + index}", choice.text, choice.reading, input = choice.reading)
             },
             hasPreviousPage = page > 0,
-            hasNextPage = (page + 1) * PAGE_SIZE < choices.size,
+            hasNextPage = (page + 1) * pageSize < choices.size,
             canUndoSelection = segments.isNotEmpty(),
             canSelectSyllable = raw.isNotEmpty(),
         )
         return EngineUpdate(snapshot)
     }
 
-    private data class Segment(val text: String, val reading: String, val consumed: Int)
+    private data class Segment(val text: String, val reading: String, val consumed: Int, val inputLength: Int)
     private data class Choice(val text: String, val reading: String, val consumed: Int)
 
     private companion object {
-        const val PAGE_SIZE = 8
         const val MAX_INPUT = 128
         val phrases = mapOf(
             "a" to listOf("啊", "阿"), "ai" to listOf("爱", "哎", "唉"),
@@ -182,10 +198,30 @@ internal class FallbackPinyinEngine : InputEngine, CompositionEditingEngine {
             "keyi" to listOf("可以"), "meiyou" to listOf("没有"),
             "zaijian" to listOf("再见"), "shijie" to listOf("世界"),
         )
-        val completions: Map<String, List<Pair<String, List<String>>>> = buildMap {
-            for ((reading, values) in phrases) for (length in 1..reading.length) {
-                val prefix = reading.take(length)
-                put(prefix, get(prefix).orEmpty() + (reading to values))
+
+        private val compoundReadings = setOf(
+            "nihao", "xiexie", "women", "zhongguo", "keyi", "meiyou", "zaijian", "shijie",
+        )
+
+        private fun buildReadings(options: ChineseInputOptions): Map<String, List<Pair<String, List<String>>>> {
+            val syllables = phrases.keys - compoundReadings
+            return buildMap {
+                for ((reading, values) in phrases) {
+                    val entry = reading to values
+                    for (variant in FuzzyPinyinMatcher.variants(reading, options, syllables)) {
+                        val current = get(variant).orEmpty()
+                        if (entry !in current) put(variant, current + entry)
+                    }
+                }
+            }
+        }
+
+        private fun buildCompletions(
+            readings: Map<String, List<Pair<String, List<String>>>>,
+        ): Map<String, List<Pair<String, List<String>>>> = buildMap {
+            for ((variant, entries) in readings) for (length in 1..variant.length) {
+                val prefix = variant.take(length)
+                put(prefix, (get(prefix).orEmpty() + entries).distinctBy { it.first })
             }
         }
     }

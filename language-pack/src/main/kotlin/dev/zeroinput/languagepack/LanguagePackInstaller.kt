@@ -7,6 +7,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 import org.json.JSONObject
@@ -19,6 +21,8 @@ class LanguagePackInstaller(
     private val stateFile = File(context.noBackupFilesDir, "language-packs/enabled.json")
     /** Last verified filesystem scan; null means discovery has not completed. */
     private var installedCache: List<InstalledLanguagePack>? = null
+    private var enabledStateInvalid = false
+    private var enabledStateCache: MutableMap<String, Boolean>? = null
 
     fun install(uri: Uri): InstalledLanguagePack {
         val source = context.contentResolver.openInputStream(uri)
@@ -169,7 +173,7 @@ class LanguagePackInstaller(
             ) { "Language pack does not contain a supported dictionary" }
             File(staging, MANIFEST_PATH).writeText(manifestJson, StandardCharsets.UTF_8)
             val destination = destinationFor(manifest)
-            replaceDirectory(staging, destination)
+            LanguagePackDirectoryReplacement.replace(staging, destination)
             val enabled = readEnabledState()[key(manifest.id, manifest.version)] ?: true
             InstalledLanguagePack(manifest, destination, enabled)
         } catch (error: Throwable) {
@@ -238,30 +242,6 @@ class LanguagePackInstaller(
         return directoryFor(manifest.id, manifest.version)
     }
 
-    private fun replaceDirectory(staging: File, destination: File) {
-        destination.parentFile?.mkdirs()
-        val backup = File(
-            destination.parentFile,
-            ".${destination.name}.backup-${System.nanoTime()}",
-        )
-        var oldMoved = false
-        try {
-            if (destination.exists()) {
-                require(destination.renameTo(backup)) { "Unable to stage the existing language pack" }
-                oldMoved = true
-            }
-            require(staging.renameTo(destination)) { "Unable to activate language pack" }
-            if (oldMoved) backup.deleteRecursively()
-        } catch (error: Throwable) {
-            // Keep the previous verified package available if activation fails.
-            if (destination.exists()) destination.deleteRecursively()
-            if (oldMoved && backup.exists() && !backup.renameTo(destination)) {
-                error.addSuppressed(IllegalStateException("Unable to restore the previous language pack"))
-            }
-            throw error
-        }
-    }
-
     private fun readInstalled(
         directory: File,
         enabled: Map<String, Boolean>,
@@ -284,7 +264,7 @@ class LanguagePackInstaller(
                 "Language pack payload checksum mismatch"
             }
         }
-        InstalledLanguagePack(manifest, directory, enabled[key(manifest.id, manifest.version)] ?: true)
+        InstalledLanguagePack(manifest, directory, enabled[key(manifest.id, manifest.version)] ?: !enabledStateInvalid)
     }.getOrNull()
 
     private fun digestMatches(file: File, declared: LanguagePackFile): Boolean {
@@ -318,17 +298,35 @@ class LanguagePackInstaller(
     }
 
     private fun readEnabledState(): MutableMap<String, Boolean> {
-        if (!stateFile.isFile) return mutableMapOf()
-        return runCatching {
+        if (!stateFile.isFile) {
+            enabledStateInvalid = false
+            return enabledStateCache?.toMutableMap() ?: mutableMapOf()
+        }
+        return try {
             val root = JSONObject(stateFile.readText(StandardCharsets.UTF_8))
-            root.keys().asSequence().associateWith { root.optBoolean(it, true) }.toMutableMap()
-        }.getOrDefault(mutableMapOf())
+            val state = root.keys().asSequence().associateWith { root.optBoolean(it, false) }.toMutableMap()
+            enabledStateInvalid = false
+            enabledStateCache = state.toMutableMap()
+            state
+        } catch (_: Exception) {
+            enabledStateInvalid = true
+            enabledStateCache?.toMutableMap() ?: mutableMapOf()
+        }
     }
 
     private fun writeEnabledState(state: Map<String, Boolean>) {
         stateFile.parentFile?.mkdirs()
         val root = JSONObject().apply { state.forEach { (name, value) -> put(name, value) } }
-        stateFile.writeText(root.toString(), StandardCharsets.UTF_8)
+        val temporary = File(stateFile.parentFile, "${stateFile.name}.tmp")
+        temporary.writeText(root.toString(), StandardCharsets.UTF_8)
+        try {
+            Files.move(temporary.toPath(), stateFile.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            Files.move(temporary.toPath(), stateFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        enabledStateInvalid = false
+        enabledStateCache = state.toMutableMap()
     }
 
     private fun key(id: String, version: String): String = "$id@$version"

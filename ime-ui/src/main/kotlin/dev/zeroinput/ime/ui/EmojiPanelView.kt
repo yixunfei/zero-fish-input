@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import kotlin.math.ceil
+import dev.zeroinput.engine.api.PageDirection
 
 class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
     var onEmojiSelected: (EmojiEntry) -> Unit = {}
@@ -59,6 +60,14 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         setPadding(dp(12), 0, dp(12), 0)
     }
     private val groups = createGroups()
+    private val categories = createCategories()
+    private val browser = HorizontalSwipeFrameLayout(context).apply {
+        canSwipe = { direction -> adjacentCategory(direction) != null }
+        onSwipe = { direction ->
+            onUserInteraction()
+            adjacentCategory(direction)?.let(::selectCategory)
+        }
+    }
 
     init {
         orientation = VERTICAL
@@ -67,11 +76,11 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         if (android.os.Build.VERSION.SDK_INT >= 30) importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         addView(createSearchRow())
         addView(groups)
-        addView(FrameLayout(context).apply {
+        addView(browser.apply {
             addView(grid, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
             addView(emptyLabel, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         }, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(createCategories())
+        addView(categories)
         gridLayout.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             private val paint = Paint().apply { textSize = 18 * resources.displayMetrics.scaledDensity }
             override fun getSpanSize(position: Int): Int {
@@ -91,6 +100,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     }
 
     fun clearSession() {
+        browser.cancelSwipe()
         state.clearSession()
         refresh()
         onSearchModeChanged(false)
@@ -99,6 +109,29 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     fun appendQuery(value: String) { state.append(value); refresh() }
     fun removeQueryCharacter() { state.backspace(); refresh() }
     fun clearQuery() { onUserInteraction(); state.clearQuery(); refresh() }
+
+    fun closeSearch(): Boolean {
+        if (!state.searchActive) return false
+        onUserInteraction()
+        state.searchActive = false
+        state.clearQuery()
+        onSearchModeChanged(false)
+        refresh()
+        return true
+    }
+
+    private fun adjacentCategory(direction: PageDirection): EmojiCategory? = EmojiCategory.entries.getOrNull(
+        state.category.ordinal + if (direction == PageDirection.NEXT) 1 else -1,
+    )
+
+    private fun selectCategory(category: EmojiCategory) {
+        state.category = category
+        refresh()
+        grid.scrollToPosition(0)
+        categoryButtons[category]?.let { button ->
+            (categories as HorizontalScrollView).smoothScrollTo((button.left - (categories.width - button.width) / 2).coerceAtLeast(0), 0)
+        }
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -118,9 +151,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         val row = LinearLayout(context)
         EmojiCategory.entries.forEach { category ->
             val button = tab(category.marker, context.getString(category.label), compact = true) {
-                state.category = category
-                refresh()
-                grid.scrollToPosition(0)
+                selectCategory(category)
             }
             categoryButtons[category] = button
             row.addView(button)

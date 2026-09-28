@@ -252,7 +252,8 @@ class InputPanelTest {
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expression_search)).performClick()
         measure(panel, 320)
         val searchHeight = panel.measuredHeight
-        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_return)).performClick()
+        // Switching panels preserves search; Back intentionally closes it one level at a time.
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expression_smileys)).performClick()
         measure(panel, 320)
         assertTrue("Returning to active emoji search must preserve its height", panel.measuredHeight == searchHeight)

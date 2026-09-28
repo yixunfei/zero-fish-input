@@ -35,13 +35,22 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
     private val next = panelIconButton(context, android.R.drawable.ic_media_next, R.string.next_candidates) {
         requestPage(PageDirection.NEXT)
     }
+    private val browser = HorizontalSwipeFrameLayout(context).apply {
+        onSwipe = { direction ->
+            val step = if (direction == PageDirection.NEXT) 1 else -1
+            if (scroll.canScrollVertically(step)) scroll.smoothScrollBy(0, step * scroll.height)
+            else requestPage(direction)
+        }
+        addView(scroll)
+    }
     private var lastSnapshot = EngineSnapshot.Empty
     private var pending = false
     private var revision = 0L
+    private var requestedPage: PageDirection? = null
 
     init {
         orientation = VERTICAL
-        addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(browser, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(previous, LayoutParams(dp(48), dp(48)))
@@ -50,18 +59,35 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
     }
 
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        // Keep cells readable on split-screen phones while using the extra
+        // width available in landscape.  The bounded range preserves stable
+        // touch targets and avoids a layout jump for ordinary portrait widths.
+        val columns = (width / dp(112)).coerceIn(2, 4)
+        if (layout.spanCount != columns) layout.spanCount = columns
+    }
+
     fun render(snapshot: EngineSnapshot) {
         pending = false
         if (snapshot == lastSnapshot) return
+        browser.cancelSwipe()
         val position = layout.findFirstVisibleItemPosition()
         val anchor = adapter.items.getOrNull(position)?.id
         val offset = layout.findViewByPosition(position)?.top ?: 0
         val sameInput = snapshot.rawInput == lastSnapshot.rawInput && snapshot.composition == lastSnapshot.composition
+        val oldTexts = lastSnapshot.candidates.map { it.text }.toSet()
+        val newPageAnchor = if (requestedPage == PageDirection.NEXT)
+            snapshot.candidates.indexOfFirst { it.text !in oldTexts } else -1
         lastSnapshot = snapshot
         revision++
         adapter.replace(snapshot.candidates, snapshot.highlightedIndex)
         val preserved = if (sameInput) snapshot.candidates.indexOfFirst { it.id == anchor } else -1
-        layout.scrollToPositionWithOffset(preserved.coerceAtLeast(0), if (preserved >= 0) offset else 0)
+        when {
+            newPageAnchor >= 0 -> layout.scrollToPositionWithOffset(newPageAnchor, 0)
+            requestedPage == PageDirection.PREVIOUS -> layout.scrollToPositionWithOffset(0, 0)
+            else -> layout.scrollToPositionWithOffset(preserved.coerceAtLeast(0), if (preserved >= 0) offset else 0)
+        }
         previous.isEnabled = snapshot.hasPreviousPage
         previous.alpha = if (previous.isEnabled) 1f else 0.35f
         next.isEnabled = snapshot.hasNextPage
@@ -79,12 +105,13 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
             if (revision == expected && isShown) onPageChanged(direction)
             pending = false
         } else {
-            onPageChanged(direction)
-            pending = false
+            requestedPage = direction
+            try { onPageChanged(direction) } finally { requestedPage = null; pending = false }
         }
     }
 
     fun clear() {
+        browser.cancelSwipe()
         revision++
         render(EngineSnapshot.Empty)
         for (index in 0 until scroll.childCount) (scroll.getChildAt(index) as? CandidateItemView)?.clear()

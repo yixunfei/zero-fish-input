@@ -407,20 +407,35 @@ internal class QueuedPersonalizationStore(
             }
         }
         if (accepted.isEmpty()) return
-        enqueue {
-            // A delegate without the frequency port resolves every word as
-            // absent (zero), which is the safe editorial-order fallback.
-            val values = runCatching {
-                withDelegate {
-                    (delegate as? PersonalFrequencyStore)?.frequenciesFor(accepted, language).orEmpty()
-                }
-            }.getOrDefault(emptyMap())
-            synchronized(stateLock) {
-                for (word in accepted) {
-                    val key = FrequencyKey(language, word)
-                    if (isQueryCurrent(queryGeneration, queryRevision)) {
-                        frequencyCache[key] = values[word] ?: 0
+        if (!enqueue {
+            try {
+                if (!isQueryCurrent(queryGeneration, queryRevision)) return@enqueue
+                // A delegate without the frequency port resolves every word as
+                // absent (zero), which is the safe editorial-order fallback.
+                val values = runCatching {
+                    withDelegate {
+                        (delegate as? PersonalFrequencyStore)?.frequenciesFor(accepted, language).orEmpty()
                     }
+                }.getOrDefault(emptyMap())
+                synchronized(stateLock) {
+                    if (isQueryCurrent(queryGeneration, queryRevision)) {
+                        accepted.forEach { word ->
+                            frequencyCache[FrequencyKey(language, word)] = values[word] ?: 0
+                        }
+                    }
+                }
+            } finally {
+                synchronized(stateLock) {
+                    accepted.forEach { word ->
+                        val key = FrequencyKey(language, word)
+                        if (pendingFrequencyQueries[key] == queryStamp) pendingFrequencyQueries.remove(key)
+                    }
+                }
+            }
+        }) {
+            synchronized(stateLock) {
+                accepted.forEach { word ->
+                    val key = FrequencyKey(language, word)
                     if (pendingFrequencyQueries[key] == queryStamp) pendingFrequencyQueries.remove(key)
                 }
             }

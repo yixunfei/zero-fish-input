@@ -76,7 +76,9 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
                 val totals = HashMap<String, Int>(wanted.size)
                 for (term in loadTerms()) {
                     if (term.language == language && term.value in wanted) {
-                        totals.merge(term.value, term.frequency, Int::plus)
+                        totals.merge(term.value, term.frequency) { total, frequency ->
+                            (total.toLong() + frequency).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                        }
                     }
                 }
                 totals
@@ -231,7 +233,8 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
         terms.indexOfFirst { it.shortcut.equals(shortcut, ignoreCase = true) && it.value == value && it.language == language }
 
     private fun isLearnable(value: String, minimum: Int, maximum: Int): Boolean =
-        value.length in minimum..maximum && value.none(Char::isISOControl) && value.none(Char::isWhitespace)
+        value.length in minimum..maximum && value.none(Char::isISOControl) && value.none(Char::isWhitespace) &&
+            StandardCharsets.UTF_8.newEncoder().canEncode(value)
 
     private fun capacityExceeded(): Nothing = throw UserDictionaryException(UserDictionaryFailure.CAPACITY_EXCEEDED)
 

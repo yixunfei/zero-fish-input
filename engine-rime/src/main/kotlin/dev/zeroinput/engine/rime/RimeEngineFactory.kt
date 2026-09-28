@@ -25,7 +25,8 @@ class RimeEngineFactory(
     override fun isAvailable(): Boolean = runtime.isReady
 
     /** Creates the in-memory fallback without touching the native runtime. */
-    fun createFallback(): InputEngine = FallbackPinyinEngine()
+    fun createFallback(options: ChineseInputOptions = ChineseInputOptions()): InputEngine =
+        FallbackPinyinEngine(options)
 
     /**
      * Creates a native engine only when the runtime is already ready.  The
@@ -44,7 +45,7 @@ class RimeEngineFactory(
 
     override fun create(): InputEngine = createNativeOrNull() ?: createFallback()
 
-    override fun create(options: ChineseInputOptions): InputEngine = createNativeOrNull(options) ?: createFallback()
+    override fun create(options: ChineseInputOptions): InputEngine = createNativeOrNull(options) ?: createFallback(options)
 
     override fun close() = runtime.close()
 }

@@ -12,6 +12,20 @@ import java.nio.file.Files
 import java.security.MessageDigest
 
 class LanguagePackEngineTest {
+    @Test fun `composition remains bounded when a pack receives excessive input`() {
+        val directory = Files.createTempDirectory("zeroinput-pack-bound").toFile()
+        try {
+            val dictionary = File(directory, "dictionary.txt").apply { writeText("a\tA\n") }
+            val manifest = LanguagePackManifest(1, "bounded", "Bounded", "en", "1", "bounded",
+                listOf(LanguagePackFile(dictionary.name, sha256(dictionary), dictionary.length())))
+            val engine = LanguagePackEngineFactory(InstalledLanguagePack(manifest, directory)).create()
+            engine.start(EditorContext(InputLanguage.ENGLISH, false, false, "fixture", predictionsAllowed = true))
+            repeat(128) { engine.handle(EngineKey.Character("a")) }
+            val rejected = engine.handle(EngineKey.Character("a"))
+            assertFalse(rejected.consumed)
+            assertEquals(128, engine.snapshot.rawInput.length)
+        } finally { directory.deleteRecursively() }
+    }
     @Test fun `no predictions disables English expansion but retains Chinese conversion`() {
         val directory = Files.createTempDirectory("zeroinput-pack-predictions").toFile()
         try {

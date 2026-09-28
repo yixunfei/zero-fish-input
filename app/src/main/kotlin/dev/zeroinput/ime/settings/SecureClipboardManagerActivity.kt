@@ -32,6 +32,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     private var busy = false
     private var authenticationGeneration = 0L
     private var authenticationRequest: AuthenticationBroker.RequestHandle? = null
+    private var privateDialog: androidx.appcompat.app.AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +44,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        privateDialog?.dismiss()
         screen.clearMetadata()
         if (!authenticationInProgress) {
             metadata = emptyList()
@@ -52,11 +54,17 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        privateDialog?.dismiss()
         authenticationGeneration++
         authenticationRequest?.close()
         authenticationRequest = null
         worker.shutdownNow()
         super.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.clear()
     }
 
     private fun bindScreen() {
@@ -99,6 +107,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         val value = secureField(R.string.secure_item_value, MAX_VALUE_LENGTH, multiline = true, concealed = true)
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            isSaveEnabled = false
             setPadding(dp(20), dp(8), dp(20), 0)
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -113,6 +122,12 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.save, null)
             .create()
+        protectDialog(dialog)
+        dialog.setOnDismissListener {
+            label.editText?.text?.clear()
+            value.editText?.text?.clear()
+            if (privateDialog === dialog) privateDialog = null
+        }
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).apply {
                 filterTouchesWhenObscured = true
@@ -139,6 +154,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         concealed: Boolean,
     ): TextInputLayout {
         val field = TextInputEditText(this).apply {
+            isSaveEnabled = false
             val variation = if (concealed) {
                 InputType.TYPE_TEXT_VARIATION_PASSWORD
             } else {
@@ -171,14 +187,29 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
 
     private fun confirmDelete(item: SecureClipboardMetadata) {
         if (busy) return
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.delete_secure_item)
             .setMessage(item.label)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
                 authenticate(false) { grant -> deleteItem(item, grant) }
             }
-            .show()
+            .create()
+        protectDialog(dialog)
+        dialog.setOnDismissListener { if (privateDialog === dialog) privateDialog = null }
+        dialog.show()
+    }
+
+    private fun protectDialog(dialog: androidx.appcompat.app.AlertDialog) {
+        privateDialog = dialog
+        dialog.window?.apply {
+            addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            decorView.isSaveEnabled = false
+            decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                decorView.importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+            }
+        }
     }
 
     private fun deleteItem(item: SecureClipboardMetadata, grant: AuthenticationGrant) {

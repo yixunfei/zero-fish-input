@@ -79,17 +79,20 @@ class SettingsRepository(context: Context) {
         get() = ChineseInputOptions(
             script = if (preferences.getBoolean(KEY_SIMPLIFIED, true)) ChineseScript.SIMPLIFIED else ChineseScript.TRADITIONAL,
             abbreviatedPinyin = preferences.getBoolean(KEY_ABBREVIATED, true),
-            fuzzyPinyinMask = preferences.getInt(KEY_FUZZY, 0).takeIf { it in 0..255 } ?: 0,
+            fuzzyPinyinMask = preferences.getInt(KEY_FUZZY, 0)
+                .takeIf { it in 0..ChineseInputOptions.MAX_FUZZY_PINYIN_MASK } ?: 0,
             chinesePunctuation = preferences.getBoolean(KEY_CHINESE_PUNCTUATION, true),
             candidatePageSize = preferences.getInt(KEY_PAGE_SIZE, 8).takeIf { it in ChineseInputOptions.PAGE_SIZES } ?: 8,
             keyboardLayout = if (preferences.getBoolean(KEY_NINE_KEY, false)) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL,
             experimentalTypoCorrection = preferences.getBoolean(KEY_TYPO_CORRECTION, false),
+            fuzzyPinyinEnabled = preferences.getBoolean(KEY_FUZZY_ENABLED, true),
         )
         set(value) {
             preferences.edit()
                 .putBoolean(KEY_SIMPLIFIED, value.script == ChineseScript.SIMPLIFIED)
                 .putBoolean(KEY_ABBREVIATED, value.abbreviatedPinyin)
                 .putInt(KEY_FUZZY, value.fuzzyPinyinMask)
+                .putBoolean(KEY_FUZZY_ENABLED, value.fuzzyPinyinEnabled)
                 .putBoolean(KEY_CHINESE_PUNCTUATION, value.chinesePunctuation)
                 .putInt(KEY_PAGE_SIZE, value.candidatePageSize)
                 .putBoolean(KEY_NINE_KEY, value.keyboardLayout == ChineseKeyboardLayout.NINE_KEY)
@@ -125,6 +128,7 @@ class SettingsRepository(context: Context) {
         const val KEY_SIMPLIFIED = "chinese.simplified"
         const val KEY_ABBREVIATED = "chinese.abbreviated"
         const val KEY_FUZZY = "chinese.fuzzy-mask"
+        const val KEY_FUZZY_ENABLED = "chinese.fuzzy-enabled"
         const val KEY_CHINESE_PUNCTUATION = "chinese.punctuation"
         const val KEY_PAGE_SIZE = "chinese.page-size"
         const val KEY_NINE_KEY = "chinese.nine-key"

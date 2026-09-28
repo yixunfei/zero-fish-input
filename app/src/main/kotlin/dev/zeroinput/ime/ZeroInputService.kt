@@ -40,6 +40,8 @@ import java.util.Locale
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import dev.zeroinput.ai.api.AiAction
+import dev.zeroinput.ai.api.AiStreamEvent
 
 class ZeroInputService : InputMethodService() {
     private var clipboardGuardObserver: AutoCloseable? = null
@@ -109,6 +111,21 @@ class ZeroInputService : InputMethodService() {
     private var sessionChineseEngine = ChineseEngineChoice.RIME
     private var nativeRetryRequested = false
     private var diagnosticEditor: InputDiagnostics.EditorMetadata? = null
+    private val aiDraft = dev.zeroinput.ime.ai.AiDraftInput(
+        graph = { graph }, post = { mainHandler.post(it) },
+        render = { text, state -> inputView?.renderAiDraft(text, state) },
+    )
+    private var aiObserver: AutoCloseable? = null
+    private val aiWorkbench by lazy {
+        dev.zeroinput.ime.ai.AiWorkbenchController(
+            graph.aiCoordinator, graph.aiConversations, graph.aiPersistenceExecutor,
+            graph::aiConfigurationSnapshot, graph.aiDataGeneration,
+            post = { mainHandler.post(it) }, allowed = ::aiAllowed,
+            render = { inputView?.renderAi(it) },
+            renderList = { inputView?.renderAiConversations(it) },
+            renderConversation = { inputView?.renderAiConversation(it) },
+        )
+    }
 
     // Settings-derived values mirrored in memory so the per-keystroke engine
     // probe does not re-read SharedPreferences. Refreshed synchronously by the
@@ -191,40 +208,13 @@ class ZeroInputService : InputMethodService() {
                 // while this IME session remains alive.  Reconciliation can
                 // replace the engine, so invalidate any pending authenticated
                 // action tied to the old UI/engine state first.
+                invalidateAiRequest()
                 registerInteraction()
                 reconcileLanguagePackSession(session)
             }
         }
-        settingsObserver = graph.settings.addChangeListener {
-            // SharedPreferences callbacks can arrive before the posted main
-            // turn below. Advance the generation immediately so a queued
-            // personal-data write cannot win a race with a privacy change.
-            invalidatePendingPersonalization()
-            // Publish all mirrored settings before the posted UI reconciliation.
-            refreshConfiguredSettings()
-            mainHandler.post {
-                // Settings can be changed while the authentication activity
-                // is in the foreground (for example by another settings
-                // window). Treat every change as a new UI state so a grant
-                // can never outlive the configuration under which it began.
-                registerInteraction()
-                inputView?.cancelPendingGestures()
-                controller?.clearModelRanking()
-                refreshKeyboardAppearance()
-                val session = activeSession
-                if (session != null) {
-                    syncSessionPrivacy()
-                    reconcileChineseOptions()
-                    scheduleEngineWarmup(session)
-                    if (session.controller.state.language != graph.settings.lastLanguage ||
-                        session.controller.state.languagePackKey != graph.settings.lastLanguagePackKey
-                    ) {
-                        reconcileLanguagePackSession(session)
-                    }
-                    inputView?.let(::renderLocalPanels)
-                }
-            }
-        }
+        aiObserver = graph.observeAiConfiguration { mainHandler.post { invalidateAiRequest() } }
+        settingsObserver = graph.settings.addChangeListener(::handleSettingsChange)
         personalizationObserver = graph.addPersonalizationListener {
             invalidatePendingPersonalization()
             mainHandler.post {
@@ -251,7 +241,34 @@ class ZeroInputService : InputMethodService() {
         }
     }
 
+    private fun handleSettingsChange() {
+        // Revoke queued work before posting UI reconciliation; settings can also
+        // change while an authentication activity owns the foreground.
+        invalidatePendingPersonalization()
+        graph.aiCoordinator.invalidate()
+        graph.aiDataGeneration.invalidate()
+        refreshConfiguredSettings()
+        mainHandler.post {
+            invalidateAiRequest()
+            registerInteraction()
+            inputView?.cancelPendingGestures()
+            controller?.clearModelRanking()
+            refreshKeyboardAppearance()
+            val session = activeSession ?: return@post
+            syncSessionPrivacy()
+            reconcileChineseOptions()
+            scheduleEngineWarmup(session)
+            if (session.controller.state.language != graph.settings.lastLanguage ||
+                session.controller.state.languagePackKey != graph.settings.lastLanguagePackKey
+            ) {
+                reconcileLanguagePackSession(session)
+            }
+            inputView?.let(::renderLocalPanels)
+        }
+    }
+
     override fun onCreateInputView(): View {
+        invalidateAiRequest()
         controller?.invalidateWordAssociations()
         modelRanking.invalidate()
         inputView?.release()
@@ -265,6 +282,7 @@ class ZeroInputService : InputMethodService() {
         renderLocalPanels(view)
         controller?.state?.let(view::renderSession)
         renderEngineStatus()
+        view.renderAi(AiStreamEvent.Completed(""))
         return view
     }
 
@@ -390,7 +408,9 @@ class ZeroInputService : InputMethodService() {
         controller?.invalidateReconversion()
         inputView?.cancelPendingGestures()
         inputViewActive = false
+        aiDraft.close()
         cancelSecureClipboardRequest()
+        invalidateAiRequest()
         graph.securePaste.leaveEditor()
         inputView?.renderPasteConfirmation(false)
         inputView?.renderCopySelectionAvailable(false)
@@ -410,6 +430,9 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        aiObserver?.close()
+        aiObserver = null
+        aiDraft.close()
         pasteConsentObserver?.close()
         pasteConsentObserver = null
         graph.securePaste.leaveEditor()
@@ -453,14 +476,30 @@ class ZeroInputService : InputMethodService() {
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && inputView?.canNavigateBack == true) {
+            if (event.repeatCount == 0) event.startTracking()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && event.isTracking && !event.isCanceled &&
+            inputView?.navigateBack() == true) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         if (editorConnection?.updateSelection(newSelStart, newSelEnd, candidatesStart, candidatesEnd) == true) {
+            if (inputView?.isAiOpen == true) invalidateAiRequest()
             cancelSecureClipboardRequest()
             graph.securePaste.editorChanged(pasteEditorIdentity())
             controller?.clearModelRanking()
             controller?.invalidateReconversion()
+            controller?.finishCompositionForCursorMove()
         }
     }
 
@@ -486,6 +525,7 @@ class ZeroInputService : InputMethodService() {
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = true
 
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype?) {
+        invalidateAiRequest()
         super.onCurrentInputMethodSubtypeChanged(newSubtype)
         // A subtype change is an input-surface interaction even when the
         // locale is not one of our built-in labels.  It must invalidate a
@@ -525,7 +565,8 @@ class ZeroInputService : InputMethodService() {
         view.onTouchFinished = ::refreshModelRanking
         view.onUserInteraction = { modelRanking.invalidate(); registerInteraction(); syncSessionPrivacy() }
         view.onKeyboardAction = ::handleKeyboardAction
-        view.onClearCompositionRequested = {
+        view.onClearCompositionRequested = clearComposition@{
+            if (view.isAiOpen) return@clearComposition aiDraft.clearComposition()
             registerInteraction()
             val hadComposition = controller?.state?.snapshot?.isComposing == true
             syncSessionPrivacy()
@@ -535,6 +576,19 @@ class ZeroInputService : InputMethodService() {
             hadComposition || composing
         }
         view.onEngineRetryRequested = ::retryEngine
+        view.onFuzzySettingsRequested = {
+            invalidateAiRequest()
+            registerInteraction()
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(MainActivity.EXTRA_FUZZY_SETTINGS, true))
+        }
+        view.onFuzzySwitchRequested = {
+            registerInteraction()
+            val current = configuredChineseOptions
+            graph.settings.chineseInputOptions = current.copy(fuzzyPinyinEnabled = !current.fuzzyPinyinEnabled)
+            refreshConfiguredSettings()
+            reconcileChineseOptions()
+        }
         view.onScriptSwitchRequested = {
             registerInteraction()
             val current = configuredChineseOptions
@@ -575,12 +629,68 @@ class ZeroInputService : InputMethodService() {
         view.onPasteConfirmed = ::confirmSecurePaste
         view.onPasteCancelled = { registerInteraction(); inputView?.returnToKeyboard() }
         view.onSettingsRequested = {
+            invalidateAiRequest()
             registerInteraction()
             launchActivity(MainActivity::class.java)
         }
         view.onSecureClipboardManagementRequested = {
             launchActivity(SecureClipboardManagerActivity::class.java)
         }
+        bindAiView(view)
+    }
+
+    private fun bindAiView(view: ZeroInputView) {
+        view.onAiSubmit = { action, _, target -> submitAiRequest(action, target) }
+        view.onAiDraftChanged = {
+            syncSessionPrivacy()
+            if (inputView?.isAiEditing == true && aiAllowed()) { aiWorkbench.stop(); aiDraft.handle(it) }
+        }
+        view.onAiCancel = ::cancelAiRequest
+        view.onAiInsert = { insertAiResult() }
+        view.onAiConversationsRequested = { aiWorkbench.refreshConversations() }
+        view.onAiConversationSelected = { aiDraft.clear(); aiWorkbench.selectConversation(it) }
+        view.onAiConversationDeleted = aiWorkbench::deleteConversation
+        view.onAiNewConversation = { aiWorkbench.newConversation(); aiDraft.clear() }
+        view.onAiVisibilityChanged = { open ->
+            if (open) aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE)
+            else { aiDraft.close(); invalidateAiRequest() }
+            window?.window?.let { window ->
+                if (open) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+        }
+    }
+
+    private fun aiAllowed(): Boolean {
+        val session = activeSession ?: return false
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return false
+        return inputViewActive && inputView?.isAiOpen == true && isSessionActive(session, connection) &&
+            dev.zeroinput.ime.ai.AiEditorPolicy.allows(session.controller.state.privacy)
+    }
+
+    private fun submitAiRequest(action: AiAction, targetLanguage: String?) {
+        syncSessionPrivacy()
+        aiWorkbench.submit(action, aiDraft.submittedText(), targetLanguage)
+    }
+
+    private fun cancelAiRequest() = aiWorkbench.stop()
+
+    private fun invalidateAiRequest() {
+        aiWorkbench.invalidate()
+        inputView?.clearAiSession()
+        aiDraft.close()
+    }
+
+    private fun insertAiResult() {
+        syncSessionPrivacy()
+        if (!aiAllowed()) return
+        val text = aiWorkbench.consumeResult() ?: return
+        val session = activeSession ?: return
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
+        registerInteraction()
+        session.controller.reset()
+        if (isSessionActive(session, connection)) connection.commitText(text, 1)
+        inputView?.returnToKeyboard()
     }
 
     private fun handleKeyboardAction(action: KeyboardAction) {
@@ -616,9 +726,15 @@ class ZeroInputService : InputMethodService() {
             -> Unit
         }
         maybeReloadLanguagePack()
+        retryEngineWarmupIfIdle()
     }
 
     private fun handleControllerCommand(command: InputCommand) {
+        if (inputView?.isAiOpen == true) {
+            syncSessionPrivacy()
+            if (aiAllowed()) { aiWorkbench.stop(); aiDraft.command(command) }
+            return
+        }
         if (command == InputCommand.ReconvertLast || command == InputCommand.UndoSelection ||
             command is InputCommand.SelectReading || command == InputCommand.SelectSyllable) modelRanking.invalidate()
         registerInteraction(preserveReconversion = command == InputCommand.ReconvertLast, preserveWordAssociations = true)
@@ -626,6 +742,15 @@ class ZeroInputService : InputMethodService() {
         maybeReloadLanguagePack()
         controller?.handle(command)
         maybeReloadLanguagePack()
+        retryEngineWarmupIfIdle()
+    }
+
+    private fun retryEngineWarmupIfIdle() {
+        val session = activeSession ?: return
+        if (engineWarmupRetry && !session.controller.state.snapshot.isComposing) {
+            engineWarmupRetry = false
+            scheduleEngineWarmup(session, force = true)
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -692,6 +817,7 @@ class ZeroInputService : InputMethodService() {
     private fun syncSessionPrivacy() {
         val session = activeSession ?: return
         if (session.controller.updatePrivacy(configuredPrivacy)) {
+            invalidateAiRequest()
             inputView?.cancelPendingGestures()
             // A prepared engine carries the old policy. Invalidate it before
             // publishing the new state, then let the worker build a context
@@ -1083,6 +1209,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun endInputSession(reset: Boolean) {
+        aiDraft.close()
         inputView?.cancelPendingGestures()
         registerInteraction(preservePasteConsent = true)
         graph.securePaste.leaveEditor()
@@ -1105,6 +1232,7 @@ class ZeroInputService : InputMethodService() {
         languagePackReloadPending = false
         engineReloadPending = false
         cancelSecureClipboardRequest()
+        invalidateAiRequest()
     }
 
     private fun clearLocalPanelCaches() {

@@ -52,6 +52,7 @@ tasks.named("preBuild").configure { dependsOn(prepareExpressionSources) }
 
 dependencies {
     api(project(":engine-api"))
+    api(project(":ai-api"))
     implementation(project(":ime-core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.recyclerview)

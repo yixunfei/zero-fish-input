@@ -13,6 +13,11 @@ Editor mutation, private learning and native selection must remain isolated.
 - `CompositionEditingEngine` owns restore, smaller-segment selection and undo.
   Engine updates carry the completed canonical reading and a learning decision.
   Segment commits stay in composition until the complete phrase is selected.
+- External editor cursor changes finish the existing visible preedit
+  without rewriting, reading or learning it, then reset engine and candidate
+  state. Rime's temporary single-syllable candidate caret is restored to the end
+  before ordinary typing or deletion. Fallback deletion removes input appended
+  after selection before undoing that selection.
 - The core retains one Chinese commit of at most 128 UTF-16 units in mutable
   buffers. The app expires this draft after 30 seconds and invalidates it on
   further editing, cursor changes, session/settings changes or destruction.

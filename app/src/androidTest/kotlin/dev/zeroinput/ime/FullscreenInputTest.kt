@@ -70,7 +70,11 @@ class FullscreenInputTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("fullscreen_fixture", true)) as InputFixtureActivity
             onMain { activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             val panel = awaitPanel(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-            onMain { click(panel, UiR.string.expression_smileys) }
+            onMain {
+                // Debug diagnostics occupy the candidate strip; open its tools first.
+                click(panel, UiR.string.keyboard_tools)
+                click(panel, UiR.string.expression_smileys)
+            }
             instrumentation.waitForIdleSync()
             onMain { click(panel, UiR.string.expression_kaomoji) }
             instrumentation.waitForIdleSync()

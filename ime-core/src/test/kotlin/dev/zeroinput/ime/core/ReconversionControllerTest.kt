@@ -27,6 +27,21 @@ class ReconversionControllerTest {
         assertEquals(1, editor.reopens)
     }
 
+    @Test fun `successful reconversion keeps the restored composition visible`() {
+        val engine = Engine()
+        val editor = Editor()
+        val controller = InputSessionController(editor, { engine }, Store())
+        controller.start(info(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("nihao"))
+        controller.handle(InputCommand.SelectCandidate(0))
+
+        controller.handle(InputCommand.ReconvertLast)
+
+        assertTrue(controller.state.snapshot.isComposing)
+        assertEquals("nihao", controller.state.snapshot.rawInput)
+        assertEquals("你好", controller.state.snapshot.candidates.single().text)
+    }
+
     @Test fun `session changes privacy tightening reset and continued typing revoke the recent word`() {
         for (action in 0..4) {
             val engine = Engine()

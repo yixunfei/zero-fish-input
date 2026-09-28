@@ -48,7 +48,12 @@ internal class RelatedReadings(syllables: List<String>) {
 
     companion object {
         private const val MAX_READINGS = 32
-        private val INITIALS = listOf("z" to "zh", "c" to "ch", "s" to "sh", "n" to "l", "h" to "f")
-        private val FINALS = listOf("an" to "ang", "en" to "eng", "in" to "ing")
+        private val INITIALS = listOf(
+            "z" to "zh", "c" to "ch", "s" to "sh", "n" to "l", "r" to "l", "h" to "f",
+        )
+        private val FINALS = listOf(
+            "an" to "ang", "en" to "eng", "in" to "ing",
+            "ian" to "iang", "uan" to "uang", "on" to "ong",
+        )
     }
 }

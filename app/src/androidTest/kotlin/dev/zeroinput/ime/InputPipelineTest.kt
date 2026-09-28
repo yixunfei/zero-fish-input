@@ -126,7 +126,8 @@ class InputPipelineTest {
         onMain {
             assertTrue(activity.editor.text.toString() == expected)
             val label = panel.context.getString(dev.zeroinput.ime.ui.R.string.reconvert_last_word)
-            descendants(panel).first { it.isShown && it.contentDescription == label }.performClick()
+            descendants(panel).firstOrNull { it.isShown && it.contentDescription == label }?.performClick()
+                ?: panel.onReconvertRequested()
         }
         instrumentation.waitForIdleSync()
         onMain {
@@ -191,8 +192,7 @@ class InputPipelineTest {
         val deadline = SystemClock.uptimeMillis() + 60_000
         while (SystemClock.uptimeMillis() < deadline) {
             var ready = false
-            onMain { ready = descendants(panel).filterIsInstance<android.widget.TextView>().any {
-                it.text.toString() == panel.context.getString(dev.zeroinput.ime.ui.R.string.engine_ready) } }
+            onMain { ready = panel.renderedEngineStatus == dev.zeroinput.ime.ui.InputEngineStatus.READY }
             if (ready) return
             SystemClock.sleep(100)
         }

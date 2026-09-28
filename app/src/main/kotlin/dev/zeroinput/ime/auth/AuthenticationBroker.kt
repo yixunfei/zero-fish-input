@@ -30,7 +30,7 @@ object AuthenticationBroker {
         callback: (AuthenticationGrant?) -> Unit,
     ): RequestHandle {
         val requestId = UUID.randomUUID().toString()
-        val timeout = Runnable { complete(requestId, null) }
+        val timeout = Runnable { cancel(requestId) }
         callbacks[requestId] = PendingRequest(callback, timeout)
         mainHandler.postDelayed(timeout, REQUEST_TIMEOUT_MILLIS)
         val intent = Intent(context, SecureClipboardUnlockActivity::class.java)
@@ -44,14 +44,31 @@ object AuthenticationBroker {
     }
 
     internal fun complete(requestId: String, grant: AuthenticationGrant?) {
+        val pending = callbacks[requestId] ?: return
+        if (!pending.completionQueued.compareAndSet(false, true)) return
+        // Keep the request cancellable until its main-thread callback is consumed.
+        // Authentication can finish just before settings or the owner revoke it.
+        if (!mainHandler.post {
+                if (callbacks.remove(requestId, pending)) {
+                    mainHandler.removeCallbacks(pending.timeout)
+                    pending.callback(grant)
+                }
+            }) {
+            callbacks.remove(requestId, pending)
+            mainHandler.removeCallbacks(pending.timeout)
+        }
+    }
+
+    private fun cancel(requestId: String) {
         val pending = callbacks.remove(requestId) ?: return
         mainHandler.removeCallbacks(pending.timeout)
-        mainHandler.post { pending.callback(grant) }
+        mainHandler.post { pending.callback(null) }
     }
 
     private data class PendingRequest(
         val callback: (AuthenticationGrant?) -> Unit,
         val timeout: Runnable,
+        val completionQueued: AtomicBoolean = AtomicBoolean(false),
     )
 
     class RequestHandle internal constructor(
@@ -61,7 +78,7 @@ object AuthenticationBroker {
 
         override fun close() {
             if (cancelled.compareAndSet(false, true)) {
-                complete(requestId, null)
+                cancel(requestId)
             }
         }
     }

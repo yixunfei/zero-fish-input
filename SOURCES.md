@@ -4,7 +4,7 @@ Project source: https://github.com/yixunfei/zero-fish-input
 
 Initial release source: https://github.com/yixunfei/zero-fish-input/tree/v0.1.0
 
-Current release source: https://github.com/yixunfei/zero-fish-input/tree/v0.3.0
+Current release source: https://github.com/yixunfei/zero-fish-input/tree/v0.4.0
 
 The project's original source code is available under Apache-2.0. See LICENSE.
 Third-party software and data retain their own licenses. See THIRD_PARTY.md,

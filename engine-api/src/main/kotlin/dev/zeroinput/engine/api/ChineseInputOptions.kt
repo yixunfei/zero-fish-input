@@ -5,7 +5,10 @@ enum class ChineseScript { SIMPLIFIED, TRADITIONAL }
 enum class ChineseKeyboardLayout { FULL, NINE_KEY }
 
 enum class FuzzyPinyinPair {
+    // Keep the original eight entries in this order: persisted bit masks use
+    // the enum ordinal and existing settings must retain their meaning.
     Z_ZH, C_CH, S_SH, N_L, HU_FU, AN_ANG, EN_ENG, IN_ING,
+    R_L, H_F, IAN_IANG, UAN_UANG, ON_ONG,
 }
 
 /** A value snapshot; masks keep the configuration immutable across worker boundaries. */
@@ -17,13 +20,18 @@ data class ChineseInputOptions(
     val candidatePageSize: Int = 8,
     val keyboardLayout: ChineseKeyboardLayout = ChineseKeyboardLayout.FULL,
     val experimentalTypoCorrection: Boolean = false,
+    val fuzzyPinyinEnabled: Boolean = true,
 ) {
     init {
-        require(fuzzyPinyinMask in 0..255)
+        require(fuzzyPinyinMask in 0..MAX_FUZZY_PINYIN_MASK)
         require(candidatePageSize in PAGE_SIZES)
     }
 
-    fun isFuzzyEnabled(pair: FuzzyPinyinPair): Boolean = fuzzyPinyinMask and (1 shl pair.ordinal) != 0
+    val effectiveFuzzyPinyinMask: Int get() = if (fuzzyPinyinEnabled) fuzzyPinyinMask else 0
+
+    fun isFuzzySelected(pair: FuzzyPinyinPair): Boolean = fuzzyPinyinMask and (1 shl pair.ordinal) != 0
+
+    fun isFuzzyEnabled(pair: FuzzyPinyinPair): Boolean = fuzzyPinyinEnabled && isFuzzySelected(pair)
 
     fun withFuzzy(pair: FuzzyPinyinPair, enabled: Boolean): ChineseInputOptions {
         val bit = 1 shl pair.ordinal
@@ -32,6 +40,7 @@ data class ChineseInputOptions(
 
     companion object {
         val PAGE_SIZES: List<Int> = listOf(5, 8, 10)
+        val MAX_FUZZY_PINYIN_MASK: Int = (1 shl FuzzyPinyinPair.entries.size) - 1
     }
 }
 

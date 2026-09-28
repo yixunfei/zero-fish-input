@@ -33,6 +33,12 @@ data class SettingsScreenState(
     val languagePacks: List<LanguagePackScreenState> = emptyList(),
     val chineseEngine: ChineseEngineChoice = ChineseEngineChoice.RIME,
     val engineCapabilities: Set<EngineCapability> = EngineCapability.entries.toSet(),
+    val aiEnabled: Boolean = false,
+    val aiNetworkAllowed: Boolean = false,
+    val aiEndpoint: String = "",
+    val aiModel: String = "",
+    val aiKeyConfigured: Boolean = false,
+    val aiSaveConversations: Boolean = false,
 )
 
 data class LanguagePackScreenState(
@@ -67,6 +73,10 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onModelRankingChanged: (Boolean) -> Unit = {}
     var onBuiltInEngineSelected: () -> Unit = {}
     var onChineseEngineChanged: (ChineseEngineChoice) -> Unit = {}
+    var onAiEnabledChanged: (Boolean) -> Unit = {}
+    var onAiNetworkChanged: (Boolean) -> Unit = {}
+    var onAiSettingsRequested: () -> Unit = {}
+    var onAiDataClearRequested: () -> Unit = {}
 
     private var suppressSwitchCallbacks = false
     private val content = LinearLayout(context).apply {
@@ -79,6 +89,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val chineseSettings = ChineseSettingsView(context).apply {
         onOptionsChanged = { onChineseOptionsChanged(it) }
     }
+
+    fun showFuzzySettings() { chineseSettings.showFuzzySettings() }
     private val languagePackContent = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
@@ -88,6 +100,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val secureClipboardSwitch = settingSwitch(context.getString(R.string.secure_clipboard)) { onSecureClipboardChanged(it) }
     private val hapticsSwitch = settingSwitch(context.getString(R.string.setting_haptics)) { onHapticsChanged(it) }
     private val associationSwitch = settingSwitch(context.getString(R.string.setting_word_associations)) { onWordAssociationsChanged(it) }
+    private val aiEnabledSwitch = settingSwitch(context.getString(R.string.ai_enabled)) { onAiEnabledChanged(it) }
+    private val aiNetworkSwitch = settingSwitch(context.getString(R.string.ai_network)) { onAiNetworkChanged(it) }
+    private val aiStatus = valueText()
     private val engineButtons = ChineseEngineChoice.entries.associateWith { choice ->
         MaterialRadioButton(context).apply {
             id = View.generateViewId()
@@ -124,6 +139,12 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         enabledStatus.setText(if (state.isEnabled) R.string.setting_enabled else R.string.setting_disabled)
         currentStatus.setText(if (state.isCurrent) R.string.setting_current else R.string.setting_not_selected)
         engineStatus.text = state.engineStatus
+        aiStatus.text = when {
+            !state.aiEnabled -> context.getString(R.string.ai_disabled)
+            !state.aiNetworkAllowed -> context.getString(R.string.ai_network_disabled)
+            !state.aiKeyConfigured -> context.getString(R.string.ai_key_missing)
+            else -> "${state.aiModel} · ${state.aiEndpoint}"
+        }
         chineseSettings.render(state.chineseOptions, state.engineCapabilities)
         dictionaryNotice.visibility = if (state.chineseEngine == ChineseEngineChoice.DICTIONARY_TEST) View.VISIBLE else View.GONE
         renderLanguagePacks(state.languagePacks)
@@ -136,6 +157,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(secureClipboardSwitch, state.secureClipboardEnabled)
             updateSwitch(hapticsSwitch, state.hapticsEnabled)
             updateSwitch(associationSwitch, state.wordAssociationsEnabled)
+            updateSwitch(aiEnabledSwitch, state.aiEnabled)
+            updateSwitch(aiNetworkSwitch, state.aiNetworkAllowed)
         } finally {
             suppressSwitchCallbacks = false
         }
@@ -169,6 +192,14 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(incognitoSwitch)
         content.addView(secureClipboardSwitch)
         command(context.getString(R.string.clipboard_guard_title)) { onClipboardGuardRequested() }
+
+        section(context.getString(R.string.ai_title))
+        content.addView(aiEnabledSwitch)
+        content.addView(aiNetworkSwitch)
+        content.addView(valueText().apply { setText(R.string.ai_privacy_notice) })
+        statusRow(context.getString(R.string.ai_configuration), aiStatus)
+        command(context.getString(R.string.ai_settings)) { onAiSettingsRequested() }
+        command(context.getString(R.string.ai_clear_data)) { onAiDataClearRequested() }
 
         section(context.getString(R.string.section_data))
         command(context.getString(R.string.setting_user_phrases)) { onDictionaryRequested() }

@@ -10,19 +10,20 @@ internal object LanguagePackParser {
         // trust boundary so installed and imported manifests behave alike.
         val normalized = json.removePrefix("\uFEFF")
         require(normalized.length <= MAX_MANIFEST_CHARS) { "Language pack manifest is too large" }
-        val root = JSONObject(normalized)
-        val format = root.getInt("formatVersion")
-        require(format == SUPPORTED_FORMAT) { "Unsupported language pack format: $format" }
+        val root = LanguagePackJson.parse(normalized) as? JSONObject
+            ?: throw IllegalArgumentException("Language pack manifest must be an object")
+        val format = root.requiredInteger("formatVersion")
+        require(format == SUPPORTED_FORMAT.toLong()) { "Unsupported language pack format" }
         val fileArray = root.getJSONArray("files")
         require(fileArray.length() in 1..MAX_FILES) { "Invalid language pack file count" }
 
         val files = List(fileArray.length()) { index ->
             val item = fileArray.getJSONObject(index)
-            val path = PackPathPolicy.validate(item.getString("path"))
+            val path = PackPathPolicy.validate(item.requiredString("path"))
             require(path != MANIFEST_PATH) { "The manifest cannot be declared as a payload" }
-            val sha256 = item.getString("sha256").lowercase()
+            val sha256 = item.requiredString("sha256").lowercase()
             require(SHA_256.matches(sha256)) { "Invalid SHA-256 for $path" }
-            val size = item.getLong("size")
+            val size = item.requiredInteger("size")
             require(size in 0..MAX_SINGLE_FILE_BYTES) { "Invalid size for $path" }
             LanguagePackFile(path, sha256, size)
         }
@@ -34,16 +35,25 @@ internal object LanguagePackParser {
         }
 
         return LanguagePackManifest(
-            formatVersion = format,
-            id = validateIdentifier(root.getString("id"), "id"),
-            displayName = root.getString("displayName").trim().also {
+            formatVersion = format.toInt(),
+            id = validateIdentifier(root.requiredString("id"), "id"),
+            displayName = root.requiredString("displayName").trim().also {
                 require(it.isNotEmpty() && it.length <= 80) { "Invalid display name" }
             },
-            languageTag = validateLanguageTag(root.getString("languageTag")),
-            version = validateIdentifier(root.getString("version"), "version"),
-            engineId = validateIdentifier(root.getString("engineId"), "engine id"),
+            languageTag = validateLanguageTag(root.requiredString("languageTag")),
+            version = validateIdentifier(root.requiredString("version"), "version"),
+            engineId = validateIdentifier(root.requiredString("engineId"), "engine id"),
             files = files,
         )
+    }
+
+    private fun JSONObject.requiredString(name: String): String = opt(name) as? String
+        ?: throw IllegalArgumentException("Invalid language pack string field")
+
+    private fun JSONObject.requiredInteger(name: String): Long = when (val value = opt(name)) {
+        is Int -> value.toLong()
+        is Long -> value
+        else -> throw IllegalArgumentException("Invalid language pack integer field")
     }
 
     private fun validateIdentifier(value: String, field: String): String = value.trim().also {

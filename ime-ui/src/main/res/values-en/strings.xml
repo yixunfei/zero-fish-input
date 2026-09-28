@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="input_diagnostics_format">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Hexadecimal editor flags are identifiers, not plural quantities. -->
+    <string name="input_diagnostics_format" tools:ignore="PluralsCandidate">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
     <string name="related_candidate">%1$s · Similar</string>
     <string name="reconvert_last_word">Reselect last word</string>
     <string name="undo_segment">Undo segment selection</string>
@@ -104,4 +105,39 @@
     <string name="secure_clipboard_confirm_paste">Confirm paste</string>
     <string name="secure_clipboard_cancel_paste">Cancel paste</string>
     <string name="word_associations">Next word</string>
+    <string name="ai_toolbar_label">AI</string>
+    <string name="ai_open">Open AI workbench</string>
+    <string name="ai_entry_unavailable">AI unavailable. Tap for details</string>
+    <string name="ai_entry_privacy_blocked">AI is blocked by this field or your privacy settings.</string>
+    <string name="ai_input_hint">Enter a question or text</string>
+    <string name="ai_target_language_hint">Translation language</string>
+    <string name="ai_submit">Send</string>
+    <string name="ai_cancel">Stop</string>
+    <string name="ai_insert">Insert result</string>
+    <string name="ai_input_required">Enter some text</string>
+    <string name="ai_request_failed">Unable to complete. Check AI settings and try again.</string>
+    <string name="ai_policy_unavailable">AI is unavailable. Check the AI and network switches in settings and this field’s privacy restrictions.</string>
+    <string name="ai_configuration_invalid">Check the AI service URL, model, and API key in settings.</string>
+    <string name="ai_connection_failed">Could not connect to the AI service. Check your network and service settings, then retry.</string>
+    <string name="ai_response_invalid">The AI service did not return valid content. Please retry.</string>
+    <string name="ai_action_ask">Ask</string>
+    <string name="ai_action_plan">Plan</string>
+    <string name="ai_action_polish">Polish</string>
+    <string name="ai_action_rewrite">Rewrite</string>
+    <string name="ai_action_translate">Translate</string>
+    <string name="ai_new_conversation">New chat</string>
+    <string name="ai_delete_conversation">Delete</string>
+    <string name="ai_confirm_delete">Confirm delete</string>
+    <string name="ai_delete_named">Delete chat %1$s</string>
+    <string name="ai_user_message">You: %1$s</string>
+    <string name="ai_assistant_message">AI: %1$s</string>
+    <string name="ai_edit">Edit</string>
+    <string name="ai_read">Hide keyboard</string>
+    <string name="fuzzy_short">Fuzzy</string>
+    <string name="fuzzy_toggle">Toggle fuzzy pinyin</string>
+    <string name="fuzzy_choose_rules">Choose fuzzy pinyin rules in settings first</string>
+    <string name="fuzzy_disable">Turn fuzzy pinyin off</string>
+    <string name="fuzzy_enable">Turn fuzzy pinyin on</string>
+    <string name="fuzzy_enabled_state">On</string>
+    <string name="fuzzy_disabled_state">Off</string>
 </resources>

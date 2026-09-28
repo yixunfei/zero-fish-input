@@ -11,6 +11,7 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.PageDirection
 import dev.zeroinput.engine.api.CandidateTextNormalizer
 import dev.zeroinput.engine.api.ChineseInputOptions
+import dev.zeroinput.engine.api.ChineseKeyboardLayout
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.EngineCapability
 import dev.zeroinput.engine.api.ReadingSelectionEngine
@@ -33,6 +34,7 @@ internal class RimeInputEngine(
     private var selectedInput = ""
     private var pageNumber = 0
     private var caretPosition = 0
+    private var selectingSyllable = false
 
     override val descriptor = Descriptor
 
@@ -53,8 +55,18 @@ internal class RimeInputEngine(
         if (key == EngineKey.Space && currentSnapshot.candidates.isNotEmpty()) {
             return selectCandidate(currentSnapshot.highlightedIndex)
         }
+        // Selecting a smaller candidate temporarily moves Rime's caret. Ordinary
+        // typing/deletion resumes at the end of the visible preedit, not at that
+        // hidden boundary where repeated Backspace would eventually do nothing.
+        if (selectingSyllable) {
+            NativeRimeBridge.nativeProcessKey(sessionId, KEY_END, 0)
+            selectingSyllable = false
+            readUpdate(false)
+        }
         val input = currentSnapshot.rawInput
-        if (input.length >= 128 && key is EngineKey.Character && key.text.any { it.isLetter() || it == '\'' }) {
+        if (input.length >= 128 && key is EngineKey.Character && key.text.any {
+            it.isLetter() || it == '\'' || options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY && it in '2'..'9'
+        }) {
             return EngineUpdate(currentSnapshot, consumed = false)
         }
         val reading = committedReading(currentSnapshot.highlightedIndex)
@@ -86,6 +98,7 @@ internal class RimeInputEngine(
         val segment = SelectedSegment(absoluteIndex, caretPosition, canonicalReading(currentSnapshot.candidates[index].comment))
         val consumed = NativeRimeBridge.nativeSelectAbsoluteCandidate(sessionId, absoluteIndex)
         if (consumed) {
+            selectingSyllable = false
             hasFixedSelection = true
             readingHistory.clear()
             selectedInput = input
@@ -97,6 +110,7 @@ internal class RimeInputEngine(
     override fun restoreComposition(input: String): EngineUpdate = nativeCall {
         if (input.isEmpty() || input.length > 128) return EngineUpdate(currentSnapshot, consumed = false)
         val consumed = NativeRimeBridge.nativeSetInput(sessionId, input)
+        selectingSyllable = false
         clearSelectionHistory()
         readingHistory.clear()
         hasFixedSelection = false
@@ -119,6 +133,7 @@ internal class RimeInputEngine(
             }
         }
         hasFixedSelection = selectedIndices.isNotEmpty()
+        selectingSyllable = false
         readingHistory.clear()
         readUpdate(true)
     }
@@ -127,6 +142,7 @@ internal class RimeInputEngine(
         if (!currentSnapshot.isComposing) return EngineUpdate(currentSnapshot, consumed = false)
         NativeRimeBridge.nativeProcessKey(sessionId, KEY_END, 0)
         val consumed = NativeRimeBridge.nativeProcessKey(sessionId, KEY_RIGHT, CONTROL_MASK)
+        selectingSyllable = consumed
         readUpdate(consumed)
     }
 
@@ -178,6 +194,7 @@ internal class RimeInputEngine(
 
     override fun reset(): EngineSnapshot = nativeCall {
         NativeRimeBridge.nativeClearComposition(sessionId)
+        selectingSyllable = false
         hasFixedSelection = false
         readingHistory.clear()
         clearSelectionHistory()
@@ -186,6 +203,7 @@ internal class RimeInputEngine(
     }
 
     override fun close() {
+        selectingSyllable = false
         val id = sessionId
         sessionId = 0L
         currentSnapshot = EngineSnapshot.Empty
@@ -209,6 +227,7 @@ internal class RimeInputEngine(
         pageNumber = update.pageNumber
         caretPosition = update.caretPosition
         if (update.rawInput.isEmpty()) {
+            selectingSyllable = false
             hasFixedSelection = false
             readingHistory.clear()
             clearSelectionHistory()

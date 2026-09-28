@@ -21,8 +21,13 @@ import dev.zeroinput.languagepack.InstalledLanguagePack
 import dev.zeroinput.userdata.EmojiHistoryRepository
 import dev.zeroinput.userdata.SecureClipboardVault
 import dev.zeroinput.userdata.UserLexiconRepository
+import dev.zeroinput.userdata.AiConfiguration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.atomic.AtomicLong
+import dev.zeroinput.ime.ai.AiCoordinator
+import dev.zeroinput.ime.ai.AiDataGeneration
+import dev.zeroinput.ime.ai.OpenAiCompatibleProvider
 
 class AppGraph(context: Context) : AutoCloseable {
     private val applicationContext = context.applicationContext
@@ -35,6 +40,18 @@ class AppGraph(context: Context) : AutoCloseable {
      */
     internal val engineExecutor: ExecutorService = BoundedExecutors.singleThread(
         name = "zeroinput-engine-worker",
+        queueCapacity = 2,
+    )
+    internal val aiExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-ai-worker",
+        queueCapacity = 1,
+    )
+    internal val aiCancellationExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-ai-cancel",
+        queueCapacity = 2,
+    )
+    internal val aiPersistenceExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-ai-storage",
         queueCapacity = 2,
     )
 
@@ -58,6 +75,68 @@ class AppGraph(context: Context) : AutoCloseable {
         return AutoCloseable { expressionListeners -= listener }
     }
     val secureClipboard = SecureClipboardVault(applicationContext)
+    val aiConfiguration = dev.zeroinput.userdata.AiConfigurationRepository(applicationContext)
+    val aiConversations = dev.zeroinput.userdata.AiConversationRepository(applicationContext)
+    private val aiConfigurationState = dev.zeroinput.ime.ai.AiConfigurationState()
+    val aiCoordinator = AiCoordinator(OpenAiCompatibleProvider({ aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor))
+    val aiDataGeneration = AiDataGeneration()
+
+    fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
+
+    private val aiConfigurationListeners = CopyOnWriteArrayList<() -> Unit>()
+
+    fun observeAiConfiguration(listener: () -> Unit): AutoCloseable {
+        aiConfigurationListeners += listener
+        return AutoCloseable { aiConfigurationListeners -= listener }
+    }
+
+    fun readAiConfiguration(completed: (Result<AiConfiguration>) -> Unit) {
+        val token = aiConfigurationState.current()
+        try {
+            aiPersistenceExecutor.execute {
+                val result = runCatching { aiConfiguration.read() }
+                if (aiConfigurationState.publish(token, result.getOrNull())) completed(result)
+                else completed(Result.failure(IllegalStateException("AI configuration revoked")))
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            completed(Result.failure(IllegalStateException("AI settings unavailable")))
+        }
+    }
+
+    /** Immediately revokes use of the old endpoint, then durably saves on the AI storage queue. */
+    fun updateAiConfiguration(value: AiConfiguration, completed: (Boolean) -> Unit) {
+        val token = revokeAiConfiguration()
+        enqueueAiControl(completed) {
+            check(aiConfigurationState.isCurrent(token))
+            aiConfiguration.write(value)
+            check(aiConfigurationState.publish(token, value, explicitControl = true))
+        }
+    }
+
+    fun clearAiData(completed: (Boolean) -> Unit) {
+        val token = revokeAiConfiguration()
+        enqueueAiControl(completed) {
+            val config = runCatching { aiConfiguration.clear() }
+            val history = runCatching { aiConversations.clear() }
+            config.getOrThrow()
+            history.getOrThrow()
+            check(aiConfigurationState.publish(token, AiConfiguration(), explicitControl = true))
+        }
+    }
+
+    private fun revokeAiConfiguration(): Long {
+        val token = aiConfigurationState.revoke()
+        aiDataGeneration.invalidate()
+        aiCoordinator.invalidate()
+        aiConfigurationListeners.forEach { it() }
+        return token
+    }
+
+    private fun enqueueAiControl(completed: (Boolean) -> Unit, work: () -> Unit) {
+        try {
+            aiPersistenceExecutor.execute { completed(runCatching(work).isSuccess) }
+        } catch (_: java.util.concurrent.RejectedExecutionException) { completed(false) }
+    }
     internal val securePaste = dev.zeroinput.ime.clipboard.SecurePasteCoordinator(applicationContext, settings, secureClipboard)
     internal val clipboardSelectionTransfer = dev.zeroinput.ime.clipboard.ClipboardSelectionTransfer()
     val languagePacks = LanguagePackInstaller(applicationContext)
@@ -93,6 +172,7 @@ class AppGraph(context: Context) : AutoCloseable {
     private val personalizationListeners = CopyOnWriteArrayList<() -> Unit>()
 
     init {
+        readAiConfiguration {}
         // Bring the core engine online before hashing optional packs.  Both
         // operations stay on one background queue so they do not compete for
         // storage bandwidth during the first input session.
@@ -117,7 +197,7 @@ class AppGraph(context: Context) : AutoCloseable {
      * the native/data-backed replacement is prepared in the worker below.
      */
     fun createImmediateEngine(language: InputLanguage): InputEngine = when (language) {
-        InputLanguage.CHINESE -> rime.createFallback()
+        InputLanguage.CHINESE -> rime.createFallback(settings.chineseInputOptions)
         InputLanguage.ENGLISH -> english.create()
     }
 
@@ -228,6 +308,11 @@ class AppGraph(context: Context) : AutoCloseable {
         clipboardSelectionTransfer.close()
         clipboardGuard.close()
         engineExecutor.shutdownNow()
+        aiConfigurationListeners.clear()
+        aiCoordinator.close()
+        aiExecutor.shutdownNow()
+        aiCancellationExecutor.shutdown()
+        aiPersistenceExecutor.shutdownNow()
         queuedPersonalization.close()
         languagePackSnapshot = emptyList()
         languagePackListeners.clear()

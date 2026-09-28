@@ -10,14 +10,17 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import dev.zeroinput.engine.api.EngineSnapshot
+import dev.zeroinput.engine.api.PageDirection
 
 class CandidateStripView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
     var onCandidateSelected: (Int) -> Unit = {}
     var onExpandRequested: () -> Unit = {}
     var onRetryRequested: () -> Unit = {}
     var onToolsRequested: () -> Unit = {}
+    var onAiRequested: () -> Unit = {}
     var onUndoSelectionRequested: () -> Unit = {}
     var onSyllableRequested: () -> Unit = {}
+    var onPageChanged: (PageDirection) -> Unit = {}
     private val composition = TextView(context).apply {
         textSize = 14f
         gravity = Gravity.CENTER_VERTICAL
@@ -42,7 +45,19 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         addView(candidates)
     }
     private val expand = panelIconButton(context, android.R.drawable.arrow_down_float, R.string.expand_candidates) { onExpandRequested() }
+    private var requestedPage: PageDirection? = null
+    private val browser = HorizontalSwipeFrameLayout(context).apply {
+        canSwipe = { direction ->
+            val snapshot = previousSnapshot
+            if (direction == PageDirection.NEXT) snapshot?.hasNextPage == true && !scroll.canScrollHorizontally(1)
+            else snapshot?.hasPreviousPage == true && !scroll.canScrollHorizontally(-1)
+        }
+        onSwipe = { direction -> requestedPage = direction; onPageChanged(direction); requestedPage = null }
+        addView(scroll)
+    }
     private val tools = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.keyboard_tools) { onToolsRequested() }
+    private val ai = aiEntryButton(context) { onAiRequested() }
+        .apply { visibility = GONE }
     private val undo = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.undo_segment) { onUndoSelectionRequested() }
     private val syllable = panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.select_single_syllable) { onSyllableRequested() }
     private val retry = panelIconButton(context, android.R.drawable.ic_popup_sync, R.string.retry_engine) { onRetryRequested() }
@@ -65,9 +80,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         addView(statusRow, if (landscape) LayoutParams(0, dp(48), 1f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(24)))
         addView(LinearLayout(context).apply {
             addView(tools, LayoutParams(dp(48), dp(48)))
+            addView(ai, LayoutParams(dp(48), dp(48)))
             addView(undo, LayoutParams(dp(48), dp(48)))
             addView(syllable, LayoutParams(dp(48), dp(48)))
-            addView(scroll, LayoutParams(0, dp(48), 1f))
+            addView(browser, LayoutParams(0, dp(48), 1f))
             addView(retry, LayoutParams(dp(48), dp(48)))
             addView(expand, LayoutParams(dp(48), dp(48)))
         }, if (landscape) LayoutParams(0, dp(48), 3f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
@@ -78,6 +94,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
 
     fun render(snapshot: EngineSnapshot) {
         if (snapshot == previousSnapshot) return
+        browser.cancelSwipe()
+        val oldTexts = previousSnapshot?.candidates.orEmpty().map { it.text }.toSet()
+        val pageTarget = if (requestedPage == PageDirection.NEXT)
+            snapshot.candidates.indexOfFirst { it.text !in oldTexts }.coerceAtLeast(0) else 0
         val changedInput = snapshot.rawInput != previousSnapshot?.rawInput ||
             snapshot.candidates != previousSnapshot?.candidates
         previousSnapshot = snapshot
@@ -99,6 +119,9 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         }
         expand.visibility = if (snapshot.candidates.isEmpty() || associations) View.INVISIBLE else View.VISIBLE
         if (changedInput) scroll.scrollTo(0, 0)
+        if (pageTarget > 0) scroll.post {
+            if (previousSnapshot == snapshot) buttons.getOrNull(pageTarget)?.let { scroll.scrollTo(it.left, 0) }
+        }
         updateStatusVisibility()
     }
 
@@ -107,6 +130,11 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         expanded = value
         expand.setImageResource(if (value) android.R.drawable.arrow_up_float else android.R.drawable.arrow_down_float)
         expand.contentDescription = context.getString(if (value) R.string.collapse_candidates else R.string.expand_candidates)
+    }
+
+    fun renderAiEntry(available: Boolean, visible: Boolean) {
+        ai.visibility = if (visible) VISIBLE else GONE
+        ai.renderAiEntryAvailability(available)
     }
 
     fun renderStatus(value: InputEngineStatus) {

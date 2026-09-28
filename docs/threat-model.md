@@ -9,9 +9,11 @@
 
 ## Enforced controls
 
-- Manifest 不含联网权限，CI 扫描项目源码中的联网权限和系统剪贴板 API，并解析 Debug/Release
-  合并清单执行权限白名单校验，防止依赖间接引入网络、存储或其他敏感权限。系统剪贴板正文
-  读取始终禁止；仅专用防护适配器可在用户开启后监听、检查时间戳和清理。AndroidX 文本控件
+- Manifest 只为用户主动开启的 AI 网络工作台声明 `INTERNET`；CI 扫描项目源码中的联网权限和
+  系统剪贴板 API，并解析 Debug/Release 合并清单执行权限白名单校验，防止依赖间接引入网络、
+  存储或其他敏感权限。网络传输仅允许 `OpenAiCompatibleProvider`，只接受 HTTPS、禁止明文、
+  查询参数、片段、用户信息和重定向，并限制请求、超时、SSE 单行及整体响应大小。系统剪贴板
+  正文读取始终禁止；仅专用防护适配器可在用户开启后监听、检查时间戳和清理。AndroidX 文本控件
   只可能在用户明确执行标准粘贴操作时进入系统编辑路径。
 - 除启动页、输入法服务和只接收待确认文本的剪贴板导入页外，Android 组件均不导出；输入法服务只使用系统要求的绑定权限。导入页不能查询或返回私有库内容。
 - `allowBackup=false` 且不启用数据提取规则。
@@ -64,10 +66,53 @@
 - 导入器对归档和展开内容限制文件大小、条目数、路径、扩展名和校验和；manifest
   通过有界字节流严格按 UTF-8 解码，实际读取字节仍会在激活前复核，防止 zip slip、zip
   bomb 和压缩条目元数据失真。
+  替换已安装语言包时，只有成功暂存旧包后
+  才允许恢复备份；暂存失败保留原目录，新包激活后的备份清理失败不会回滚有效新包。
 - release 构建关闭调试，源码不得记录输入文本。
+- AI 工作台默认关闭，只有用户同时打开 AI 总开关和联网开关后才可发起网络请求。请求只携带
+  用户在 AI 面板主动提交的文本与用户明确选择的会话历史；不读取编辑器周边内容、选区、系统
+  剪贴板、安全剪贴板、个人词库、emoji 历史或其他输入历史。密码、PIN、邮箱、URI、隐身、
+  未知或隐私收紧的输入会 fail-closed。流式结果只显示在面板，必须再次点击“插入结果”才可
+  写入当前编辑器。
+- AI 配置（含 API key）与可选会话历史使用相互独立的 AES-256-GCM/Keystore 别名，位于
+  `noBackupFilesDir`；会话保存默认关闭。API key 不进入日志、Intent、异常文本或诊断。会话、
+  设置、输入法服务销毁、清除 AI 数据或编辑器切换都会使旧请求和排队写入失效。
+- AI 配置的发布与撤销使用同一短锁及独立版本，过期读取和保存不能重新启用旧联网配置；
+  编辑器隐私变化只撤销请求和数据任务，不会误丢初始化配置。回归测试覆盖撤销后旧读取、
+  新配置生效后旧保存以及编辑器代次独立性。
+- AI configuration persistence rejects invalid ports and API-key control characters
+  before replacing saved data, matching the transport validation. A rejected edit
+  retains saved credentials while the UI keeps activation switches off. Empty or
+  oversized completion events cannot become insertable results. Regression
+  coverage is recorded in [the code audit](code-audit-2026-09-28.md).
 - Debug-only 输入诊断只显示编辑器包名、公开 `EditorInfo` 类型/选项、subtype 及当前会话的
   隐私、语言和引擎状态；不显示输入文本、拼音、候选词、周边文本或异常堆栈，不写入日志/文件，
   会话结束时清除。Release 构建不渲染该诊断。
+
+## Review follow-up controls (2026-09-28)
+
+- Authentication results remain cancellable until the owner-thread callback is
+  consumed. Cancelling or timing out after success was queued delivers denial
+  once; duplicate or late completions cannot revive the grant. Regression tests
+  exercise the real Android Handler without launching or bypassing authentication.
+- Private clipboard management dialogs protect their own windows with FLAG_SECURE;
+  the Activity flag alone does not protect a dialog window. Dialogs and metadata
+  views disable state saving, autofill and content capture. Dismissal clears editable
+  drafts, and stopping the page dismisses private dialogs. Tests use public fixtures.
+- AI SSE responses reject non-string content and explicit truncated, filtered or
+  tool-call finish reasons even when followed by DONE. Such output is not an
+  insertable or persistable completion. Conversation titles do not split UTF-16
+  surrogate pairs at the existing length bound.
+- Language-pack manifest and JSON dictionaries are checked before recursive
+  parsing for a maximum of 16 container levels and standard JSON tokens. Bare
+  keys, single-quoted strings, comments, NUL and trailing documents are rejected.
+  JSON dictionaries use bounded strict UTF-8 decoding; invalid JSON cannot be
+  reinterpreted as a line dictionary or activated alongside otherwise valid rows.
+- Optional ranking worker-construction failures wipe pending owned inputs and
+  reset scheduling state, allowing later retry without retaining model context.
+- Settings mutations report content-free failures for storage errors and rejected
+  execution. A destroyed page cannot receive pending callbacks; an error cannot
+  produce a success notification or expose a parser exception to the user.
 
 ## Encrypted storage failure boundaries
 
@@ -166,6 +211,17 @@
 
 ## Editor and user lexicon hardening
 
+- Panel Back navigation and expression category gestures use the existing
+  interaction callback, revoking pending authenticated actions. Predictive Back
+  callbacks unregister on root navigation, view release and window detach.
+  Horizontal drags cancel candidate/expression clicks and reject cancelled or
+  multi-pointer streams; empty private-expression states do not expose data.
+- External cursor changes end the visible preedit without reading surrounding
+  text, learning its contents or replacing the new selection. Engine/candidate
+  state is reset so a later Backspace cannot use the old composing position.
+- The fuzzy master stores only a boolean preference, preserving the rule mask.
+  It uses existing configuration generations and never changes privacy eligibility.
+
 - Editor classes and variations have an explicit allowlist. Unknown classes,
   `TYPE_NULL` and unknown variations are treated as sensitive before any user
   preference can allow suggestions or learning. Session replacement clears old
@@ -175,6 +231,8 @@
   nested scalar values, trailing documents, malformed UTF-8 and invalid language
   names fail closed without retaining parser messages or causes. All validation
   and merge-capacity checks finish before any persisted or cached data changes.
+  Automatic learning also rejects malformed UTF-16 before serialization, so cached
+  text cannot diverge from the UTF-8 data restored after restart.
 - Imported IDs cannot identify a different local candidate. Matching phrase
   identities preserve their local ID; new identities receive a fresh ID.
 - Repository writes publish memory only after encrypted persistence succeeds.
@@ -442,3 +500,42 @@ phrases. See ADR 0013, ADR 0014 and `word-association-validation.md`.
 - 被恶意系统组件截屏、录屏或注入的输入。
 - 用户主动导出明文文件后的外部存储安全。
 - 目标应用自身读取已经提交给它的文本。
+
+
+## AI workbench additions
+
+See [ADR 0015](adr/0015-ai-workbench-boundary.md). The AI draft uses a separate
+local conversion session and an empty personalization port. It has no external
+editor or clipboard read port. Email, URI, no-personalization, no-suggestions,
+incognito and learning-disabled sessions are rejected alongside sensitive inputs.
+The always-discoverable AI icon is only an explanation action in those contexts:
+it displays a fixed, localized restriction message without opening the workbench,
+loading AI history, reading editor/clipboard content or creating a request. The
+entry rechecks privacy after the interaction callback, so a concurrent policy
+change cannot use a previously available icon to enter AI.
+
+One bounded worker handles transport; a separate serial worker owns encrypted
+storage. Stream deltas coalesce into one pending UI callback. Both enqueue-time
+and delivery-time generations reject stale results. Malformed or truncated streams
+cannot produce an insertable result; duplicate terminal callbacks are discarded.
+Settings changes revoke old requests before saving. Clear reports success only
+after both stores and dedicated keys are deleted; a failed deletion blocks access
+until an explicit retry. All store work stays off the input thread.
+
+The bounded encrypted history file is temporarily decoded when listing; only
+summaries leave that operation. Selecting a chat loads messages, without a global
+plaintext cache. The active chat and draft are released on panel/session changes.
+AI and API-key windows use FLAG_SECURE and disable saved drafts/autofill/content
+capture. Results are plain text and never execute tools, render HTML or fetch URLs.
+Provider configuration fields may remain in their protected dialog while the user
+temporarily switches apps to obtain configuration details. This bounded draft
+stays only in the live Activity's views; it is neither automatically persisted
+nor put in a Bundle. Cancel, page finish or destruction clears the editable
+fields. Only explicit Save updates the encrypted configuration. Platform tests
+cover background/foreground retention, no implicit persistence, cancellation,
+destruction and continued secure-window protection.
+
+Explicitly submitted text and selected history leave the device for the configured
+provider. Provider retention, connection metadata, malicious model replies and JVM
+string zeroization limits are documented in the assessment. A prompt cannot bypass
+local insertion, session checks or clipboard authentication.

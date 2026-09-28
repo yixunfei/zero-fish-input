@@ -3,7 +3,6 @@ package dev.zeroinput.ime.core
 import dev.zeroinput.engine.api.CandidateScorer
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -73,7 +72,9 @@ class AsyncCandidateRanker(
         try {
             val worker = executor ?: executorFactory().also { executor = it }
             worker.execute(::drain)
-        } catch (_: RejectedExecutionException) {
+        } catch (_: RuntimeException) {
+            // Worker construction and thread creation can fail before execute
+            // rejects anything. Release owned input and allow a later retry.
             draining = false
             cancelLocked()
         }

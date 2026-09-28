@@ -168,9 +168,7 @@ class WordAssociationIntegrationTest {
             // A fixed sleep can start this fixture in the small fallback dictionary.
             // Wait for the actual session handoff before testing native vocabulary.
             if (language == InputLanguage.CHINESE) await {
-                views(panel()).filterIsInstance<TextView>().any {
-                    it.text.toString() == it.context.getString(dev.zeroinput.ime.ui.R.string.engine_ready)
-                }
+                panel().renderedEngineStatus == dev.zeroinput.ime.ui.InputEngineStatus.READY
             }
             action(editor)
         } finally {

@@ -13,8 +13,15 @@ native state. Future Chinese engines should share product-level settings.
 ## Decision
 
 - Define immutable ChineseInputOptions and explicit capabilities in engine-api.
-  Keep Rime spelling algebra and deployment in engine-rime.
+  Keep Rime spelling algebra and deployment in engine-rime. The fuzzy-pinyin
+  mask keeps the original bit positions and appends new pairs, so existing
+  saved settings retain their meaning while supporting the expanded rule set.
 - Default to simplified Chinese with abbreviation enabled; fuzzy pairs are opt-in.
+  A master boolean suspends the selected pair mask without erasing it. The
+  effective mask drives both spelling rules and schema identity; preferences
+  without the new boolean retain their prior selected-rule behavior. No personal
+  storage migration or duplicate format is introduced. The keyboard shortcut
+  opens rule configuration when no pair has been selected.
   Use Rime's existing algebra and OpenCC's pinned offline dictionaries.
 - Use JSON syntax for the bundled YAML schema, allowing structured configuration
   derivation with the platform JSON parser. Derive only known option values.

@@ -276,7 +276,42 @@ class QueuedPersonalizationStoreTest {
         }
     }
 
-    private class FrequencyFakeStore : PersonalFrequencyStore {
+    @Test
+    fun `frequency query does not read after privacy invalidation`() {
+        val delegate = CountingFrequencyStore()
+        val executor = TestExecutorService()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            executor.runNext() // preload
+            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            store.invalidatePendingWrites()
+            executor.runNext() // stale frequency query
+            assertEquals(0, delegate.frequencyReads)
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
+    fun `rejected frequency query clears pending marker for retry`() {
+        val delegate = CountingFrequencyStore()
+        val executor = TestExecutorService()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            executor.runNext() // preload
+            executor.rejectSubmissions = true
+            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            executor.rejectSubmissions = false
+            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            assertTrue(executor.hasTasks())
+        } finally {
+            store.close()
+        }
+    }
+
+    private open class FrequencyFakeStore : PersonalFrequencyStore {
         override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> =
             mapOf("世界" to 7)
 
@@ -288,6 +323,15 @@ class QueuedPersonalizationStoreTest {
         override fun recordUse(id: String, learningAllowed: Boolean) = Unit
 
         override fun clear() = Unit
+    }
+
+    private class CountingFrequencyStore : FrequencyFakeStore() {
+        var frequencyReads = 0
+
+        override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
+            frequencyReads += 1
+            return super.frequenciesFor(words, language)
+        }
     }
 
     private class FakeStore : PersonalizationStore {

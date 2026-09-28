@@ -8,6 +8,28 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 
 class AsyncCandidateRankerTest {
+    @Test fun `worker construction failure wipes input and permits later recovery`() {
+        val worker = ManualExecutor()
+        var attempts = 0
+        val completed = mutableListOf<Long>()
+        val ranker = AsyncCandidateRanker({ Scorer() }, { it.run(); true },
+            { revision, _ -> completed += revision }, {
+                if (attempts++ == 0) throw IllegalStateException("Fixture worker unavailable")
+                worker
+            }, { 0L })
+        ranker.setEnabled(true)
+        val prefix = "学习".toCharArray()
+        val candidates = words()
+        ranker.request(1, prefix, candidates)
+        assertTrue(prefix.all { it == '\u0000' })
+        assertTrue(candidates.all { word -> word.all { it == '\u0000' } })
+        ranker.request(2, "学习".toCharArray(), words())
+        worker.run()
+        assertEquals(listOf(2L), completed)
+        ranker.close()
+        worker.run()
+    }
+
     @Test fun `disabled requests do not create runtime or executor and wipe their buffers`() {
         val ranker = AsyncCandidateRanker({ error("Unexpected model") }, { error("Unexpected delivery") },
             { _, _ -> error("Unexpected result") }, { error("Unexpected worker") })

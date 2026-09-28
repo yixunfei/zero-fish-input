@@ -17,6 +17,21 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class NineKeyPinyinTest {
+    @Test fun nineKeyCompositionLimitReturnsAdditionalInputToTheController() = withEngine { engine ->
+        val input = "64".repeat(64)
+        type(engine, input)
+        assertEquals(input, engine.snapshot.rawInput)
+        val before = engine.snapshot
+        val overflow = engine.handle(EngineKey.Character("4"))
+        assertFalse(overflow.consumed)
+        assertEquals("", overflow.committedText)
+        assertEquals(before, overflow.snapshot)
+        assertTrue(engine.handle(EngineKey.Backspace).consumed)
+        assertEquals(input.dropLast(1), engine.snapshot.rawInput)
+        assertTrue(engine.handle(EngineKey.Character("4")).consumed)
+        assertEquals(input, engine.snapshot.rawInput)
+    }
+
     @Test fun numericPinyinOffersAndCommitsThePhrase() = withEngine { engine ->
         type(engine, "64426")
         val index = engine.snapshot.candidates.indexOfFirst { it.text == "你好" }

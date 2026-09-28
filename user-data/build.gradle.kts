@@ -27,8 +27,10 @@ android {
 }
 
 dependencies {
+    api(project(":ai-api"))
     api(project(":engine-api"))
     api(project(":security"))
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
+    testImplementation(libs.json)
 }

@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.color.MaterialColors
 
 /** Persistent status outside candidate/tools panels; progress has no estimated percentage. */
 internal class EnginePreparationView(context: Context) : LinearLayout(context) {
@@ -19,13 +20,8 @@ internal class EnginePreparationView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
         visibility = GONE
-        val attributes = context.obtainStyledAttributes(intArrayOf(
-            com.google.android.material.R.attr.colorPrimary,
-            com.google.android.material.R.attr.colorOnPrimary,
-        ))
-        val background = attributes.getColor(0, android.graphics.Color.DKGRAY)
-        val foreground = attributes.getColor(1, android.graphics.Color.WHITE)
-        attributes.recycle()
+        val background = MaterialColors.getColor(context, com.google.android.material.R.attr.colorPrimary, android.graphics.Color.DKGRAY)
+        val foreground = MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnPrimary, android.graphics.Color.WHITE)
         setBackgroundColor(background)
         addView(TextView(context).apply {
             setText(R.string.engine_preparing_basic)

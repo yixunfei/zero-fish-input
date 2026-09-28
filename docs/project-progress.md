@@ -11,6 +11,15 @@ branding. Version 0.3.0-debug uses code 3 and the existing Debug signing identit
 See [release notes](releases/v0.3.0.md) and [validation](releases/v0.3.0-validation.md)
 for current checks and remaining device boundaries.
 
+## v0.4.0 testing prerelease (2026-09-28)
+
+The release packages the AI workbench, stricter streaming and language-pack
+validation, input/editor lifecycle repairs, private clipboard hardening, and
+the follow-up audit regressions. Version 0.4.0-debug uses version code 4 and
+the existing Debug signing identity. See [release notes](releases/v0.4.0.md)
+and [validation](releases/v0.4.0-validation.md) for the final checks and
+remaining device/signing boundaries.
+
 ## Association coverage follow-up (2026-09-21)
 
 The approved priority is association coverage and evaluation. The project-authored

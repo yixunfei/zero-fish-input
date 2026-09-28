@@ -1,0 +1,253 @@
+package dev.zeroinput.userdata
+
+import dev.zeroinput.ai.api.AiConversation
+import dev.zeroinput.ai.api.AiLimits
+import dev.zeroinput.ai.api.AiMessage
+import dev.zeroinput.ai.api.AiRole
+import dev.zeroinput.security.EncryptedStore
+import java.io.IOException
+import org.json.JSONArray
+import org.json.JSONObject
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class AiRepositoryTest {
+    @Test
+    fun configurationRoundTripWipesBuffersAndKeepsApiKeyOutOfTheMemoryContract() {
+        val store = MemoryStore()
+        val value = AiConfiguration(
+            enabled = true,
+            networkAllowed = true,
+            endpoint = "https://provider.example/v1/chat/completions",
+            model = "local-compatible",
+            apiKey = "fixture-api-key",
+            timeoutMs = 30_000L,
+            saveConversations = true,
+        )
+
+        AiConfigurationRepository(store).write(value)
+        val loaded = AiConfigurationRepository(store).read()
+
+        assertEquals(value, loaded)
+        assertTrue(checkNotNull(store.lastWrite).all { it == 0.toByte() })
+        assertTrue(checkNotNull(store.lastRead).all { it == 0.toByte() })
+    }
+
+    @Test
+    fun failedConfigurationWriteDoesNotPublishTheNewCache() {
+        val store = MemoryStore()
+        val repository = AiConfigurationRepository(store)
+        val original = AiConfiguration(apiKey = "original")
+        repository.write(original)
+        store.failWrite = true
+
+        assertThrows(IOException::class.java) {
+            repository.write(original.copy(model = "new-model"))
+        }
+        assertEquals(original, repository.read())
+    }
+
+    @Test
+    fun configurationRejectsInvalidPortsAndHeaderControlsBeforePersisting() {
+        val store = MemoryStore()
+        val repository = AiConfigurationRepository(store)
+        val original = AiConfiguration(apiKey = "original")
+        repository.write(original)
+        val originalBytes = checkNotNull(store.bytes).copyOf()
+        val invalid = listOf(
+            original.copy(endpoint = "https://provider.example:65536/v1/chat/completions"),
+            original.copy(endpoint = "https://provider.example:0/v1/chat/completions"),
+            original.copy(apiKey = "fixture\r\nheader"),
+            original.copy(apiKey = "fixture\u0000key"),
+        )
+        invalid.forEach { value ->
+            assertThrows(IllegalArgumentException::class.java) { repository.write(value) }
+            assertEquals(original, repository.read())
+            assertArrayEquals(originalBytes, store.bytes)
+        }
+    }
+
+    @Test
+    fun malformedConfigurationIsRejectedWithoutReplacingTheCiphertext() {
+        val store = MemoryStore()
+        store.bytes = "{\"format\":1,\"apiKey\":\"unterminated}".toByteArray()
+        val original = store.bytes!!.copyOf()
+        val repository = AiConfigurationRepository(store)
+
+        assertThrows(IllegalStateException::class.java) { repository.read() }
+        assertArrayEquals(original, store.bytes)
+    }
+
+    @Test
+    fun conversationRoundTripReplacesDuplicateIdsAndWipesBuffers() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        val original = AiConversation(
+            id = "conversation-1",
+            title = "First",
+            messages = listOf(AiMessage(AiRole.USER, "hello")),
+            updatedAtEpochMillis = 1L,
+        )
+        val replacement = original.copy(
+            title = "Updated",
+            messages = listOf(
+                AiMessage(AiRole.USER, "hello"),
+                AiMessage(AiRole.ASSISTANT, "world"),
+            ),
+            updatedAtEpochMillis = 2L,
+        )
+
+        repository.upsert(original)
+        repository.upsert(replacement)
+        val loaded = AiConversationRepository(store).list()
+
+        assertEquals(listOf(replacement), loaded)
+        assertTrue(checkNotNull(store.lastWrite).all { it == 0.toByte() })
+        assertTrue(checkNotNull(store.lastRead).all { it == 0.toByte() })
+    }
+
+    @Test
+    fun failedConversationWriteDoesNotPublishTheNewCache() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        val original = AiConversation(id = "one", title = "Original")
+        repository.upsert(original)
+        store.failWrite = true
+
+        assertThrows(IOException::class.java) {
+            repository.upsert(original.copy(title = "Changed"))
+        }
+        assertEquals(listOf(original), repository.list())
+    }
+
+    @Test
+    fun malformedConversationJsonAndOversizedHistoryAreRejected() {
+        val store = MemoryStore()
+        store.bytes = JSONObject().put("format", 1).toString().toByteArray()
+        assertThrows(Exception::class.java) { AiConversationRepository(store).list() }
+
+        val messages = JSONArray().apply {
+            repeat(AiLimits.MAX_HISTORY_MESSAGES + 1) {
+                put(JSONObject().put("role", "USER").put("content", "fixture"))
+            }
+        }
+        store.bytes = JSONObject()
+            .put("format", 1)
+            .put("conversations", JSONArray().put(
+                JSONObject()
+                    .put("id", "one")
+                    .put("title", "Fixture")
+                    .put("messages", messages),
+            ))
+            .toString()
+            .toByteArray()
+        assertThrows(Exception::class.java) { AiConversationRepository(store).list() }
+    }
+
+    @Test
+    fun duplicatePersistedConversationIdsAreRejected() {
+        val item = JSONObject().put("id", "same").put("title", "Fixture").put("messages", JSONArray())
+        val store = MemoryStore()
+        store.bytes = JSONObject()
+            .put("format", 1)
+            .put("conversations", JSONArray().put(item).put(item))
+            .toString()
+            .toByteArray()
+
+        assertThrows(Exception::class.java) { AiConversationRepository(store).list() }
+    }
+
+    @Test
+    fun clearDeletesDedicatedKeyAndEmptiesConversationCache() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        repository.upsert(AiConversation(id = "one", title = "Fixture"))
+
+        repository.clear()
+
+        assertTrue(store.deletedKey)
+        assertNull(store.bytes)
+        assertEquals(emptyList<AiConversation>(), repository.list())
+    }
+
+    @Test
+    fun summariesDoNotExposeMessagesAndSingleDeleteIsAtomic() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        repository.upsert(AiConversation(id = "one", title = "First", messages = listOf(AiMessage(AiRole.USER, "secret"))))
+        repository.upsert(AiConversation(id = "two", title = "Second"))
+
+        val summaries = repository.listSummaries()
+        assertEquals(setOf("one", "two"), summaries.map { it.id }.toSet())
+        assertEquals("First", summaries.first { it.id == "one" }.title)
+        repository.delete("one")
+
+        assertNull(repository.find("one"))
+        assertEquals("two", repository.find("two")?.id)
+    }
+
+    @Test
+    fun cancelledWriteAfterLoadingCannotPublishOrOverwriteStoredConversation() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        repository.upsert(AiConversation(id = "one", title = "original"))
+        var current = true
+        store.afterRead = { current = false }
+        assertThrows(IllegalStateException::class.java) {
+            repository.upsert(AiConversation(id = "one", title = "late")) { current }
+        }
+        store.afterRead = {}
+        assertEquals("original", repository.list().single().title)
+    }
+
+    @Test
+    fun failedDeletionBlocksConfigurationAndHistoryUntilExplicitRetry() {
+        val store = MemoryStore()
+        val history = AiConversationRepository(store)
+        history.upsert(AiConversation(id = "one", title = "fixture"))
+        store.failDelete = true
+        assertThrows(IOException::class.java) { history.clear() }
+        assertThrows(IllegalStateException::class.java) { history.list() }
+        assertThrows(IllegalStateException::class.java) { history.upsert(AiConversation(title = "late")) }
+        store.failDelete = false
+        history.clear()
+        assertTrue(history.list().isEmpty())
+
+        val configuration = AiConfigurationRepository(store)
+        configuration.write(AiConfiguration(apiKey = "fixture"))
+        store.failDelete = true
+        assertThrows(IOException::class.java) { configuration.clear() }
+        assertThrows(IllegalStateException::class.java) { configuration.read() }
+        store.failDelete = false
+        configuration.clear()
+        assertEquals("", configuration.read().apiKey)
+    }
+
+    private class MemoryStore : EncryptedStore {
+        var bytes: ByteArray? = null
+        var lastRead: ByteArray? = null
+        var lastWrite: ByteArray? = null
+        var failWrite = false
+        var deletedKey = false
+        var failDelete = false
+        var afterRead: () -> Unit = {}
+
+        override fun read(): ByteArray? = bytes?.copyOf()?.also { lastRead = it; afterRead() }
+
+        override fun write(plaintext: ByteArray) {
+            lastWrite = plaintext
+            if (failWrite) throw IOException("fixture failure")
+            bytes = plaintext.copyOf()
+        }
+
+        override fun delete(deleteKey: Boolean) {
+            if (failDelete) throw IOException("fixture failure")
+            deletedKey = deleteKey
+            bytes = null
+        }
+    }
+}

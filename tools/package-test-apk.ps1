@@ -121,6 +121,8 @@ function Assert-TestApk {
         "android.permission.POST_NOTIFICATIONS",
         # The separately enabled clipboard overlay requires explicit user consent.
         "android.permission.SYSTEM_ALERT_WINDOW",
+        # User-approved optional AI transport; input and clipboard features remain offline.
+        "android.permission.INTERNET",
         "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
     )
     $unexpectedPermissions = @($permissionNames | Where-Object { $_ -notin $allowedPermissions })
