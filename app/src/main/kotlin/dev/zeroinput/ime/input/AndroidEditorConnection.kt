@@ -17,25 +17,37 @@ class AndroidEditorConnection(
 
     fun selectedLength(): Int? = selection.selectedLength()
 
-    fun updateSelection(start: Int, end: Int, composingStart: Int = -1, composingEnd: Int = -1): Boolean =
-        selection.updated(start, end, composingStart, composingEnd).also { if (it) onContextInvalidated() }
+    fun updateSelection(start: Int, end: Int, composingStart: Int = -1, composingEnd: Int = -1,
+        previousStart: Int = -1, previousEnd: Int = -1): Boolean =
+        selection.updated(start, end, composingStart, composingEnd, previousStart, previousEnd)
+            .also { if (it) onContextInvalidated() }
 
     override fun setComposingText(text: String) {
         committedConnection = null
-        if (current()?.setComposingText(text, 1) == true) selection.replaced(text.length, composing = true)
-        else { selection.unknown(); onContextInvalidated() }
+        // Register the expected cursor/span before crossing the Binder call.
+        // Editors are allowed to invoke updateSelection synchronously from
+        // setComposingText; registering afterwards makes that callback look
+        // like an external cursor move and drops the next key.
+        selection.replaced(text.length, composing = true)
+        if (current()?.setComposingText(text, 1) != true) {
+            selection.unknown()
+            onContextInvalidated()
+        }
     }
 
     override fun finishComposingText() {
-        current()?.finishComposingText()
         selection.finishComposition()
+        current()?.finishComposingText()
     }
 
     override fun commitText(text: String): Boolean {
         val connection = current()
         committedConnection = null
+        // As with pre-edit updates, reserve the resulting cursor before the
+        // platform callback can arrive.  A rejected commit invalidates the
+        // prediction and forces the next interaction to re-anchor.
+        selection.replaced(text.length, composing = false)
         if (connection?.commitText(text, 1) == true) {
-            selection.replaced(text.length, composing = false)
             committedConnection = connection
             onCommitted(text)
             return true
@@ -55,8 +67,11 @@ class AndroidEditorConnection(
         return try {
             val before = connection.getTextBeforeCursor(expectedText.length, 0) ?: return false
             if (before.toString() != expectedText || current() !== connection) return false
-            if (!connection.setComposingRegion(range.start, range.end)) return false
             selection.reopened(range)
+            if (!connection.setComposingRegion(range.start, range.end)) {
+                selection.unknown()
+                return false
+            }
             true
         } finally { connection.endBatchEdit() }
     }

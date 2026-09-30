@@ -145,7 +145,7 @@ class InputSessionController(
         }
         if (command != InputCommand.ReconvertLast) invalidateReconversion(publishState = false)
         if (command !is InputCommand.ChangeCandidatePage && command !is InputCommand.SelectCandidate &&
-            command != InputCommand.Space && command != InputCommand.Enter) candidateWindow.clear()
+            command != InputCommand.Space) candidateWindow.clear()
         if (privacy.isSensitive) {
             handleSensitive(command)
             return
@@ -164,13 +164,13 @@ class InputSessionController(
                 is InputCommand.Text -> handleKey(activeEngine, EngineKey.Character(command.value))
                 is InputCommand.LiteralText -> commitLiteral(activeEngine, command.value)
                 InputCommand.Backspace -> handleKey(activeEngine, EngineKey.Backspace, fallbackBackspace = true)
-                InputCommand.Space, InputCommand.Enter -> {
+                InputCommand.Space -> {
                     if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
                         (candidateWindow.isBrowsing || personalPaging.isBrowsing || state.modelRanked)) {
                         selectCandidate(activeEngine, state.snapshot.highlightedIndex)
-                    } else if (command == InputCommand.Enter) handleEnter(activeEngine)
-                    else handleKey(activeEngine, EngineKey.Space)
+                    } else handleKey(activeEngine, EngineKey.Space)
                 }
+                InputCommand.Enter -> handleEnter(activeEngine)
                 InputCommand.ReconvertLast -> reconvert(activeEngine)
                 InputCommand.UndoSelection -> (activeEngine as? CompositionEditingEngine)?.let {
                     apply(it.undoSelection())
@@ -482,9 +482,11 @@ class InputSessionController(
             }
             if (committed && privacy.personalizationAllowed && update.learnable) {
                 runCatching {
+                    val learnedValue = update.committedText.trimEnd(' ')
+                    if (learnedValue.isEmpty()) return@runCatching
                     personalization.learn(
-                        shortcut = reading.ifBlank { update.committedText },
-                        value = update.committedText,
+                        shortcut = reading.ifBlank { learnedValue },
+                        value = learnedValue,
                         language = language,
                         learningAllowed = privacy.learningAllowed,
                     )
@@ -515,21 +517,11 @@ class InputSessionController(
             return
         }
 
-        val update = activeEngine.handle(EngineKey.Enter)
-        if (update.consumed || update.committedText.isNotEmpty()) {
-            apply(update, before.rawInput)
-            return
-        }
-
-        // The engine declined Enter. Commit the visible preedit before handing
-        // the key to the editor, and always clear the engine state.
-        val declinedSnapshot = update.snapshot.takeIf(EngineSnapshot::isComposing) ?: before
-        val rawComposition = fallbackComposition(declinedSnapshot)
+        val rawComposition = before.rawInput.ifBlank { before.composition }
         runCatching { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         commitRawComposition(rawComposition)
         publish(EngineSnapshot.Empty)
-        performEnterAction()
     }
 
     private fun commitLiteral(activeEngine: InputEngine, text: String) {
@@ -537,11 +529,10 @@ class InputSessionController(
         if (state.modelRanked) selectCandidate(activeEngine, state.snapshot.highlightedIndex)
         if (state.snapshot.isComposing) {
             val before = state.snapshot
-            val update = activeEngine.handle(EngineKey.Enter)
-            apply(update, before.rawInput)
-            val remaining = update.snapshot.takeIf(EngineSnapshot::isComposing)
-                ?: before.takeIf { !update.consumed && update.committedText.isEmpty() }
-            flushUnconsumedComposition(activeEngine, remaining)
+            if (before.candidates.isNotEmpty()) {
+                selectCandidate(activeEngine, before.highlightedIndex)
+            }
+            flushUnconsumedComposition(activeEngine, state.snapshot)
         }
         connection.commitText(text)
         associations.clear()

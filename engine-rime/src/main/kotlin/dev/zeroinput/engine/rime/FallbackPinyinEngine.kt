@@ -39,7 +39,7 @@ internal class FallbackPinyinEngine(
         is EngineKey.Character -> character(key.text)
         EngineKey.Backspace -> backspace()
         EngineKey.Space -> if (snapshot.candidates.isNotEmpty()) selectCandidate(0) else commitLiteral(" ")
-        EngineKey.Enter -> if (snapshot.candidates.isNotEmpty()) selectCandidate(0)
+        EngineKey.Enter -> if (input.isNotEmpty()) commitRawInput()
             else EngineUpdate(snapshot, consumed = false)
     }
 
@@ -119,6 +119,11 @@ internal class FallbackPinyinEngine(
     private fun commitLiteral(suffix: String): EngineUpdate {
         val value = segments.joinToString("") { it.text } + input.substring(consumedLength()) + suffix
         return EngineUpdate(reset(), value, learnable = false)
+    }
+
+    private fun commitRawInput(): EngineUpdate {
+        val raw = input.toString()
+        return EngineUpdate(reset(), raw, learnable = false)
     }
 
     private fun consumedLength(): Int = segments.sumOf { it.consumed }

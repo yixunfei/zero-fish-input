@@ -75,7 +75,8 @@ class NineKeyPinyinTest {
         engine.selectCandidate(partial)
         assertTrue("Reading changes must not overwrite a fixed candidate", engine.snapshot.readings.isEmpty())
         assertFalse((engine as ReadingSelectionEngine).selectReading(0).consumed)
-        assertTrue(engine.handle(EngineKey.Enter).committedText == "你好")
+        val raw = engine.snapshot.rawInput
+        assertEquals(raw, engine.handle(EngineKey.Enter).committedText)
     }
 
     private fun select(engine: InputEngine, reading: String) {

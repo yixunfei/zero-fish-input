@@ -42,10 +42,10 @@ class NativePinyinTest {
     }
 
     @Test
-    fun enterCommitsCompositionAndIdleKeysRemainAvailableToEditor() = withEngine { engine ->
+    fun enterCommitsRawInputAndIdleKeysRemainAvailableToEditor() = withEngine { engine ->
         type(engine, "nihao")
         val update = engine.handle(EngineKey.Enter)
-        assertTrue("Enter must commit the current phrase", update.committedText == "你好")
+        assertTrue("Enter must commit the original reading", update.committedText == "nihao")
         assertFalse(update.snapshot.isComposing)
         assertFalse(engine.handle(EngineKey.Enter).consumed)
         assertFalse(engine.handle(EngineKey.Backspace).consumed)

@@ -3,7 +3,7 @@
 Date: 2026-09-21
 
 The approved follow-up expands public Chinese/English associations and adds a
-repeatable evaluation. The corpus grows from 286 to 1,698 pairs. The frozen
+repeatable evaluation. The corpus grows from 286 to 1,728 pairs. The frozen
 development fixtures improve from 36/136 to 136/136 acceptable first choices;
 unwanted suggestions on the 20 abstention fixtures decrease from four to zero.
 These fixtures were visible during curation. This is a development/acceptance
@@ -17,12 +17,12 @@ personal-data format or migration is introduced.
 
 | Language | Initial pairs | Current pairs | Current language/prefix keys |
 | --- | ---: | ---: | ---: |
-| Chinese | 157 | 1,055 | 427 |
-| English | 129 | 643 | 296 |
-| Total | 286 | 1,698 | 723 |
+| Chinese | 157 | 1,072 | 432 |
+| English | 129 | 656 | 303 |
+| Total | 286 | 1,728 | 735 |
 
 Counts include traditional Chinese aliases; they are table rows and lookup keys,
-not counts of distinct meanings. The UTF-8 resource occupies 33,307 bytes. The
+not counts of distinct meanings. The UTF-8 resource occupies 33,981 bytes. The
 expanded scenes include greetings, arrangements, work, travel, food, study,
 health and assistance. Priority follows table order rather than measured usage
 frequency. No private input or usage data was used to curate it.
@@ -89,9 +89,9 @@ changes from 32.4% to 100%, and Top-1 from 26.5% to 100% on this development set
 The new regression checks preserve baseline hits and their ranks, require
 improved coverage and Top-1 in both languages, and reject every unwanted
 suggestion on the abstention cases. A separate exhaustive table check queries
-all 723 keys and verifies ordered, unique results within the eight-entry limit.
+all 735 keys and verifies ordered, unique results within the eight-entry limit.
 This table check establishes index consistency, not semantic quality for all
-1,698 pairs or arbitrary suffix contexts.
+1,728 pairs or arbitrary suffix contexts.
 
 ### Reproduction
 
@@ -113,7 +113,7 @@ not runtime resources.
 | Frozen fixture | `5e6e564b2021733285c1b77f62cb18afd9f898a1c64654357537919b5b57e40e` |
 | Initial 286-pair corpus | `e658a8ef387d183d1db42f8cd8ac3fc308d5a75f6472c80aab9946fcf974ce2c` |
 | Recorded baseline report | `981422bcd78ac9d106e6afc4fcfdd8556dbe9186462f196d0087db04985f7b26` |
-| Current 1,698-pair corpus | `8d4fd8ebc715b2a5385ff6deef39bba1d78770e72307b3eaf8bf638dc654e1f6` |
+| Current 1,728-pair corpus | `ff737267d0fa32b581fbd9b559742f5d6cd91cef6be05a624bd053f2d1e9243c` |
 
 Scoped `.gitattributes` LF rules keep these TSV bytes stable across checkouts.
 The baseline report is stored in test resources; the initial corpus hash

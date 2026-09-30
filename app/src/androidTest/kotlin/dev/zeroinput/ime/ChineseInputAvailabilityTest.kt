@@ -67,8 +67,9 @@ class ChineseInputAvailabilityTest {
         }
     }
 
-    @Test fun noSuggestionsEditorConvertsWithCandidateSpaceAndEnter() {
-        withEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) { activity ->
+    @Test fun noSuggestionsEditorConvertsWithCandidateAndSpaceButEnterCommitsRawInput() {
+        withEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+            InputType.TYPE_TEXT_FLAG_MULTI_LINE) { activity ->
             await { panel().renderedEngineStatus == InputEngineStatus.READY }
             for (index in 1..3) {
                 typePinyin()
@@ -80,13 +81,17 @@ class ChineseInputAvailabilityTest {
                         3 -> panel().onKeyboardAction(KeyboardAction.Enter)
                     }
                 }
-                await { activity.editor.text.toString() == "你好".repeat(index) }
+                val expected = "你好".repeat(minOf(index, 2)) + if (index == 3) "nihao" else ""
+                await { activity.editor.text.toString() == expected }
             }
+            onMain { panel().onKeyboardAction(KeyboardAction.Enter) }
+            await { activity.editor.text.toString() == "你好你好nihao\n" }
         }
     }
 
-    @Test fun noSuggestionsEnglishKeepsTypedTextWithoutPredictions() {
-        withEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) { activity ->
+    @Test fun noSuggestionsEnglishEnterCommitsRawInputBeforeNewlineWithoutPredictions() {
+        withEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+            InputType.TYPE_TEXT_FLAG_MULTI_LINE) { activity ->
             onMain { panel().onKeyboardAction(KeyboardAction.SwitchLanguage) }
             typeText("hel")
             onMain {
@@ -96,6 +101,11 @@ class ChineseInputAvailabilityTest {
                 panel().onKeyboardAction(KeyboardAction.Space)
             }
             await { activity.editor.text.toString() == "hel " }
+            typeText("hel")
+            onMain { panel().onKeyboardAction(KeyboardAction.Enter) }
+            await { activity.editor.text.toString() == "hel hel" }
+            onMain { panel().onKeyboardAction(KeyboardAction.Enter) }
+            await { activity.editor.text.toString() == "hel hel\n" }
         }
     }
 

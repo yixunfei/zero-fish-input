@@ -60,7 +60,7 @@ class DictionaryInputEngineTest {
         type(engine, "ni")
         assertFalse(engine.reset().isComposing)
         type(engine, "hao")
-        assertEquals("好", engine.handle(EngineKey.Enter).committedText)
+        assertEquals("hao", engine.handle(EngineKey.Enter).committedText)
         type(engine, "ni")
         engine.close()
         engine.close()

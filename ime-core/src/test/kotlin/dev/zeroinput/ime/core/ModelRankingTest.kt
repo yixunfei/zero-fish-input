@@ -57,7 +57,7 @@ class ModelRankingTest {
             candidates = listOf(Candidate("long", "知识库", input = "zhishi")) + candidates))).isEmpty())
     }
 
-    @Test fun `tap space and enter route to the promoted native candidate`() {
+    @Test fun `tap and space route to the promoted native candidate while enter commits raw input`() {
         for (command in listOf(InputCommand.SelectCandidate(0), InputCommand.Space, InputCommand.Enter)) {
             val editor = Editor()
             val engine = Engine(state().snapshot)
@@ -68,8 +68,8 @@ class ModelRankingTest {
             assertFalse(controller.applyModelWinner(revision, 1))
             assertEquals(listOf("芝士", "知识", "指示"), controller.state.snapshot.candidates.map { it.text })
             controller.handle(command)
-            assertEquals("芝士", editor.committed)
-            assertEquals(2, engine.selected)
+            assertEquals(if (command == InputCommand.Enter) "zhishi" else "芝士", editor.committed)
+            assertEquals(if (command == InputCommand.Enter) -1 else 2, engine.selected)
         }
     }
 

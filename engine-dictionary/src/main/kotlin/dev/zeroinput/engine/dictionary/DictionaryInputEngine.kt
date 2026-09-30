@@ -35,7 +35,8 @@ internal class DictionaryInputEngine(
                 refresh()
             }
             EngineKey.Space -> commit(if (input.isEmpty()) " " else "")
-            EngineKey.Enter -> if (input.isEmpty()) EngineUpdate(snapshot, consumed = false) else commit("")
+            EngineKey.Enter -> if (input.isEmpty()) EngineUpdate(snapshot, consumed = false)
+                else commitRawInput()
         }
     }
 
@@ -95,6 +96,11 @@ internal class DictionaryInputEngine(
     private fun commit(suffix: String): EngineUpdate {
         val text = (snapshot.candidates.firstOrNull()?.text ?: input) + suffix
         return EngineUpdate(reset(), committedText = text)
+    }
+
+    private fun commitRawInput(): EngineUpdate {
+        val raw = input
+        return EngineUpdate(reset(), committedText = raw)
     }
 
     companion object {

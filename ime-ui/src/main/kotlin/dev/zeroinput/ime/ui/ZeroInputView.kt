@@ -259,6 +259,11 @@ class ZeroInputView @JvmOverloads constructor(
         refreshHeader()
     }
 
+    /** Announces text only after the editor confirms a successful commit. */
+    fun announceCommittedText(value: String) {
+        if (value.isNotBlank()) candidateStrip.announceForAccessibility(value)
+    }
+
     fun startEditor(options: EditorInputOptions) {
         enginePreparation.resetEditor()
         editorOptions = options
@@ -272,6 +277,10 @@ class ZeroInputView @JvmOverloads constructor(
         keyboard.setHeight(height)
         readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
         updatePanelLayout()
+    }
+
+    fun configureSoundEffects(value: Boolean) {
+        keyboard.keySoundEffectsEnabled = value
     }
 
     fun renderClipboardGuard(enabled: Boolean, changed: Boolean) { clipboardGuard.render(enabled, changed) }

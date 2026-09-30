@@ -180,7 +180,7 @@ phrase pairs on the existing engine worker. A volatile immutable provider is
 published once; there are no asynchronous private-context tasks or delivery
 callbacks. Queries before readiness return no candidates.
 
-The public corpus currently has 1,698 pairs and 723 distinct language/prefix
+  The public corpus currently has 1,728 pairs and 735 distinct language/prefix
 keys. A query still performs at most 32 suffix probes and returns at most eight
 words. Multi-character Chinese suffixes use longest matching; one-character
 Chinese keys require a full-context match to avoid completing an unrelated word
@@ -326,7 +326,9 @@ management page or active permitted IME holds personal display snapshots.
 `EmojiHistoryRepository` retains JSON format 1 and its dedicated key, extends
 valid text length to 128 UTF-16 units, and checks strict decoding, cancellation
 and deletion generation. Failed writes do not publish unsaved history. See
-[ADR 0009](adr/0009-personal-expressions.md).
+[ADR 0009](adr/0009-personal-expressions.md). User initiated expression exports
+use a separate Keystore alias from the repository file and are device-bound;
+the management UI never writes plaintext export files.
 
 The IME window uses an explicit transparent, nondimming base theme in all resource
 variants. Android fullscreen extraction stays disabled. In landscape, the
@@ -354,11 +356,14 @@ mutation. Imports merge by language, case-insensitive input code and phrase;
 existing local IDs remain stable and new entries receive fresh local IDs.
 Manual additions and imports fail atomically beyond 20,000 terms or 5 MiB of
 compact JSON. Learning retains its existing bounded frequency/recency eviction.
-Exports use the same compact JSON representation so new writes fit the import
-limit. The format version, encrypted file name and key alias are unchanged.
+  Exports serialize the same compact JSON representation, then encrypt it with
+  a dedicated Android Keystore alias for user initiated transfers. The export
+  is device-bound: clearing app data or deleting that export key makes existing
+  files unrecoverable. The internal file format and production storage key alias
+  remain unchanged; import still applies the existing size and schema limits.
 
-Transfer confirmations belong to the settings presentation layer. They explain
-merge/overwrite behavior, export scope and plaintext exposure before opening the
+  Transfer confirmations belong to the settings presentation layer. They explain
+  merge/overwrite behavior and device-bound export scope before opening the
 system document picker. Parser exceptions are converted to content-free failure
 codes; the UI uses localized messages and never displays raw exceptions. See
 [ADR 0005](adr/0005-user-lexicon-boundary.md).
@@ -449,6 +454,12 @@ layout class, numeric flags and Enter action. It is independent of input text an
 privacy decisions. The controller and UI use the same Enter policy, including
 `IME_FLAG_NO_ENTER_ACTION`. Existing conservative editor privacy classification
 continues to decide whether suggestions and personalization are allowed.
+When a Chinese or English composition is active, Enter commits its raw input
+without performing the editor action. Only Enter with no active composition
+sends a newline or performs the editor action. Space and explicit candidate
+selection retain candidate conversion. The editor adapter registers expected
+selection and composing-span updates before platform calls, so synchronous
+callbacks and delayed acknowledgements cannot discard a subsequent key.
 
 `ime-ui/KeyboardAppearance` owns four resource overlays and three row heights.
 `app` persists only their enum names as nonsensitive settings and applies the

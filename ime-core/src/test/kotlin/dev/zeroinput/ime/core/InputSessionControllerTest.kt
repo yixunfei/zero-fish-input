@@ -60,7 +60,7 @@ class InputSessionControllerTest {
             assertTrue(controller.state.snapshot.candidates.any { it.text == "你好" })
             assertTrue(connection.commits.isEmpty())
             controller.handle(command)
-            assertEquals(listOf("你好"), connection.commits)
+            assertEquals(listOf(if (command == InputCommand.Enter) "nihao" else "你好"), connection.commits)
             assertFalse(controller.state.snapshot.isComposing)
             assertEquals(0, personal.suggestionCalls)
             assertTrue(personal.learned.isEmpty())
@@ -69,7 +69,7 @@ class InputSessionControllerTest {
         }
     }
 
-    @Test fun `space and enter on a later personal page commit its visible selection`() {
+    @Test fun `space selects a later personal page while enter preserves the typed input`() {
         for (command in listOf(InputCommand.Space, InputCommand.Enter)) {
             val editor = RecordingConnection()
             val store = object : dev.zeroinput.engine.api.PagedPersonalizationStore {
@@ -86,7 +86,7 @@ class InputSessionControllerTest {
             controller.handle(InputCommand.ChangeCandidatePage(PageDirection.NEXT))
             assertEquals("词组8", controller.state.snapshot.candidates.first().text)
             controller.handle(command)
-            assertEquals(listOf("词组8"), editor.commits)
+            assertEquals(listOf(if (command == InputCommand.Enter) "ni" else "词组8"), editor.commits)
             controller.close()
         }
     }
@@ -541,7 +541,7 @@ class InputSessionControllerTest {
     }
 
     @Test
-    fun `enter is sent to the engine before falling back for unknown composition`() {
+    fun `enter commits unknown composition and only the next enter reaches the editor`() {
         val connection = RecordingConnection()
         val engine = UnconsumingEngine(composition = "qz")
         val controller = InputSessionController(connection, { engine }, RecordingPersonalization())
@@ -551,10 +551,12 @@ class InputSessionControllerTest {
 
         controller.handle(InputCommand.Enter)
 
-        assertEquals(1, engine.enterCalls)
+        assertEquals(0, engine.enterCalls)
         assertEquals(listOf("qz"), connection.commits)
-        assertEquals(1, connection.enterKeys)
+        assertEquals(0, connection.enterKeys)
         assertFalse(controller.state.snapshot.isComposing)
+        controller.handle(InputCommand.Enter)
+        assertEquals(1, connection.enterKeys)
     }
 
     @Test

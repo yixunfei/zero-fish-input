@@ -1,0 +1,25 @@
+# Supplemental contexts kept separate from the frozen development fixture.
+# id language context expected-next-words (pipe-separated)
+zh-h001	zh	明天晚上	见|好
+zh-h002	zh	工作顺利	进行|完成
+zh-h003	zh	希望	如此|可以
+zh-h004	zh	如果	需要|方便
+zh-h005	zh	辛苦你了	谢谢|早点休息
+zh-h006	zh	回头	联系|再聊
+zh-h007	zh	这几天	注意休息|天气不错
+zh-h008	zh	有空	聊聊|见面
+zh-h009	zh	祝你	好运|开心
+zh-h010	zh	一路平安	到家|顺利
+en-h001	en	how are you	doing|feeling
+en-h002	en	have a great	day|weekend
+en-h003	en	see you	soon|later
+en-h004	en	i will	help|check
+en-h005	en	let us	know|start
+en-h006	en	thank you for	coming|understanding
+en-h007	en	please keep me	posted
+en-h012	en	please keep us	updated
+en-h008	en	could you send	it|that
+en-h009	en	what do you	think|need
+en-h010	en	i am sorry	about
+en-h011	en	good to	see|hear
+en-h013	en	i am sorry to	hear

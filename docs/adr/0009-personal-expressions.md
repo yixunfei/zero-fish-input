@@ -50,8 +50,12 @@ following the existing editor privacy policy.
   in the bounded encrypted history until eviction or explicit data clearing.
 - The existing Clear personal data command deletes phrases, history, favorites,
   custom expressions and their dedicated keys. Its confirmation names all of
-  those data types. Expression import/export and engine candidate integration
-  are outside this iteration.
+  those data types. User initiated expression export/import serializes the
+  validated format and encrypts it with a dedicated
+  `zeroinput.personal-expressions-export.v1` Android Keystore alias. Export
+  files are device-bound; clearing app data or that alias makes them
+  unrecoverable. Import remains bounded and fails closed on authentication or
+  format errors.
 
 ## Consequences
 
@@ -60,6 +64,8 @@ text. Public expressions remain available in private editors; favorites, custom
 entries and history are hidden. Automatic learning and manual favorites are
 separate commands, but both IME write paths require permitted personalization.
 There is no new module, runtime dependency, permission or exported component.
+The export key is separate from the on-device repository key, so sharing an
+export does not expose the storage key or permit use on another device.
 
 The new file needs no migration. Existing emoji history remains readable and no
 dual-format or dual-write compatibility path is introduced. Future schema changes

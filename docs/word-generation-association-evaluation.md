@@ -36,7 +36,7 @@ key → InputSessionController.handle
 | Personal overlay | Prefix match on encrypted shortcut; exact shortcut first, then frequency, recency; merged ahead of native candidates with text dedup | 216 unit + 44 device storage tests in [security storage validation](security-storage-validation.md); ranking correctness covered in `PersonalCandidatePagingTest` |
 | Model rerank (experimental, default off) | Top-8, full-reading two-character Chinese words only, margin 1.25, 80 ms budget, order-preserving single promotion | Held-out +11.70 pp first-choice gain with 1.06 pp clean regression (gate ≤0.5): **quality gate fails, stays default-off**; one concrete `人物→任务` error recorded |
 | Typo algebra (experimental, default off) | Adjacent-key, transposition, missing and repeated letter rules feeding Rime with reduced credibility | No independent effectiveness evaluation; the 1.06% figure belongs to the model rerank, not to typo rules |
-| English engine | ~179-word lexicon, pure prefix, no paging, no correction | Comprehensive review P1; smallest gap closure is isolated to `engine-english` |
+| English engine | 862-word offline lexicon, indexed prefix lookup, frequency-aware paging, optional explicit corrections and automatic spacing | Public completions remain offline and bounded; correction candidates stay default-off |
 | Word associations | See §2 | See §2 |
 
 ### 1.3 Assessed gaps
@@ -53,8 +53,9 @@ key → InputSessionController.handle
    "which learned shortcuts start with X" but not "what is the frequency of
    word W". Anything that needs value-based frequency (including §3) requires
    a port extension.
-4. **English generation is a placeholder.** Prefix matching over ~179 words;
-   paging and correction absent.
+4. **English generation remains bounded.** The offline seed lexicon is broader and
+   indexed, with frequency ordering, eight-item paging and explicit correction
+   candidates. It is still not a complete dictionary or a natural-language model.
 5. **No repeatable candidate-quality gate.** Rime first-choice baselines exist
    only as recorded numbers in evaluation documents; there is no JVM
    regression harness comparable to the association quality task (§2.3).
@@ -75,7 +76,7 @@ successful commit (adapter-confirmed) → WordAssociationSession
 
 From [word association quality](word-association-quality.md) (2026-09-21):
 
-- Corpus: 1,698 project-authored public pairs, 723 language/prefix keys,
+- Corpus: 1,728 project-authored public pairs, 735 language/prefix keys,
   33,307 bytes UTF-8, Apache-2.0, no external corpus.
 - Development fixtures (visible during curation, **not** an independent
   estimate): coverage 44/136 → 136/136, Top-1 36/136 → 136/136; abstention

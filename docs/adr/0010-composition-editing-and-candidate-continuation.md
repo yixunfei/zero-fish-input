@@ -42,7 +42,8 @@ Editor mutation, private learning and native selection must remain isolated.
   The first eight precede public candidates; remaining personal pages follow
   public exhaustion. Pending results within the same data revision preserve the
   previous page; clear or mutation revisions immediately discard old pages.
-  Space/Enter route to the visible highlight, including earlier retained pages.
+  Space routes to the visible highlight, including earlier retained pages.
+  Enter commits raw composition; only an idle Enter invokes the editor action.
   Cache storage
   remains bounded at 64 requests with at most 50 terms each. The existing 20,000
   entry repository capacity and encrypted format remain unchanged.

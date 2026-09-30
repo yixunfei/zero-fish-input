@@ -110,8 +110,9 @@
     <string name="user_dictionary_full">Dictionary capacity reached (20,000 phrases or 5 MiB). Delete some phrases first.</string>
     <string name="user_dictionary_too_large">Import files must be at most 5 MiB</string>
     <string name="user_dictionary_invalid">Invalid phrase data. No changes were made.</string>
-    <string name="user_dictionary_export_warning">Export all Chinese and English phrases, input codes, frequencies and usage times as an unencrypted JSON file. Emoji and private clipboard data are excluded. Other apps with access to the location can read the file. Selecting an existing file replaces its contents.</string>
-    <string name="user_dictionary_import_notice">Import a JSON file (up to 5 MiB) and merge it into this dictionary. Matching language, input code and phrase entries have their frequency and usage time updated. The combined limit is 20,000 phrases and 5 MiB. Invalid or oversized imports are cancelled in full.</string>
+    <string name="user_dictionary_write_failed">Could not save learned phrases. Try again later.</string>
+    <string name="user_dictionary_export_warning">Export an app-Keystore-encrypted dictionary file containing Chinese and English phrases, input codes, frequencies and usage times. Emoji and private clipboard data are excluded. It can only be imported by ZeroInput on this device. Selecting an existing file replaces its contents.</string>
+    <string name="user_dictionary_import_notice">Import a ZeroInput-encrypted dictionary file (up to 5 MiB) and merge it into this dictionary. Matching language, input code and phrase entries have their frequency and usage time updated. The combined limit is 20,000 phrases. Invalid, undecryptable or oversized imports are cancelled in full.</string>
     <string name="clear_personal_data">Clear personalization</string>
     <string name="clear_personal_data_message">Local phrases, frequencies, recent expressions, favorites and custom kaomoji will be permanently deleted.</string>
     <string name="personal_data_cleared">Personalization cleared</string>
@@ -140,6 +141,7 @@
     <string name="setting_learning">Local learning</string>
     <string name="setting_incognito">Incognito mode</string>
     <string name="setting_haptics">Key vibration</string>
+    <string name="setting_sound_effects">Key sounds</string>
     <string name="setting_enabled">Enabled</string>
     <string name="setting_disabled">Disabled</string>
     <string name="setting_current">In use</string>
@@ -169,6 +171,11 @@
     <string name="engine_dictionary_notice">Limited test phrases. Sentence composition, initials, fuzzy pinyin, traditional output and 9-key input are unavailable.</string>
     <string name="expression_manager_title">Custom Kaomoji</string>
     <string name="expression_add_custom">Add kaomoji</string>
+    <string name="expression_import">Import encrypted kaomoji</string>
+    <string name="expression_export">Export encrypted kaomoji</string>
+    <string name="expression_export_message">The file can only be imported on this device with the app key. It cannot be recovered after app data or keys are cleared.</string>
+    <string name="expression_imported">Kaomoji imported</string>
+    <string name="expression_exported">Kaomoji exported (this device only)</string>
     <string name="expression_edit_custom">Edit kaomoji</string>
     <string name="expression_delete_custom">Delete kaomoji</string>
     <string name="expression_edit_named">Edit %1$s</string>

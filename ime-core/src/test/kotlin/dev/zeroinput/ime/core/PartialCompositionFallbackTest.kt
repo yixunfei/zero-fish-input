@@ -22,13 +22,15 @@ class PartialCompositionFallbackTest {
         controller.close()
     }
 
-    @Test fun `declined enter preserves selected segments before editor action`() {
+    @Test fun `enter commits the original input and only a second enter reaches the editor`() {
         val editor = Editor()
         val controller = controller(editor)
         controller.handle(InputCommand.Enter)
-        assertEquals(listOf("你hso"), editor.commits)
-        assertEquals(1, editor.enters)
+        assertEquals(listOf("nihso"), editor.commits)
+        assertEquals(0, editor.enters)
         assertFalse(controller.state.snapshot.isComposing)
+        controller.handle(InputCommand.Enter)
+        assertEquals(1, editor.enters)
         controller.close()
     }
 

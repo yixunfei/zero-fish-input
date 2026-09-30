@@ -64,6 +64,8 @@ is established by this baseline.
 - Final review also routes Space/Enter through the visible candidate after
   browsing, and invalidates personal pages on data revision changes. New unit
   regressions cover both and immediate hiding before queued clear executes.
+  This records the earlier behavior; current Enter commits raw composition,
+  while Space still selects the visible candidate.
   A focused **28-test device run passed** after those production changes, in
   62.510 seconds (input panels/pipeline, native composition, reconversion and
   user-lexicon boundaries).

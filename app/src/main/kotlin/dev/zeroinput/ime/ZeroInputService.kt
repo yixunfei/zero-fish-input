@@ -135,6 +135,7 @@ class ZeroInputService : InputMethodService() {
     @Volatile private var configuredChineseEngine = ChineseEngineChoice.RIME
     @Volatile private var configuredPrivacy = PrivacyConfiguration()
     @Volatile private var configuredHapticFeedback = true
+    @Volatile private var configuredSoundEffects = false
     @Volatile private var configuredWordAssociations = true
 
     private fun refreshConfiguredSettings() {
@@ -142,6 +143,7 @@ class ZeroInputService : InputMethodService() {
         configuredChineseEngine = graph.settings.chineseEngine
         configuredPrivacy = graph.settings.privacyConfiguration()
         configuredHapticFeedback = graph.settings.hapticFeedbackEnabled
+        configuredSoundEffects = graph.settings.soundEffectsEnabled
         configuredWordAssociations = graph.settings.wordAssociationsEnabled
     }
     @Volatile
@@ -276,6 +278,7 @@ class ZeroInputService : InputMethodService() {
         val view = ZeroInputView(dev.zeroinput.ime.settings.KeyboardThemeContext.create(this, appearance.theme))
         currentAppearance = appearance
         view.setKeyboardHeight(appearance.height)
+        view.configureSoundEffects(configuredSoundEffects)
         currentInputEditorInfo?.let { view.startEditor(dev.zeroinput.ime.core.EditorInputOptions.from(it)) }
         inputView = view
         bindView(view)
@@ -318,7 +321,12 @@ class ZeroInputService : InputMethodService() {
         sessionChineseOptions = configuredChineseOptions
         sessionChineseEngine = configuredChineseEngine
         val editor = AndroidEditorConnection(attribute.initialSelStart, attribute.initialSelEnd,
-            onCommitted = modelRanking::committed, onContextInvalidated = {
+            onCommitted = { committed ->
+                modelRanking.committed(committed)
+                if (committed != null && activeSession?.controller?.state?.privacy?.isSensitive != true) {
+                    inputView?.announceCommittedText(committed)
+                }
+            }, onContextInvalidated = {
                 modelRanking.invalidate()
                 if (activeSession?.token == token) controller?.invalidateWordAssociations()
             }) {
@@ -481,6 +489,25 @@ class ZeroInputService : InputMethodService() {
             if (event.repeatCount == 0) event.startTracking()
             return true
         }
+        // Hardware keyboards deliver the same key path as touch keys. Keep
+        // repeat events in the composition so held backspace and key repeat
+        // remain useful instead of falling through to the system editor.
+        if (activeSession != null && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) {
+            val action = when (keyCode) {
+                android.view.KeyEvent.KEYCODE_DEL -> KeyboardAction.Backspace
+                android.view.KeyEvent.KEYCODE_ENTER -> KeyboardAction.Enter
+                android.view.KeyEvent.KEYCODE_SPACE -> KeyboardAction.Space
+                else -> event.unicodeChar.takeIf { it > 0 && !Character.isISOControl(it) }?.let {
+                    val value = String(Character.toChars(it))
+                    if (value.length == 1 && value[0].isLetter()) KeyboardAction.Text(value)
+                    else KeyboardAction.LiteralText(value)
+                }
+            }
+            if (action != null) {
+                handleKeyboardAction(action)
+                return true
+            }
+        }
         return super.onKeyDown(keyCode, event)
     }
 
@@ -493,7 +520,8 @@ class ZeroInputService : InputMethodService() {
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        if (editorConnection?.updateSelection(newSelStart, newSelEnd, candidatesStart, candidatesEnd) == true) {
+        if (editorConnection?.updateSelection(newSelStart, newSelEnd, candidatesStart, candidatesEnd,
+                oldSelStart, oldSelEnd) == true) {
             if (inputView?.isAiOpen == true) invalidateAiRequest()
             cancelSecureClipboardRequest()
             graph.securePaste.editorChanged(pasteEditorIdentity())
@@ -819,6 +847,7 @@ class ZeroInputService : InputMethodService() {
         if (session.controller.updatePrivacy(configuredPrivacy)) {
             invalidateAiRequest()
             inputView?.cancelPendingGestures()
+            inputView?.configureSoundEffects(configuredSoundEffects)
             // A prepared engine carries the old policy. Invalidate it before
             // publishing the new state, then let the worker build a context
             // that matches the tightened policy.

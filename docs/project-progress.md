@@ -23,7 +23,7 @@ remaining device/signing boundaries.
 ## Association coverage follow-up (2026-09-21)
 
 The approved priority is association coverage and evaluation. The project-authored
-Chinese/English corpus grows from 286 to 1,698 pairs, including traditional-input
+Chinese/English corpus grows from 286 to 1,728 pairs, including traditional-input
 aliases and longer scheduling/help-request chains. Single-character Chinese
 suffixes no longer trigger inside unrelated words. Public input fixtures expose
 and guard both ranked output and complete editor commit chains. The frozen set

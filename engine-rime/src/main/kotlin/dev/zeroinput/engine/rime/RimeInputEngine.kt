@@ -52,6 +52,11 @@ internal class RimeInputEngine(
     }
 
     override fun handle(key: EngineKey): EngineUpdate = nativeCall {
+        if (key == EngineKey.Enter) {
+            val raw = currentSnapshot.rawInput
+            return if (raw.isEmpty()) EngineUpdate(currentSnapshot, consumed = false)
+                else EngineUpdate(reset(), committedText = raw, learnable = false)
+        }
         if (key == EngineKey.Space && currentSnapshot.candidates.isNotEmpty()) {
             return selectCandidate(currentSnapshot.highlightedIndex)
         }
@@ -84,7 +89,7 @@ internal class RimeInputEngine(
                 ?: return EngineUpdate(currentSnapshot, consumed = false)
             EngineKey.Backspace -> KEY_BACKSPACE to 0
             EngineKey.Space -> KEY_SPACE to 0
-            EngineKey.Enter -> KEY_RETURN to 0
+            EngineKey.Enter -> error("Enter is handled before native key dispatch")
         }
         val consumed = NativeRimeBridge.nativeProcessKey(sessionId, keyCode, modifiers)
         readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty())

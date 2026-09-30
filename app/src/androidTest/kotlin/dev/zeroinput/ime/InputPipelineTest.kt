@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.ime.testing.InputFixtureActivity
+import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.ZeroInputView
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.ime.settings.ChineseEngineChoice
@@ -65,16 +66,18 @@ class InputPipelineTest {
             report("dispatch", dispatch)
             report("editor", editorTimes)
             report("frame", frames)
-            verifyBurst(panel, activity, "nihao".map(Char::toString), "rime-full")
+            verifyBurst(panel, activity, "nihao".map(Char::toString), "rime-full", KeyboardAction.Space, "你好")
+            verifyBurst(panel, activity, "da".map(Char::toString), "rime-raw", KeyboardAction.Enter, "da")
             verifyReconversion(panel, activity)
             onMain { panel.onLayoutSwitchRequested() }
             awaitReady(panel)
             instrumentation.waitForIdleSync()
-            verifyBurst(panel, activity, listOf("6 MNO", "4 GHI", "4 GHI", "2 ABC", "6 MNO"), "rime-nine")
+            verifyBurst(panel, activity, listOf("6 MNO", "4 GHI", "4 GHI", "2 ABC", "6 MNO"),
+                "rime-nine", KeyboardAction.Space, "你好")
             onMain { settings.chineseEngine = ChineseEngineChoice.DICTIONARY_TEST }
             awaitReady(panel)
             instrumentation.waitForIdleSync()
-            verifyBurst(panel, activity, "nihao".map(Char::toString), "dictionary-full")
+            verifyBurst(panel, activity, "nihao".map(Char::toString), "dictionary-full", KeyboardAction.Space, "你好")
         } finally {
             activity?.let { onMain { it.finish() } }
             if (originalMethod.isNotBlank() && originalMethod != "null") shell("ime set $originalMethod")
@@ -120,7 +123,7 @@ class InputPipelineTest {
         onMain {
             expected = activity.editor.text.toString() + "你好"
             "nihao".forEach { sendKey(panel, it.toString()) }
-            sendKey(panel, "↵")
+            panel.onKeyboardAction(KeyboardAction.Space)
         }
         instrumentation.waitForIdleSync()
         onMain {
@@ -131,13 +134,14 @@ class InputPipelineTest {
         instrumentation.waitForIdleSync()
         onMain {
             assertTrue(android.view.inputmethod.BaseInputConnection.getComposingSpanStart(activity.editor.text) == expected.length - 2)
-            sendKey(panel, "↵")
+            panel.onKeyboardAction(KeyboardAction.Space)
         }
         instrumentation.waitForIdleSync()
         onMain { assertTrue(activity.editor.text.toString() == expected) }
     }
 
-    private fun verifyBurst(panel: ZeroInputView, activity: InputFixtureActivity, labels: List<String>, phase: String) {
+    private fun verifyBurst(panel: ZeroInputView, activity: InputFixtureActivity, labels: List<String>,
+        phase: String, commit: KeyboardAction, term: String) {
         var expected = ""
         val completed = CountDownLatch(1)
         val watcher = object : TextWatcher {
@@ -149,11 +153,11 @@ class InputPipelineTest {
         }
         onMain {
             // Replacing the editor's Editable would invalidate its InputConnection before this burst.
-            expected = activity.editor.text.toString() + "你好".repeat(10)
+            expected = activity.editor.text.toString() + term.repeat(10)
             activity.editor.addTextChangedListener(watcher)
             repeat(10) {
                 labels.forEach { sendKey(panel, it) }
-                sendKey(panel, "↵")
+                panel.onKeyboardAction(commit)
             }
         }
         val delivered = completed.await(3, TimeUnit.SECONDS)

@@ -70,6 +70,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private var expanded = false
     private var lastStatus: InputEngineStatus? = null
     private var diagnostics: String? = null
+    private var lastAnnouncedCandidate: String? = null
 
     init {
         val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -106,6 +107,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         val changedInput = snapshot.rawInput != previousSnapshot?.rawInput ||
             snapshot.candidates != previousSnapshot?.candidates
         previousSnapshot = snapshot
+        if (snapshot.candidates.isEmpty()) lastAnnouncedCandidate = null
         undo.visibility = if (snapshot.canUndoSelection) VISIBLE else GONE
         syllable.visibility = if (snapshot.canSelectSyllable && !snapshot.canUndoSelection) VISIBLE else GONE
         val associations = snapshot.candidates.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
@@ -113,7 +115,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             else snapshot.composition.ifEmpty { snapshot.rawInput }
         while (buttons.size < snapshot.candidates.size) {
             buttons += CandidateItemView(context).also { button ->
-                button.onSelected = { onCandidateSelected(it) }
+                button.onSelected = { index -> onCandidateSelected(index) }
                 candidates.addView(button, LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)))
             }
         }
@@ -124,6 +126,13 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         }
         expand.visibility = if (snapshot.candidates.isEmpty() || associations) View.INVISIBLE else View.VISIBLE
         if (changedInput) scroll.scrollTo(0, 0)
+        if (changedInput && snapshot.candidates.isNotEmpty()) {
+            val announcement = snapshot.candidates.first().text
+            if (announcement != lastAnnouncedCandidate) {
+                lastAnnouncedCandidate = announcement
+                announceForAccessibility(announcement)
+            }
+        }
         if (pageTarget > 0) scroll.post {
             if (previousSnapshot == snapshot) buttons.getOrNull(pageTarget)?.let { scroll.scrollTo(it.left, 0) }
         }

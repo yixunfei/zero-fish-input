@@ -4,6 +4,7 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.security.EncryptedStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UserLexiconRepositoryTest {
@@ -24,10 +25,30 @@ class UserLexiconRepositoryTest {
         assertEquals("\uD83D\uDE00", repository.list().single().value)
     }
 
+    @Test
+    fun `failed persistence is observable without exposing phrase data`() {
+        val store = MemoryStore()
+        val repository = UserLexiconRepository(store)
+        var observed: UserDictionaryFailure? = null
+        val registration = repository.addWriteFailureListener { observed = it }
+        store.failWrite = true
+        try {
+            repository.addPhrase("hello", "hello", InputLanguage.ENGLISH)
+        } catch (_: Exception) {
+            // The caller still receives the original storage failure.
+        } finally {
+            registration.close()
+        }
+        assertEquals(UserDictionaryFailure.WRITE_FAILED, observed)
+        assertTrue(repository.list().isEmpty())
+    }
+
     private class MemoryStore : EncryptedStore {
         var bytes: ByteArray? = null
+        var failWrite = false
         override fun read(): ByteArray? = bytes?.copyOf()
         override fun write(plaintext: ByteArray) {
+            if (failWrite) throw java.io.IOException("write failed")
             bytes = plaintext.copyOf()
         }
         override fun delete(deleteKey: Boolean) { bytes = null }

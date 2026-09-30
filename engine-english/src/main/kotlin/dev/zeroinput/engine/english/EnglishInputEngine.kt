@@ -10,30 +10,36 @@ import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.LearnedSuggestionSource
 import dev.zeroinput.engine.api.PageDirection
+import java.util.Locale
 
+/** Deterministic offline English word completion. */
 class EnglishInputEngine(
     private val learnedSuggestions: LearnedSuggestionSource = LearnedSuggestionSource { _, _ -> emptyList() },
-    private val lexicon: List<String> = DefaultEnglishLexicon.words,
+    lexicon: List<String> = DefaultEnglishLexicon.words,
+    /** Opt-in only. Corrections are shown as candidates and never applied implicitly. */
+    private val correctionsEnabled: Boolean = false,
 ) : InputEngine {
     override val descriptor = Descriptor
 
+    private val lexiconWords = lexicon.asSequence()
+        .map { it.trim().lowercase(Locale.ROOT) }
+        .filter { it.isNotEmpty() && it.all { character -> character.isLetter() || character == '\'' } }
+        .distinct()
+        .toList()
+    private val prefixIndex: Map<String, List<IndexedWord>> = buildPrefixIndex(lexiconWords)
     private val buffer = StringBuilder()
     private var currentSnapshot = EngineSnapshot.Empty
     private var learnedSuggestionsAllowed = true
     private var predictionsAllowed = true
-    // InputEngine calls are serialized by the session controller. These
-    // scratch collections therefore belong to this engine instance and can be
-    // reused for every snapshot without exposing mutable state in a snapshot.
-    private val seenWords = HashSet<String>(MAX_CANDIDATES * 2)
-    private val scoredWords = ArrayList<ScoredWord>(MAX_CANDIDATES * 2)
+    private var page = 0
+    private var allCandidates: List<ScoredWord> = emptyList()
+    private val seenWords = HashSet<String>(LEXICON_PAGE_SIZE * 2)
+    private val scoredWords = ArrayList<ScoredWord>(LEXICON_PAGE_SIZE * 4)
 
     override val snapshot: EngineSnapshot
         get() = currentSnapshot
 
     override fun start(context: EditorContext): EngineSnapshot {
-        // Learned terms are personal data.  The engine must apply the same
-        // session privacy decision as the controller before querying its
-        // optional learned-suggestion source.
         predictionsAllowed = context.predictionsAllowed && !context.isSensitive
         learnedSuggestionsAllowed = context.learningAllowed && predictionsAllowed
         return reset()
@@ -43,20 +49,33 @@ class EnglishInputEngine(
         is EngineKey.Character -> handleText(key.text)
         EngineKey.Backspace -> handleBackspace()
         EngineKey.Space -> commitWithSuffix(" ")
-        EngineKey.Enter -> commitWithSuffix("\n")
+        EngineKey.Enter -> if (buffer.isEmpty()) unchanged(consumed = false) else commitWithSuffix("")
     }
 
     override fun selectCandidate(index: Int): EngineUpdate {
         val selected = currentSnapshot.candidates.getOrNull(index) ?: return unchanged(consumed = false)
         buffer.clear()
+        page = 0
+        allCandidates = emptyList()
         currentSnapshot = EngineSnapshot.Empty
-        return EngineUpdate(currentSnapshot, committedText = selected.text)
+        // Selecting a completed English word ends the word, matching normal
+        // hardware-keyboard behavior while keeping corrections explicit.
+        return EngineUpdate(currentSnapshot, committedText = selected.text + " ")
     }
 
-    override fun changePage(direction: PageDirection): EngineUpdate = unchanged(consumed = false)
+    override fun changePage(direction: PageDirection): EngineUpdate {
+        if (buffer.isEmpty()) return unchanged(consumed = false)
+        val target = page + if (direction == PageDirection.NEXT) 1 else -1
+        if (target < 0 || target * PAGE_SIZE >= allCandidates.size) return unchanged(consumed = false)
+        page = target
+        currentSnapshot = publishPage(buffer.toString())
+        return EngineUpdate(currentSnapshot)
+    }
 
     override fun reset(): EngineSnapshot {
         buffer.clear()
+        page = 0
+        allCandidates = emptyList()
         currentSnapshot = EngineSnapshot.Empty
         return currentSnapshot
     }
@@ -67,91 +86,143 @@ class EnglishInputEngine(
 
     private fun handleText(text: String): EngineUpdate {
         if (text.length == 1 && (text[0].isLetter() || text == "'")) {
+            if (buffer.length >= MAX_BUFFER_LENGTH) return unchanged(consumed = true)
             buffer.append(text)
+            page = 0
             currentSnapshot = createSnapshot()
             return EngineUpdate(currentSnapshot)
         }
-
         val committed = buffer.toString() + text
-        buffer.clear()
-        currentSnapshot = EngineSnapshot.Empty
+        reset()
         return EngineUpdate(currentSnapshot, committedText = committed)
     }
 
     private fun handleBackspace(): EngineUpdate {
         if (buffer.isEmpty()) return unchanged(consumed = false)
         buffer.deleteCharAt(buffer.lastIndex)
+        page = 0
         currentSnapshot = createSnapshot()
         return EngineUpdate(currentSnapshot)
     }
 
     private fun commitWithSuffix(suffix: String): EngineUpdate {
         val committed = buffer.toString() + suffix
-        buffer.clear()
-        currentSnapshot = EngineSnapshot.Empty
+        reset()
         return EngineUpdate(currentSnapshot, committedText = committed)
     }
 
     private fun createSnapshot(): EngineSnapshot {
         val typed = buffer.toString()
         if (typed.isEmpty()) return EngineSnapshot.Empty
-        if (!predictionsAllowed) return EngineSnapshot(rawInput = typed, composition = typed)
-
-        val normalized = typed.lowercase()
-        val learned = if (learnedSuggestionsAllowed) {
-            learnedSuggestions.suggestions(normalized, MAX_CANDIDATES)
-        } else {
-            emptyList()
+        if (!predictionsAllowed) {
+            allCandidates = emptyList()
+            return EngineSnapshot(rawInput = typed, composition = typed)
         }
-        // Collected with plain loops: a Sequence pipeline allocates an
-        // iterator and a lambda for every stage on each keystroke, while the
-        // lexicon is small enough that loops are allocation-light.  Keeping
-        // the first occurrence of a word mirrors the previous distinctBy.
+        val normalized = typed.lowercase(Locale.ROOT)
         seenWords.clear()
         scoredWords.clear()
-        fun collect(word: String, score: Int) {
-            if (seenWords.add(word.lowercase())) scoredWords.add(ScoredWord(word, score))
+        var insertionOrder = 0
+        fun collect(word: String, score: Int, comment: String = "") {
+            val normalizedWord = word.lowercase(Locale.ROOT)
+            if (normalizedWord.isEmpty() || !seenWords.add(normalizedWord)) return
+            scoredWords += ScoredWord(word, score, insertionOrder++, comment)
         }
-        collect(typed, Int.MAX_VALUE)
-        for (term in learned) collect(term.text, 10_000 + term.weight)
-        var matched = 0
-        for (word in lexicon) {
-            if (matched >= MAX_CANDIDATES) break
-            if (word.startsWith(normalized)) {
-                collect(word, 1_000 - matched)
-                matched++
+        // Keep the literal input available as a deterministic fallback. This
+        // preserves editing even when the word is absent from the seed data.
+        collect(typed, EXACT_INPUT_SCORE)
+        if (learnedSuggestionsAllowed) {
+            val learned = learnedSuggestions.suggestions(normalized, MAX_LEARNED_SUGGESTIONS)
+            for (term in learned) {
+                val score = (LEARNED_SCORE_BASE.toLong() + term.weight.toLong())
+                    .coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+                collect(term.text, score)
             }
         }
-        scoredWords.sortWith(SCORED_WORD_COMPARATOR)
-        val limit = minOf(scoredWords.size, MAX_CANDIDATES)
-        val candidates = ArrayList<Candidate>(limit)
-        for (index in 0 until limit) {
-            val scored = scoredWords[index]
-            candidates += Candidate(
-                id = "english:$index:${scored.word}",
+        for (indexed in prefixIndex[normalized].orEmpty()) {
+            collect(indexed.word, LEXICON_SCORE_BASE - indexed.index)
+        }
+        val hasPrefixMatch = scoredWords.any { it.word.length > normalized.length && it.word.startsWith(normalized) }
+        if (correctionsEnabled && !hasPrefixMatch && normalized.length >= MIN_CORRECTION_LENGTH) {
+            for ((index, word) in lexiconWords.withIndex()) {
+                if (isSingleEditAway(normalized, word)) {
+                    collect(word, CORRECTION_SCORE_BASE - index, "Did you mean?")
+                }
+            }
+        }
+        scoredWords.sortWith(compareByDescending<ScoredWord> { it.score }.thenBy { it.order })
+        allCandidates = scoredWords.toList()
+        return publishPage(typed)
+    }
+
+    private fun publishPage(typed: String): EngineSnapshot {
+        val from = page * PAGE_SIZE
+        val visible = allCandidates.drop(from).take(PAGE_SIZE)
+        val candidates = visible.mapIndexed { index, scored ->
+            Candidate(
+                id = "english:${from + index}:${scored.word}",
                 text = preserveCase(typed, scored.word),
+                comment = scored.comment,
                 score = scored.score,
             )
         }
-
         return EngineSnapshot(
             rawInput = typed,
             composition = typed,
             candidates = candidates,
+            hasPreviousPage = page > 0,
+            hasNextPage = (page + 1) * PAGE_SIZE < allCandidates.size,
         )
     }
 
     private fun unchanged(consumed: Boolean) = EngineUpdate(currentSnapshot, consumed = consumed)
 
     private fun preserveCase(typed: String, suggestion: String): String = when {
-        typed.all(Char::isUpperCase) -> suggestion.uppercase()
-        typed.firstOrNull()?.isUpperCase() == true -> suggestion.replaceFirstChar(Char::uppercase)
+        typed.all(Char::isUpperCase) -> suggestion.uppercase(Locale.ROOT)
+        typed.firstOrNull()?.isUpperCase() == true -> suggestion.replaceFirstChar { it.uppercase(Locale.ROOT) }
         else -> suggestion
     }
 
+    private fun isSingleEditAway(input: String, candidate: String): Boolean {
+        if (kotlin.math.abs(input.length - candidate.length) > 1) return false
+        if (input.length == candidate.length) {
+            var mismatch = 0
+            var first = -1
+            var second = -1
+            for (index in input.indices) if (input[index] != candidate[index]) {
+                if (mismatch++ == 0) first = index else if (mismatch == 2) second = index
+            }
+            if (mismatch == 0) return false
+            if (mismatch == 1) return true
+            return mismatch == 2 && second == first + 1 && input[first] == candidate[second] &&
+                input[second] == candidate[first]
+        }
+        val shorter = if (input.length < candidate.length) input else candidate
+        val longer = if (input.length < candidate.length) candidate else input
+        var shortIndex = 0
+        var longIndex = 0
+        var skipped = false
+        while (shortIndex < shorter.length && longIndex < longer.length) {
+            if (shorter[shortIndex] == longer[longIndex]) {
+                shortIndex++
+                longIndex++
+            } else if (!skipped) {
+                skipped = true
+                longIndex++
+            } else return false
+        }
+        return true
+    }
+
     companion object {
-        private const val MAX_CANDIDATES = 8
-        private val SCORED_WORD_COMPARATOR = compareByDescending<ScoredWord> { it.score }
+        private const val PAGE_SIZE = 8
+        private const val LEXICON_PAGE_SIZE = PAGE_SIZE
+        private const val MAX_LEARNED_SUGGESTIONS = 32
+        private const val EXACT_INPUT_SCORE = Int.MAX_VALUE
+        private const val LEARNED_SCORE_BASE = 1_000_000
+        private const val CORRECTION_SCORE_BASE = 500_000
+        private const val LEXICON_SCORE_BASE = 100_000
+        private const val MIN_CORRECTION_LENGTH = 3
+        private const val MAX_BUFFER_LENGTH = 64
 
         val Descriptor = EngineDescriptor(
             id = "zeroinput.english",
@@ -161,5 +232,17 @@ class EnglishInputEngine(
         )
     }
 
-    private data class ScoredWord(val word: String, val score: Int)
+    private data class ScoredWord(val word: String, val score: Int, val order: Int, val comment: String = "")
+    private data class IndexedWord(val word: String, val index: Int)
+
+    private fun buildPrefixIndex(words: List<String>): Map<String, List<IndexedWord>> {
+        val index = HashMap<String, MutableList<IndexedWord>>()
+        words.forEachIndexed { position, word ->
+            for (length in 1..word.length) {
+                index.getOrPut(word.substring(0, length)) { ArrayList() }
+                    .add(IndexedWord(word, position))
+            }
+        }
+        return index
+    }
 }

@@ -4,12 +4,19 @@ import android.content.Context
 import dev.zeroinput.security.EncryptedFileStore
 import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.security.SecurityAliases
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /** Background-only operations. Plaintext snapshots are owned by the visible caller, never cached here. */
-class PersonalExpressionRepository(private val store: EncryptedStore) {
-    constructor(context: Context) : this(EncryptedFileStore(context, "personal-expressions.bin", SecurityAliases.EXPRESSIONS))
+class PersonalExpressionRepository(
+    private val store: EncryptedStore,
+    private val exportCipher: EncryptedExportCipher = KeyStoreExportCipher(SecurityAliases.EXPRESSIONS_EXPORT),
+) {
+    constructor(context: Context) : this(
+        EncryptedFileStore(context, "personal-expressions.bin", SecurityAliases.EXPRESSIONS),
+        KeyStoreExportCipher(SecurityAliases.EXPRESSIONS_EXPORT),
+    )
 
     private val lock = Any()
     private val deletionGeneration = AtomicLong()
@@ -20,6 +27,43 @@ class PersonalExpressionRepository(private val store: EncryptedStore) {
     fun revision(): Long = revision.get()
 
     fun read(): PersonalExpressions = snapshot().data
+
+    /** Creates a device-bound encrypted export; plaintext is kept only in memory. */
+    fun exportEncrypted(): ByteArray {
+        val plaintext = synchronized(lock) { PersonalExpressionFormat.encode(load()) }
+        return try {
+            exportCipher.encrypt(plaintext, EXPORT_ASSOCIATED_DATA)
+        } finally {
+            plaintext.fill(0)
+        }
+    }
+
+    /** Merges a device-bound export into the local custom expressions. */
+    fun importEncrypted(bytes: ByteArray, expected: Long = generation(), isCurrent: () -> Boolean = { true }): Int {
+        if (bytes.size > ExpressionLimits.BYTES + ENVELOPE_OVERHEAD) fail(ExpressionFailure.INVALID)
+        val capturedGeneration = expected
+        val plaintext = try {
+            exportCipher.decrypt(bytes, EXPORT_ASSOCIATED_DATA)
+        } catch (_: Exception) {
+            fail(ExpressionFailure.CORRUPT)
+        }
+        return try {
+            val imported = PersonalExpressionFormat.decode(plaintext)
+            update(capturedGeneration, isCurrent) { current ->
+                val existing = current.custom.associateBy { it.value }.toMutableMap()
+                imported.custom.forEach { item ->
+                    if (item.value !in existing) existing[item.value] = item.copy(id = UUID.randomUUID().toString())
+                }
+                if (existing.size > ExpressionLimits.CUSTOM) fail(ExpressionFailure.CAPACITY)
+                val favorites = (current.favorites + imported.favorites)
+                if (favorites.size > ExpressionLimits.FAVORITES) fail(ExpressionFailure.CAPACITY)
+                PersonalExpressions(existing.values.toList(), favorites)
+            }
+            imported.custom.size
+        } finally {
+            plaintext.fill(0)
+        }
+    }
 
     fun snapshot(expected: Long = generation(), isCurrent: () -> Boolean = { true }): PersonalExpressionSnapshot =
         synchronized(lock) {
@@ -70,6 +114,7 @@ class PersonalExpressionRepository(private val store: EncryptedStore) {
             deletionPending = true
             try {
                 store.delete(deleteKey = true)
+                if (exportCipher.hasKey()) exportCipher.deleteKey()
                 deletionPending = false
             } catch (_: Exception) {
                 fail(ExpressionFailure.STORAGE)
@@ -109,4 +154,9 @@ class PersonalExpressionRepository(private val store: EncryptedStore) {
     }
 
     private fun fail(reason: ExpressionFailure): Nothing = throw ExpressionException(reason)
+
+    private companion object {
+        val EXPORT_ASSOCIATED_DATA = "zeroinput-expression-export-v1".toByteArray(StandardCharsets.UTF_8)
+        const val ENVELOPE_OVERHEAD = 64
+    }
 }

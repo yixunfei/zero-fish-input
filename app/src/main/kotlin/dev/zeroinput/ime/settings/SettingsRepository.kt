@@ -50,6 +50,10 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_HAPTICS, true)
         set(value) = edit(KEY_HAPTICS, value)
 
+    var soundEffectsEnabled: Boolean
+        get() = preferences.getBoolean(KEY_SOUND_EFFECTS, false)
+        set(value) = edit(KEY_SOUND_EFFECTS, value)
+
     var wordAssociationsEnabled: Boolean
         get() = preferences.getBoolean(KEY_WORD_ASSOCIATIONS, true)
         set(value) = edit(KEY_WORD_ASSOCIATIONS, value)
@@ -120,6 +124,7 @@ class SettingsRepository(context: Context) {
         const val KEY_INCOGNITO = "privacy.incognito"
         const val KEY_SECURE_CLIPBOARD = "secure-clipboard.enabled"
         const val KEY_HAPTICS = "keyboard.haptics"
+        const val KEY_SOUND_EFFECTS = "keyboard.sound-effects"
         const val KEY_WORD_ASSOCIATIONS = "keyboard.word-associations"
         const val KEY_THEME = "keyboard.theme"
         const val KEY_HEIGHT = "keyboard.height"

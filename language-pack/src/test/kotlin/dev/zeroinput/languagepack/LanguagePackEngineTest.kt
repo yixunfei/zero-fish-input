@@ -76,6 +76,11 @@ class LanguagePackEngineTest {
             val update = engine.handle(EngineKey.Character("i"))
 
             assertEquals(listOf("你", "你好"), update.snapshot.candidates.map { it.text })
+            assertEquals("ni", engine.handle(EngineKey.Enter).committedText)
+            assertFalse(engine.snapshot.isComposing)
+            assertFalse(engine.handle(EngineKey.Enter).consumed)
+            engine.handle(EngineKey.Character("q"))
+            assertEquals("q", engine.handle(EngineKey.Enter).committedText)
         } finally {
             directory.deleteRecursively()
         }

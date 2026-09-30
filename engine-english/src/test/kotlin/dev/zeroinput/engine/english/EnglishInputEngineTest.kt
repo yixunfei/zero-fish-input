@@ -4,12 +4,26 @@ import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.EngineKey
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.LearnedSuggestionSource
+import dev.zeroinput.engine.api.PageDirection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishInputEngineTest {
+    @Test fun `bundled lexicon contains a broad offline vocabulary`() {
+        assertTrue(DefaultEnglishLexicon.words.size > 500)
+    }
+
+    @Test fun `enter commits the typed word without completion or newline and declines idle enter`() {
+        val engine = EnglishInputEngine()
+        engine.start(context)
+        "hel".forEach { engine.handle(EngineKey.Character(it.toString())) }
+        assertEquals("hel", engine.handle(EngineKey.Enter).committedText)
+        assertFalse(engine.snapshot.isComposing)
+        assertFalse(engine.handle(EngineKey.Enter).consumed)
+    }
+
     @Test fun `disabled prediction preserves editing without querying personal words`() {
         val engine = EnglishInputEngine(learnedSuggestions = LearnedSuggestionSource { _, _ ->
             error("Personal words must not be queried")
@@ -98,5 +112,40 @@ class EnglishInputEngineTest {
 
         assertEquals("hel", engine.snapshot.candidates.first().text)
         assertEquals(1, engine.snapshot.candidates.count { it.text.equals("hello", ignoreCase = true) && it.text.length > 3 })
+    }
+
+    @Test fun `candidate pages expose every matching word in stable order`() {
+        val engine = EnglishInputEngine(lexicon = listOf("the", "there", "their", "then", "these", "they", "thing", "think", "this", "those"))
+        engine.start(context)
+        "th".forEach { engine.handle(EngineKey.Character(it.toString())) }
+        assertEquals(8, engine.snapshot.candidates.size)
+        assertTrue(engine.snapshot.hasNextPage)
+        assertTrue(engine.changePage(PageDirection.NEXT).consumed)
+        assertEquals(listOf("think", "this", "those"), engine.snapshot.candidates.map { it.text })
+        assertTrue(engine.snapshot.hasPreviousPage)
+        assertFalse(engine.changePage(PageDirection.NEXT).consumed)
+        assertTrue(engine.changePage(PageDirection.PREVIOUS).consumed)
+        assertEquals("th", engine.snapshot.candidates.first().text)
+    }
+
+    @Test fun `selecting a candidate commits a trailing space`() {
+        val engine = EnglishInputEngine()
+        engine.start(context)
+        "hel".forEach { engine.handle(EngineKey.Character(it.toString())) }
+        val helloIndex = engine.snapshot.candidates.indexOfFirst { it.text == "hello" }
+        assertTrue(helloIndex >= 0)
+        assertEquals("hello ", engine.selectCandidate(helloIndex).committedText)
+    }
+
+    @Test fun `correction is explicit and disabled by default`() {
+        val disabled = EnglishInputEngine(lexicon = listOf("the"))
+        disabled.start(context)
+        "teh".forEach { disabled.handle(EngineKey.Character(it.toString())) }
+        assertTrue(disabled.snapshot.candidates.none { it.text == "the" })
+
+        val enabled = EnglishInputEngine(lexicon = listOf("the"), correctionsEnabled = true)
+        enabled.start(context)
+        "teh".forEach { enabled.handle(EngineKey.Character(it.toString())) }
+        assertTrue(enabled.snapshot.candidates.any { it.text == "the" && it.comment == "Did you mean?" })
     }
 }

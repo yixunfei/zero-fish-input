@@ -45,6 +45,9 @@ the application's normal Rime data. The keyboard regression failed on the
 reported APK and passed after the fix. The 16-test combined device suite passed,
 covering native selection, paging, configured sessions, slow preparation with
 fallback selection, no-suggestions click/space/enter commits and rapid input.
+The Enter observations above describe the September 22 artifact. Current
+behavior commits raw composition on the first Enter and invokes the editor
+action or newline only on the next Enter.
 
 Use the repository test script to isolate native tests from a live IME session.
 A preliminary direct Gradle run of native and keyboard tests together encountered
@@ -67,7 +70,8 @@ tests passed again against that exact artifact.
 1. Install the newly generated Debug APK over the old Debug package.
 2. Open an ordinary text editor. During initial preparation, type `nihao` and
    select the fallback candidate. After preparation, repeat and confirm Chinese
-   output using both a candidate click and Space/Enter.
+   output using both a candidate click and Space. Enter should commit the raw
+   pinyin without conversion; a second Enter should act on the editor.
 3. Repeat in a non-sensitive editor that sets `TYPE_TEXT_FLAG_NO_SUGGESTIONS`.
    Switch to English: typing `hel` must keep that text without offering completions;
    Space must commit `hel ` unchanged. A no-personalized-learning flag alone must
@@ -109,7 +113,7 @@ Validation completed for this follow-up:
   policy propagation through language switching and background preparation,
   English composition editing, and Chinese/English language-pack restrictions.
 - Device checks of visible progress during fallback composition and tools,
-  Chinese candidate/Space/Enter commits, English prediction suppression,
+  Chinese candidate/Space/Enter commits under the historical behavior, English prediction suppression,
   failure/retry controls, ready/release cleanup and attached light/dark screenshots.
 - Layout checks at 320x640, 540x280 and 800x360 dp in light and dark themes, including
   visible status text and bounds of every displayed key. The initial layout-only

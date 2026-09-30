@@ -144,6 +144,20 @@ class PersonalExpressionRepositoryTest {
         assertEquals(ExpressionLimits.FAVORITES, repo.read().favorites.size)
     }
 
+    @Test fun encryptedExportRoundTripsAndRejectsTampering() {
+        val cipher = TestExportCipher()
+        val source = PersonalExpressionRepository(MemoryStore(), cipher)
+        val entry = source.save(null, "(^_^)", "Happy", "happy", "happy")
+        source.favorite(entry.value, true)
+        val payload = source.exportEncrypted()
+        val target = PersonalExpressionRepository(MemoryStore(), cipher)
+        assertEquals(1, target.importEncrypted(payload))
+        assertEquals(source.read().custom.map { it.copy(id = "") }, target.read().custom.map { it.copy(id = "") })
+        assertEquals(source.read().favorites, target.read().favorites)
+        payload[0] = 0
+        assertThrows(ExpressionException::class.java) { target.importEncrypted(payload) }
+    }
+
     private fun failure(expected: ExpressionFailure, block: () -> Unit) {
         assertEquals(expected, assertThrows(ExpressionException::class.java, block).failure)
     }
@@ -168,6 +182,16 @@ class PersonalExpressionRepositoryTest {
             if (failDelete) throw IOException("Fixture failure")
             deletedKey = deleteKey
             bytes = null
+        }
+    }
+
+    private class TestExportCipher : EncryptedExportCipher {
+        override fun encrypt(plaintext: ByteArray, associatedData: ByteArray): ByteArray =
+            byteArrayOf(0x24) + plaintext
+
+        override fun decrypt(payload: ByteArray, associatedData: ByteArray): ByteArray {
+            if (payload.firstOrNull() != 0x24.toByte()) error("tampered")
+            return payload.copyOfRange(1, payload.size)
         }
     }
 }

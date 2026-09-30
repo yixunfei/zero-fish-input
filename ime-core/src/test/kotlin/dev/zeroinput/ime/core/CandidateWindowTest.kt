@@ -32,6 +32,36 @@ class CandidateWindowTest {
         controller.close()
     }
 
+    @Test fun `enter after browsing commits raw input and removes cached candidates`() {
+        val engine = Pages()
+        val commits = mutableListOf<String>()
+        val editor = object : EditorConnection {
+            override fun setComposingText(text: String) = Unit
+            override fun finishComposingText() = Unit
+            override fun commitText(text: String): Boolean { commits += text; return true }
+            override fun deleteBeforeCursor() = Unit
+            override fun performEditorAction(actionId: Int) = false
+            override fun sendEnterKey() = Unit
+        }
+        val store = object : PersonalizationStore {
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(editor, { engine }, store)
+        controller.start(android.view.inputmethod.EditorInfo().apply { inputType = android.text.InputType.TYPE_CLASS_TEXT },
+            InputLanguage.CHINESE, dev.zeroinput.ime.core.privacy.PrivacyConfiguration())
+        controller.handle(InputCommand.ChangeCandidatePage(PageDirection.NEXT))
+        assertTrue(controller.state.snapshot.candidates.isNotEmpty())
+
+        controller.handle(InputCommand.Enter)
+
+        assertEquals(listOf("ni"), commits)
+        assertFalse(controller.state.snapshot.isComposing)
+        assertTrue(controller.state.snapshot.candidates.isEmpty())
+        controller.close()
+    }
+
     @Test fun `all pages remain reachable while only six pages stay resident`() {
         val engine = Pages()
         val window = CandidateWindow()

@@ -105,8 +105,9 @@
     <string name="user_dictionary_full">词库容量已达上限（20,000 条或 5 MiB），请先删除部分词组</string>
     <string name="user_dictionary_too_large">导入文件不能超过 5 MiB</string>
     <string name="user_dictionary_invalid">词组数据格式无效，未进行更新</string>
-    <string name="user_dictionary_export_warning">将以未加密的 JSON 文件导出全部中英文词组、输入码、词频和使用时间，不包含 emoji 或安全剪贴板。能访问保存位置的其他应用也能读取此文件。选择已有文件会覆盖其内容。</string>
-    <string name="user_dictionary_import_notice">导入 JSON 文件（最多 5 MiB），合并到现有词库。相同语言、输入码和词组的词频及使用时间将被更新。合并后最多 20,000 条、5 MiB；格式无效或超限时整次导入取消。</string>
+    <string name="user_dictionary_write_failed">用户词频保存失败，请稍后重试</string>
+    <string name="user_dictionary_export_warning">将导出应用 Keystore 加密的词库文件，包含中英文词组、输入码、词频和使用时间，不包含 emoji 或安全剪贴板。文件只能在本设备上的 ZeroInput 中导入；选择已有文件会覆盖其内容。</string>
+    <string name="user_dictionary_import_notice">导入 ZeroInput 加密词库文件（最多 5 MiB），合并到现有词库。相同语言、输入码和词组的词频及使用时间将被更新。合并后最多 20,000 条；格式无效、无法解密或超限时整次导入取消。</string>
     <string name="clear_personal_data">清除个性化数据</string>
     <string name="clear_personal_data_message">将删除本地用户词组、词频、表情最近记录、收藏和自定义颜文字，且无法恢复。</string>
     <string name="personal_data_cleared">个性化数据已清除</string>
@@ -135,6 +136,7 @@
     <string name="setting_learning">本地词频学习</string>
     <string name="setting_incognito">隐私模式</string>
     <string name="setting_haptics">按键振动</string>
+    <string name="setting_sound_effects">按键音</string>
     <string name="setting_enabled">已启用</string>
     <string name="setting_disabled">未启用</string>
     <string name="setting_current">正在使用</string>
@@ -164,6 +166,11 @@
     <string name="engine_dictionary_notice">仅含常用测试词组；不支持整句组词、简拼、模糊音、繁体和九键。</string>
     <string name="expression_manager_title">自定义颜文字</string>
     <string name="expression_add_custom">新增颜文字</string>
+    <string name="expression_import">导入加密颜文字</string>
+    <string name="expression_export">导出加密颜文字</string>
+    <string name="expression_export_message">导出文件只能在本设备使用应用密钥导入；清除应用数据或密钥后无法恢复。</string>
+    <string name="expression_imported">颜文字已导入</string>
+    <string name="expression_exported">颜文字已导出（仅本设备可导入）</string>
     <string name="expression_edit_custom">编辑颜文字</string>
     <string name="expression_delete_custom">删除颜文字</string>
     <string name="expression_edit_named">编辑 %1$s</string>

@@ -101,11 +101,11 @@ private class LanguagePackInputEngine(
     }
 
     private fun handleEnter(): EngineUpdate {
-        val candidate = currentSnapshot.candidates.firstOrNull()
-            ?: return EngineUpdate(currentSnapshot, consumed = false)
+        if (input.isEmpty()) return EngineUpdate(currentSnapshot, consumed = false)
+        val raw = input
         input = ""
         currentSnapshot = EngineSnapshot.Empty
-        return EngineUpdate(currentSnapshot, committedText = candidate.text)
+        return EngineUpdate(currentSnapshot, committedText = raw)
     }
 
     private fun commitBest(suffix: String): EngineUpdate {

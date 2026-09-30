@@ -41,7 +41,7 @@ class UserDictionaryActivity : AppCompatActivity() {
     private var busy = false
     private var operationGeneration = 0L
 
-    private val exporter = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    private val exporter = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) runOperation({ exportTo(uri) }) { showMessage(R.string.user_dictionary_exported) }
     }
 
@@ -52,7 +52,7 @@ class UserDictionaryActivity : AppCompatActivity() {
                 val input = contentResolver.openInputStream(uri) ?: error("Unable to open import")
                 val bytes = input.use { it.readBoundedBytes(MAX_IMPORT_BYTES) }
                 try {
-                    graph.userLexicon.importJson(bytes, replace = false)
+                    graph.userLexicon.importEncrypted(bytes, replace = false)
                 } finally {
                     bytes.fill(0)
                 }
@@ -118,15 +118,15 @@ class UserDictionaryActivity : AppCompatActivity() {
     }
 
     private fun confirmExport() {
-        UserDictionaryTransferDialogs.export(this) { exporter.launch("zeroinput-phrases.json") }.show()
+        UserDictionaryTransferDialogs.export(this) { exporter.launch("zeroinput-phrases.zlex") }.show()
     }
 
     private fun confirmImport() {
-        UserDictionaryTransferDialogs.import(this) { importer.launch(arrayOf("application/json", "text/plain")) }.show()
+        UserDictionaryTransferDialogs.import(this) { importer.launch(arrayOf("application/octet-stream", "application/x-zeroinput-lexicon")) }.show()
     }
 
     private fun exportTo(uri: Uri) {
-        val bytes = graph.userLexicon.exportJson()
+        val bytes = graph.userLexicon.exportEncrypted()
         try {
             val output = contentResolver.openOutputStream(uri, "wt") ?: error("Unable to open export")
             output.use { it.write(bytes) }
@@ -260,6 +260,7 @@ class UserDictionaryActivity : AppCompatActivity() {
             UserDictionaryFailure.CAPACITY_EXCEEDED -> R.string.user_dictionary_full
             UserDictionaryFailure.IMPORT_TOO_LARGE -> R.string.user_dictionary_too_large
             UserDictionaryFailure.INVALID_FORMAT -> R.string.user_dictionary_invalid
+            UserDictionaryFailure.WRITE_FAILED -> R.string.user_dictionary_write_failed
             null -> R.string.operation_failed
         }
         showMessage(resource)

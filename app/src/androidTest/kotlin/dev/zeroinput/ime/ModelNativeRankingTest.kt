@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 class ModelNativeRankingTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-    @Test fun miniPromotionRoutesTapSpaceEnterAndPunctuationToTheCorrectNativeWord() {
+    @Test fun miniPromotionRoutesTapSpaceAndPunctuationWhileEnterCommitsRawInput() {
         val graph = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
         for (command in listOf(InputCommand.SelectCandidate(0), InputCommand.Space, InputCommand.Enter, InputCommand.LiteralText("。"))) {
             val engine = graph.engineExecutor.submit<InputEngine> {
@@ -62,7 +62,9 @@ class ModelNativeRankingTest {
                     val active = checkNotNull(controller)
                     assertEquals("知识", active.state.snapshot.candidates.first().text)
                     active.handle(command)
-                    assertEquals("老师正在传授知识" + if (command is InputCommand.LiteralText) "。" else "", editor.text.toString())
+                    val expected = if (command == InputCommand.Enter) "老师正在传授zhishi"
+                        else "老师正在传授知识" + if (command is InputCommand.LiteralText) "。" else ""
+                    assertEquals(expected, editor.text.toString())
                 }
             } finally {
                 onMain { coordinator.close(); controller?.close() }

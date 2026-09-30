@@ -4,8 +4,11 @@ import android.content.Context
 import android.graphics.Color
 import android.util.AttributeSet
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.PopupWindow
+import android.widget.TextView
 import androidx.core.content.withStyledAttributes
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
@@ -38,6 +41,11 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var onSurfaceColor = 0
     private var outlineColor = 0
     private var enterSpec: KeySpec? = null
+    var keySoundEffectsEnabled: Boolean = false
+        set(value) {
+            field = value
+            keys.forEach { it.isSoundEffectsEnabled = value }
+        }
 
     init {
         orientation = VERTICAL
@@ -160,6 +168,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         minHeight = 0
         minimumHeight = 0
         isAllCaps = false
+        isSoundEffectsEnabled = keySoundEffectsEnabled
         letterSpacing = 0f
         setSingleLine()
         ensureKeyColors()
@@ -179,7 +188,70 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             ViewCompat.replaceAccessibilityAction(this, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
                 context.getString(R.string.key_caps_lock)) { _, _ -> performLongClick() }
         }
+        alternativesFor(spec)?.let { alternatives ->
+            setOnLongClickListener { showAlternatives(this, alternatives); true }
+        }
         keys += this
+    }
+
+    private fun alternativesFor(spec: KeySpec): List<String>? {
+        val value = (spec.action as? KeyboardAction.Text)?.value ?: return null
+        if (value.length != 1 || !value[0].isLetterOrDigit()) return null
+        return when (value.lowercase()) {
+            "q" -> listOf("1")
+            "w" -> listOf("2")
+            "e" -> listOf("3", "€")
+            "r" -> listOf("4")
+            "t" -> listOf("5")
+            "y" -> listOf("6")
+            "u" -> listOf("7")
+            "i" -> listOf("8")
+            "o" -> listOf("9", "°")
+            "p" -> listOf("0")
+            "a" -> listOf("@")
+            "s" -> listOf("$", "§")
+            "d" -> listOf("#")
+            "f" -> listOf("%")
+            "g" -> listOf("&")
+            "h" -> listOf("-")
+            "j" -> listOf("+")
+            "k" -> listOf("(")
+            "l" -> listOf(")")
+            else -> null
+        }
+    }
+
+    private fun showAlternatives(anchor: View, values: List<String>) {
+        onUserInteraction()
+        var popup: PopupWindow? = null
+        val row = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setBackgroundColor(surfaceColor)
+            values.forEach { value ->
+                addView(TextView(context).apply {
+                    text = value
+                    contentDescription = value
+                    gravity = Gravity.CENTER
+                    textSize = 20f
+                    setTextColor(onSurfaceColor)
+                    minWidth = dp(48)
+                    minHeight = dp(48)
+                    isClickable = true
+                    setOnClickListener {
+                        onUserInteraction()
+                        onAction(KeyboardAction.LiteralText(value))
+                        popup?.dismiss()
+                    }
+                })
+            }
+        }
+        popup = PopupWindow(row, ViewGroup.LayoutParams.WRAP_CONTENT, dp(56), true).apply {
+            elevation = dp(8).toFloat()
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE))
+            isOutsideTouchable = true
+            showAsDropDown(anchor, 0, -anchor.height - dp(64))
+        }
     }
 
     private fun bind(view: KeyboardKeyView, original: KeySpec) {

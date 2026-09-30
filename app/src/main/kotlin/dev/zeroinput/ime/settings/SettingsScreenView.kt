@@ -26,6 +26,7 @@ data class SettingsScreenState(
     val incognitoMode: Boolean,
     val secureClipboardEnabled: Boolean,
     val hapticsEnabled: Boolean,
+    val soundEffectsEnabled: Boolean = false,
     val engineStatus: String,
     val chineseOptions: ChineseInputOptions = ChineseInputOptions(),
     val experimentalModelRanking: Boolean = false,
@@ -58,6 +59,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onIncognitoChanged: (Boolean) -> Unit = {}
     var onSecureClipboardChanged: (Boolean) -> Unit = {}
     var onHapticsChanged: (Boolean) -> Unit = {}
+    var onSoundEffectsChanged: (Boolean) -> Unit = {}
     var onWordAssociationsChanged: (Boolean) -> Unit = {}
     var onDictionaryRequested: () -> Unit = {}
     var onExpressionsRequested: () -> Unit = {}
@@ -99,6 +101,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val incognitoSwitch = settingSwitch(context.getString(R.string.setting_incognito)) { onIncognitoChanged(it) }
     private val secureClipboardSwitch = settingSwitch(context.getString(R.string.secure_clipboard)) { onSecureClipboardChanged(it) }
     private val hapticsSwitch = settingSwitch(context.getString(R.string.setting_haptics)) { onHapticsChanged(it) }
+    private val soundEffectsSwitch = settingSwitch(context.getString(R.string.setting_sound_effects)) { onSoundEffectsChanged(it) }
     private val associationSwitch = settingSwitch(context.getString(R.string.setting_word_associations)) { onWordAssociationsChanged(it) }
     private val aiEnabledSwitch = settingSwitch(context.getString(R.string.ai_enabled)) { onAiEnabledChanged(it) }
     private val aiNetworkSwitch = settingSwitch(context.getString(R.string.ai_network)) { onAiNetworkChanged(it) }
@@ -156,6 +159,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(incognitoSwitch, state.incognitoMode)
             updateSwitch(secureClipboardSwitch, state.secureClipboardEnabled)
             updateSwitch(hapticsSwitch, state.hapticsEnabled)
+            updateSwitch(soundEffectsSwitch, state.soundEffectsEnabled)
             updateSwitch(associationSwitch, state.wordAssociationsEnabled)
             updateSwitch(aiEnabledSwitch, state.aiEnabled)
             updateSwitch(aiNetworkSwitch, state.aiNetworkAllowed)
@@ -213,6 +217,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
 
         section(context.getString(R.string.section_input))
         content.addView(hapticsSwitch)
+        content.addView(soundEffectsSwitch)
         content.addView(associationSwitch)
         command(context.getString(R.string.keyboard_appearance)) { onAppearanceRequested() }
 

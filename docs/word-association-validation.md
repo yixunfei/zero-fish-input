@@ -3,7 +3,7 @@
 Date: 2026-09-21
 
 This page records the initial 286-pair implementation and its original test run.
-The subsequent 1,698-pair expansion, frozen synthetic evaluation and current
+The subsequent 1,728-pair expansion, frozen synthetic evaluation and current
 verification are documented in [word-association-quality.md](word-association-quality.md).
 Generated APK/report paths below may have been rebuilt; the old hash identifies
 the initial artifact, not the latest file at that path.

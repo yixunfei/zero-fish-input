@@ -120,7 +120,7 @@ class FallbackPinyinEngineTest {
     )
 
     @Test
-    fun `enter commits a candidate without manufacturing an editor newline`() {
+    fun `enter commits raw input without choosing a candidate or learning`() {
         val engine = FallbackPinyinEngine()
         engine.start(context)
         "nihao".forEach { engine.handle(EngineKey.Character(it.toString())) }
@@ -128,21 +128,23 @@ class FallbackPinyinEngineTest {
         val update = engine.handle(EngineKey.Enter)
 
         assertTrue(update.consumed)
-        assertEquals("你好", update.committedText)
+        assertEquals("nihao", update.committedText)
+        assertFalse(update.learnable)
         assertFalse(update.snapshot.isComposing)
+        assertFalse(engine.handle(EngineKey.Enter).consumed)
     }
 
     @Test
-    fun `enter declines unknown composition so controller can commit it and send enter`() {
+    fun `enter commits unknown composition without newline`() {
         val engine = FallbackPinyinEngine()
         engine.start(context)
         "qz".forEach { engine.handle(EngineKey.Character(it.toString())) }
 
         val update = engine.handle(EngineKey.Enter)
 
-        assertFalse(update.consumed)
-        assertEquals("qz", update.snapshot.rawInput)
-        assertTrue(update.snapshot.isComposing)
+        assertTrue(update.consumed)
+        assertEquals("qz", update.committedText)
+        assertFalse(update.snapshot.isComposing)
     }
 
     @Test

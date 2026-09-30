@@ -19,19 +19,28 @@ import dev.zeroinput.userdata.UserLexiconFormat.MAX_VALUE_LENGTH
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** All methods that access the store must run on a background worker. */
-class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggestionSource, PagedPersonalizationStore, PersonalFrequencyStore {
+class UserLexiconRepository(
+    private val store: EncryptedStore,
+    private val exportCipher: EncryptedExportCipher = KeyStoreExportCipher(SecurityAliases.USER_DATA_EXPORT),
+) : LearnedSuggestionSource, PagedPersonalizationStore, PersonalFrequencyStore {
     constructor(context: Context) : this(EncryptedFileStore(
         context = context,
         fileName = "user-lexicon.bin",
         keyAlias = SecurityAliases.USER_DATA,
-    ))
+    ), KeyStoreExportCipher(SecurityAliases.USER_DATA_EXPORT))
 
     private val lock = Any()
     private val generation = AtomicLong(0L)
     private var terms: List<UserTerm>? = null
+    private var prefixIndex: Map<IndexKey, List<UserTerm>> = emptyMap()
+    private var listIndex: Map<InputLanguage, List<UserTerm>> = emptyMap()
+    private var allListIndex: List<UserTerm> = emptyList()
     private var deletionPending = false
+    private val writeFailureListeners = CopyOnWriteArrayList<(Throwable) -> Unit>()
+    @Volatile private var writeFailure: UserDictionaryFailure? = null
 
     fun warmUp() {
         synchronized(lock) { loadTerms() }
@@ -47,12 +56,13 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
         synchronized(lock) {
             require(limit in 0..MAX_SUGGESTION_LIMIT)
             require(offset in 0..MAX_TERMS)
+            loadTerms()
             val normalized = prefix.trim().lowercase()
             if (normalized.isEmpty() || limit == 0) return@synchronized PersonalSuggestionPage()
-            val values = loadTerms().asSequence()
-                .filter { it.language == language && it.shortcut.lowercase().startsWith(normalized) }
-                .sortedWith(compareBy<UserTerm> { !it.shortcut.equals(normalized, ignoreCase = true) }
-                    .thenByDescending { it.frequency }.thenByDescending { it.lastUsedEpochMillis }.thenBy { it.id })
+            val indexed = prefixIndex[IndexKey(language, normalized)].orEmpty()
+            val exact = indexed.asSequence().filter { it.shortcut.equals(normalized, ignoreCase = true) }
+            val remainder = indexed.asSequence().filterNot { it.shortcut.equals(normalized, ignoreCase = true) }
+            val values = exact.plus(remainder)
                 .drop(offset)
                 .take(limit + 1)
                 .map { PersonalSuggestion(it.id, it.value, it.frequency, it.shortcut) }
@@ -86,10 +96,8 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
         }
 
     fun list(language: InputLanguage? = null): List<UserTerm> = synchronized(lock) {
-        loadTerms().asSequence()
-            .filter { language == null || it.language == language }
-            .sortedWith(compareByDescending<UserTerm> { it.lastUsedEpochMillis }.thenBy { it.value })
-            .toList()
+        loadTerms()
+        if (language != null) listIndex[language].orEmpty() else allListIndex
     }
 
     fun addPhrase(shortcut: String, value: String, language: InputLanguage): UserTerm {
@@ -168,15 +176,67 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
         // Advance before waiting for an in-flight write so earlier waiting updates cannot revive data.
         generation.incrementAndGet()
         synchronized(lock) {
-            terms = emptyList()
+            publishTerms(emptyList())
             deletionPending = true
             store.delete(deleteKey = true)
+            if (exportCipher.hasKey()) exportCipher.deleteKey()
             deletionPending = false
         }
     }
 
     fun exportJson(): ByteArray = synchronized(lock) {
         UserLexiconFormat.serialize(loadTerms()).toString().toByteArray(StandardCharsets.UTF_8)
+    }
+
+    /** Returns an application-KeyStore encrypted export; plaintext never leaves this repository. */
+    fun exportEncrypted(): ByteArray = synchronized(lock) {
+        val plaintext = UserLexiconFormat.serialize(loadTerms()).toString().toByteArray(StandardCharsets.UTF_8)
+        try {
+            exportCipher.encrypt(plaintext, EXPORT_ASSOCIATED_DATA)
+        } finally {
+            plaintext.fill(0)
+        }
+    }
+
+    /** Imports only payloads produced by [exportEncrypted]. */
+    fun importEncrypted(bytes: ByteArray, replace: Boolean): Int {
+        if (bytes.size > UserLexiconFormat.MAX_IMPORT_BYTES) {
+            throw UserDictionaryException(UserDictionaryFailure.IMPORT_TOO_LARGE)
+        }
+        val expected = generation.get()
+        val plaintext = try {
+            exportCipher.decrypt(bytes, EXPORT_ASSOCIATED_DATA)
+        } catch (_: Exception) {
+            throw UserDictionaryException(UserDictionaryFailure.INVALID_FORMAT)
+        }
+        return try {
+            val imported = UserLexiconFormat.parse(plaintext)
+            synchronized(lock) {
+                ensureCurrent(expected)
+                val target = if (replace) linkedMapOf() else loadTerms().associateByTo(linkedMapOf(), UserLexiconFormat::identity)
+                for (candidate in imported) {
+                    val identity = UserLexiconFormat.identity(candidate)
+                    val existing = target[identity]
+                    if (existing == null && target.size >= MAX_TERMS) capacityExceeded()
+                    target[identity] = candidate.copy(id = existing?.id ?: UUID.randomUUID().toString())
+                }
+                persist(target.values.toList(), expected)
+            }
+            imported.size
+        } finally {
+            plaintext.fill(0)
+        }
+    }
+
+    fun lastWriteFailure(): UserDictionaryFailure? = writeFailure
+
+    fun addWriteFailureListener(listener: (UserDictionaryFailure) -> Unit): AutoCloseable {
+        val wrapper: (Throwable) -> Unit = {
+            val failure = writeFailure ?: UserDictionaryFailure.WRITE_FAILED
+            listener(failure)
+        }
+        writeFailureListeners += wrapper
+        return AutoCloseable { writeFailureListeners -= wrapper }
     }
 
     fun importJson(bytes: ByteArray, replace: Boolean): Int {
@@ -203,9 +263,9 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
     private fun loadTerms(): List<UserTerm> {
         check(!deletionPending) { "User dictionary deletion is incomplete" }
         terms?.let { return it }
-        val bytes = store.read() ?: return emptyList<UserTerm>().also { terms = it }
+        val bytes = store.read() ?: return emptyList<UserTerm>().also(::publishTerms)
         return try {
-            UserLexiconFormat.parse(bytes).also { terms = it }
+            UserLexiconFormat.parse(bytes).also(::publishTerms)
         } finally {
             bytes.fill(0)
         }
@@ -219,10 +279,15 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
             if (bytes.size > UserLexiconFormat.MAX_IMPORT_BYTES) capacityExceeded()
             ensureCurrent(expected)
             store.write(bytes)
+            writeFailure = null
+        } catch (error: Throwable) {
+            writeFailure = UserDictionaryFailure.WRITE_FAILED
+            writeFailureListeners.forEach { listener -> runCatching { listener(error) } }
+            throw error
         } finally {
             bytes.fill(0)
         }
-        terms = if (expected == generation.get()) values.toList() else emptyList()
+        if (expected == generation.get()) publishTerms(values) else publishTerms(emptyList())
     }
 
     private fun ensureCurrent(expected: Long) {
@@ -238,7 +303,29 @@ class UserLexiconRepository(private val store: EncryptedStore) : LearnedSuggesti
 
     private fun capacityExceeded(): Nothing = throw UserDictionaryException(UserDictionaryFailure.CAPACITY_EXCEEDED)
 
+    private fun publishTerms(values: List<UserTerm>) {
+        val snapshot = values.toList()
+        terms = snapshot
+        val byPrefix = HashMap<IndexKey, MutableList<UserTerm>>()
+        snapshot.forEach { term ->
+            val shortcut = term.shortcut.lowercase()
+            for (length in 1..shortcut.length) {
+                byPrefix.getOrPut(IndexKey(term.language, shortcut.substring(0, length))) { ArrayList() } += term
+            }
+        }
+        val rank = compareByDescending<UserTerm> { it.frequency }
+            .thenByDescending { it.lastUsedEpochMillis }.thenBy { it.id }
+        prefixIndex = byPrefix.mapValues { (_, valuesForPrefix) -> valuesForPrefix.sortedWith(rank) }
+        listIndex = snapshot.groupBy { it.language }.mapValues { (_, languageTerms) ->
+            languageTerms.sortedWith(compareByDescending<UserTerm> { it.lastUsedEpochMillis }.thenBy { it.value })
+        }
+        allListIndex = snapshot.sortedWith(compareByDescending<UserTerm> { it.lastUsedEpochMillis }.thenBy { it.value })
+    }
+
+    private data class IndexKey(val language: InputLanguage, val prefix: String)
+
     private companion object {
         const val MAX_SUGGESTION_LIMIT = 50
+        val EXPORT_ASSOCIATED_DATA = "zeroinput:user-lexicon-export:v1".toByteArray(StandardCharsets.UTF_8)
     }
 }

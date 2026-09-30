@@ -239,11 +239,14 @@
   Clearing invalidates older waiting operations before serializing with in-flight
   writes, then removes the ciphertext and key. Read and write byte buffers are
   cleared in finally blocks; failed reads never become an empty cached dictionary.
-- User-initiated exports contain phrases, input codes, languages, frequencies and
-  usage times as plaintext JSON. A confirmation describes scope and exposure;
-  existing destinations are explicitly truncated only after data is available.
-  Document providers can expose/synchronize a user-selected destination outside
-  ZeroInput's control. ZeroInput itself never uploads or shares the file.
+- User-initiated phrase and personal-expression exports contain only their
+  validated local data and are encrypted with separate Android Keystore export
+  aliases. The formats are device-bound: clearing app data or deleting the
+  corresponding alias makes an existing export unrecoverable. A confirmation
+  describes scope and overwrite behavior; existing destinations are explicitly
+  truncated only after encrypted data is available. Document providers can
+  expose/synchronize a user-selected destination outside ZeroInput's control.
+  ZeroInput itself never uploads or shares the file.
 - Device tests use in-memory fault injection and isolated fixture directories/key
   aliases to verify capacity, malformed imports, failed writes, clear/write races,
   ciphertext truncation/tampering and missing keys. Layout images contain only
@@ -498,7 +501,7 @@ phrases. See ADR 0013, ADR 0014 and `word-association-validation.md`.
 
 - root、解锁 bootloader 后的系统级攻击。
 - 被恶意系统组件截屏、录屏或注入的输入。
-- 用户主动导出明文文件后的外部存储安全。
+- 用户主动导出文件交给文档提供方或外部同步后的存储安全。
 - 目标应用自身读取已经提交给它的文本。
 
 

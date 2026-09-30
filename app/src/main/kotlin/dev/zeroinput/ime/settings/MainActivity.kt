@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var screen: SettingsScreenView
     private var runtimeObserver: AutoCloseable? = null
     private var languagePackObserver: AutoCloseable? = null
+    private var lexiconFailureObserver: AutoCloseable? = null
     private var clipboardAuthGeneration = 0L
     private var clipboardAuthRequest: AuthenticationBroker.RequestHandle? = null
     private var aiConfig = AiConfiguration()
@@ -77,6 +78,13 @@ class MainActivity : AppCompatActivity() {
                 if (!isFinishing && !isDestroyed) render()
             }
         }
+        lexiconFailureObserver = graph.userLexicon.addWriteFailureListener {
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    Toast.makeText(this, R.string.user_dictionary_write_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -113,6 +121,8 @@ class MainActivity : AppCompatActivity() {
         runtimeObserver = null
         languagePackObserver?.close()
         languagePackObserver = null
+        lexiconFailureObserver?.close()
+        lexiconFailureObserver = null
         worker.shutdownNow()
         super.onDestroy()
     }
@@ -129,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         screen.onSecureClipboardChanged = ::setSecureClipboardEnabled
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
+        screen.onSoundEffectsChanged = { graph.settings.soundEffectsEnabled = it; render() }
         screen.onWordAssociationsChanged = { graph.settings.wordAssociationsEnabled = it; render() }
         screen.onAiEnabledChanged = { updateAiConfig { copy(enabled = it) } }
         screen.onAiNetworkChanged = { updateAiConfig { copy(networkAllowed = it) } }
@@ -346,6 +357,7 @@ class MainActivity : AppCompatActivity() {
                 incognitoMode = graph.settings.incognitoMode,
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,
+                soundEffectsEnabled = graph.settings.soundEffectsEnabled,
                 wordAssociationsEnabled = graph.settings.wordAssociationsEnabled,
                 engineStatus = engine,
                 chineseOptions = graph.settings.chineseInputOptions,

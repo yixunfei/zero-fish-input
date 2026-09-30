@@ -76,7 +76,7 @@ successful typed words may still use the preexisting encrypted learning policy.
 ## Verification
 
 The approved 2026-09-21 coverage follow-up expands the project-authored table to
-1,698 pairs (723 keys), with no new corpus license or runtime component. Frozen
+1,728 pairs (735 keys), with no new corpus license or runtime component. Frozen
 development/acceptance fixtures measure before/after coverage and ranked hits.
 They were visible during curation and are not a held-out accuracy estimate.
 One-character Chinese keys now match only the complete context; longer Chinese
