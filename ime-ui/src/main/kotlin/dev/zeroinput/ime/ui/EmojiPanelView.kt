@@ -17,6 +17,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import kotlin.math.ceil
 import dev.zeroinput.engine.api.PageDirection
+import java.io.Closeable
+import java.lang.ref.WeakReference
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.Future
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
     var onEmojiSelected: (EmojiEntry) -> Unit = {}
@@ -26,6 +33,11 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     var onUserInteraction: () -> Unit = {}
 
     private val state = ExpressionBrowserState()
+    private var preparation: Closeable? = null
+    private var preparationFailed = false
+    private var filterWorker: ThreadPoolExecutor? = null
+    private var filterTask: Future<*>? = null
+    private var renderGeneration = 0L
     val isSearchActive: Boolean get() = state.searchActive
     private val categoryButtons = linkedMapOf<EmojiCategory, MaterialButton>()
     private val groupButtons = linkedMapOf<KaomojiGroup?, MaterialButton>()
@@ -196,9 +208,56 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         groups.visibility = if (state.category == EmojiCategory.KAOMOJI) VISIBLE else GONE
         categoryButtons.forEach { (category, button) -> select(button, category == state.category) }
         groupButtons.forEach { (group, button) -> select(button, group == state.group) }
-        val entries = state.visible()
-        adapter.submit(entries, state.personal.favorites, state.personalizationAllowed)
-        emptyLabel.visibility = if (entries.isEmpty()) VISIBLE else GONE
+        filterEntries()
+    }
+
+    private fun filterEntries() {
+        val generation = ++renderGeneration
+        filterTask?.cancel(false)
+        (filterTask as? Runnable)?.let { filterWorker?.remove(it) }
+        filterTask = null
+        // Revocation removes old personal rows synchronously before any new background result.
+        adapter.submit(emptyList(), emptySet(), false)
+        emptyLabel.visibility = VISIBLE
+        val privateCategory = state.category in setOf(EmojiCategory.RECENT, EmojiCategory.FAVORITES, EmojiCategory.CUSTOM)
+        if (!state.personalizationAllowed && privateCategory) {
+            updateEmptyLabel()
+            return
+        }
+        if (!EmojiCatalog.isReady && state.category !in setOf(EmojiCategory.KAOMOJI, EmojiCategory.CUSTOM)) {
+            emptyLabel.setText(if (preparationFailed) R.string.expression_unavailable else R.string.expression_loading)
+            return
+        }
+        val request = state.request()
+        val allowed = state.personalizationAllowed
+        if (!state.searchActive || state.query.isBlank()) {
+            // Public categories are pre-indexed; personal and kaomoji lists are bounded small snapshots.
+            val entries = request.resolve()
+            adapter.submit(entries, request.personal.favorites, allowed)
+            emptyLabel.visibility = if (entries.isEmpty()) VISIBLE else GONE
+            updateEmptyLabel()
+            return
+        }
+        val reference = WeakReference(this)
+        try {
+            filterTask = filterWorker?.submit {
+                val entries = request.resolve()
+                reference.get()?.post {
+                    val panel = reference.get()
+                    if (panel != null && panel.isAttachedToWindow && panel.renderGeneration == generation) {
+                        panel.adapter.submit(entries, request.personal.favorites, allowed)
+                        panel.emptyLabel.visibility = if (entries.isEmpty()) VISIBLE else GONE
+                        panel.updateEmptyLabel()
+                    }
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            emptyLabel.setText(R.string.expression_unavailable)
+        }
+        updateEmptyLabel()
+    }
+
+    private fun updateEmptyLabel() {
         emptyLabel.setText(when {
             !state.personalizationAllowed && (state.category == EmojiCategory.RECENT || state.category == EmojiCategory.FAVORITES || state.category == EmojiCategory.CUSTOM) -> R.string.expression_private
             state.searchActive && state.query.isNotEmpty() -> R.string.expression_no_results
@@ -220,10 +279,32 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         // A re-attach can carry a new theme; resolve the tab colors again.
         colorsResolved = false
         super.onAttachedToWindow()
+        filterWorker = ThreadPoolExecutor(1, 1, 15, TimeUnit.SECONDS, ArrayBlockingQueue(1),
+            { task -> Thread(task, "emoji-search").apply { isDaemon = true } }).apply { allowCoreThreadTimeOut(true) }
+        preparationFailed = false
+        val reference = WeakReference(this)
+        preparation = EmojiCatalog.prepare(context) { ready ->
+            reference.get()?.let { panel ->
+                if (panel.isAttachedToWindow) { panel.preparationFailed = !ready; panel.refresh() }
+            }
+        }
         ensureColors()
         iconButtons.forEach { it.imageTintList = android.content.res.ColorStateList.valueOf(onSurfaceTextColor) }
         categoryButtons.forEach { (category, button) -> select(button, category == state.category) }
         groupButtons.forEach { (group, button) -> select(button, group == state.group) }
+        refresh()
+    }
+
+    override fun onDetachedFromWindow() {
+        renderGeneration++
+        preparation?.close()
+        preparation = null
+        filterTask?.cancel(false)
+        filterTask = null
+        filterWorker?.shutdownNow()
+        filterWorker = null
+        adapter.submit(emptyList(), emptySet(), false)
+        super.onDetachedFromWindow()
     }
 
     private fun select(button: MaterialButton, selected: Boolean) {

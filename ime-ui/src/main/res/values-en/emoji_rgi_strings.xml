@@ -1,0 +1,7 @@
+<resources>
+    <string name="expression_flags">Flags</string>
+    <string name="expression_variants">Variants</string>
+    <string name="expression_loading">Preparing emoji…</string>
+    <string name="expression_unavailable">Emoji unavailable</string>
+    <string name="expression_close_variants">Close variants</string>
+</resources>

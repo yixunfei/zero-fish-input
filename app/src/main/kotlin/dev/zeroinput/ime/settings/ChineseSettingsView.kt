@@ -13,6 +13,7 @@ import com.google.android.material.color.MaterialColors
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.engine.api.EngineCapability
 import dev.zeroinput.engine.api.FuzzyPinyinPair
 import dev.zeroinput.ime.R
@@ -40,6 +41,20 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
     private val layouts = modeGroup(layoutButtons.values.toList()) { id ->
         layoutButtons.entries.firstOrNull { it.value.id == id }?.let { update(options.copy(keyboardLayout = it.key)) }
     }
+    private val doublePinyinButtons = mapOf(
+        DoublePinyinScheme.OFF to modeButton(context.getString(R.string.double_pinyin_off)),
+        DoublePinyinScheme.MICROSOFT to modeButton(context.getString(R.string.double_pinyin_microsoft)).apply {
+            contentDescription = context.getString(R.string.double_pinyin_microsoft_a11y)
+        },
+        DoublePinyinScheme.ZIRANMA to modeButton(context.getString(R.string.double_pinyin_ziranma)).apply {
+            contentDescription = context.getString(R.string.double_pinyin_ziranma_a11y)
+        },
+    )
+    private val doublePinyin = modeGroup(doublePinyinButtons.values.toList()) { id ->
+        doublePinyinButtons.entries.firstOrNull { it.value.id == id }?.let {
+            update(options.copy(doublePinyinScheme = it.key))
+        }
+    }
     private val pageButtons = ChineseInputOptions.PAGE_SIZES.associateWith { modeButton(it.toString()) }
     private val pages = modeGroup(pageButtons.values.toList()) { id ->
         pageButtons.entries.firstOrNull { it.value.id == id }?.let { update(options.copy(candidatePageSize = it.key)) }
@@ -55,6 +70,8 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         orientation = VERTICAL
         label(R.string.keyboard_layout)
         addView(layouts)
+        label(R.string.double_pinyin_scheme)
+        addView(doublePinyin)
         label(R.string.chinese_script)
         addView(scripts)
         addView(abbreviated)
@@ -75,6 +92,7 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         try {
             scripts.check(scriptButtons.getValue(value.script).id)
             layouts.check(layoutButtons.getValue(value.keyboardLayout).id)
+            doublePinyin.check(doublePinyinButtons.getValue(value.doublePinyinScheme).id)
             abbreviated.isChecked = value.abbreviatedPinyin
             punctuation.isChecked = value.chinesePunctuation
             typoCorrection.isChecked = value.experimentalTypoCorrection
@@ -85,6 +103,8 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
             fuzzySwitches.forEach { (pair, view) -> view.isChecked = value.isFuzzySelected(pair) }
             scriptButtons.values.forEach { it.isEnabled = EngineCapability.CHINESE_SCRIPT in capabilities }
             layoutButtons.values.forEach { it.isEnabled = EngineCapability.NINE_KEY_PINYIN in capabilities }
+            doublePinyinButtons.values.forEach { it.isEnabled =
+                EngineCapability.DOUBLE_PINYIN in capabilities && value.keyboardLayout == ChineseKeyboardLayout.FULL }
             abbreviated.isEnabled = EngineCapability.ABBREVIATED_PINYIN in capabilities
             punctuation.isEnabled = EngineCapability.PUNCTUATION_MODE in capabilities
             pageButtons.values.forEach { it.isEnabled = EngineCapability.CANDIDATE_PAGE_SIZE in capabilities }

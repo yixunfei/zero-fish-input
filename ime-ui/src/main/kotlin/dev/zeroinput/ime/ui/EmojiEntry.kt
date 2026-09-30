@@ -16,6 +16,7 @@ enum class EmojiCategory(val marker: String, @StringRes val label: Int) {
     TRAVEL("✈", R.string.expression_travel),
     OBJECTS("◆", R.string.expression_objects),
     SYMBOLS("♥", R.string.expression_symbols),
+    FLAGS("⚑", R.string.expression_flags),
 }
 
 enum class KaomojiGroup(@StringRes val label: Int, val keywords: String) {
@@ -38,9 +39,14 @@ data class EmojiEntry(
     val group: KaomojiGroup? = null,
     val customId: String? = null,
     val name: String = keywords.substringBefore(' '),
+    val englishName: String = name,
+    val artworkKey: String? = null,
+    val variantKey: String? = null,
+    val isComponent: Boolean = false,
 ) {
     val isWide: Boolean get() = group != null || customId != null
     internal val searchText = "$value $name $keywords ${group?.keywords.orEmpty()}".lowercase(Locale.ROOT)
+    internal fun displayName(locale: Locale): String = if (locale.language == "zh") name else englishName
 }
 
 data class PersonalExpressionsUi(

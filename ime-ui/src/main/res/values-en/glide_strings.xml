@@ -1,0 +1,9 @@
+<resources>
+    <string name="glide_enabled">Glide typing</string>
+    <string name="glide_description">Slide across letters or nine-key groups, then choose a word or reading. Supports full pinyin, Microsoft and Ziranma double pinyin.</string>
+    <string name="glide_cancel">Cancel glide candidates</string>
+    <string name="glide_recognizing">Recognizing gesture…</string>
+    <string name="glide_unavailable">Glide unavailable. Please try again.</string>
+    <string name="glide_no_match">No matching words. Try again.</string>
+    <string name="glide_choose">Choose %1$s</string>
+</resources>

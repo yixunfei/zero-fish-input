@@ -1,0 +1,19 @@
+<resources>
+    <string name="keyboard_placement">键盘模式</string>
+    <string name="keyboard_docked">标准键盘</string>
+    <string name="keyboard_left_hand">左手键盘</string>
+    <string name="keyboard_right_hand">右手键盘</string>
+    <string name="keyboard_floating">浮动键盘</string>
+    <string name="keyboard_dock">回到底部标准键盘</string>
+    <string name="keyboard_move">拖动键盘</string>
+    <string name="keyboard_change_hand">切换左右手</string>
+    <string name="keyboard_minimize">收起浮动键盘</string>
+    <string name="keyboard_restore">恢复浮动键盘</string>
+    <string name="keyboard_resize">拖动调整键盘大小</string>
+    <string name="keyboard_move_up">向上移动</string>
+    <string name="keyboard_move_down">向下移动</string>
+    <string name="keyboard_move_left">向左移动</string>
+    <string name="keyboard_move_right">向右移动</string>
+    <string name="keyboard_enlarge">放大键盘</string>
+    <string name="keyboard_shrink">缩小键盘</string>
+</resources>

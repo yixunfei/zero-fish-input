@@ -1,5 +1,16 @@
 # Security policy
 
+Offline input additions retain the same boundary: glide uses only bounded current
+touches and public word lists, handwriting uses verified public stroke/OCR models,
+and complete Emoji data/artwork is bundled. No input trace or handwriting is
+stored, learned or transmitted. Worker results and code replay are revoked on
+session, interaction, privacy and data-clear transitions; background revocation
+does not manipulate UI. Floating/one-hand keyboard uses only the IME window,
+with touches limited to its visible surface, and adds no overlay permission.
+Public emoji variants do not grant access to personal favorites/history. Explicit
+Backspace reads at most 64 cursor-local UTF-16 units to delete complete sequences,
+without retaining context. See ADR 0016/0017 and docs/threat-model.md.
+
 请勿在公开 Issue 中提交可能泄露用户输入、密钥或本地文件的安全报告。本仓库已启用
 [GitHub 私密漏洞报告](https://github.com/yixunfei/zero-fish-input/security/advisories/new)。
 请提供使用构造数据的复现步骤、影响版本和预期边界，勿附带真实输入、词库、片段或密钥。
@@ -22,6 +33,9 @@
   前文；不匹配时不删除文字。不支持重新打开组合区间的应用可能无法使用此操作。
 - 候选扩展和实验纠错完全离线，不记录触点轨迹；纠错默认关闭。新词学习仍使用加密词库及原有
   隐私和代次校验。独立的短词智能排序实验使用随包模型，没有新增应用网络权限或运行时下载。
+- 离线手写只处理当前面板的有界笔迹和公开模型，不读取编辑器正文、剪贴板或个人记录，也不学习；
+  敏感输入框使用相同公开识别路径。切换面板、会话或设置会使旧结果失效，候选需主动点选且再次
+  校验当前输入连接。笔迹不落盘，应用缓冲区及时清零；native 内部副本无法保证逐字节清除。
 
 - zero fish input 的设计目标是防止普通应用通过系统剪贴板或导出的 Android 组件读取私有内容。
 - 本地数据使用 Android Keystore 管理的 AES-GCM 密钥加密。

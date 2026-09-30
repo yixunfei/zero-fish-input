@@ -3,6 +3,7 @@ package dev.zeroinput.engine.rime
 import android.content.Context
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.InputEngine
 import java.util.concurrent.CopyOnWriteArrayList
@@ -70,7 +71,7 @@ class RimeRuntime(context: Context) : AutoCloseable {
 
         return try {
             val directories = RimeAssetInstaller(applicationContext).install()
-            configurationInstaller = RimeConfigurationInstaller(directories)
+            configurationInstaller = RimeConfigurationInstaller(directories, publicSyllables)
             check(NativeRimeBridge.nativeInitialize(
                 directories.shared.absolutePath,
                 directories.user.absolutePath,
@@ -119,7 +120,8 @@ class RimeRuntime(context: Context) : AutoCloseable {
         try {
             val primary = createVerifiedPrimary(id, options)
             try {
-                val engine = if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) primary else {
+                val engine = if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY ||
+                    options.effectiveDoublePinyinScheme != DoublePinyinScheme.OFF) primary else {
                     // Secondary sessions remain lazy and use the same serial worker.
                     ExpandingRimeEngine(primary, relatedReadings, { context ->
                         createSecondaryEngine(id, options, context)
@@ -142,7 +144,7 @@ class RimeRuntime(context: Context) : AutoCloseable {
             if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) nineKeyReadings else null)
             .also { activeEngines.incrementAndGet() }
         try {
-            RimeSessionVerifier.verify(engine, options.keyboardLayout)
+            RimeSessionVerifier.verify(engine, options.keyboardLayout, options.effectiveDoublePinyinScheme)
             return engine
         } catch (error: Throwable) {
             engine.close()

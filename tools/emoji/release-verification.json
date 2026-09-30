@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "verifiedDate": "2026-09-30",
+  "unicode": {
+    "version": "18.0.0",
+    "emojiVersion": "18.0",
+    "releaseDateShownByVersionPage": "2026-09-16",
+    "versionPage": {
+      "url": "https://www.unicode.org/versions/Unicode18.0.0/",
+      "sha256": "3e2cebad368dc12e880068c79d9688d196cbd192dc58e19c203b5fb360862f35",
+      "activeStatusDisplay": "none",
+      "statusClassUsesCssVariable": true,
+      "preliminaryNoticeHidden": true
+    },
+    "dataReadMe": {
+      "url": "https://www.unicode.org/Public/18.0.0/ReadMe.txt",
+      "sha256": "3726573fc40dafdacec2e950e193f46e9520a107af5fed52cdf6e3075b8de956",
+      "declaresFinalData": true
+    },
+    "announcement": {
+      "url": "https://blog.unicode.org/2026/09/announcing-unicode-standard-version-180.html",
+      "linkedByVersionPage": true,
+      "independentFetchResult": "HTTP 429",
+      "announcementBodyVerified": false
+    },
+    "emojiTest": {
+      "url": "https://www.unicode.org/Public/18.0.0/emoji/emoji-test.txt",
+      "sha256": "8f3735cda1f92a779d78af67cf86066bb1f07143dc22f2ac29394d9bc57ab21a",
+      "headerVersion": "18.0",
+      "headerDataDate": "2026-04-30, 22:40:18 GMT",
+      "localFixtureEqualsRemoteBytes": true,
+      "statusCounts": {
+        "fully-qualified": 3963,
+        "unqualified": 243,
+        "minimally-qualified": 1029,
+        "component": 9
+      },
+      "catalogStatuses": [
+        "fully-qualified",
+        "component"
+      ],
+      "catalogCount": 3972
+    }
+  },
+  "noto": {
+    "tag": "v2026-09-24-unicode18_0",
+    "releaseName": "Unicode 18.0",
+    "publishedAt": "2026-09-24T17:51:26Z",
+    "draft": false,
+    "prerelease": false,
+    "tagObjectType": "commit",
+    "commit": "e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e",
+    "releaseApi": {
+      "url": "https://api.github.com/repos/googlefonts/noto-emoji/releases/tags/v2026-09-24-unicode18_0",
+      "sha256": "f442e1915851c00aeb111904a77b71003948abb3fbde73a2ecf6e73cef0abf8a"
+    },
+    "tagApi": {
+      "url": "https://api.github.com/repos/googlefonts/noto-emoji/git/ref/tags/v2026-09-24-unicode18_0",
+      "sha256": "fdc87f23d8af8c5b5a1ae7902a1742cbc08af4d374d7578630c7c6592ae16741"
+    }
+  }
+}

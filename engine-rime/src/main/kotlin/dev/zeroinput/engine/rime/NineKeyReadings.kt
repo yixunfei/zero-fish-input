@@ -46,10 +46,15 @@ internal class NineKeyReadings(syllables: List<String>) {
         return start until start + size
     }
 
-    private fun digits(value: String): String = value.map { digitMap[it - 'a'] }.joinToString("")
+    private fun digits(value: String): String = value.map(::digitFor).joinToString("")
 
     companion object {
         private const val MAX_CHOICES = 32
         private const val digitMap = "22233344455566677778889999"
+
+        internal fun digitFor(character: Char): Char {
+            require(character in 'a'..'z')
+            return digitMap[character - 'a']
+        }
     }
 }

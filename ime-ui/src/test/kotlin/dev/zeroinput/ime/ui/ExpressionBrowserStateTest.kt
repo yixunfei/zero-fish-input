@@ -3,8 +3,14 @@ package dev.zeroinput.ime.ui
 import java.util.Locale
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
+import java.io.File
 
 class ExpressionBrowserStateTest {
+    @Before fun preparePublicCatalog() {
+        EmojiCatalog.install(File("src/main/assets/emoji/18.0/catalog.tsv").inputStream().use(RgiEmojiData::read))
+    }
+
     @Test fun catalogHasDistinctBoundedUnicodeEntriesAndPopulatedPublicCategories() {
         val entries = EmojiCatalog.entries
         assertTrue(entries.count { !it.isWide } >= 350)

@@ -16,6 +16,13 @@ native state. Future Chinese engines should share product-level settings.
   Keep Rime spelling algebra and deployment in engine-rime. The fuzzy-pinyin
   mask keeps the original bit positions and appends new pairs, so existing
   saved settings retain their meaning while supporting the expanded rule set.
+- Microsoft and Ziranma double-pinyin are distinct full-keyboard options. Their
+  codes derive from the bundled public dictionary syllables during bounded,
+  worker-side schema deployment. The memory fallback uses the same code mapping.
+  Nine-key ignores the saved double-pinyin choice, and compiled variants carry
+  a separate schema identity. Only the applied session choice changes the keys.
+  Related-reading expansion remains specific to full pinyin; double-pinyin
+  sessions use native candidate pages without interpreting codes as readings.
 - Default to simplified Chinese with abbreviation enabled; fuzzy pairs are opt-in.
   A master boolean suspends the selected pair mask without erasing it. The
   effective mask drives both spelling rules and schema identity; preferences

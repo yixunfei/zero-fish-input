@@ -35,6 +35,13 @@
   probe is reset before handoff and never logs input or candidates. A missing
   dictionary fails readiness even if librime can create a session; the private
   data boundary is unchanged and the memory-only fallback remains usable.
+- Double-pinyin schema generation uses only the bundled public syllable list on
+  the engine worker. No typed text is saved in schema files. Scheme changes use
+  the existing idle-composition handoff; native verification uses fixed public
+  input. Kaomoji injection reads only a bounded public keyword index plus an
+  already permitted personal snapshot. Privacy tightening removes personal
+  candidates, and a stale personal candidate is rechecked before selection.
+  Password and unknown editors continue to bypass composition candidates.
 - 常规用户数据和安全剪贴板使用不同的 Keystore 密钥。
 - librime 内建用户词典关闭，候选学习只通过加密的 `PersonalizationStore`。
 - 安全剪贴板默认关闭；读取由用户点击发起并要求系统身份认证。
@@ -421,6 +428,16 @@ content. No new permission, network dependency or personal-data format is added.
 
 ## Experimental model context
 
+Offline handwriting uses only the user's current touch strokes and fixed public
+model assets. It does not read editor text, clipboard, personal dictionaries or
+history, and does not learn or transmit strokes even for sensitive editors. The
+panel stores bounded strokes only in memory; cancellation, panel/session/settings
+changes invalidate queued work and stale results. Application-owned buffers are
+wiped, but native allocator copies cannot be verified as fully erased. Only a
+size/hash-verified public model is cached under `noBackupFilesDir`. A failed model
+shows an unavailable state and cannot insert an old candidate into a new editor.
+See [ADR 0016](adr/0016-offline-chinese-handwriting.md).
+
 The default-off short-word scorer adds at most 16 transient Chinese characters
 successfully committed by this IME in the current editor. It never queries the
 editor, clipboard or stored personal history for context. Sensitive, unknown,
@@ -489,6 +506,35 @@ logged, backed up or transmitted; temporary JVM lookup strings remain subject to
 garbage collection. No new permission, exported component, dependency or stored
 personal format is added. Unit and device regressions use constructed public
 phrases. See ADR 0013, ADR 0014 and `word-association-validation.md`.
+
+## Offline glide, placement and RGI additions
+
+Glide input owns only bounded current-touch coordinates and public key geometry.
+There is no editor-text lookup, private dictionary access, runtime networking,
+gesture training, logging or persistent trace. One worker uses public pinned
+English/Rime data. Atomic generation revocation can originate on a data-clear
+worker, while UI/replay cleanup stays on the IME thread. Delivery, explicit choice,
+each replay slice and final English commit recheck the same session/layout and
+actual connection. New touches, panels, settings, privacy, cursor, service/view
+and data-clear boundaries invalidate prior choices. Sensitive, unknown and
+nontext editors reject the path; no-predictions English editors reject it too.
+
+Floating/single-hand geometry contains no text or application identity. The IME
+touchable region is restricted to the visible surface so an empty full-screen
+host cannot consume other application's touches. Safe bounds are recomputed after
+rotation/resize; malformed stored fractions fail to safe clamped defaults.
+Placement controls use the existing interaction invalidation boundary and do not
+create any application overlay or permission. All secret-panel protections still
+apply to the same IME window.
+
+Official Emoji/CLDR metadata and Noto artwork are public, hash-checked and bundled.
+Parsing, filtering and decoding have byte/row/query/queue/cache limits. Stale cell
+callbacks cannot replace a newly bound image; stale query results cannot restore
+personal rows. Variants grant no personal-data access. Explicit Backspace reads
+at most 64 UTF-16 units before the cursor to delete one grapheme/RGI sequence,
+without retaining, learning, logging or transmitting that cursor-local text.
+The receiver controls its own font. No encrypted-store format, permission or
+exported component is added. See ADR 0017 and the scoped validation reports.
 
 ## Out of scope
 

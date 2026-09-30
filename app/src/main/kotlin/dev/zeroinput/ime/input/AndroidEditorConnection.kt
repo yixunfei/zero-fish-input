@@ -87,16 +87,8 @@ class AndroidEditorConnection(
             if (!connection.commitText("", 1)) sendKey(connection, KeyEvent.KEYCODE_DEL)
             return
         }
-        val before = connection.getTextBeforeCursor(2, 0)?.toString().orEmpty()
-        val deleteLength = if (
-            before.length >= 2 &&
-            Character.isLowSurrogate(before[before.lastIndex]) &&
-            Character.isHighSurrogate(before[before.lastIndex - 1])
-        ) {
-            2
-        } else {
-            1
-        }
+        val before = connection.getTextBeforeCursor(UnicodeDeletionBoundary.LOOKBEHIND_LIMIT, 0)?.toString().orEmpty()
+        val deleteLength = UnicodeDeletionBoundary.precedingLength(before)
         if (!connection.deleteSurroundingText(deleteLength, 0)) sendKey(connection, KeyEvent.KEYCODE_DEL)
     }
 

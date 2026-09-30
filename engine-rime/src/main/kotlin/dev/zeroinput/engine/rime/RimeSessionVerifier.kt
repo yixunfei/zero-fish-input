@@ -1,6 +1,7 @@
 package dev.zeroinput.engine.rime
 
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.EngineKey
 import dev.zeroinput.engine.api.InputEngine
@@ -8,10 +9,15 @@ import dev.zeroinput.engine.api.InputLanguage
 
 /** Worker-only probe using public fixture text, before any editor owns the session. */
 internal object RimeSessionVerifier {
-    fun verify(engine: InputEngine, layout: ChineseKeyboardLayout = ChineseKeyboardLayout.FULL) {
+    fun verify(engine: InputEngine, layout: ChineseKeyboardLayout = ChineseKeyboardLayout.FULL,
+        scheme: DoublePinyinScheme = DoublePinyinScheme.OFF) {
         try {
             engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
-            val input = if (layout == ChineseKeyboardLayout.NINE_KEY) "64426" else "nihao"
+            val input = when {
+                layout == ChineseKeyboardLayout.NINE_KEY -> "64426"
+                scheme != DoublePinyinScheme.OFF -> "nihk"
+                else -> "nihao"
+            }
             for (character in input) {
                 val update = engine.handle(EngineKey.Character(character.toString()))
                 check(update.consumed && update.committedText.isEmpty()) { "Rime conversion probe failed" }

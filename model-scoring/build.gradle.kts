@@ -8,21 +8,39 @@ plugins {
 val modelAssets = layout.buildDirectory.dir("generated/modelAssets")
 val modelSource = rootProject.file("build/model-evaluation/android-assets/mini-int8/model.onnx")
 val vocabSource = rootProject.file("build/model-evaluation/mini/vocab.txt")
+val handwritingModel = rootProject.file("build/handwriting-model/inference.onnx")
+val handwritingCharacters = rootProject.file("build/handwriting-model/characters.txt")
+val strokeModels = listOf(
+    Triple(rootProject.file("build/handwriting-stroke-model/stroke-simplified.zsh"), 7_016_330L,
+        "fdd47959e8cb95add75fc1e5bd10ff62e88b5d09fc6c6305d284d8f3df57667f"),
+    Triple(rootProject.file("build/handwriting-stroke-model/stroke-traditional.zsh"), 39_052_454L,
+        "7eaa62001987b03fa0ea24824b1a1203599064db905604026da8bc7e4e3b0288"),
+)
 val prepareModelAssets = tasks.register("prepareModelAssets") {
-    inputs.files(modelSource, vocabSource)
+    inputs.files(modelSource, vocabSource, handwritingModel, handwritingCharacters)
+    inputs.files(strokeModels.map { it.first })
     outputs.dir(modelAssets)
     doLast {
         val files = listOf(
             Triple(modelSource, 14_898_764L, "5fb4dbe2c618e8757258253e10481ea9181e8a7b9a8efea03ee70c3a5ca19446"),
             Triple(vocabSource, 109_540L, "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c"),
-        )
+            Triple(handwritingModel, 16_534_782L, "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092"),
+            Triple(handwritingCharacters, 74_012L, "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b"),
+        ) + strokeModels
         files.forEach { (file, size, hash) ->
-            check(file.isFile && file.length() == size) { "Prepare pinned Mini INT8 assets: see docs/model-integration.md" }
+            check(file.isFile && file.length() == size) { "Prepare pinned model assets: see docs/model-integration.md, tools/prepare-handwriting-model.py and tools/prepare-handwriting-stroke-model.py" }
             val actual = MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
-            check(actual == hash) { "Mini asset checksum mismatch" }
+            check(actual == hash) { "Pinned model asset checksum mismatch: ${file.name}" }
         }
         val target = modelAssets.get().dir("mini-int8").asFile.apply { mkdirs() }
-        files.forEach { (source, _, _) -> source.copyTo(target.resolve(source.name), overwrite = true) }
+        files.take(2).forEach { (source, _, _) -> source.copyTo(target.resolve(source.name), overwrite = true) }
+        // These are obsolete generated duplicates, not source assets.
+        target.resolve("inference.onnx").delete()
+        target.resolve("characters.txt").delete()
+        val handwritingTarget = modelAssets.get().dir("handwriting").asFile.apply { mkdirs() }
+        handwritingModel.copyTo(handwritingTarget.resolve("model.onnx"), overwrite = true)
+        handwritingCharacters.copyTo(handwritingTarget.resolve("characters.txt"), overwrite = true)
+        strokeModels.forEach { (source, _, _) -> source.copyTo(handwritingTarget.resolve(source.name), overwrite = true) }
     }
 }
 

@@ -12,6 +12,7 @@ import com.google.android.material.button.MaterialButtonToggleGroup
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.settings.SettingsRepository
 import dev.zeroinput.ime.settings.SettingsScreenState
@@ -81,6 +82,18 @@ class SettingsPanelTest {
         } finally { repository.chineseInputOptions = original }
     }
 
+    @Test fun doublePinyinSchemePersistsWithTheChineseOptions() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = SettingsRepository(context)
+        val original = repository.chineseInputOptions
+        try {
+            repository.chineseInputOptions = original.copy(doublePinyinScheme = DoublePinyinScheme.MICROSOFT)
+            assertEquals(DoublePinyinScheme.MICROSOFT, SettingsRepository(context).chineseInputOptions.doublePinyinScheme)
+            repository.chineseInputOptions = original.copy(doublePinyinScheme = DoublePinyinScheme.ZIRANMA)
+            assertEquals(DoublePinyinScheme.ZIRANMA, SettingsRepository(context).chineseInputOptions.doublePinyinScheme)
+        } finally { repository.chineseInputOptions = original }
+    }
+
     private fun verifyPanel(locale: Locale, night: Boolean) {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val configuration = Configuration(target.resources.configuration).apply {
@@ -90,7 +103,8 @@ class SettingsPanelTest {
         }
         val context = ContextThemeWrapper(target.createConfigurationContext(configuration), R.style.Theme_ZeroInput)
         val panel = SettingsScreenView(context)
-        panel.render(SettingsScreenState(false, false, true, false, false, true, context.getString(R.string.engine_status_ready)))
+        panel.render(SettingsScreenState(false, false, true, false, false, true,
+            engineStatus = context.getString(R.string.engine_status_ready)))
         val width = (320 * context.resources.displayMetrics.density).toInt()
         panel.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(width * 2, View.MeasureSpec.EXACTLY))
@@ -104,7 +118,7 @@ class SettingsPanelTest {
         association.performClick()
         assertTrue(!enabled)
         val groups = all.filterIsInstance<MaterialButtonToggleGroup>()
-        assertEquals(3, groups.size)
+        assertEquals(4, groups.size)
         for (group in groups) {
             val buttons = descendants(group).filterIsInstance<MaterialButton>()
             assertEquals(1, buttons.count { it.isChecked })

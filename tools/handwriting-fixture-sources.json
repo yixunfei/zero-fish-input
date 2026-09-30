@@ -1,0 +1,117 @@
+[
+  {
+    "path": "LGPL",
+    "bytes": 26430,
+    "sha256": "a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7"
+  },
+  {
+    "path": "data/train/simplified-chinese/handwriting-zh_CN.xml",
+    "bytes": 8751834,
+    "sha256": "969862706c883c89ae6b945549b141e0051847930e04d8fa8a26aad2b3d4db11"
+  },
+  {
+    "path": "data/train/traditional-chinese/handwriting-zh_TW.xml",
+    "bytes": 995168,
+    "sha256": "3f38322c30b0101cc1b84938444e4fedccdf158153b483adeba0f41eee2f28da"
+  },
+  {
+    "path": "data/test/traditional-chinese/20188.xml",
+    "bytes": 14484,
+    "sha256": "7b40fa2aed121aa7252da25a94233ad614e4fa6a8bc06048bee7595c255ff4a9"
+  },
+  {
+    "path": "data/test/traditional-chinese/20275.xml",
+    "bytes": 26399,
+    "sha256": "4ffe01e204382a18f42161202150204008d228a16080aa2ac80dfcf0629adca2"
+  },
+  {
+    "path": "data/test/traditional-chinese/21131.xml",
+    "bytes": 29329,
+    "sha256": "c1030fc5f312430b4ae84cc9bf76322121d8ea3149bc2d2e284902a9c4aa9799"
+  },
+  {
+    "path": "data/test/traditional-chinese/21158.xml",
+    "bytes": 23439,
+    "sha256": "fa879f01a8256f143b3333c6e70ecd76423295efb17aa2b0dd2445b86f20c111"
+  },
+  {
+    "path": "data/test/traditional-chinese/21282.xml",
+    "bytes": 23805,
+    "sha256": "a405e2e51776cb7b019c4e3a0b5ac7af434f365d11e013a9a88ca5d322f7e08d"
+  },
+  {
+    "path": "data/test/traditional-chinese/23372.xml",
+    "bytes": 33758,
+    "sha256": "deb24e0e126c666da8dc92191f22a6a83ba32756a2b78b26c74465eaa3d08949"
+  },
+  {
+    "path": "data/test/traditional-chinese/23823.xml",
+    "bytes": 30847,
+    "sha256": "4b3f7c3e0cbcb59e305feac5776e7c5fd41a54694c6fc23b55533f0525d052cb"
+  },
+  {
+    "path": "data/test/traditional-chinese/24194.xml",
+    "bytes": 15029,
+    "sha256": "054ef85a92b8321b9094bdcbdd23ec62c6d6f73479e9b7850ba3276a9813ac71"
+  },
+  {
+    "path": "data/test/traditional-chinese/26738.xml",
+    "bytes": 24522,
+    "sha256": "5a8fb2683a09f7d576719d48d00da9f6b319a17a1cfb68f838b476edb1bbbed6"
+  },
+  {
+    "path": "data/test/traditional-chinese/28376.xml",
+    "bytes": 17258,
+    "sha256": "64706904f302e36a5bf0972f9776bcebd96aea9e327dbf26e38ae7e67b29a017"
+  },
+  {
+    "path": "data/test/traditional-chinese/29027.xml",
+    "bytes": 25753,
+    "sha256": "c74e1f94a9790428a1276bd3289ae602da8bca951bec7d75abf42cd626cb850f"
+  },
+  {
+    "path": "data/test/traditional-chinese/34822.xml",
+    "bytes": 38043,
+    "sha256": "da4bdb75e056e34a8c5b55189eb95458baa950d068380286bf20f05278837932"
+  },
+  {
+    "path": "data/test/traditional-chinese/35942.xml",
+    "bytes": 30021,
+    "sha256": "1b1f83f65f74ae3f15a8a56f1d5487a7f7c0b8bf3ba4f5419ea3e1db93620f90"
+  },
+  {
+    "path": "data/test/traditional-chinese/35974.xml",
+    "bytes": 25712,
+    "sha256": "fe01e509a07d4d48b62146147af2975bc86233cd06606cd105a29489737b6c78"
+  },
+  {
+    "path": "data/test/traditional-chinese/37934.xml",
+    "bytes": 45897,
+    "sha256": "869e2ca47dc473d3982a5c61fcd675db2bafa382c23a524e00e6cc29e50e5d5f"
+  },
+  {
+    "path": "data/test/traditional-chinese/38595.xml",
+    "bytes": 23499,
+    "sha256": "729f9ec00fe9a7b897b7ed6e02b84c8d6df274a1f1615262df4663cbad930153"
+  },
+  {
+    "path": "data/test/traditional-chinese/38680.xml",
+    "bytes": 25345,
+    "sha256": "737ff8847de894780632ac3e6bf77c8843465924323b25e43fa48b4f3829eff2"
+  },
+  {
+    "path": "data/test/traditional-chinese/39324.xml",
+    "bytes": 32758,
+    "sha256": "34ab44d58e3e2a94415f8fbe52d6833720044b69bc4c6778acf70fa22c5e0c18"
+  },
+  {
+    "path": "data/test/traditional-chinese/40775.xml",
+    "bytes": 55721,
+    "sha256": "99f00065f264b3161a19293831e6f087eeb02191692b386887e2144375dd9045"
+  },
+  {
+    "path": "data/test/traditional-chinese/40868.xml",
+    "bytes": 56971,
+    "sha256": "ef7797033a04748935aad999fc15608bf249742c65641278a98d925f64a77b51"
+  }
+]

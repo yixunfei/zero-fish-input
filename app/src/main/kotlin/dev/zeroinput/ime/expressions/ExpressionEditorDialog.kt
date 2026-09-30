@@ -67,6 +67,7 @@ internal class ExpressionEditorDialog(context: Context, entry: PersonalExpressio
                     val title = name.editText?.text?.toString().orEmpty()
                     val words = keywords.editText?.text?.toString().orEmpty()
                     value.error = when {
+                        !EmojiCatalog.isReady -> context.getString(dev.zeroinput.ime.ui.R.string.expression_loading)
                         !ExpressionLimits.validText(text) -> context.getString(R.string.expression_invalid)
                         EmojiCatalog.find(text) != null -> context.getString(R.string.expression_builtin_duplicate)
                         else -> null

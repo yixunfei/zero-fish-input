@@ -37,6 +37,7 @@ open class ExpressionManagerActivity : AppCompatActivity() {
     private var form: ExpressionEditorDialog? = null
     private var confirmation: AlertDialog? = null
     private var observer: AutoCloseable? = null
+    private var catalogPreparation: java.io.Closeable? = null
     private lateinit var toolbar: MaterialToolbar
     private lateinit var status: TextView
     private var busy = false
@@ -64,6 +65,7 @@ open class ExpressionManagerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null)
+        catalogPreparation = dev.zeroinput.ime.ui.EmojiCatalog.prepare(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         requestedId = intent.getStringExtra(EDIT_ID)?.takeIf { it.length == 36 }
         intent.removeExtra(EDIT_ID)
@@ -114,6 +116,7 @@ open class ExpressionManagerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        catalogPreparation?.close()
         observer?.close()
         worker.shutdownNow()
         super.onDestroy()

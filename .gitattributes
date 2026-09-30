@@ -20,3 +20,6 @@ engine-dictionary/src/test/resources/candidate-quality*.tsv text eol=lf
 engine-rime/src/main/assets/rime/luna_pinyin.dict.yaml -text
 engine-rime/src/main/assets/rime/essay.txt -text
 ime-ui/src/main/assets/expressions/rime-kaomoji-source.txt -text
+engine-english/src/main/resources/glide-*.txt -text
+ime-ui/src/main/assets/emoji/** -text
+ime-ui/src/test/resources/emoji/** -text

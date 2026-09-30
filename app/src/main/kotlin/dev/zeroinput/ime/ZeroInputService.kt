@@ -36,6 +36,10 @@ import dev.zeroinput.ime.ui.EmojiEntry
 import dev.zeroinput.ime.ui.PersonalExpressionsUi
 import dev.zeroinput.ime.expressions.presentation
 import dev.zeroinput.ime.expressions.ExpressionManagerActivity
+import dev.zeroinput.ime.expressions.KaomojiCandidateIndex
+import dev.zeroinput.ime.handwriting.HandwritingCoordinator
+import dev.zeroinput.ime.handwriting.OnnxHandwritingRecognizer
+import dev.zeroinput.model.OfflineHandwritingRecognizer
 import java.util.Locale
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,6 +52,12 @@ class ZeroInputService : InputMethodService() {
     private var expressionObserver: AutoCloseable? = null
     private var personalExpressionCache = PersonalExpressionsUi()
     private var personalExpressionRevision = -1L
+    private val kaomojiCandidates by lazy {
+        KaomojiCandidateIndex {
+            if (personalExpressionRevision == graph.expressions.revision()) personalExpressionCache
+            else PersonalExpressionsUi()
+        }
+    }
     private val graph: AppGraph
         get() = (application as ZeroInputApplication).graph
 
@@ -64,6 +74,17 @@ class ZeroInputService : InputMethodService() {
         currentController = { controller },
         allowed = { modelRankingAllowed() },
     )
+    private var handwritingCoordinator: HandwritingCoordinator? = null
+    private var glideInput: dev.zeroinput.ime.glide.GlideInputBinding? = null
+    private val keyboardWindow by lazy {
+        dev.zeroinput.ime.keyboard.KeyboardWindowLayout(this, graph.settings) {
+            modelRanking.invalidate()
+            handwritingCoordinator?.invalidate()
+            inputView?.clearHandwriting()
+            registerInteraction()
+            syncSessionPrivacy()
+        }
+    }
     private val reconversionExpiry = Runnable { controller?.invalidateReconversion() }
     private var reconversionExpiryScheduled = false
     private val secureClipboardExecutor = BoundedExecutors.singleThread(
@@ -247,6 +268,7 @@ class ZeroInputService : InputMethodService() {
         // Revoke queued work before posting UI reconciliation; settings can also
         // change while an authentication activity owns the foreground.
         invalidatePendingPersonalization()
+        handwritingCoordinator?.invalidate()
         graph.aiCoordinator.invalidate()
         graph.aiDataGeneration.invalidate()
         refreshConfiguredSettings()
@@ -254,6 +276,7 @@ class ZeroInputService : InputMethodService() {
             invalidateAiRequest()
             registerInteraction()
             inputView?.cancelPendingGestures()
+            inputView?.clearHandwriting()
             controller?.clearModelRanking()
             refreshKeyboardAppearance()
             val session = activeSession ?: return@post
@@ -270,7 +293,9 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        glideInput?.invalidate()
         invalidateAiRequest()
+        handwritingCoordinator?.invalidate()
         controller?.invalidateWordAssociations()
         modelRanking.invalidate()
         inputView?.release()
@@ -279,17 +304,21 @@ class ZeroInputService : InputMethodService() {
         currentAppearance = appearance
         view.setKeyboardHeight(appearance.height)
         view.configureSoundEffects(configuredSoundEffects)
+        view.configureGlide(graph.settings.glideTypingEnabled)
         currentInputEditorInfo?.let { view.startEditor(dev.zeroinput.ime.core.EditorInputOptions.from(it)) }
         inputView = view
+        updatePrivatePanelWindowFlag()
         bindView(view)
         renderLocalPanels(view)
         controller?.state?.let(view::renderSession)
         renderEngineStatus()
         view.renderAi(AiStreamEvent.Completed(""))
-        return view
+        return keyboardWindow.wrap(view)
     }
 
     private fun refreshKeyboardAppearance() {
+        keyboardWindow.refresh()
+        inputView?.configureGlide(graph.settings.glideTypingEnabled)
         if (inputView == null || currentAppearance == graph.settings.keyboardAppearance) return
         setInputView(onCreateInputView())
         updateNavigationBarAppearance()
@@ -327,6 +356,7 @@ class ZeroInputService : InputMethodService() {
                     inputView?.announceCommittedText(committed)
                 }
             }, onContextInvalidated = {
+                glideInput?.invalidate()
                 modelRanking.invalidate()
                 if (activeSession?.token == token) controller?.invalidateWordAssociations()
             }) {
@@ -357,6 +387,7 @@ class ZeroInputService : InputMethodService() {
             languagePackDiscoveryComplete = graph::isLanguagePackDiscoveryComplete,
             deferHeavyEngineCreation = true,
             nextWordPredictor = graph.nextWordPredictor,
+            kaomojiCandidates = kaomojiCandidates,
             wordAssociationsEnabled = { inputViewActive && configuredWordAssociations &&
                 configuredPrivacy.learningEnabled && !configuredPrivacy.incognitoMode &&
                 activeSession?.token == token && connectionBinding.resolve(currentInputConnection) != null },
@@ -379,6 +410,7 @@ class ZeroInputService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         inputViewActive = true
+        inputView?.closeHandwriting()
         refreshKeyboardAppearance()
         if (graph.clipboardGuard.state.status in setOf(
                 dev.zeroinput.ime.clipboardguard.ClipboardGuardStatus.UNAVAILABLE,
@@ -410,6 +442,9 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        glideInput?.invalidate()
+        handwritingCoordinator?.invalidate()
+        inputView?.closeHandwriting()
         controller?.invalidateWordAssociations()
         modelRanking.invalidate()
         controller?.clearModelRanking()
@@ -438,6 +473,9 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        glideInput?.close()
+        glideInput = null
+        keyboardWindow.close()
         aiObserver?.close()
         aiObserver = null
         aiDraft.close()
@@ -445,6 +483,8 @@ class ZeroInputService : InputMethodService() {
         pasteConsentObserver = null
         graph.securePaste.leaveEditor()
         modelRanking.close()
+        handwritingCoordinator?.close()
+        handwritingCoordinator = null
         expressionObserver?.close()
         expressionObserver = null
         clipboardGuardObserver?.close()
@@ -522,6 +562,8 @@ class ZeroInputService : InputMethodService() {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         if (editorConnection?.updateSelection(newSelStart, newSelEnd, candidatesStart, candidatesEnd,
                 oldSelStart, oldSelEnd) == true) {
+            handwritingCoordinator?.invalidate()
+            inputView?.clearHandwriting()
             if (inputView?.isAiOpen == true) invalidateAiRequest()
             cancelSecureClipboardRequest()
             graph.securePaste.editorChanged(pasteEditorIdentity())
@@ -551,6 +593,11 @@ class ZeroInputService : InputMethodService() {
      * builds that report that configuration conservatively.
      */
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean = true
+
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        keyboardWindow.computeInsets(outInsets)
+    }
 
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype?) {
         invalidateAiRequest()
@@ -583,6 +630,37 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun bindView(view: ZeroInputView) {
+        val glide = glideInput ?: dev.zeroinput.ime.glide.GlideInputBinding(applicationContext, mainHandler,
+            identity = ::glideIdentity, controller = { controller },
+            beforeAction = { registerInteraction(); syncSessionPrivacy() }).also { glideInput = it }
+        glide.bind(view)
+        bindHandwritingView(view)
+        bindInputActions(view)
+        bindLocalPanelActions(view)
+        bindAiView(view)
+    }
+
+    private fun bindHandwritingView(view: ZeroInputView) {
+        view.onHandwritingStrokesChanged = { strokes ->
+            try {
+                if (view !== inputView || !view.isHandwritingOpen || !inputViewActive ||
+                    activeSession?.connectionBinding?.resolve(currentInputConnection) == null) {
+                    handwritingCoordinator?.invalidate()
+                } else handwriting().request(strokes)
+            } finally { strokes.forEach { it.fill(0f) } }
+        }
+        view.onHandwritingCandidateSelected = ::commitHandwriting
+        view.onHandwritingVisibilityChanged = { open ->
+            handwritingCoordinator?.invalidate()
+            if (open) {
+                modelRanking.invalidate()
+                controller?.finishCompositionForCursorMove()
+            }
+            updatePrivatePanelWindowFlag()
+        }
+    }
+
+    private fun bindInputActions(view: ZeroInputView) {
         val guard = graph.clipboardGuard.state
         view.renderClipboardGuard(guard.options.listening && guard.options.keyboardReminder, guard.ticket != null)
         view.onClipboardGuardRequested = {
@@ -642,6 +720,9 @@ class ZeroInputService : InputMethodService() {
             activeSession?.let { scheduleEngineWarmup(it) }
         }
         view.onCandidatePageChanged = { handleControllerCommand(InputCommand.ChangeCandidatePage(it)) }
+    }
+
+    private fun bindLocalPanelActions(view: ZeroInputView) {
         view.onEmojiSelected = ::commitEmoji
         view.onExpressionFavoriteRequested = ::setExpressionFavorite
         view.onExpressionManagementRequested = { id ->
@@ -664,7 +745,6 @@ class ZeroInputService : InputMethodService() {
         view.onSecureClipboardManagementRequested = {
             launchActivity(SecureClipboardManagerActivity::class.java)
         }
-        bindAiView(view)
     }
 
     private fun bindAiView(view: ZeroInputView) {
@@ -682,11 +762,45 @@ class ZeroInputService : InputMethodService() {
         view.onAiVisibilityChanged = { open ->
             if (open) aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE)
             else { aiDraft.close(); invalidateAiRequest() }
-            window?.window?.let { window ->
-                if (open) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-            }
+            updatePrivatePanelWindowFlag()
         }
+    }
+
+    private fun updatePrivatePanelWindowFlag() {
+        window?.window?.let { imeWindow ->
+            if (inputView?.isAiOpen == true || inputView?.isHandwritingOpen == true) {
+                imeWindow.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            } else imeWindow.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    private fun handwriting(): HandwritingCoordinator = handwritingCoordinator ?: HandwritingCoordinator(
+        handler = mainHandler,
+        createRecognizer = { OnnxHandwritingRecognizer(OfflineHandwritingRecognizer(applicationContext)) },
+        deliver = { values, failed ->
+            val view = inputView
+            if (inputViewActive && view?.isHandwritingOpen == true &&
+                activeSession?.connectionBinding?.resolve(currentInputConnection) != null) {
+                if (failed) view.renderHandwritingFailure() else view.renderHandwritingCandidates(values.orEmpty())
+            }
+        },
+    ).also { handwritingCoordinator = it }
+
+    private fun commitHandwriting(value: String): Boolean {
+        val view = inputView ?: return false
+        if (!inputViewActive || !view.containsHandwritingCandidate(value)) return false
+        syncSessionPrivacy()
+        val session = activeSession ?: return false
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return false
+        if (!isSessionActive(session, connection) || !view.containsHandwritingCandidate(value)) return false
+        handwritingCoordinator?.invalidate()
+        modelRanking.invalidate()
+        registerInteraction()
+        session.controller.reset()
+        if (!isSessionActive(session, connection) || view !== inputView || !view.isHandwritingOpen) return false
+        val committed = connection.commitText(value, 1)
+        if (committed) view.clearHandwriting()
+        return committed
     }
 
     private fun aiAllowed(): Boolean {
@@ -722,6 +836,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun handleKeyboardAction(action: KeyboardAction) {
+        if (inputView?.isHandwritingOpen == true) inputView?.clearHandwriting()
         registerInteraction(preserveWordAssociations = true)
         syncSessionPrivacy()
         maybeReloadLanguagePack()
@@ -845,6 +960,8 @@ class ZeroInputService : InputMethodService() {
     private fun syncSessionPrivacy() {
         val session = activeSession ?: return
         if (session.controller.updatePrivacy(configuredPrivacy)) {
+            handwritingCoordinator?.invalidate()
+            inputView?.clearHandwriting()
             invalidateAiRequest()
             inputView?.cancelPendingGestures()
             inputView?.configureSoundEffects(configuredSoundEffects)
@@ -1238,6 +1355,8 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun endInputSession(reset: Boolean) {
+        handwritingCoordinator?.invalidate()
+        inputView?.closeHandwriting()
         aiDraft.close()
         inputView?.cancelPendingGestures()
         registerInteraction(preservePasteConsent = true)
@@ -1375,6 +1494,7 @@ class ZeroInputService : InputMethodService() {
         inputView?.renderEngineStatus(status)
         inputView?.renderChineseOptions(configuredChineseOptions)
         inputView?.renderActiveLayout(sessionChineseOptions.keyboardLayout)
+        inputView?.renderActiveDoublePinyin(sessionChineseOptions.effectiveDoublePinyinScheme)
         state?.let(::renderInputDiagnostics)
     }
 
@@ -1409,8 +1529,18 @@ class ZeroInputService : InputMethodService() {
 
     /** Records an interaction and cancels work that was authorized in an
      * older UI state.  All callers run on the IME main thread. */
+    private fun glideIdentity(): dev.zeroinput.ime.glide.GlideSessionIdentity? {
+        val session = activeSession ?: return null
+        val view = inputView ?: return null
+        if (!inputViewActive || !graph.settings.glideTypingEnabled || session.controller.state.privacy.isSensitive ||
+            session.connectionBinding.resolve(currentInputConnection) == null) return null
+        val layout = view.availableGlideLayout ?: return null
+        return dev.zeroinput.ime.glide.GlideSessionIdentity(session.token, interactionSequence, layout)
+    }
+
     private fun registerInteraction(preserveReconversion: Boolean = false, preservePasteConsent: Boolean = false,
         preserveWordAssociations: Boolean = false) {
+        glideInput?.invalidate()
         if (!preserveWordAssociations) controller?.invalidateWordAssociations()
         modelRanking.interaction()
         interactionSequence++
@@ -1420,6 +1550,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun invalidatePendingPersonalization() {
+        glideInput?.invalidate()
         modelRanking.invalidate()
         personalizationWriteGeneration.incrementAndGet()
         graph.personalization.invalidatePendingWrites()

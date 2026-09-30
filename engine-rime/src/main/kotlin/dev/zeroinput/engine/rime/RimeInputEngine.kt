@@ -70,7 +70,9 @@ internal class RimeInputEngine(
         }
         val input = currentSnapshot.rawInput
         if (input.length >= 128 && key is EngineKey.Character && key.text.any {
-            it.isLetter() || it == '\'' || options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY && it in '2'..'9'
+            it.isLetter() || it == '\'' ||
+                options.effectiveDoublePinyinScheme == dev.zeroinput.engine.api.DoublePinyinScheme.MICROSOFT && it == ';' ||
+                options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY && it in '2'..'9'
         }) {
             return EngineUpdate(currentSnapshot, consumed = false)
         }
@@ -276,7 +278,8 @@ internal class RimeInputEngine(
             languages = setOf(InputLanguage.CHINESE),
             capabilities = setOf(EngineCapability.CHINESE_SCRIPT, EngineCapability.ABBREVIATED_PINYIN,
                 EngineCapability.FUZZY_PINYIN, EngineCapability.PUNCTUATION_MODE, EngineCapability.CANDIDATE_PAGE_SIZE,
-                EngineCapability.NINE_KEY_PINYIN, EngineCapability.TYPO_CORRECTION, EngineCapability.SEGMENT_SELECTION),
+                EngineCapability.NINE_KEY_PINYIN, EngineCapability.TYPO_CORRECTION,
+                EngineCapability.SEGMENT_SELECTION, EngineCapability.DOUBLE_PINYIN),
         )
     }
 }

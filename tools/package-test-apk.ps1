@@ -191,6 +191,8 @@ try {
     )
     if ($Abi -eq "universal") {
         $buildArguments += "-PtestUniversalApk=true"
+    } else {
+        $buildArguments += "-Pandroid.injected.build.abi=$Abi"
     }
     Invoke-CheckedCommand $gradleWrapper $buildArguments
 } finally {
@@ -228,12 +230,17 @@ $noticePaths = @("LICENSE", "NOTICE", "THIRD_PARTY.md", "SOURCES.md", "LICENSES"
     ForEach-Object { Join-Path $repositoryRoot $_ }
 Compress-Archive -LiteralPath $noticePaths -DestinationPath $noticesArchive
 
+$sourcesName = "zero-fish-input-$($metadata.VersionName)-handwriting-sources.zip"
+$sourcesArchive = Join-Path $artifactDirectory $sourcesName
+& (Join-Path $PSScriptRoot "package-handwriting-sources.ps1") -RepositoryRoot $repositoryRoot -Destination $sourcesArchive
+
 $hash = (Get-FileHash -LiteralPath $artifactApk -Algorithm SHA256).Hash.ToLowerInvariant()
 $noticesHash = (Get-FileHash -LiteralPath $noticesArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+$sourcesHash = (Get-FileHash -LiteralPath $sourcesArchive -Algorithm SHA256).Hash.ToLowerInvariant()
 $checksumPath = Join-Path $artifactDirectory "SHA256SUMS.txt"
 [System.IO.File]::WriteAllText(
     $checksumPath,
-    "$hash  $artifactName$([Environment]::NewLine)$noticesHash  $noticesName$([Environment]::NewLine)",
+    "$hash  $artifactName$([Environment]::NewLine)$noticesHash  $noticesName$([Environment]::NewLine)$sourcesHash  $sourcesName$([Environment]::NewLine)",
     [System.Text.UTF8Encoding]::new($false)
 )
 
@@ -244,6 +251,7 @@ if ($Install) {
 $gradleCheckStatus = if ($SkipChecks) { "skipped by request" } else { "passed" }
 Write-Output "Test APK: $artifactApk"
 Write-Output "License notices: $noticesArchive"
+Write-Output "Corresponding sources: $sourcesArchive"
 Write-Output "SHA-256: $hash"
 Write-Output "Gradle checks: $gradleCheckStatus"
 Write-Output "APK signature, ABI, and permission validation: passed"

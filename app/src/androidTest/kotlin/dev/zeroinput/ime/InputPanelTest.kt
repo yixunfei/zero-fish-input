@@ -26,6 +26,7 @@ import dev.zeroinput.ime.ui.InputEngineStatus
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -260,6 +261,53 @@ class InputPanelTest {
         assertTrue("Panel changes must invalidate pending authenticated actions", interactions >= 5)
     }
 
+    @Test fun handwritingPanelFitsSmallLayoutsAndSpaceRequiresAcceptedCandidate() = onMain {
+        for (landscape in listOf(false, true)) {
+            val panel = panel(false, landscape)
+            val width = if (landscape) 800 else 320
+            val strokeUpdates = ArrayList<Int>()
+            var spaceActions = 0
+            var accept = false
+            panel.onHandwritingStrokesChanged = { strokes ->
+                strokeUpdates.add(strokes.size)
+                strokes.forEach { it.fill(0f) }
+            }
+            panel.onHandwritingCandidateSelected = { accept }
+            panel.onKeyboardAction = { if (it == KeyboardAction.Space) spaceActions++ }
+            measure(panel, width, if (landscape) 320 else 600)
+            button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_open)).performClick()
+            measure(panel, width, if (landscape) 320 else 600)
+            val canvas = button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_canvas))
+            assertTrue(canvas.width > 0 && canvas.height > 0)
+            val updatesBeforeStroke = strokeUpdates.size
+            val now = SystemClock.uptimeMillis()
+            for ((action, x, y) in listOf(
+                Triple(MotionEvent.ACTION_DOWN, canvas.width * 0.2f, canvas.height * 0.5f),
+                Triple(MotionEvent.ACTION_UP, canvas.width * 0.8f, canvas.height * 0.5f),
+            )) {
+                val event = MotionEvent.obtain(now, now, action, x, y, 0)
+                canvas.dispatchTouchEvent(event)
+                event.recycle()
+                if (action == MotionEvent.ACTION_DOWN) {
+                    assertEquals("Touch-down must immediately revoke the previous recognition", updatesBeforeStroke + 1, strokeUpdates.size)
+                    assertEquals(0, strokeUpdates.last())
+                }
+            }
+            assertEquals("A stroke must invalidate first, then publish one completed trace", listOf(0, 1), strokeUpdates.drop(updatesBeforeStroke))
+            button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_space)).performClick()
+            assertTrue(spaceActions == 0)
+            panel.renderHandwritingCandidates(listOf("中"))
+            button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_space)).performClick()
+            assertTrue(spaceActions == 0)
+            accept = true
+            button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_space)).performClick()
+            assertTrue(spaceActions == 1)
+            measure(panel, width, if (landscape) 320 else 600)
+            assertLabelsFit(panel)
+            panel.release()
+        }
+    }
+
     private fun panel(night: Boolean, landscape: Boolean = false): ZeroInputView {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val configuration = Configuration(target.resources.configuration).apply {
@@ -285,7 +333,8 @@ class InputPanelTest {
     private fun assertLabelsFit(root: View) {
         visible(root).filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach { button ->
             val available = button.width - button.compoundPaddingLeft - button.compoundPaddingRight
-            assertTrue("Button padding must leave space for its label", available >= button.paint.measureText(button.text.toString()))
+            assertTrue("Button '${button.text}': width=${button.width}, padding=${button.compoundPaddingLeft + button.compoundPaddingRight}, text=${button.paint.measureText(button.text.toString())}",
+                available >= button.paint.measureText(button.text.toString()))
             val layout = button.layout
             assertTrue("Button label must have a text layout", layout != null && layout.lineCount > 0)
             assertTrue("Button label must not be ellipsized", layout.getEllipsisCount(0) == 0)

@@ -166,6 +166,12 @@
     <string name="keyboard_layout">Chinese keyboard</string>
     <string name="keyboard_full">Full keyboard</string>
     <string name="keyboard_nine">9-key pinyin</string>
+    <string name="double_pinyin_scheme">Double pinyin</string>
+    <string name="double_pinyin_off">Full</string>
+    <string name="double_pinyin_microsoft">MS</string>
+    <string name="double_pinyin_microsoft_a11y">Microsoft double pinyin</string>
+    <string name="double_pinyin_ziranma">Ziran</string>
+    <string name="double_pinyin_ziranma_a11y">Ziranma double pinyin</string>
     <string name="engine_rime_name">Rime Pinyin (default)</string>
     <string name="engine_dictionary_name">Offline dictionary (test)</string>
     <string name="engine_dictionary_notice">Limited test phrases. Sentence composition, initials, fuzzy pinyin, traditional output and 9-key input are unavailable.</string>

@@ -20,6 +20,7 @@ internal class EmojiAdapter(
     private var allowPersonal = false
     private var revision = 0L
     private var popup: PopupMenu? = null
+    private var variantPopup: EmojiVariantPopup? = null
     private val bound = mutableSetOf<Holder>()
 
     fun submit(entries: List<EmojiEntry>, starred: Set<String>, allowed: Boolean) {
@@ -27,8 +28,10 @@ internal class EmojiAdapter(
         revision++
         popup?.dismiss()
         popup = null
+        variantPopup?.dismiss()
+        variantPopup = null
         bound.forEach { holder ->
-            holder.text.text = ""
+            holder.text.bindExpression(null)
             holder.text.contentDescription = null
             holder.text.setOnClickListener(null)
             holder.text.setOnLongClickListener(null)
@@ -69,10 +72,11 @@ internal class EmojiAdapter(
         val boundRevision = revision
         val view = holder.text
         view.bindingRevision = revision
-        view.text = entry.value
+        view.bindExpression(entry)
         view.textSize = if (entry.isWide) 18f else 26f
         view.maxLines = if (entry.isWide) 12 else 1
-        view.contentDescription = if (entry.customId != null) "${entry.name} ${entry.value}" else entry.value
+        view.contentDescription = if (entry.customId != null) "${entry.name} ${entry.value}"
+            else entry.displayName(view.resources.configuration.locales[0])
         view.isActivated = entry.value in favorites
         view.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0,
             if (entry.value in favorites) R.drawable.ic_expression_star_small else 0, 0)
@@ -80,18 +84,20 @@ internal class EmojiAdapter(
             values.getOrNull(holder.bindingAdapterPosition) == entry
         view.setOnClickListener { if (current()) onSelected(entry) }
         view.setOnLongClickListener {
-            if (current() && allowPersonal) showMenu(view, entry, boundRevision)
+            if (current() && (allowPersonal || EmojiCatalog.variants(entry).size > 1)) showMenu(view, entry, boundRevision)
             true
         }
         ViewCompat.replaceAccessibilityAction(view, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
             view.context.getString(R.string.expression_actions)) { _, _ ->
-            if (current() && allowPersonal) { showMenu(view, entry, boundRevision); true } else false
+            if (current() && (allowPersonal || EmojiCatalog.variants(entry).size > 1)) {
+                showMenu(view, entry, boundRevision); true
+            } else false
         }
     }
 
     override fun onViewRecycled(holder: Holder) {
         bound -= holder
-        holder.text.text = ""
+        holder.text.bindExpression(null)
         holder.text.contentDescription = null
         holder.text.setOnClickListener(null)
         holder.text.setOnLongClickListener(null)
@@ -105,17 +111,28 @@ internal class EmojiAdapter(
         val selected = entry.value in favorites
         popup?.dismiss()
         popup = PopupMenu(view.context, view).apply {
-            menu.add(0, 1, 0, if (selected) R.string.expression_unfavorite else R.string.expression_favorite)
-            if (entry.customId != null) menu.add(0, 2, 1, R.string.expression_edit)
+            if (allowPersonal) {
+                menu.add(0, 1, 0, if (selected) R.string.expression_unfavorite else R.string.expression_favorite)
+                if (entry.customId != null) menu.add(0, 2, 1, R.string.expression_edit)
+            }
+            if (EmojiCatalog.variants(entry).size > 1) menu.add(0, 3, 2, R.string.expression_variants)
             setOnMenuItemClickListener { item ->
-                if (boundRevision == revision && allowPersonal) when (item.itemId) {
-                    1 -> onFavorite(entry, !selected)
-                    2 -> entry.customId?.let(onEdit)
+                if (boundRevision == revision) when (item.itemId) {
+                    1 -> if (allowPersonal) onFavorite(entry, !selected)
+                    2 -> if (allowPersonal) entry.customId?.let(onEdit)
+                    3 -> showVariants(view, entry, boundRevision)
                 }
                 true
             }
             show()
         }
+    }
+
+    private fun showVariants(view: TextView, entry: EmojiEntry, boundRevision: Long) {
+        variantPopup?.dismiss()
+        variantPopup = EmojiVariantPopup(view, EmojiCatalog.variants(entry)) { variant ->
+            if (boundRevision == revision) onSelected(variant)
+        }.also { it.show() }
     }
 
     class Holder(val text: ExpressionCellView) : RecyclerView.ViewHolder(text)

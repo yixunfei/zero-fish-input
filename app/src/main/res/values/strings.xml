@@ -161,6 +161,12 @@
     <string name="keyboard_layout">中文键盘</string>
     <string name="keyboard_full">全键盘</string>
     <string name="keyboard_nine">九键拼音</string>
+    <string name="double_pinyin_scheme">双拼方案</string>
+    <string name="double_pinyin_off">全拼</string>
+    <string name="double_pinyin_microsoft">微软</string>
+    <string name="double_pinyin_microsoft_a11y">微软双拼</string>
+    <string name="double_pinyin_ziranma">自然码</string>
+    <string name="double_pinyin_ziranma_a11y">自然码双拼</string>
     <string name="engine_rime_name">Rime 拼音（默认）</string>
     <string name="engine_dictionary_name">离线词典（测试）</string>
     <string name="engine_dictionary_notice">仅含常用测试词组；不支持整句组词、简拼、模糊音、繁体和九键。</string>

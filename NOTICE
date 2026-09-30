@@ -28,6 +28,11 @@ LICENSES/rime-kaomoji-LGPL-3.0.txt and LICENSES/GPL-3.0.txt.
 The experimental short-word scorer and separate developer benchmark use ONNX
 Runtime 1.26.0 from Microsoft Corporation under MIT; see
 LICENSES/onnxruntime-MIT.txt and LICENSES/onnxruntime-ThirdPartyNotices.txt.
+The offline Chinese handwriting recognizer bundles PaddlePaddle's
+PP-OCRv5_mobile_rec_onnx graph and derived character table, revision
+ed152b8b495f84de93cda5709d768548a9127622. Its model card declares
+Apache-2.0; see LICENSES/Apache-2.0.txt and THIRD_PARTY.md. It reuses the
+already bundled ONNX Runtime without a runtime network download.
 The bundled Mini INT8 graph is adapted from UER's
 roberta-mini-wwm-chinese-cluecorpussmall, revision
 5e567169018f5cf84cf1d85a2b391c8d51211eda. Conversion exports masked-position
@@ -37,3 +42,22 @@ maintainer; see https://github.com/dbiir/UER-py and LICENSES/Apache-2.0.txt.
 The independent model card has no weight-license metadata. This notice records
 the project decision, not an additional upstream statement. Tiny/FP16 research
 graphs and host tools (including ONNX under Apache-2.0) are not bundled.
+
+English glide spellings are derived from Carnegie Mellon University's CMUdict,
+revision 74790861f652b15e4ac49015a90074ad62a27690. Pronunciations and variant markers
+are removed and spellings are filtered, deduplicated and sorted. The complete
+BSD-style notice is preserved in LICENSES/cmudict-LICENSE.txt.
+
+Unicode Emoji 18.0 sequences and CLDR 48 annotations are provided under Unicode
+License V3. Bundled Noto Emoji artwork is adapted to lossless WebP from revision
+e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e. Artwork attribution, flag terms and the
+upstream OFL license text are preserved in LICENSES/ and assets/emoji/licenses/.
+No Noto font binary is included. Sources and exact hashes are recorded in
+tools/emoji/sources.lock.json and docs/rgi-emoji-validation.md.
+
+The stroke recognizer adapts Zinnia's feature/scoring algorithm,
+Copyright (c) 2005-2007, Taku Kudo, under BSD-3-Clause. It uses repacked Tegaki 0.3
+simplified-light and traditional Chinese model data under LGPL-2.1. See
+LICENSES/Zinnia-BSD-3-Clause.txt and LICENSES/Tegaki-LGPL-2.1.txt. The corresponding
+source distribution contains the original training XML, model archives, build
+files and the format-adaptation scripts. See SOURCES.md for replacement steps.

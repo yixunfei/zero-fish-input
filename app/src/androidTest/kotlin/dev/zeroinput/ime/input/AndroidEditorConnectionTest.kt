@@ -11,6 +11,25 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AndroidEditorConnectionTest {
+    @Test fun backspaceDeletesWholeEmojiSequencesAndCombiningCharacters() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val ready = java.util.concurrent.CountDownLatch(1)
+        val preparation = dev.zeroinput.ime.ui.EmojiCatalog.prepare(instrumentation.targetContext) { if (it) ready.countDown() }
+        try {
+            org.junit.Assert.assertTrue(ready.await(10, java.util.concurrent.TimeUnit.SECONDS))
+            onMain {
+                for (sequence in listOf("👨‍👩‍👧‍👦", "👩🏿‍🚀", "🇨🇳", "1️⃣", "❤️", "🫱🏻‍🫲🏿", "e\u0301")) {
+                    val editor = editor("a${sequence}z")
+                    val cursor = 1 + sequence.length
+                    editor.setSelection(cursor)
+                    val connection = checkNotNull(editor.onCreateInputConnection(EditorInfo()))
+                    AndroidEditorConnection(cursor, cursor) { connection }.deleteBeforeCursor()
+                    assertEquals("az", editor.text.toString())
+                }
+            }
+        } finally { preparation.close() }
+    }
+
     @Test fun backspaceDeletesOnlySelectedTextInEitherSelectionDirection() = onMain {
         for ((selectionStart, selectionEnd) in listOf(1 to 5, 5 to 1)) {
             val editor = editor("a选中🙂z")

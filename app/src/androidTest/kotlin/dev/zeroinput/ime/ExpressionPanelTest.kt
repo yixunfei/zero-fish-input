@@ -1,6 +1,7 @@
 package dev.zeroinput.ime
 
 import android.content.res.Configuration
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.SystemClock
@@ -13,20 +14,37 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.ime.ui.EmojiCategory
+import dev.zeroinput.ime.ui.EmojiCatalog
 import dev.zeroinput.ime.ui.EmojiEntry
 import dev.zeroinput.ime.ui.EmojiPanelView
 import dev.zeroinput.ime.ui.KaomojiGroup
 import dev.zeroinput.ime.ui.PersonalExpressionsUi
 import dev.zeroinput.ime.ui.ZeroInputView
 import java.io.File
+import java.io.Closeable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
 import org.junit.runner.RunWith
 import dev.zeroinput.ime.ui.R as UiR
 
 @RunWith(AndroidJUnit4::class)
 class ExpressionPanelTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    @Before fun awaitPublicCatalogPreparation() {
+        val latch = CountDownLatch(1)
+        var ready = false
+        lateinit var handle: Closeable
+        onMain { handle = EmojiCatalog.prepare(instrumentation.targetContext) { ready = it; latch.countDown() } }
+        try {
+            assertTrue(latch.await(15, TimeUnit.SECONDS))
+            assertTrue(ready)
+        } finally { handle.close() }
+    }
 
     @Test fun kaomojiSubtagsAndLongEntriesFitNarrowWideAndDarkPanels() = onMain {
         for (night in listOf(false, true)) for (width in listOf(320, 411, 800)) {
@@ -87,23 +105,48 @@ class ExpressionPanelTest {
         assertFalse(selected)
     }
 
-    @Test fun searchAndSubtagsKeepTheKeyboardInsideTheMeasuredWindow() = onMain {
+    @Test fun searchAndSubtagsKeepTheKeyboardInsideTheMeasuredWindow() {
         for (width in listOf(320, 411, 800)) {
-            val panel = ZeroInputView(context(false, width))
-            panel.renderExpressions(true, PersonalExpressionsUi(), emptyList())
-            measure(panel, width, null)
-            click(panel, UiR.string.expression_smileys)
-            click(panel, UiR.string.expression_kaomoji)
-            click(panel, UiR.string.expression_search)
-            measure(panel, width, null)
-            val expressions = visible(panel).filterIsInstance<EmojiPanelView>().single()
-            expressions.appendQuery("kaixin")
-            measure(panel, width, null)
-            assertTrue(expressions.height >= dp(panel, 224))
-            assertTrue(panel.height < dp(panel, if (width == 800) 411 else 700))
-            verifyCells(expressions)
-            save(panel, "expression-search-$width.png")
+            val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardPreviewFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyboardPreviewFixtureActivity
+            lateinit var panel: ZeroInputView
+            lateinit var expressions: EmojiPanelView
+            try {
+                onMain {
+                    panel = ZeroInputView(context(false, width))
+                    activity.keyboard.release()
+                    activity.setContentView(panel)
+                    panel.renderExpressions(true, PersonalExpressionsUi(), emptyList())
+                    measure(panel, width, null)
+                    click(panel, UiR.string.expression_smileys)
+                    click(panel, UiR.string.expression_kaomoji)
+                    click(panel, UiR.string.expression_search)
+                    measure(panel, width, null)
+                    expressions = visible(panel).filterIsInstance<EmojiPanelView>().single()
+                    expressions.appendQuery("kaixin")
+                }
+                await { visible(expressions).filterIsInstance<RecyclerView>().single().adapter?.itemCount?.let { it > 0 } == true }
+                onMain {
+                    measure(panel, width, null)
+                    assertTrue(expressions.height >= dp(panel, 224))
+                    assertTrue(panel.height < dp(panel, if (width == 800) 411 else 700))
+                    assertTrue(visible(expressions).filterIsInstance<TextView>().any { it.text.toString() == "^_^" })
+                    verifyCells(expressions)
+                    save(panel, "expression-search-$width.png")
+                }
+            } finally { onMain { panel.release(); activity.finish() } }
         }
+    }
+
+    private fun await(condition: () -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + 5000
+        while (SystemClock.uptimeMillis() < deadline) {
+            var ready = false
+            onMain { ready = condition() }
+            if (ready) return
+            SystemClock.sleep(20)
+        }
+        fail("Expression background search did not complete")
     }
 
     private fun context(night: Boolean, width: Int): android.content.Context {

@@ -39,6 +39,48 @@ Only the Android adapter verifies and reopens an editor composing region.
 Rime prepares a secondary shared-dictionary session for related full-keyboard
 readings; nine-key retains its original native flow. Personal query pages are
 prepared on the existing serial worker and never decrypt on key dispatch.
+Microsoft and Ziranma double-pinyin codes are generated from the pinned public
+syllable list during worker-side schema deployment. The full-pinyin related-reading
+session is not used for double-pinyin codes. The keyboard follows the applied
+session scheme while a pending setting waits for the current composition to end.
+`ime-core` appends bounded kaomoji candidates from an injected lookup port only
+to eligible built-in Rime composition. The app indexes public expression keywords
+once and supplies only the currently permitted personal snapshot; candidate taps
+recheck identity and personal availability before committing.
+
+Handwriting is a separate single-character panel. `ime-ui` owns bounded touch
+strokes, `app/handwriting` owns debouncing and editor-generation cancellation,
+and `model-scoring` owns verified public assets, aspect-preserving stroke features,
+Tegaki/Zinnia sparse scoring, rasterization, ONNX inference and Han-only fusion.
+The app commits an explicitly selected candidate only after
+checking the current input connection. No Rime session, personal lookup or learning
+port participates. Model I/O and inference run on one bounded worker; see
+[ADR 0016](adr/0016-offline-chinese-handwriting.md).
+
+Glide recognition uses an Android-free `engine-api/GlideDecoder` contract.
+`ime-ui/GlideTouchTracker` snapshots bounded points and actual key geometry;
+`engine-dictionary/DictionaryGlideDecoder` matches public templates on one
+application-owned worker. English/Rime adapters load pinned public word/readings
+off the input thread; double-pinyin and nine-key reuse the existing mappings.
+`app/glide` owns request generations, explicit choice and short main-thread code
+replay slices. Every slice rechecks session, connection, interaction and layout.
+Chinese readings append through normal conversion; English choices finish a word.
+Public lookup never queries editor context or personal data. See [ADR 0017](adr/0017-glide-placement-and-rgi-emoji.md).
+
+`ime-ui/KeyboardLayoutHost` owns a single surface containing all panels, placement
+controls and bounded normalized geometry. `app/keyboard/KeyboardWindowLayout`
+adapts the IME content/visible/touchable insets. Floating mode reserves no full-screen
+content inset and only its visible rectangle receives input; docked/one-hand modes
+reserve their measured height. No application overlay window or permission is used.
+Only public geometry is stored, separately for portrait and landscape.
+
+The complete Emoji 18.0 catalog and suffix trie are built on a bounded worker from
+hash-verified bundled data. UI category lookup uses immutable indexes; text searches
+and WebP decoding use bounded workers with generation/cell-binding checks. A 4 MiB
+public-image cache supplies older Android versions independently of system fonts.
+Variant selection emits the exact sequence. Cursor deletion combines bounded system
+grapheme segmentation with the bundled RGI suffix trie; it reads at most 64 UTF-16
+units only for the user's explicit Backspace action and retains no context history.
 
 1. `ZeroInputService` 是唯一输入法服务并持有当前输入会话。每个会话都有单调递增的令牌，
    安全剪贴板在认证后返回编辑器，由用户再次确认时绑定当前令牌、实际 `InputConnection` 和

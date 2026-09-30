@@ -19,9 +19,13 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.engine.api.EngineCapability
 import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.PageDirection
+import dev.zeroinput.engine.api.GlideLayout
+import dev.zeroinput.engine.api.GlideRequest
+import dev.zeroinput.engine.api.GlideCandidate
 import dev.zeroinput.ime.core.InputSessionState
 import dev.zeroinput.ime.core.EditorInputOptions
 import dev.zeroinput.ime.core.EditorLayout
@@ -45,6 +49,23 @@ class ZeroInputView @JvmOverloads constructor(
     var onPasteConfirmed: () -> Unit = {}
     var onPasteCancelled: () -> Unit = {}
     var onSettingsRequested: () -> Unit = {}
+    var onGlideStarted: () -> Unit = {}
+    var onGlideRequested: (GlideRequest, GlideLetterCase) -> Unit = { _, _ -> }
+    var onGlideCandidateSelected: (GlideCandidate) -> Unit = {}
+    private var glideEnabled = true
+    private var glidePolicyAllowed = true
+    private var glideSuggestionsActive = false
+    val availableGlideLayout: GlideLayout? get() = when {
+        !glideEnabled || !glidePolicyAllowed || sensitive || currentPack != null ||
+            mode != PanelMode.KEYBOARD || editorOptions.layout != EditorLayout.TEXT -> null
+        currentLanguage == InputLanguage.ENGLISH -> GlideLayout.ENGLISH_QWERTY
+        chineseLayout == ChineseKeyboardLayout.NINE_KEY && EngineCapability.NINE_KEY_PINYIN in capabilities -> GlideLayout.PINYIN_NINE_KEY
+        doublePinyinScheme == DoublePinyinScheme.MICROSOFT -> GlideLayout.DOUBLE_PINYIN_MICROSOFT
+        doublePinyinScheme == DoublePinyinScheme.ZIRANMA -> GlideLayout.DOUBLE_PINYIN_ZIRANMA
+        else -> GlideLayout.PINYIN_QWERTY
+    }
+    var onPlacementRequested: (View) -> Unit = {}
+    private var externalInsets = false
     var onClipboardGuardRequested: () -> Unit = {}
     var onSecureClipboardManagementRequested: () -> Unit = {}
     var onAiSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
@@ -92,6 +113,18 @@ class ZeroInputView @JvmOverloads constructor(
     var onReconvertRequested: () -> Unit = {}
     var onUndoSelectionRequested: () -> Unit = {}
     var onSyllableRequested: () -> Unit = {}
+    var onHandwritingStrokesChanged: (List<FloatArray>) -> Unit = {}
+    var onHandwritingCandidateSelected: (String) -> Boolean = { false }
+    var onHandwritingVisibilityChanged: (Boolean) -> Unit = {}
+    val isHandwritingOpen: Boolean get() = mode == PanelMode.HANDWRITING
+    fun containsHandwritingCandidate(value: String): Boolean = isHandwritingOpen && handwriting.containsCandidate(value)
+    fun renderHandwritingCandidates(values: List<String>) { if (isHandwritingOpen) handwriting.renderCandidates(values, completed = true) }
+    fun renderHandwritingFailure() { if (isHandwritingOpen) handwriting.showFailure() }
+    fun clearHandwriting() { handwriting.clear() }
+    fun closeHandwriting() {
+        if (isHandwritingOpen) showMode(PanelMode.KEYBOARD, userInitiated = false)
+        else handwriting.clear()
+    }
 
     private var mode = PanelMode.KEYBOARD
     private var editorOptions = EditorInputOptions()
@@ -108,6 +141,11 @@ class ZeroInputView @JvmOverloads constructor(
         dispatchKeyboardAction(KeyboardAction.SwitchLanguage)
     }
     private val candidateStrip = CandidateStripView(context)
+    private val glideSuggestions = GlideSuggestionsView(context).apply {
+        visibility = GONE
+        onSelected = { onGlideCandidateSelected(it) }
+        onCancelled = { onUserInteraction(); clearGlideCandidates() }
+    }
     private val enginePreparation = EnginePreparationView(context)
     private val clipboardGuard = ClipboardGuardReminderView(context).apply { onRequested = { onClipboardGuardRequested() } }
     private val expandedCandidates = ExpandedCandidatesView(context)
@@ -135,6 +173,7 @@ class ZeroInputView @JvmOverloads constructor(
     private val keyboard = KeyboardPanel(context)
     private val readings = ReadingChoicesView(context).apply { onSelected = { onReadingSelected(it) } }
     private var chineseLayout = ChineseKeyboardLayout.FULL
+    private var doublePinyinScheme = DoublePinyinScheme.OFF
     private var capabilities: Set<EngineCapability> = emptySet()
     private val keyboardContainer = LinearLayout(context).apply {
         orientation = HORIZONTAL
@@ -145,6 +184,7 @@ class ZeroInputView @JvmOverloads constructor(
         onLayoutSwitchRequested()
     }
     private val emoji = EmojiPanelView(context)
+    private val handwriting = HandwritingPanelView(context)
     private val secureClipboard = SecureClipboardPanelView(context)
     private val ai = AiWorkbenchPanelView(context)
     private val content = LinearLayout(context).apply {
@@ -166,6 +206,7 @@ class ZeroInputView @JvmOverloads constructor(
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(if (landscape) 48 else 72))
         addView(toolbar, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48), Gravity.CENTER_VERTICAL))
         addView(candidateStrip, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(glideSuggestions, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
     private val backNavigation = PanelBackNavigation(this, { canNavigateBack }) { navigateBack() }
 
@@ -183,6 +224,7 @@ class ZeroInputView @JvmOverloads constructor(
         orientation = VERTICAL
         setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface, 0xfffafafa.toInt()))
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+            if (externalInsets) return@setOnApplyWindowInsetsListener insets
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             if (view.paddingLeft != bars.left || view.paddingRight != bars.right || view.paddingBottom != bars.bottom) {
                 view.setPadding(bars.left, 0, bars.right, bars.bottom)
@@ -196,6 +238,7 @@ class ZeroInputView @JvmOverloads constructor(
         addView(header)
         addView(clipboardGuard)
         content.addView(emoji)
+        content.addView(handwriting)
         content.addView(secureClipboard)
         content.addView(ai)
         content.addView(keyboardContainer)
@@ -213,6 +256,8 @@ class ZeroInputView @JvmOverloads constructor(
         currentLanguage = state.language
         currentPack = state.languagePackKey
         sensitive = state.privacy.isSensitive
+        glidePolicyAllowed = state.privacy.suggestionsAllowed &&
+            (state.language != InputLanguage.ENGLISH || state.privacy.predictionsAllowed)
         aiAvailable = !state.privacy.isSensitive && state.privacy.personalizationAllowed &&
             state.privacy.suggestionsAllowed && state.privacy.predictionsAllowed
         if (!aiAvailable && mode == PanelMode.AI) showMode(PanelMode.KEYBOARD, userInitiated = false)
@@ -269,6 +314,7 @@ class ZeroInputView @JvmOverloads constructor(
         editorOptions = options
         manualTools = false
         emoji.clearSession()
+        handwriting.clear()
         keyboard.startEditor(options)
         showMode(PanelMode.KEYBOARD, userInitiated = false)
     }
@@ -279,8 +325,35 @@ class ZeroInputView @JvmOverloads constructor(
         updatePanelLayout()
     }
 
+    fun setExternalInsets(value: Boolean) {
+        externalInsets = value
+        if (value) setPadding(0, 0, 0, 0)
+    }
+
+    fun setLayoutHeightScale(value: Float) {
+        keyboard.setHeightScale(value)
+        readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
+        updatePanelLayout()
+    }
+
     fun configureSoundEffects(value: Boolean) {
         keyboard.keySoundEffectsEnabled = value
+    }
+
+    fun configureGlide(enabled: Boolean) { glideEnabled = enabled; keyboard.configureGlide(availableGlideLayout) }
+
+    fun renderGlideCandidates(values: List<GlideCandidate>, busy: Boolean = false, failed: Boolean = false) {
+        if (availableGlideLayout == null) return
+        glideSuggestionsActive = true
+        glideSuggestions.render(values, busy, failed)
+        refreshHeader()
+    }
+
+    fun clearGlideCandidates() {
+        if (!glideSuggestionsActive) return
+        glideSuggestionsActive = false
+        glideSuggestions.clear()
+        refreshHeader()
     }
 
     fun renderClipboardGuard(enabled: Boolean, changed: Boolean) { clipboardGuard.render(enabled, changed) }
@@ -343,14 +416,22 @@ class ZeroInputView @JvmOverloads constructor(
         updateKeyboardLayout()
     }
 
+    fun renderActiveDoublePinyin(scheme: DoublePinyinScheme) {
+        doublePinyinScheme = scheme
+        updateKeyboardLayout()
+    }
+
     private fun updateKeyboardLayout() {
         val nineKey = currentLanguage == InputLanguage.CHINESE && currentPack == null && !sensitive &&
             chineseLayout == ChineseKeyboardLayout.NINE_KEY && EngineCapability.NINE_KEY_PINYIN in capabilities &&
             mode != PanelMode.EMOJI && mode != PanelMode.AI && editorOptions.layout == EditorLayout.TEXT
         keyboard.setKeyboardLayout(if (nineKey) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL)
+        keyboard.setDoublePinyinScheme(if (currentLanguage == InputLanguage.CHINESE && currentPack == null &&
+            !sensitive && !nineKey && editorOptions.layout == EditorLayout.TEXT) doublePinyinScheme else DoublePinyinScheme.OFF)
         readings.visibility = if (nineKey) View.VISIBLE else View.GONE
         val label = context.getString(if (nineKey) R.string.layout_full_short else R.string.layout_nine_short)
         if (layoutButton.text != label) layoutButton.text = label
+        keyboard.configureGlide(availableGlideLayout)
     }
 
     fun cancelPendingGestures() { keyboard.cancelPendingGestures() }
@@ -372,6 +453,11 @@ class ZeroInputView @JvmOverloads constructor(
         onPasteConfirmed = {}
         onPasteCancelled = {}
         onSettingsRequested = {}
+        onGlideStarted = {}
+        onGlideRequested = { _, _ -> }
+        onGlideCandidateSelected = {}
+        glideSuggestions.clear()
+        onPlacementRequested = {}
         onClipboardGuardRequested = {}
         onSecureClipboardManagementRequested = {}
         onAiSubmit = { _, _, _ -> }
@@ -397,6 +483,9 @@ class ZeroInputView @JvmOverloads constructor(
         onReconvertRequested = {}
         onUndoSelectionRequested = {}
         onSyllableRequested = {}
+        onHandwritingStrokesChanged = {}
+        onHandwritingCandidateSelected = { false }
+        onHandwritingVisibilityChanged = {}
         currentSnapshot = EngineSnapshot.Empty
         candidateStrip.render(currentSnapshot)
         diagnosticsVisible = false
@@ -404,6 +493,7 @@ class ZeroInputView @JvmOverloads constructor(
         expandedCandidates.clear()
         readings.render(currentSnapshot)
         emoji.clearSession()
+        handwriting.clear()
         secureClipboard.render(false, emptyList())
         secureClipboard.renderCopyAvailable(false)
         secureClipboard.renderPasteConfirmation(false)
@@ -483,11 +573,17 @@ class ZeroInputView @JvmOverloads constructor(
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
         addView(languageButton)
         addView(aiButton)
+        addView(panelIconButton(context, android.R.drawable.ic_menu_crop, R.string.keyboard_placement) {
+            onPlacementRequested(toolbar)
+        }, LayoutParams(dp(48), dp(48)))
         addView(reconvertButton, LayoutParams(dp(48), dp(48)))
         addView(scriptButton)
         addView(layoutButton)
         addView(fuzzyButton)
         addView(toolbarButton("☺", context.getString(R.string.expression_smileys)) { toggleMode(PanelMode.EMOJI) })
+        addView(panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.handwriting_open) {
+            toggleMode(PanelMode.HANDWRITING)
+        }, LayoutParams(dp(48), dp(48)))
         addView(toolbarButton("🔒", context.getString(R.string.secure_clipboard_open)) { toggleMode(PanelMode.SECURE_CLIPBOARD) })
         addView(Space(context).apply { layoutParams = LayoutParams(0, 1, 1f) })
         // The return control replaces the layout switch while a secondary panel is open.
@@ -496,6 +592,8 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     private fun bindCallbacks() {
+        keyboard.onGlideStarted = { onGlideStarted() }
+        keyboard.onGlideRequest = { request, letterCase -> onGlideRequested(request, letterCase) }
         keyboard.onAction = ::dispatchKeyboardAction
         keyboard.onUserInteraction = { onUserInteraction() }
         keyboard.onClearComposition = {
@@ -531,6 +629,9 @@ class ZeroInputView @JvmOverloads constructor(
         emoji.onManageRequested = { onExpressionManagementRequested(it) }
         emoji.onSearchModeChanged = { searchActive -> updateEmojiSearchLayout(searchActive) }
         emoji.onUserInteraction = { onUserInteraction() }
+        handwriting.onStrokesChanged = { onHandwritingStrokesChanged(it) }
+        handwriting.onCandidateSelected = { onHandwritingCandidateSelected(it) }
+        handwriting.onEditAction = { onKeyboardAction(it) }
         secureClipboard.onItemSelected = { onSecureClipboardSelected(it) }
         secureClipboard.onCopySelectionRequested = { onCopySelectionRequested() }
         secureClipboard.onPasteConfirmed = { onPasteConfirmed() }
@@ -615,6 +716,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun showMode(target: PanelMode, userInitiated: Boolean = true) {
         if (target == PanelMode.AI && !aiAvailable) return
         val aiChanged = (mode == PanelMode.AI) != (target == PanelMode.AI)
+        val handwritingChanged = (mode == PanelMode.HANDWRITING) != (target == PanelMode.HANDWRITING)
         val leavingSearch = mode == PanelMode.EMOJI && emoji.isSearchActive && target != PanelMode.EMOJI
         if (mode != target) {
             cancelPendingGestures()
@@ -623,6 +725,10 @@ class ZeroInputView @JvmOverloads constructor(
             manualTools = false
         }
         mode = target
+        if (handwritingChanged) {
+            handwriting.clear()
+            onHandwritingVisibilityChanged(target == PanelMode.HANDWRITING)
+        }
         if (aiChanged) {
             onAiVisibilityChanged(target == PanelMode.AI)
             if (target == PanelMode.AI) ai.setEditing(true)
@@ -647,6 +753,7 @@ class ZeroInputView @JvmOverloads constructor(
         setPanelVisible(secureClipboard, target == PanelMode.SECURE_CLIPBOARD)
         setPanelVisible(ai, target == PanelMode.AI && aiAvailable)
         setPanelVisible(emoji, target == PanelMode.EMOJI)
+        setPanelVisible(handwriting, target == PanelMode.HANDWRITING)
         setPanelVisible(
             keyboardContainer,
             target == PanelMode.KEYBOARD || emoji.isSearchActive && target == PanelMode.EMOJI ||
@@ -688,10 +795,12 @@ class ZeroInputView @JvmOverloads constructor(
         val showCandidates = !manualTools && when (mode) {
             PanelMode.AI -> ai.editing && hasCandidates
             PanelMode.KEYBOARD, PanelMode.CANDIDATES -> diagnosticsVisible || hasCandidates || needsStatus
-            PanelMode.EMOJI, PanelMode.SECURE_CLIPBOARD -> false
+            PanelMode.EMOJI, PanelMode.SECURE_CLIPBOARD, PanelMode.HANDWRITING -> false
         }
         candidateStrip.visibility = if (showCandidates) VISIBLE else GONE
         toolbar.visibility = if (showCandidates) GONE else VISIBLE
+        glideSuggestions.visibility = if (glideSuggestionsActive && mode == PanelMode.KEYBOARD) VISIBLE else GONE
+        if (glideSuggestions.visibility == VISIBLE) { candidateStrip.visibility = GONE; toolbar.visibility = GONE }
         returnButton.visibility = if (mode != PanelMode.KEYBOARD || manualTools) VISIBLE else GONE
         if (mode == PanelMode.AI) { scriptButton.visibility = GONE; layoutButton.visibility = GONE }
         else if (returnButton.isVisible) layoutButton.visibility = GONE
@@ -730,6 +839,7 @@ class ZeroInputView @JvmOverloads constructor(
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
         secureClipboard.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, minOf(dp(PANEL_HEIGHT_DP), maximumContentHeight))
+        handwriting.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, minOf(dp(PANEL_HEIGHT_DP), maximumContentHeight))
         ai.layoutParams = when {
             aiEditing && landscape -> LayoutParams(0, panelHeight, 1f)
             aiEditing -> LayoutParams(LayoutParams.MATCH_PARENT, dp(144))
@@ -776,6 +886,7 @@ class ZeroInputView @JvmOverloads constructor(
         EMOJI,
         SECURE_CLIPBOARD,
         AI,
+        HANDWRITING,
         CANDIDATES,
     }
 

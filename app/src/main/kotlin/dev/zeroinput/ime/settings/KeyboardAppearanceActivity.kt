@@ -56,6 +56,17 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
 
     private fun options() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        addView(com.google.android.material.switchmaterial.SwitchMaterial(context).apply {
+            setText(dev.zeroinput.ime.ui.R.string.glide_enabled)
+            isChecked = settings.glideTypingEnabled
+            minHeight = dp(48)
+            setPadding(dp(16), 0, dp(16), 0)
+            setOnCheckedChangeListener { _, enabled -> settings.glideTypingEnabled = enabled }
+        })
+        addView(TextView(context).apply {
+            setText(dev.zeroinput.ime.ui.R.string.glide_description)
+            setPadding(dp(16), 0, dp(16), dp(8))
+        })
         addView(title(R.string.keyboard_style))
         addView(RadioGroup(context).apply {
             orientation = RadioGroup.VERTICAL

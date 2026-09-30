@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="key_semicolon">分号，微软双拼 ing</string>
     <!-- Hexadecimal editor flags are identifiers, not plural quantities. -->
     <string name="input_diagnostics_format" tools:ignore="PluralsCandidate">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
     <string name="related_candidate">%1$s · 相近</string>
@@ -144,4 +145,17 @@
     <string name="fuzzy_enable">开启模糊拼音</string>
     <string name="fuzzy_enabled_state">已开启</string>
     <string name="fuzzy_disabled_state">已关闭</string>
+    <string name="handwriting_open">手写输入</string>
+    <string name="handwriting_canvas">手写区域</string>
+    <string name="handwriting_hint">在下方书写单个汉字</string>
+    <string name="handwriting_recognizing">识别中…</string>
+    <string name="handwriting_no_match">未识别出汉字，请重写</string>
+    <string name="handwriting_unavailable">手写识别暂不可用</string>
+    <string name="handwriting_undo">撤销</string>
+    <string name="handwriting_clear">清空</string>
+    <string name="handwriting_delete">删除</string>
+    <string name="handwriting_space">空格</string>
+    <string name="handwriting_enter">回车</string>
+    <string name="handwriting_candidate">候选字</string>
+    <string name="handwriting_candidate_value">输入 %1$s</string>
 </resources>

@@ -3,10 +3,11 @@ package dev.zeroinput.engine.rime
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.FuzzyPinyinPair
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 
 /** Rime compiles these rules into its syllable index, outside the input thread. */
 internal object PinyinAlgebra {
-    fun rules(options: ChineseInputOptions): List<String> = buildList {
+    fun rules(options: ChineseInputOptions, syllables: List<String> = emptyList()): List<String> = buildList {
         if (options.experimentalTypoCorrection && options.keyboardLayout == ChineseKeyboardLayout.FULL) {
             addAll(TypoPinyinAlgebra.rules())
         }
@@ -14,6 +15,9 @@ internal object PinyinAlgebra {
             if (options.isFuzzyEnabled(pair)) {
                 addAll(FuzzyPinyinRules.rimeRules(FuzzyPinyinRules.all.first { it.pair == pair }))
             }
+        }
+        if (options.effectiveDoublePinyinScheme != DoublePinyinScheme.OFF) {
+            addAll(DoublePinyin.rules(syllables, options.effectiveDoublePinyinScheme))
         }
         if (options.abbreviatedPinyin) {
             add("abbrev/^([a-z]).+\u0024/\u00241/")
@@ -30,11 +34,17 @@ internal object PinyinAlgebra {
 
     fun schemaId(options: ChineseInputOptions): String =
         if (options.effectiveFuzzyPinyinMask == 0 && options.abbreviatedPinyin && options.candidatePageSize == 8 &&
-            options.keyboardLayout == ChineseKeyboardLayout.FULL && !options.experimentalTypoCorrection) {
+            options.keyboardLayout == ChineseKeyboardLayout.FULL && !options.experimentalTypoCorrection &&
+            options.effectiveDoublePinyinScheme == DoublePinyinScheme.OFF) {
             "zeroinput_pinyin"
         } else {
             "zeroinput_pinyin_${options.effectiveFuzzyPinyinMask}_${if (options.abbreviatedPinyin) 1 else 0}_${options.candidatePageSize}" +
                 (if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) "_9" else "") +
+                (when (options.effectiveDoublePinyinScheme) {
+                    DoublePinyinScheme.OFF -> ""
+                    DoublePinyinScheme.MICROSOFT -> "_ms"
+                    DoublePinyinScheme.ZIRANMA -> "_zm"
+                }) +
                 (if (options.experimentalTypoCorrection && options.keyboardLayout == ChineseKeyboardLayout.FULL) "_2" else "")
         }
 

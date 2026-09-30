@@ -37,6 +37,7 @@ class InputSessionController(
     private val deferHeavyEngineCreation: Boolean = false,
     nextWordPredictor: NextWordPredictor = NextWordPredictor.Empty,
     private val wordAssociationsEnabled: () -> Boolean = { true },
+    private val kaomojiCandidates: KaomojiCandidateSource = KaomojiCandidateSource.Empty,
 ) : AutoCloseable {
     private var engine: InputEngine? = null
     private var language = InputLanguage.CHINESE
@@ -178,7 +179,12 @@ class InputSessionController(
                 InputCommand.SelectSyllable -> (activeEngine as? CompositionEditingEngine)?.let {
                     apply(it.selectSyllable())
                 }
-                is InputCommand.SelectCandidate -> selectCandidate(activeEngine, command.visibleIndex)
+                is InputCommand.SelectCandidate -> {
+                    if (command.candidateId == null ||
+                        state.snapshot.candidates.getOrNull(command.visibleIndex)?.id == command.candidateId) {
+                        selectCandidate(activeEngine, command.visibleIndex)
+                    }
+                }
                 is InputCommand.ChangeCandidatePage -> {
                     if (!rawEngineSnapshot.isComposing) return
                     if (personalPaging.changePage(command.direction, candidateWindow.snapshot(rawEngineSnapshot))) {
@@ -592,6 +598,19 @@ class InputSessionController(
                 }
                 publish(EngineSnapshot.Empty)
             }
+            is CandidateRoute.Kaomoji -> {
+                if (language != InputLanguage.CHINESE || !privacy.suggestionsAllowed ||
+                    route.personal && !privacy.personalizationAllowed) return
+                val stillAvailable = runCatching {
+                    kaomojiCandidates.suggestions(state.snapshot.rawInput, privacy.personalizationAllowed)
+                        .any { it.id == route.id && it.text == route.text }
+                }.getOrDefault(false)
+                if (!stillAvailable) { publish(rawEngineSnapshot); return }
+                candidateWindow.clear()
+                activeEngine.reset()
+                commitPredictableText(route.text)
+                publish(EngineSnapshot.Empty)
+            }
             null -> Unit
         }
     }
@@ -627,8 +646,9 @@ class InputSessionController(
         }
         if (!associationsAllowed()) associations.clear()
         if (composed.isComposing) associations.hide()
-        val visibleSnapshot = if (!composed.isComposing && composed.candidates.isEmpty() && associations.candidates.isNotEmpty())
+        val associated = if (!composed.isComposing && composed.candidates.isEmpty() && associations.candidates.isNotEmpty())
             composed.copy(candidates = associations.candidates) else composed
+        val visibleSnapshot = withKaomoji(associated)
         // The update snapshot is the authoritative view for this event.  Do
         // not resolve engine candidates through the engine's mutable
         // `snapshot` property: adapters may publish that property lazily (or
@@ -639,6 +659,19 @@ class InputSessionController(
             canReconvert = recentComposition.available && !visibleSnapshot.isComposing,
             candidateRevision = state.candidateRevision + 1)
         onStateChanged(state)
+    }
+
+    private fun withKaomoji(snapshot: EngineSnapshot): EngineSnapshot {
+        if (language != InputLanguage.CHINESE || languagePackKey != null || !snapshot.isComposing ||
+            !privacy.suggestionsAllowed || engine?.descriptor?.id != "rime.luna-pinyin") return snapshot
+        val input = snapshot.rawInput
+        if (input.length !in 2..32 || input.any { it !in 'a'..'z' }) return snapshot
+        val seen = snapshot.candidates.mapTo(HashSet()) { it.text }
+        val extra = runCatching { kaomojiCandidates.suggestions(input, privacy.personalizationAllowed) }
+            .getOrDefault(emptyList())
+            .take(4).filter { it.text.isNotEmpty() && seen.add(it.text) }
+            .map { Candidate("kaomoji:${it.id}", it.text) }
+        return if (extra.isEmpty()) snapshot else snapshot.copy(candidates = snapshot.candidates + extra)
     }
 
     private fun commitUnconsumedKey(
@@ -706,6 +739,9 @@ class InputSessionController(
         routes = snapshot.candidates.map { candidate ->
             if (candidate.kind == CandidateKind.NEXT_WORD) {
                 CandidateRoute.Association(candidate.id)
+            } else if (candidate.id.startsWith("kaomoji:")) {
+                val id = candidate.id.removePrefix("kaomoji:")
+                CandidateRoute.Kaomoji(id, candidate.text, id.startsWith("custom:"))
             } else if (candidate.id.startsWith("personal:")) {
                 CandidateRoute.Personal(candidate.id.removePrefix("personal:"), candidate.text, candidate.input)
             } else {
@@ -751,6 +787,7 @@ class InputSessionController(
 
         data class Personal(val id: String, val text: String, val input: String) : CandidateRoute
         data class Association(val id: String) : CandidateRoute
+        data class Kaomoji(val id: String, val text: String, val personal: Boolean) : CandidateRoute
     }
 
 }

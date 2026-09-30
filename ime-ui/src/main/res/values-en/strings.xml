@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="key_semicolon">Semicolon, Microsoft double pinyin ing</string>
     <!-- Hexadecimal editor flags are identifiers, not plural quantities. -->
     <string name="input_diagnostics_format" tools:ignore="PluralsCandidate">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
     <string name="related_candidate">%1$s · Similar</string>
@@ -140,4 +141,17 @@
     <string name="fuzzy_enable">Turn fuzzy pinyin on</string>
     <string name="fuzzy_enabled_state">On</string>
     <string name="fuzzy_disabled_state">Off</string>
+    <string name="handwriting_open">Handwriting input</string>
+    <string name="handwriting_canvas">Handwriting area</string>
+    <string name="handwriting_hint">Write one Chinese character below</string>
+    <string name="handwriting_recognizing">Recognizing…</string>
+    <string name="handwriting_no_match">No Chinese character found. Try again.</string>
+    <string name="handwriting_unavailable">Handwriting recognition unavailable</string>
+    <string name="handwriting_undo">Undo</string>
+    <string name="handwriting_clear">Clear</string>
+    <string name="handwriting_delete">Delete</string>
+    <string name="handwriting_space">Space</string>
+    <string name="handwriting_enter">Enter</string>
+    <string name="handwriting_candidate">Candidate</string>
+    <string name="handwriting_candidate_value">Insert %1$s</string>
 </resources>

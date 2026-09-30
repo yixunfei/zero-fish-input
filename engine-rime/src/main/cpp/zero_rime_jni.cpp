@@ -221,7 +221,7 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeDeploySchema(
       file.size() > prefix.size() + 64 || file.substr(file.size() - suffix.size()) != suffix) return JNI_FALSE;
   const std::string variant = file.substr(prefix.size(), file.size() - prefix.size() - suffix.size());
   if (!std::all_of(variant.begin(), variant.end(), [](char ch) {
-        return (ch >= '0' && ch <= '9') || ch == '_';
+        return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || ch == '_';
       })) return JNI_FALSE;
   return initialized && api && api->deploy_schema(file.c_str()) ? JNI_TRUE : JNI_FALSE;
 }

@@ -5,10 +5,13 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.ime.core.privacy.PrivacyConfiguration
 import dev.zeroinput.ime.ui.KeyboardAppearance
 import dev.zeroinput.ime.ui.KeyboardTheme
 import dev.zeroinput.ime.ui.KeyboardHeight
+import dev.zeroinput.ime.ui.KeyboardPlacement
+import dev.zeroinput.ime.ui.KeyboardPlacementMode
 
 class SettingsRepository(context: Context) {
     private val preferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -54,6 +57,10 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_SOUND_EFFECTS, false)
         set(value) = edit(KEY_SOUND_EFFECTS, value)
 
+    var glideTypingEnabled: Boolean
+        get() = preferences.getBoolean("keyboard.glide", true)
+        set(value) = edit("keyboard.glide", value)
+
     var wordAssociationsEnabled: Boolean
         get() = preferences.getBoolean(KEY_WORD_ASSOCIATIONS, true)
         set(value) = edit(KEY_WORD_ASSOCIATIONS, value)
@@ -70,6 +77,28 @@ class SettingsRepository(context: Context) {
             InputLanguage.valueOf(preferences.getString(KEY_LANGUAGE, InputLanguage.CHINESE.name).orEmpty())
         }.getOrDefault(InputLanguage.CHINESE)
         set(value) = preferences.edit().putString(KEY_LANGUAGE, value.name).apply()
+
+    fun keyboardPlacement(landscape: Boolean): KeyboardPlacement {
+        val prefix = if (landscape) "placement.landscape." else "placement.portrait."
+        return KeyboardPlacement(
+            mode = KeyboardPlacementMode.entries.firstOrNull { it.name == preferences.getString(prefix + "mode", null) }
+                ?: KeyboardPlacementMode.DOCKED,
+            oneHandWidth = preferences.getFloat(prefix + "handWidth", 0.82f),
+            floatingWidth = preferences.getFloat(prefix + "floatWidth", 0.86f),
+            horizontalPosition = preferences.getFloat(prefix + "x", 0.5f),
+            verticalPosition = preferences.getFloat(prefix + "y", 0.8f),
+            heightScale = preferences.getFloat(prefix + "height", 1f),
+        ).sanitized()
+    }
+
+    fun saveKeyboardPlacement(landscape: Boolean, value: KeyboardPlacement) {
+        val prefix = if (landscape) "placement.landscape." else "placement.portrait."
+        val state = value.sanitized()
+        preferences.edit().putString(prefix + "mode", state.mode.name)
+            .putFloat(prefix + "handWidth", state.oneHandWidth).putFloat(prefix + "floatWidth", state.floatingWidth)
+            .putFloat(prefix + "x", state.horizontalPosition).putFloat(prefix + "y", state.verticalPosition)
+            .putFloat(prefix + "height", state.heightScale).apply()
+    }
 
     var lastLanguagePackKey: String?
         get() = preferences.getString(KEY_LANGUAGE_PACK, null)
@@ -90,6 +119,9 @@ class SettingsRepository(context: Context) {
             keyboardLayout = if (preferences.getBoolean(KEY_NINE_KEY, false)) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL,
             experimentalTypoCorrection = preferences.getBoolean(KEY_TYPO_CORRECTION, false),
             fuzzyPinyinEnabled = preferences.getBoolean(KEY_FUZZY_ENABLED, true),
+            doublePinyinScheme = DoublePinyinScheme.entries.firstOrNull {
+                it.name == preferences.getString(KEY_DOUBLE_PINYIN, null)
+            } ?: DoublePinyinScheme.OFF,
         )
         set(value) {
             preferences.edit()
@@ -100,6 +132,7 @@ class SettingsRepository(context: Context) {
                 .putBoolean(KEY_CHINESE_PUNCTUATION, value.chinesePunctuation)
                 .putInt(KEY_PAGE_SIZE, value.candidatePageSize)
                 .putBoolean(KEY_NINE_KEY, value.keyboardLayout == ChineseKeyboardLayout.NINE_KEY)
+                .putString(KEY_DOUBLE_PINYIN, value.doublePinyinScheme.name)
                 .putBoolean(KEY_TYPO_CORRECTION, value.experimentalTypoCorrection)
                 .apply()
         }
@@ -137,6 +170,7 @@ class SettingsRepository(context: Context) {
         const val KEY_CHINESE_PUNCTUATION = "chinese.punctuation"
         const val KEY_PAGE_SIZE = "chinese.page-size"
         const val KEY_NINE_KEY = "chinese.nine-key"
+        const val KEY_DOUBLE_PINYIN = "chinese.double-pinyin"
         const val KEY_CHINESE_ENGINE = "chinese.engine"
         const val KEY_TYPO_CORRECTION = "chinese.experimental-typo-correction"
         const val KEY_MODEL_RANKING = "chinese.experimental-model-ranking"

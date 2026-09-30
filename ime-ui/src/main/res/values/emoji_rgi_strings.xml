@@ -1,0 +1,9 @@
+<resources>
+    <string name="expression_flags">旗帜</string>
+    <string name="expression_variants">变体</string>
+    <string name="expression_loading">正在准备表情…</string>
+    <string name="expression_unavailable">表情暂不可用</string>
+    <string name="expression_close_variants">关闭变体</string>
+    <string name="expression_image_loading" translatable="false">⋯</string>
+    <string name="expression_image_unavailable" translatable="false">□</string>
+</resources>

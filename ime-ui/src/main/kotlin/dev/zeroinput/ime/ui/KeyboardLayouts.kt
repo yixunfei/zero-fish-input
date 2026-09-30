@@ -17,11 +17,14 @@ internal object KeyboardLayouts {
 
     private fun digit(label: String, code: String) = KeySpec(label, label, KeyboardAction.Text(code))
 
-    fun letters(context: android.content.Context, shifted: Boolean, languageLabel: String): List<List<KeySpec>> {
+    fun letters(context: android.content.Context, shifted: Boolean, languageLabel: String,
+        microsoftDoublePinyin: Boolean = false): List<List<KeySpec>> {
         val rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
         return listOf(
             characterRow(rows[0], shifted),
-            characterRow(rows[1], shifted),
+            characterRow(rows[1], shifted) + if (microsoftDoublePinyin)
+                listOf(KeySpec(";", context.getString(R.string.key_semicolon), KeyboardAction.Text(";")))
+            else emptyList(),
             listOf(
                 KeySpec("⇧", context.getString(R.string.key_shift), KeyboardAction.Shift, 1.35f, KeyStyle.MODIFIER),
             ) + characterRow(rows[2], shifted) + listOf(

@@ -1,0 +1,9 @@
+<resources>
+    <string name="glide_enabled">滑行输入</string>
+    <string name="glide_description">在字母或九键上连续滑动，松手后选择词语或拼音。支持全拼、微软双拼和自然码双拼。</string>
+    <string name="glide_cancel">取消滑行候选</string>
+    <string name="glide_recognizing">正在识别滑行…</string>
+    <string name="glide_unavailable">滑行暂不可用，请重新滑动</string>
+    <string name="glide_no_match">未识别到候选，请重试</string>
+    <string name="glide_choose">选择 %1$s</string>
+</resources>

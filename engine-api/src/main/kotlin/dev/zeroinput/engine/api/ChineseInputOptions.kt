@@ -4,6 +4,8 @@ enum class ChineseScript { SIMPLIFIED, TRADITIONAL }
 
 enum class ChineseKeyboardLayout { FULL, NINE_KEY }
 
+enum class DoublePinyinScheme { OFF, MICROSOFT, ZIRANMA }
+
 enum class FuzzyPinyinPair {
     // Keep the original eight entries in this order: persisted bit masks use
     // the enum ordinal and existing settings must retain their meaning.
@@ -21,6 +23,7 @@ data class ChineseInputOptions(
     val keyboardLayout: ChineseKeyboardLayout = ChineseKeyboardLayout.FULL,
     val experimentalTypoCorrection: Boolean = false,
     val fuzzyPinyinEnabled: Boolean = true,
+    val doublePinyinScheme: DoublePinyinScheme = DoublePinyinScheme.OFF,
 ) {
     init {
         require(fuzzyPinyinMask in 0..MAX_FUZZY_PINYIN_MASK)
@@ -28,6 +31,8 @@ data class ChineseInputOptions(
     }
 
     val effectiveFuzzyPinyinMask: Int get() = if (fuzzyPinyinEnabled) fuzzyPinyinMask else 0
+    val effectiveDoublePinyinScheme: DoublePinyinScheme get() =
+        if (keyboardLayout == ChineseKeyboardLayout.NINE_KEY) DoublePinyinScheme.OFF else doublePinyinScheme
 
     fun isFuzzySelected(pair: FuzzyPinyinPair): Boolean = fuzzyPinyinMask and (1 shl pair.ordinal) != 0
 
@@ -46,5 +51,5 @@ data class ChineseInputOptions(
 
 enum class EngineCapability {
     CHINESE_SCRIPT, ABBREVIATED_PINYIN, FUZZY_PINYIN, PUNCTUATION_MODE, CANDIDATE_PAGE_SIZE, NINE_KEY_PINYIN,
-    TYPO_CORRECTION, SEGMENT_SELECTION,
+    TYPO_CORRECTION, SEGMENT_SELECTION, DOUBLE_PINYIN,
 }

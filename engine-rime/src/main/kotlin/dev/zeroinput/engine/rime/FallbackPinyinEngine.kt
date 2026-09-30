@@ -7,6 +7,7 @@ internal class FallbackPinyinEngine(
     options: ChineseInputOptions = ChineseInputOptions(),
 ) : InputEngine, CompositionEditingEngine {
     private val pageSize = options.candidatePageSize
+    private val doublePinyinScheme = options.effectiveDoublePinyinScheme
     private val readingIndex = buildReadings(options)
     private val completionIndex = buildCompletions(readingIndex)
     private val syllableIndex = readingIndex.mapValues { (_, entries) ->
@@ -30,6 +31,7 @@ internal class FallbackPinyinEngine(
             EngineCapability.SEGMENT_SELECTION,
             EngineCapability.CANDIDATE_PAGE_SIZE,
             EngineCapability.FUZZY_PINYIN,
+            EngineCapability.DOUBLE_PINYIN,
         ),
     )
 
@@ -64,7 +66,8 @@ internal class FallbackPinyinEngine(
     }
 
     override fun restoreComposition(input: String): EngineUpdate {
-        if (input.length !in 1..MAX_INPUT || input.any { it !in 'a'..'z' && it != '\'' }) {
+        if (input.length !in 1..MAX_INPUT || input.any { it !in 'a'..'z' && it != '\'' &&
+                !(doublePinyinScheme == DoublePinyinScheme.MICROSOFT && it == ';') }) {
             return EngineUpdate(snapshot, consumed = false)
         }
         reset()
@@ -99,7 +102,8 @@ internal class FallbackPinyinEngine(
 
     private fun character(text: String): EngineUpdate {
         val letter = text.singleOrNull()?.lowercaseChar()
-        if (letter != null && (letter in 'a'..'z' || letter == '\'')) {
+        if (letter != null && (letter in 'a'..'z' || letter == '\'' ||
+                doublePinyinScheme == DoublePinyinScheme.MICROSOFT && letter == ';')) {
             if (input.length == MAX_INPUT) return EngineUpdate(snapshot, consumed = false)
             input.append(letter)
             syllableOnly = false
@@ -208,14 +212,25 @@ internal class FallbackPinyinEngine(
             "nihao", "xiexie", "women", "zhongguo", "keyi", "meiyou", "zaijian", "shijie",
         )
 
+        private val compoundSyllables = mapOf(
+            "nihao" to listOf("ni", "hao"), "xiexie" to listOf("xie", "xie"),
+            "women" to listOf("wo", "men"), "zhongguo" to listOf("zhong", "guo"),
+            "keyi" to listOf("ke", "yi"), "meiyou" to listOf("mei", "you"),
+            "zaijian" to listOf("zai", "jian"), "shijie" to listOf("shi", "jie"),
+        )
+
         private fun buildReadings(options: ChineseInputOptions): Map<String, List<Pair<String, List<String>>>> {
             val syllables = phrases.keys - compoundReadings
             return buildMap {
                 for ((reading, values) in phrases) {
                     val entry = reading to values
                     for (variant in FuzzyPinyinMatcher.variants(reading, options, syllables)) {
-                        val current = get(variant).orEmpty()
-                        if (entry !in current) put(variant, current + entry)
+                        val code = if (options.effectiveDoublePinyinScheme == DoublePinyinScheme.OFF) variant
+                            else compoundSyllables[variant]?.joinToString("") {
+                                DoublePinyin.encode(it, options.effectiveDoublePinyinScheme).orEmpty()
+                            } ?: DoublePinyin.encode(variant, options.effectiveDoublePinyinScheme) ?: continue
+                        val current = get(code).orEmpty()
+                        if (entry !in current) put(code, current + entry)
                     }
                 }
             }

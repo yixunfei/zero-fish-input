@@ -12,20 +12,12 @@ internal class ExpressionBrowserState {
     var personal = PersonalExpressionsUi()
         private set
     private var recent = emptyList<String>()
-    // visible() runs on every expression-panel keystroke.  The catalog is
-    // constant and personal data only changes through renderPersonal, so the
-    // concatenated list and the RECENT index are rebuilt only at that point
-    // instead of on every call.
-    private var allCache: List<EmojiEntry>? = null
-    private var recentIndexCache: Map<String, EmojiEntry>? = null
 
     fun renderPersonal(allowed: Boolean, data: PersonalExpressionsUi, values: List<String>) {
         if (!allowed && personalizationAllowed) clearQuery()
         personalizationAllowed = allowed
-        personal = if (allowed) data else PersonalExpressionsUi()
+        personal = if (allowed) PersonalExpressionsUi(data.custom.toList(), data.favorites.toSet()) else PersonalExpressionsUi()
         recent = if (allowed) values.take(128).distinct() else emptyList()
-        allCache = null
-        recentIndexCache = null
     }
 
     fun append(value: String) {
@@ -42,26 +34,42 @@ internal class ExpressionBrowserState {
 
     fun clearQuery() { query = "" }
 
-    fun visible(): List<EmojiEntry> {
-        val all = allCache ?: (EmojiCatalog.entries + personal.custom).also { allCache = it }
-        val source = when {
-            category == EmojiCategory.RECENT -> {
-                val indexed = recentIndexCache
-                    ?: all.associateBy(EmojiEntry::value).also { recentIndexCache = it }
-                recent.mapNotNull(indexed::get)
-            }
-            category == EmojiCategory.FAVORITES -> all.filter { it.value in personal.favorites }
-            category == EmojiCategory.CUSTOM -> personal.custom
-            category == EmojiCategory.KAOMOJI -> all.filter { it.isWide && (group == null || it.group == group) }
-            searchActive -> all
-            else -> all.filter { it.category == category }
-        }
-        return if (searchActive) EmojiCatalog.search(query, source) else source
-    }
+    /** Capture on the UI thread; resolve on the panel worker without retaining this mutable state. */
+    fun request() = ExpressionQuery(EmojiCatalog.snapshot, category, group, searchActive, query, personal, recent)
+
+    fun visible(): List<EmojiEntry> = request().resolve()
 
     fun clearSession() {
         renderPersonal(false, PersonalExpressionsUi(), emptyList())
         query = ""
         searchActive = false
+    }
+}
+
+internal data class ExpressionQuery(
+    val catalog: EmojiCatalogSnapshot,
+    val category: EmojiCategory,
+    val group: KaomojiGroup?,
+    val searchActive: Boolean,
+    val query: String,
+    val personal: PersonalExpressionsUi,
+    val recent: List<String>,
+) {
+    fun resolve(): List<EmojiEntry> {
+        val source = when {
+            category == EmojiCategory.RECENT -> {
+                val custom = personal.custom.associateBy(EmojiEntry::value)
+                recent.mapNotNull { custom[it] ?: catalog.find(it) }
+            }
+            category == EmojiCategory.FAVORITES ->
+                personal.favorites.mapNotNull(catalog::find) + personal.custom.filter { it.value in personal.favorites }
+            category == EmojiCategory.CUSTOM -> personal.custom
+            category == EmojiCategory.KAOMOJI ->
+                (catalog.categories[EmojiCategory.KAOMOJI].orEmpty() + personal.custom)
+                    .filter { group == null || it.group == group }
+            searchActive -> catalog.entries + personal.custom
+            else -> catalog.categories[category].orEmpty()
+        }
+        return if (searchActive) EmojiCatalog.search(query, source) else source
     }
 }

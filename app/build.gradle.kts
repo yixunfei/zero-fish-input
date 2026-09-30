@@ -13,6 +13,7 @@ val prepareLicenseAssets = tasks.register<Sync>("prepareLicenseAssets") {
 }
 
 android {
+    sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("build/handwriting-evaluation/platform-fixtures"))
     namespace = "dev.zeroinput.ime"
     compileSdk = 36
 

@@ -25,6 +25,52 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InputSessionControllerTest {
+    @Test fun `kaomoji follows rime candidates and stale custom selection cannot commit`() {
+        val connection = RecordingConnection()
+        val store = RecordingPersonalization()
+        var custom = true
+        val engine = object : InputEngine by TestEngine() {
+            override val descriptor = EngineDescriptor("rime.luna-pinyin", "Rime", "1", setOf(InputLanguage.CHINESE))
+        }
+        val source = KaomojiCandidateSource { input, allowed ->
+            if (input != "nihao") emptyList() else listOf(KaomojiSuggestion("public:hello", "(^_^)") ) +
+                if (allowed && custom) listOf(KaomojiSuggestion("custom:one", "(o_o)", true)) else emptyList()
+        }
+        val controller = InputSessionController(connection, { engine }, store, kaomojiCandidates = source)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("nihao"))
+        assertEquals(listOf("你好", "(^_^)", "(o_o)"), controller.state.snapshot.candidates.map { it.text })
+        val stale = controller.state.snapshot.candidates.last()
+        custom = false
+        controller.handle(InputCommand.SelectCandidate(2, stale.id))
+        assertTrue(connection.commits.isEmpty())
+        controller.handle(InputCommand.SelectCandidate(1, stale.id))
+        assertTrue(connection.commits.isEmpty())
+        controller.handle(InputCommand.SelectCandidate(1, controller.state.snapshot.candidates[1].id))
+        assertEquals(listOf("(^_^)"), connection.commits)
+        assertTrue(store.learned.isEmpty())
+        controller.close()
+    }
+
+    @Test fun `privacy tightening removes personal kaomoji without retaining composition`() {
+        val connection = RecordingConnection()
+        val engine = object : InputEngine by TestEngine() {
+            override val descriptor = EngineDescriptor("rime.luna-pinyin", "Rime", "1", setOf(InputLanguage.CHINESE))
+        }
+        val source = KaomojiCandidateSource { _, allowed ->
+            listOf(KaomojiSuggestion("public:one", "(^_^)")) +
+                if (allowed) listOf(KaomojiSuggestion("custom:one", "(o_o)", true)) else emptyList()
+        }
+        val controller = InputSessionController(connection, { engine }, RecordingPersonalization(), kaomojiCandidates = source)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        assertEquals(3, controller.state.snapshot.candidates.size)
+        controller.updatePrivacy(PrivacyConfiguration(incognitoMode = true))
+        assertTrue(controller.state.snapshot.candidates.isEmpty())
+        controller.handle(InputCommand.Text("ni"))
+        assertEquals(listOf("你好", "(^_^)"), controller.state.snapshot.candidates.map { it.text })
+        controller.close()
+    }
     @Test fun `prediction restriction follows engine switches and clears on ordinary editor restart`() {
         val contexts = mutableListOf<EditorContext>()
         val controller = InputSessionController(RecordingConnection(), {

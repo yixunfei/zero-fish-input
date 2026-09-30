@@ -6,6 +6,11 @@ Initial release source: https://github.com/yixunfei/zero-fish-input/tree/v0.1.0
 
 Current release source: https://github.com/yixunfei/zero-fish-input/tree/v0.4.0
 
+The 2026-09-30 input-feature test artifacts are development builds from the
+working checkout. The published release link above is not a claim that these
+unpublished changes are included in that tag. Preserve this checkout's source
+and the packaged corresponding-source archives when distributing a test build.
+
 The project's original source code is available under Apache-2.0. See LICENSE.
 Third-party software and data retain their own licenses. See THIRD_PARTY.md,
 NOTICE and LICENSES/ for attribution and complete license texts.
@@ -52,3 +57,54 @@ Both files are included as readable APK assets under expressions/. Modify the
 Kotlin data and rebuild with the documented Gradle commands to replace the
 compiled catalog. No runtime download, Python generator or Rime schema change
 is required. The independent application code retains Apache-2.0.
+
+## Offline glide and emoji
+
+CMUdict source: https://github.com/cmusphinx/cmudict/tree/74790861f652b15e4ac49015a90074ad62a27690
+The source and derived hashes, filtering steps and rebuild command are in
+docs/glide-decoder-validation.md. Run engine-english/tools/prepare-glide-lexicon.py
+with the hash-verified source dictionary to regenerate the bundled spelling list.
+
+Emoji uses Unicode Emoji 18.0, CLDR 48 and Noto Emoji revision
+e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e. Exact source URLs, complete commits,
+PNG and derived WebP hashes are in tools/emoji/sources.lock.json. Run
+`python tools/prepare-emoji.py` to reproduce assets, then
+`python tools/prepare-emoji.py --verify` for an offline exact-set audit.
+
+## Offline handwriting and corresponding source archive
+
+PaddlePaddle OCR source:
+https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_rec_onnx/tree/ed152b8b495f84de93cda5709d768548a9127622
+Preparation and model hashes are in tools/prepare-handwriting-model.py.
+Zinnia algorithm source:
+https://github.com/taku910/zinnia/tree/581faa8f6f15e4a7b21964be3a5ec36265c80e5b
+
+The Tegaki 0.3 data archives, under LGPL-2.1, are:
+
+- https://github.com/tegaki/tegaki/releases/download/v0.3/tegaki-zinnia-simplified-chinese-light-0.3.zip
+  SHA-256: 598787133a4d59fcf3a2fbc5654c68eaf35a8e422274efcea2035cc081f3446c
+- https://github.com/tegaki/tegaki/releases/download/v0.3/tegaki-zinnia-traditional-chinese-0.3.zip
+  SHA-256: f41032e67a4eff056813d243eabc32ea07eea404c714bdb5882a5b0fcda51690
+
+Each archive includes the original model, corresponding training XML, COPYING
+and build files. The test APK packaging command distributes these exact archives
+in a separate `handwriting-sources.zip`, with the current adaptation scripts and
+this file. Preserve that archive alongside the APK and notices when redistributing.
+The format conversion filters valid Han labels and rearranges sparse weights;
+it does not retrain or secretly modify the training data.
+
+To reproduce the shipped tables, extract the corresponding-source archive into
+a project checkout, preserving its `build/handwriting-stroke-model` and `tools`
+paths. With Python, NumPy and Pillow installed, run from the repository root:
+
+```powershell
+python tools/prepare-handwriting-stroke-model.py
+```
+
+To replace the data with modified tables, edit or retrain the source models using
+the included upstream build files, update the explicit source size/hash records
+in that script, regenerate the `.zsh` files, and update the model size/hash records
+in `model-scoring/build.gradle.kts` and `HandwritingStrokeAssets.kt`. Rebuild the
+APK with the repository Gradle wrapper. Integrity checks remain enabled. The
+runtime Kotlin adaptation is in `model-scoring/src/main/kotlin/dev/zeroinput/model/`
+and is distributed in the corresponding-source archive for this build.

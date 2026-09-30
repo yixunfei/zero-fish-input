@@ -16,6 +16,13 @@ following the existing editor privacy policy.
   never comes from editor contents, personal storage or a runtime download.
   Kaomoji data has a pinned LGPL-3.0 source; original and adapted source data are
   distributed in APK assets with license and rebuild instructions.
+- The app builds a bounded public kaomoji keyword index for built-in Rime
+  composition and offers at most four matches after conversion candidates.
+  An injected core port supplies the current permitted custom-expression
+  snapshot without storage I/O on key dispatch. Personal matches receive up
+  to two places before public matches. Selection rechecks the current item and
+  candidate identity; sensitive or privacy-tightened sessions cannot retain
+  personal matches. This does not alter the encrypted expression format.
 - Favorites and custom expressions belong to user-data. A separate
   personal-expressions.bin uses the zeroinput.personal-expressions.v1 Keystore
   alias and the existing AES-256-GCM EncryptedStore under noBackupFilesDir.

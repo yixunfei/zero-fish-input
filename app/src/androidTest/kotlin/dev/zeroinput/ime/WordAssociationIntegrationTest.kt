@@ -43,11 +43,12 @@ class WordAssociationIntegrationTest {
             onMain { panel().onKeyboardAction(KeyboardAction.Space) }
             await { activity.editor.text.toString() == "thank you very " && words().isEmpty() }
             type("good")
-            choose("good")
-            await { "morning" in words() }
+            // Commit through the engine; learned display-identical candidates use a different route.
+            onMain { panel().onKeyboardAction(KeyboardAction.Space) }
+            await { activity.editor.text.toString() == "thank you very good " && "morning" in words() }
             onMain { panel().onKeyboardAction(KeyboardAction.Enter) }
             await { activity.editorActions.contains(EditorInfo.IME_ACTION_DONE) && words().isEmpty() }
-            onMain { assertEquals("thank you very good", activity.editor.text.toString()) }
+            onMain { assertEquals("thank you very good ", activity.editor.text.toString()) }
         }
 
     @Test fun chineseAssociationsClearOnCursorSettingPrivacyAndEditorRestart() =
