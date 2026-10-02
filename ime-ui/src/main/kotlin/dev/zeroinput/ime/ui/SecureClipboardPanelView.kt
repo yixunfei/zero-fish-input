@@ -1,7 +1,6 @@
 package dev.zeroinput.ime.ui
 
 import android.content.Context
-import android.graphics.Color
 import android.util.AttributeSet
 import android.view.Gravity
 import android.widget.LinearLayout
@@ -112,20 +111,14 @@ class SecureClipboardPanelView @JvmOverloads constructor(
         })
     }
 
-    private fun manageButton() = MaterialButton(context).apply {
-        text = "⚙"
-        contentDescription = context.getString(R.string.secure_clipboard_manage)
-        textSize = 20f
-        setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
-        isAllCaps = false
-        setBackgroundColor(Color.TRANSPARENT)
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
-        setOnClickListener { onManageRequested() }
-    }
-
-    private fun resolveColor(attribute: Int, fallback: Int): Int {
-        val values = context.obtainStyledAttributes(intArrayOf(attribute))
-        return values.getColor(0, fallback).also { values.recycle() }
+    private fun manageButton() = panelIconButton(
+        context,
+        android.R.drawable.ic_menu_manage,
+        R.string.secure_clipboard_manage,
+    ) { onManageRequested() }.apply {
+        layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+            gravity = Gravity.END
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

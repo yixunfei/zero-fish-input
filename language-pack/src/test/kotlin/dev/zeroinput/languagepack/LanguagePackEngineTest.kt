@@ -12,6 +12,25 @@ import java.nio.file.Files
 import java.security.MessageDigest
 
 class LanguagePackEngineTest {
+    @Test
+    fun `each prefix keeps only the first eight unique candidates`() {
+        val directory = Files.createTempDirectory("zeroinput-pack-prefix-limit").toFile()
+        try {
+            val dictionary = File(directory, "dictionary.txt").apply {
+                writeText((0 until 12).joinToString("\n") { "n${('a'.code + it).toChar()}\tvalue-$it" })
+            }
+            val manifest = LanguagePackManifest(
+                1, "prefix-limit", "Prefix limit", "zh", "1", "prefix-limit",
+                listOf(LanguagePackFile(dictionary.name, sha256(dictionary), dictionary.length())),
+            )
+            val engine = LanguagePackEngineFactory(InstalledLanguagePack(manifest, directory)).create()
+            engine.start(EditorContext(InputLanguage.CHINESE, false, true, "fixture"))
+            engine.handle(EngineKey.Character("n"))
+
+            assertEquals((0 until 8).map { "value-$it" }, engine.snapshot.candidates.map { it.text })
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun `composition remains bounded when a pack receives excessive input`() {
         val directory = Files.createTempDirectory("zeroinput-pack-bound").toFile()
         try {

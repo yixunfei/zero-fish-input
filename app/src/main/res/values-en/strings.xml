@@ -156,6 +156,10 @@
     <string name="setting_user_phrases">Personal phrases</string>
     <string name="section_language_packs">Language packs</string>
     <string name="setting_import_pack">Import language pack</string>
+    <string name="language_pack_imported">Imported %1$s</string>
+    <string name="language_pack_unsupported">This language pack is not supported</string>
+    <string name="language_pack_selected">Language pack selected; reopen the keyboard to apply it</string>
+    <string name="language_pack_deleted">Language pack deleted</string>
     <string name="section_input">Input</string>
     <string name="section_engine">Engine</string>
     <string name="setting_no_packs">No language packs installed</string>
@@ -227,4 +231,10 @@
     <string name="ai_privacy_notice">When enabled, Send or Translate sends workbench text and the selected conversation to your configured provider. The provider may retain this content. Only send text you choose to share.</string>
     <string name="fuzzy_pinyin_enabled">Enable fuzzy pinyin</string>
     <string name="fuzzy_pinyin_enabled_help">Choose rules below to use fuzzy pinyin. Turning this off keeps your selections. Changes take effect after the current composition ends.</string>
+    <string name="secure_clipboard_ordinal">Secure item %1$d</string>
+    <string name="language_pack_unavailable">Unavailable</string>
+    <string name="language_pack_enable">Enable %1$s</string>
+    <string name="language_pack_in_use">In use</string>
+    <string name="language_pack_use">Use</string>
+    <string name="language_pack_delete">Delete</string>
 </resources>

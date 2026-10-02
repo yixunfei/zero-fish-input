@@ -503,7 +503,8 @@ and write-back failures are counted without affecting the commit.
 The bounded phrase resource is loaded off the input thread. Malformed/missing
 data and lookup failures leave ordinary input usable. Context is never persisted,
 logged, backed up or transmitted; temporary JVM lookup strings remain subject to
-garbage collection. No new permission, exported component, dependency or stored
+garbage collection, and JSON decoding necessarily creates JVM `String` copies
+that cannot be reliably zeroed. No new permission, exported component, dependency or stored
 personal format is added. Unit and device regressions use constructed public
 phrases. See ADR 0013, ADR 0014 and `word-association-validation.md`.
 

@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ClipboardClearActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
     private val active = AtomicBoolean(true)
-    private var focused = AtomicBoolean(false)
+    private val focused = AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
     private var ticket = ""
     private var resumed = false
@@ -89,9 +89,8 @@ class ClipboardClearActivity : AppCompatActivity() {
                     alert.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).apply {
                         filterTouchesWhenObscured = true
                         setOnClickListener {
-                            if (resumed && alert.window?.decorView?.hasWindowFocus() == true && !busy && valid()) {
-                                focused.set(false)
-                                focused = AtomicBoolean(true)
+                            if (canConfirmClear(resumed, alert.window?.decorView?.hasWindowFocus() == true, busy, valid())) {
+                                focused.set(true)
                                 alert.window?.decorView?.viewTreeObserver?.addOnWindowFocusChangeListener { hasFocus ->
                                     if (!hasFocus) focused.set(false)
                                 }
@@ -161,3 +160,6 @@ class ClipboardClearActivity : AppCompatActivity() {
         const val EXTRA_TICKET = "dev.zeroinput.ime.clipboardguard.TICKET"
     }
 }
+
+internal fun canConfirmClear(resumed: Boolean, windowHasFocus: Boolean, busy: Boolean, valid: Boolean): Boolean =
+    resumed && windowHasFocus && !busy && valid

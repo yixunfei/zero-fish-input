@@ -92,6 +92,24 @@ class EditorPrivacyPolicyTest {
     }
 
     @Test
+    fun `filter and autocomplete editors never use personalization`() {
+        val filter = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_FILTER
+        }
+        val autocomplete = EditorInfo().apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT or
+                InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE
+        }
+
+        for (editor in listOf(filter, autocomplete)) {
+            val result = policy.evaluate(editor, PrivacyConfiguration())
+            assertTrue(result.suggestionsAllowed)
+            assertFalse(result.learningAllowed)
+            assertFalse(result.personalizationAllowed)
+        }
+    }
+
+    @Test
     fun `no suggestions flag preserves conversion but disables personalization`() {
         val editor = EditorInfo().apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS

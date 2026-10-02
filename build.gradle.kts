@@ -25,7 +25,7 @@ fun systemClipboardViolation(path: String, text: String): String? {
 }
 
 fun networkViolation(path: String, text: String): String? {
-    val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http)|javax\.net\.|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|okhttp|retrofit|ktor\.client|Cronet)""")
+    val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http|http\b)|java\.nio\.channels\.SocketChannel|javax\.net\.|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|Class\.forName\s*\(\s*[\"']java\.net\.)""")
     val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
     if (network.containsMatchIn(text) && path != provider) return "Runtime network transport is restricted to the AI provider"
     if (text.contains("android.permission.INTERNET") && path != "app/src/main/AndroidManifest.xml") {

@@ -13,6 +13,7 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
     private val lock = Any()
     private val clearRevision = AtomicLong()
     private var deletionPending = false
+    private var lastUsedHighWater = 0L
 
     fun currentRevision(): Long = clearRevision.get()
 
@@ -24,8 +25,9 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
             if (!ExpressionLimits.validText(emoji)) throw ExpressionException(ExpressionFailure.INVALID)
             val current = load().associateByTo(linkedMapOf(), EmojiUsage::value)
             val old = current[emoji]
-            current[emoji] = EmojiUsage(emoji, ((old?.count ?: 0) + 1).coerceAtMost(EmojiHistoryFormat.MAX_COUNT),
-                maxOf(System.currentTimeMillis(), current.values.maxOfOrNull { it.lastUsed }?.plus(1) ?: 0L))
+            val nextLastUsed = maxOf(System.currentTimeMillis(), lastUsedHighWater + 1)
+            lastUsedHighWater = nextLastUsed
+            current[emoji] = EmojiUsage(emoji, ((old?.count ?: 0) + 1).coerceAtMost(EmojiHistoryFormat.MAX_COUNT), nextLastUsed)
             val updated = current.values.sortedByDescending { it.lastUsed }.take(EmojiHistoryFormat.MAX_ENTRIES)
             val bytes = EmojiHistoryFormat.encode(updated)
             try {
@@ -49,14 +51,24 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
         clearRevision.incrementAndGet()
         synchronized(lock) {
             deletionPending = true
-            store.delete(deleteKey = true)
-            deletionPending = false
+            try {
+                store.delete(deleteKey = true)
+                lastUsedHighWater = 0L
+                deletionPending = false
+            } catch (error: Throwable) {
+                deletionPending = true
+                throw error
+            }
         }
     }
 
     private fun load(): List<EmojiUsage> {
         if (deletionPending) throw ExpressionException(ExpressionFailure.STORAGE)
         val bytes = store.read() ?: return emptyList()
-        return try { EmojiHistoryFormat.decode(bytes) } finally { bytes.fill(0) }
+        return try {
+            EmojiHistoryFormat.decode(bytes).also { values ->
+                lastUsedHighWater = maxOf(lastUsedHighWater, values.maxOfOrNull { it.lastUsed } ?: 0L)
+            }
+        } finally { bytes.fill(0) }
     }
 }

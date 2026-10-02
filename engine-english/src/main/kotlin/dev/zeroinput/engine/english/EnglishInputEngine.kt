@@ -16,8 +16,6 @@ import java.util.Locale
 class EnglishInputEngine(
     private val learnedSuggestions: LearnedSuggestionSource = LearnedSuggestionSource { _, _ -> emptyList() },
     lexicon: List<String> = DefaultEnglishLexicon.words,
-    /** Opt-in only. Corrections are shown as candidates and never applied implicitly. */
-    private val correctionsEnabled: Boolean = false,
 ) : InputEngine {
     override val descriptor = Descriptor
 
@@ -141,14 +139,6 @@ class EnglishInputEngine(
         for (indexed in prefixIndex[normalized].orEmpty()) {
             collect(indexed.word, LEXICON_SCORE_BASE - indexed.index)
         }
-        val hasPrefixMatch = scoredWords.any { it.word.length > normalized.length && it.word.startsWith(normalized) }
-        if (correctionsEnabled && !hasPrefixMatch && normalized.length >= MIN_CORRECTION_LENGTH) {
-            for ((index, word) in lexiconWords.withIndex()) {
-                if (isSingleEditAway(normalized, word)) {
-                    collect(word, CORRECTION_SCORE_BASE - index, "Did you mean?")
-                }
-            }
-        }
         scoredWords.sortWith(compareByDescending<ScoredWord> { it.score }.thenBy { it.order })
         allCandidates = scoredWords.toList()
         return publishPage(typed)
@@ -182,46 +172,13 @@ class EnglishInputEngine(
         else -> suggestion
     }
 
-    private fun isSingleEditAway(input: String, candidate: String): Boolean {
-        if (kotlin.math.abs(input.length - candidate.length) > 1) return false
-        if (input.length == candidate.length) {
-            var mismatch = 0
-            var first = -1
-            var second = -1
-            for (index in input.indices) if (input[index] != candidate[index]) {
-                if (mismatch++ == 0) first = index else if (mismatch == 2) second = index
-            }
-            if (mismatch == 0) return false
-            if (mismatch == 1) return true
-            return mismatch == 2 && second == first + 1 && input[first] == candidate[second] &&
-                input[second] == candidate[first]
-        }
-        val shorter = if (input.length < candidate.length) input else candidate
-        val longer = if (input.length < candidate.length) candidate else input
-        var shortIndex = 0
-        var longIndex = 0
-        var skipped = false
-        while (shortIndex < shorter.length && longIndex < longer.length) {
-            if (shorter[shortIndex] == longer[longIndex]) {
-                shortIndex++
-                longIndex++
-            } else if (!skipped) {
-                skipped = true
-                longIndex++
-            } else return false
-        }
-        return true
-    }
-
     companion object {
         private const val PAGE_SIZE = 8
         private const val LEXICON_PAGE_SIZE = PAGE_SIZE
         private const val MAX_LEARNED_SUGGESTIONS = 32
         private const val EXACT_INPUT_SCORE = Int.MAX_VALUE
         private const val LEARNED_SCORE_BASE = 1_000_000
-        private const val CORRECTION_SCORE_BASE = 500_000
         private const val LEXICON_SCORE_BASE = 100_000
-        private const val MIN_CORRECTION_LENGTH = 3
         private const val MAX_BUFFER_LENGTH = 64
 
         val Descriptor = EngineDescriptor(

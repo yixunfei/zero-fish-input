@@ -6,7 +6,6 @@ import android.view.inputmethod.EditorInfo
 data class PrivacyConfiguration(
     val learningEnabled: Boolean = true,
     val incognitoMode: Boolean = false,
-    val excludedPackages: Set<String> = emptySet(),
 )
 
 data class SessionPrivacy(
@@ -31,7 +30,6 @@ enum class PrivacyReason {
     IDENTIFIER_FIELD,
     INCOGNITO_MODE,
     USER_DISABLED,
-    PACKAGE_EXCLUDED,
     UNKNOWN_EDITOR,
 }
 
@@ -47,13 +45,10 @@ class EditorPrivacyPolicy {
         }
         if (editorRequestsNoLearning(editorInfo)) return restricted(PrivacyReason.EDITOR_REQUEST, false)
         if (configuration.incognitoMode) return restricted(PrivacyReason.INCOGNITO_MODE, false)
-        if (editorInfo.packageName in configuration.excludedPackages) {
-            return restricted(PrivacyReason.PACKAGE_EXCLUDED, false)
-        }
         if (!configuration.learningEnabled) {
             return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = false, PrivacyReason.USER_DISABLED)
         }
-        if (isIdentifierField(editorInfo.inputType)) {
+        if (isIdentifierField(editorInfo)) {
             return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = false, PrivacyReason.IDENTIFIER_FIELD)
         }
         return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = true, PrivacyReason.NONE)
@@ -83,9 +78,13 @@ class EditorPrivacyPolicy {
         }
     }
 
-    private fun isIdentifierField(inputType: Int): Boolean {
+    private fun isIdentifierField(editorInfo: EditorInfo): Boolean {
+        val inputType = editorInfo.inputType
         if (inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
-        return inputType and InputType.TYPE_MASK_VARIATION in IDENTIFIER_VARIATIONS
+        val variation = inputType and InputType.TYPE_MASK_VARIATION
+        return variation in IDENTIFIER_VARIATIONS ||
+            variation == InputType.TYPE_TEXT_VARIATION_FILTER ||
+            inputType and InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE != 0
     }
 
     private fun isKnownEditor(inputType: Int): Boolean {

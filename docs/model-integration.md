@@ -18,8 +18,8 @@ offline. It does not generate text, decode pinyin, or replace Rime.
   keys, explicit browsing and ongoing touches preserve original ordering.
 - Touching candidates freezes asynchronous changes until typing resumes. Tap,
   Space and Enter select the displayed word through its original engine route.
-- Password/PIN/unknown/email/URI fields, no-personalization flags, incognito,
-  excluded editors and learning-disabled sessions cannot supply model context.
+- Password/PIN/unknown/email/URI fields, no-personalization flags, incognito
+  and learning-disabled sessions cannot supply model context.
 - Cursor changes, deletion, reconversion, panel/view/session/settings changes and
   service destruction cancel requests and clear context. Punctuation starts a new
   contiguous Chinese context. Private snippets and emoji never enter the buffer.

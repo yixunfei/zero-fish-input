@@ -176,13 +176,15 @@ class AppGraph(context: Context) : AutoCloseable {
         // Bring the core engine online before hashing optional packs.  Both
         // operations stay on one background queue so they do not compete for
         // storage bandwidth during the first input session.
-        engineExecutor.execute {
-            associationPredictor = runCatching { dev.zeroinput.engine.dictionary.WordAssociationIndex.loadBundled() }
-                .getOrDefault(dev.zeroinput.engine.api.NextWordPredictor.Empty)
-            // A broken optional language pack must not prevent the core Rime
-            // runtime from publishing its terminal READY/FAILED state.
-            runCatching { rime.warmUp() }
-            runCatching { refreshLanguagePacks() }
+        runCatching {
+            engineExecutor.execute {
+                associationPredictor = runCatching { dev.zeroinput.engine.dictionary.WordAssociationIndex.loadBundled() }
+                    .getOrDefault(dev.zeroinput.engine.api.NextWordPredictor.Empty)
+                // A broken optional language pack must not prevent the core Rime
+                // runtime from publishing its terminal READY/FAILED state.
+                runCatching { rime.warmUp() }
+                runCatching { refreshLanguagePacks() }
+            }
         }
     }
 
@@ -276,11 +278,20 @@ class AppGraph(context: Context) : AutoCloseable {
         // Settings invokes this on its worker.  Wait for the encrypted phrase
         // deletion so a process death immediately after the confirmation
         // cannot resurrect the old dictionary on the next launch.
-        queuedPersonalization.clearAndAwait()
-        emojiHistory.clear()
-        expressions.clear()
+        var failure: Throwable? = null
+        fun attempt(operation: () -> Unit) {
+            try {
+                operation()
+            } catch (error: Throwable) {
+                failure = failure?.also { it.addSuppressed(error) } ?: error
+            }
+        }
+        attempt(queuedPersonalization::clearAndAwait)
+        attempt(emojiHistory::clear)
+        attempt(expressions::clear)
         notifyExpressionsChanged()
         personalizationListeners.forEach { listener -> runCatching(listener) }
+        if (failure != null) throw failure
     }
 
     fun addPersonalizationListener(listener: () -> Unit): AutoCloseable {

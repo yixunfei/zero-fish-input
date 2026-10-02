@@ -151,6 +151,10 @@
     <string name="setting_user_phrases">用户词组</string>
     <string name="section_language_packs">语言包</string>
     <string name="setting_import_pack">导入语言包</string>
+    <string name="language_pack_imported">已导入 %1$s</string>
+    <string name="language_pack_unsupported">该语言包暂不支持</string>
+    <string name="language_pack_selected">已选择语言包，重新打开输入框后生效</string>
+    <string name="language_pack_deleted">语言包已删除</string>
     <string name="section_input">输入</string>
     <string name="section_engine">引擎</string>
     <string name="setting_no_packs">未导入语言包</string>
@@ -221,4 +225,10 @@
     <string name="ai_privacy_notice">开启后，仅在你点击提交或翻译时，将工作台文字和所选会话发送给配置的服务商。服务商可能保存这些内容，请只发送你愿意提供的文字。</string>
     <string name="fuzzy_pinyin_enabled">启用模糊拼音</string>
     <string name="fuzzy_pinyin_enabled_help">选择下面的规则后生效。关闭后保留规则选择，重新开启即可恢复。输入过程中切换将在本次组合结束后生效。</string>
+    <string name="secure_clipboard_ordinal">安全片段 %1$d</string>
+    <string name="language_pack_unavailable">不可用</string>
+    <string name="language_pack_enable">启用 %1$s</string>
+    <string name="language_pack_in_use">使用中</string>
+    <string name="language_pack_use">使用</string>
+    <string name="language_pack_delete">删除</string>
 </resources>

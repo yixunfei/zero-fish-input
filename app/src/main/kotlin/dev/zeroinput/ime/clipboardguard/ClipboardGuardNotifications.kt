@@ -29,7 +29,12 @@ internal class ClipboardGuardNotifications(private val context: Context) {
             Intent(context, ClipboardClearActivity::class.java).putExtra(ClipboardClearActivity.EXTRA_TICKET, ticket.id)
         } else Intent(context, ClipboardGuardSettingsActivity::class.java)
         intent.action = ticket?.id ?: "clipboard-guard-status"
-        val pending = PendingIntent.getActivity(context, REQUEST_CODE, intent, PendingIntent.FLAG_IMMUTABLE)
+        val pending = PendingIntent.getActivity(
+            context,
+            REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         target = pending
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(

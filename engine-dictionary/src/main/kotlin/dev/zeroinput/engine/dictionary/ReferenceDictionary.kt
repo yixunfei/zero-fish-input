@@ -16,8 +16,10 @@ internal class ReferenceDictionary private constructor(private val prefixes: Map
                 "Reference dictionary is missing"
             }
             val entries = TreeMap<String, MutableList<String>>()
+            var entryCount = 0
             stream.bufferedReader(Charsets.UTF_8).useLines { lines ->
-                lines.filter { it.isNotBlank() && !it.startsWith("#") }.take(512).forEach { line ->
+                lines.filter { it.isNotBlank() && !it.startsWith("#") }.forEach { line ->
+                    check(++entryCount <= MAX_ENTRIES) { "Reference dictionary exceeds $MAX_ENTRIES entries" }
                     val columns = line.split('\t')
                     check(columns.size == 2 && columns[0].length in 1..64 && columns[0].all { it in 'a'..'z' }) {
                         "Invalid reference dictionary entry"
@@ -36,5 +38,7 @@ internal class ReferenceDictionary private constructor(private val prefixes: Map
             }
             return ReferenceDictionary(prefixes.mapValues { it.value.toList() })
         }
+
+        private const val MAX_ENTRIES = 512
     }
 }

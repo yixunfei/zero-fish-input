@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity() {
                 graph.languagePacks.install(uri).also { graph.refreshLanguagePacks() }
             },
         ) { pack ->
-            Toast.makeText(this, "已导入 ${pack.manifest.displayName}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.language_pack_imported, pack.manifest.displayName), Toast.LENGTH_SHORT).show()
             render()
         }
     }
@@ -141,7 +141,14 @@ class MainActivity : AppCompatActivity() {
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
         screen.onSoundEffectsChanged = { graph.settings.soundEffectsEnabled = it; render() }
         screen.onWordAssociationsChanged = { graph.settings.wordAssociationsEnabled = it; render() }
-        screen.onAiEnabledChanged = { updateAiConfig { copy(enabled = it) } }
+        screen.onAiEnabledChanged = { enabled ->
+            updateAiConfig {
+                copy(
+                    enabled = enabled,
+                    networkAllowed = if (enabled) networkAllowed else false,
+                )
+            }
+        }
         screen.onAiNetworkChanged = { updateAiConfig { copy(networkAllowed = it) } }
         screen.onAiSettingsRequested = ::showAiSettings
         screen.onAiDataClearRequested = ::confirmClearAiData
@@ -186,12 +193,12 @@ class MainActivity : AppCompatActivity() {
                     // this guard at the UI boundary as well so a stale
                     // snapshot can never silently turn an unsupported pack
                     // into an English session.
-                    Toast.makeText(this, "该语言包暂不支持", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.language_pack_unsupported, Toast.LENGTH_SHORT).show()
                     render()
                 } else {
                     graph.settings.lastLanguage = language
                     graph.settings.lastLanguagePackKey = key
-                    Toast.makeText(this, "已选择语言包，重新打开输入框后生效", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.language_pack_selected, Toast.LENGTH_SHORT).show()
                     render()
                 }
             }
@@ -202,7 +209,7 @@ class MainActivity : AppCompatActivity() {
                 graph.refreshLanguagePacks()
                 check(removed)
             }) {
-                Toast.makeText(this, "语言包已删除", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.language_pack_deleted, Toast.LENGTH_SHORT).show()
                 render()
             }
         }
@@ -246,6 +253,7 @@ class MainActivity : AppCompatActivity() {
         if (!aiConfigReady) return
         val next = aiConfig.change()
         aiConfigReady = false
+        screen.setAiControlsEnabled(false)
         graph.updateAiConfiguration(next) { success -> runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
             // A rejected endpoint or failed write leaves the saved settings
@@ -323,6 +331,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
                 aiConfigReady = false
+                screen.setAiControlsEnabled(false)
                 graph.clearAiData { success -> runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     aiConfig = AiConfiguration()
@@ -383,5 +392,6 @@ class MainActivity : AppCompatActivity() {
                 aiSaveConversations = aiConfig.saveConversations,
             ),
         )
+        screen.setAiControlsEnabled(aiConfigReady)
     }
 }

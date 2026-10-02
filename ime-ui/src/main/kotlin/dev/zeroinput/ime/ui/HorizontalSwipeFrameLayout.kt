@@ -7,8 +7,13 @@ import android.widget.FrameLayout
 import dev.zeroinput.engine.api.PageDirection
 import kotlin.math.abs
 
-/** Owns a horizontal drag only after cancelling its child's pending click. */
-internal class HorizontalSwipeFrameLayout(context: Context) : FrameLayout(context) {
+internal enum class SwipeAxis { HORIZONTAL, VERTICAL }
+
+/** Owns a single-axis drag only after cancelling its child's pending click. */
+internal class HorizontalSwipeFrameLayout(
+    context: Context,
+    private val axis: SwipeAxis = SwipeAxis.HORIZONTAL,
+) : FrameLayout(context) {
     var canSwipe: (PageDirection) -> Boolean = { true }
     var onSwipe: (PageDirection) -> Unit = {}
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -37,13 +42,13 @@ internal class HorizontalSwipeFrameLayout(context: Context) : FrameLayout(contex
             previousAllowed = canSwipe(PageDirection.PREVIOUS)
         }
         if (event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_CANCEL) abandoned = true
-        val dx = event.x - startX
-        val dy = event.y - startY
-        val direction = if (dx < 0) PageDirection.NEXT else PageDirection.PREVIOUS
+        val primary = primaryDelta(event)
+        val secondary = secondaryDelta(event)
+        val direction = if (primary < 0) PageDirection.NEXT else PageDirection.PREVIOUS
         if (!abandoned && !dragging && event.actionMasked == MotionEvent.ACTION_MOVE) {
-            if (abs(dy) > slop && abs(dy) >= abs(dx)) abandoned = true
+            if (abs(secondary) > slop && abs(secondary) >= abs(primary)) abandoned = true
             val allowed = if (direction == PageDirection.NEXT) nextAllowed else previousAllowed
-            if (allowed && abs(dx) >= distance && abs(dx) > abs(dy) * 1.5f) {
+            if (allowed && abs(primary) >= distance && abs(primary) > abs(secondary) * 1.5f) {
                 dragging = true
                 MotionEvent.obtain(event).also { cancel ->
                     cancel.action = MotionEvent.ACTION_CANCEL
@@ -56,7 +61,7 @@ internal class HorizontalSwipeFrameLayout(context: Context) : FrameLayout(contex
         if (!dragging) return super.dispatchTouchEvent(event)
         if (event.actionMasked == MotionEvent.ACTION_UP) {
             val allowed = if (direction == PageDirection.NEXT) nextAllowed else previousAllowed
-            val invoke = !abandoned && allowed && abs(dx) >= distance && abs(dx) > abs(dy) * 1.5f
+            val invoke = !abandoned && allowed && abs(primary) >= distance && abs(primary) > abs(secondary) * 1.5f
             cancelSwipe()
             if (invoke && canSwipe(direction)) onSwipe(direction)
         } else if (event.actionMasked == MotionEvent.ACTION_CANCEL) cancelSwipe()
@@ -68,6 +73,18 @@ internal class HorizontalSwipeFrameLayout(context: Context) : FrameLayout(contex
         dragging = false
         nextAllowed = false
         previousAllowed = false
+    }
+
+    private fun primaryDelta(event: MotionEvent): Float = if (axis == SwipeAxis.HORIZONTAL) {
+        event.x - startX
+    } else {
+        event.y - startY
+    }
+
+    private fun secondaryDelta(event: MotionEvent): Float = if (axis == SwipeAxis.HORIZONTAL) {
+        event.y - startY
+    } else {
+        event.x - startX
     }
 
     override fun onDetachedFromWindow() { cancelSwipe(); super.onDetachedFromWindow() }

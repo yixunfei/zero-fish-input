@@ -178,8 +178,21 @@ class UserLexiconRepository(
         synchronized(lock) {
             publishTerms(emptyList())
             deletionPending = true
-            store.delete(deleteKey = true)
-            if (exportCipher.hasKey()) exportCipher.deleteKey()
+            var failure: Throwable? = null
+            try {
+                store.delete(deleteKey = true)
+            } catch (error: Throwable) {
+                failure = error
+            }
+            try {
+                if (exportCipher.hasKey()) exportCipher.deleteKey()
+            } catch (error: Throwable) {
+                failure = failure?.also { it.addSuppressed(error) } ?: error
+            }
+            if (failure != null) {
+                deletionPending = true
+                throw failure
+            }
             deletionPending = false
         }
     }

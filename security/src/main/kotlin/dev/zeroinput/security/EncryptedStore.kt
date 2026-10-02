@@ -4,5 +4,5 @@ package dev.zeroinput.security
 interface EncryptedStore {
     fun read(): ByteArray?
     fun write(plaintext: ByteArray)
-    fun delete(deleteKey: Boolean = false)
+    fun delete(deleteKey: Boolean = true)
 }

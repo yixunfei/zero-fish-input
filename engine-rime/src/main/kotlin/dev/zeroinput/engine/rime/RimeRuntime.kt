@@ -15,6 +15,12 @@ class RimeRuntime(context: Context) : AutoCloseable {
     private val activeEngines = AtomicInteger(0)
     private var configurationInstaller: RimeConfigurationInstaller? = null
     private var preparedSchemaId: String? = null
+    private var initializationGeneration = 0L
+    /** Keeps a cancelled worker as the sole owner until its native work returns. */
+    private var initializationInFlightGeneration: Long? = null
+    private var finalizeWhenIdle = false
+    @Volatile private var nativeInitialized = false
+    private var nativeInitializationGeneration: Long? = null
     private val publicSyllables by lazy {
         applicationContext.assets.open("pinyin-syllables.txt").bufferedReader().use {
             it.readLines()
@@ -50,48 +56,80 @@ class RimeRuntime(context: Context) : AutoCloseable {
         }
     }
 
-    fun initialize(): Boolean = synchronized(lock) {
-        if (isReady) return true
-        if (activeEngines.get() != 0) return false
-        setState(RimeRuntimeState.INITIALIZING)
-        initializationError = null
+    fun initialize(): Boolean {
+        val generation = synchronized(lock) {
+            if (isReady) return true
+            if (activeEngines.get() != 0 || initializationInFlightGeneration != null || nativeInitialized) return false
+            initializationGeneration += 1
+            initializationInFlightGeneration = initializationGeneration
+            initializationError = null
+            setState(RimeRuntimeState.INITIALIZING)
+            initializationGeneration
+        }
         if (!BuildConfig.HAS_NATIVE_RIME) {
-            initializationError = IllegalStateException("Native Rime is unavailable in this build")
-            isReady = false
-            setState(RimeRuntimeState.FAILED)
-            return false
+            return failInitialization(generation, IllegalStateException("Native Rime is unavailable in this build"))
         }
         if (!NativeRimeBridge.isLoaded) {
-            initializationError = NativeRimeBridge.loadFailure()
-                ?: IllegalStateException("Native Rime library could not be loaded")
-            isReady = false
-            setState(RimeRuntimeState.FAILED)
-            return false
+            return failInitialization(
+                generation,
+                NativeRimeBridge.loadFailure() ?: IllegalStateException("Native Rime library could not be loaded"),
+            )
         }
 
         return try {
+            // Asset deployment and native verification may perform substantial I/O.
+            // Keep them outside the runtime monitor so input callbacks can fail fast.
             val directories = RimeAssetInstaller(applicationContext).install()
-            configurationInstaller = RimeConfigurationInstaller(directories, publicSyllables)
+            val installer = RimeConfigurationInstaller(directories, publicSyllables)
             check(NativeRimeBridge.nativeInitialize(
                 directories.shared.absolutePath,
                 directories.user.absolutePath,
             )) { "Native Rime initialization returned false" }
+            synchronized(lock) {
+                nativeInitialized = true
+                nativeInitializationGeneration = generation
+            }
             // A schema can create a session even when its translator has no
             // usable dictionary. Validate conversion before publishing readiness.
             RimeInputEngine().use { RimeSessionVerifier.verify(it) }
-            runtimeVersion = NativeRimeBridge.nativeVersion().ifBlank { "unavailable" }
-            initializationError = null
-            preparedSchemaId = "zeroinput_pinyin"
-            isReady = true
-            setState(RimeRuntimeState.READY)
+            val version = NativeRimeBridge.nativeVersion().ifBlank { "unavailable" }
+            synchronized(lock) {
+                if (generation != initializationGeneration || state != RimeRuntimeState.INITIALIZING) {
+                    finalizeNativeLocked()
+                    finishInitializationLocked(generation)
+                    return false
+                }
+                configurationInstaller = installer
+                runtimeVersion = version
+                initializationError = null
+                preparedSchemaId = "zeroinput_pinyin"
+                isReady = true
+                finalizeWhenIdle = false
+                setState(RimeRuntimeState.READY)
+                finishInitializationLocked(generation)
+            }
             true
         } catch (error: Throwable) {
-            runCatching { NativeRimeBridge.nativeFinalize() }
-            isReady = false
-            initializationError = error
-            setState(RimeRuntimeState.FAILED)
-            false
+            failInitialization(generation, error)
         }
+    }
+
+    private fun failInitialization(generation: Long, error: Throwable): Boolean = synchronized(lock) {
+        if (generation != initializationGeneration) {
+            if (nativeInitializationGeneration == generation) finalizeNativeLocked()
+            finishInitializationLocked(generation)
+            return false
+        }
+        finalizeNativeLocked()
+        isReady = false
+        initializationError = error
+        setState(RimeRuntimeState.FAILED)
+        finishInitializationLocked(generation)
+        false
+    }
+
+    private fun finishInitializationLocked(generation: Long) {
+        if (initializationInFlightGeneration == generation) initializationInFlightGeneration = null
     }
 
     fun version(): String = if (isReady) runtimeVersion else "unavailable"
@@ -142,7 +180,7 @@ class RimeRuntime(context: Context) : AutoCloseable {
     private fun createVerifiedPrimary(id: String, options: ChineseInputOptions): RimeInputEngine {
         val engine = RimeInputEngine(id, options, ::markFailed, ::releaseEngine,
             if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) nineKeyReadings else null)
-            .also { activeEngines.incrementAndGet() }
+            .also { synchronized(lock) { activeEngines.incrementAndGet() } }
         try {
             RimeSessionVerifier.verify(engine, options.keyboardLayout, options.effectiveDoublePinyinScheme)
             return engine
@@ -152,8 +190,14 @@ class RimeRuntime(context: Context) : AutoCloseable {
         }
     }
 
-    private fun releaseEngine() {
-        if (activeEngines.decrementAndGet() == 0 && isReady && state == RimeRuntimeState.READY) {
+    private fun releaseEngine() = synchronized(lock) {
+        if (activeEngines.get() <= 0) return@synchronized
+        if (activeEngines.decrementAndGet() != 0) return@synchronized
+        if (finalizeWhenIdle) {
+            finalizeNativeLocked()
+            finalizeWhenIdle = false
+        }
+        if (isReady && state == RimeRuntimeState.READY) {
             // A superseded prepared session can briefly delay a new configuration.
             // Its release makes that preparation retryable without polling or waits.
             setState(RimeRuntimeState.READY)
@@ -182,7 +226,15 @@ class RimeRuntime(context: Context) : AutoCloseable {
     }
 
     override fun close() = synchronized(lock) {
-        if (isReady) runCatching { NativeRimeBridge.nativeFinalize() }
+        initializationGeneration += 1
+        if (initializationInFlightGeneration == null && activeEngines.get() == 0 && state != RimeRuntimeState.INITIALIZING) {
+            finalizeNativeLocked()
+            finalizeWhenIdle = false
+        } else {
+            // The worker owns native initialization until it reaches its final
+            // generation check; a later initialize must wait for that check.
+            finalizeWhenIdle = true
+        }
         isReady = false
         preparedSchemaId = null
         configurationInstaller = null
@@ -193,11 +245,25 @@ class RimeRuntime(context: Context) : AutoCloseable {
 
     /** Marks a runtime failure discovered while creating or using an engine. */
     internal fun markFailed(error: Throwable) = synchronized(lock) {
-        if (isReady) runCatching { NativeRimeBridge.nativeFinalize() }
+        if (!isReady) return
         isReady = false
         runtimeVersion = "unavailable"
         initializationError = error
+        if (activeEngines.get() == 0) {
+            finalizeNativeLocked()
+        } else {
+            // Existing sessions must destroy themselves before the global runtime
+            // is finalized; otherwise close() would use freed native state.
+            finalizeWhenIdle = true
+        }
         setState(RimeRuntimeState.FAILED)
+    }
+
+    private fun finalizeNativeLocked() {
+        if (!nativeInitialized) return
+        nativeInitialized = false
+        nativeInitializationGeneration = null
+        runCatching { NativeRimeBridge.nativeFinalize() }
     }
 
     private fun setState(value: RimeRuntimeState) {

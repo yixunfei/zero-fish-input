@@ -39,24 +39,28 @@ val prepareSyllableAssets = tasks.register("prepareSyllableAssets") {
         output.writeText(syllables.joinToString("\n"), Charsets.US_ASCII)
     }
 }
-val prepareOpenCcAssets = tasks.register<Sync>("prepareOpenCcAssets") {
-    val dictionaryRoot = rootProject.file("third_party/rime-deps/opencc/data/dictionary")
-    val hashes = mapOf(
-        "TSCharacters.txt" to "6b5a0a799bea2bb22c001f635eaa3fc2904310f0c08addbff275477a80ecf09a",
-        "TSPhrases.txt" to "b2ef895dd4953b4bb77fc8ef8d26a2a9ca6d43a760ed9a1d767672cfafa6324f",
-        "STCharacters.txt" to "9207708da9f2e2a248f39c457b2fccad26ec42e7efaf47a860e6900464f4cac5",
-        "STPhrases.txt" to "1411418f98dd7666a4ee673619654ed1e0518ec97953315cc10656c30c7015bb",
-    )
-    onlyIf { hasNativeRime }
-    from(dictionaryRoot) { include(hashes.keys) }
-    into(openCcAssets.map { it.dir("rime/opencc") })
-    doFirst {
-        hashes.forEach { (name, expected) ->
+val openCcDictionaryRoot = rootProject.file("third_party/rime-deps/opencc/data/dictionary")
+val openCcHashes = mapOf(
+    "TSCharacters.txt" to "6b5a0a799bea2bb22c001f635eaa3fc2904310f0c08addbff275477a80ecf09a",
+    "TSPhrases.txt" to "b2ef895dd4953b4bb77fc8ef8d26a2a9ca6d43a760ed9a1d767672cfafa6324f",
+    "STCharacters.txt" to "9207708da9f2e2a248f39c457b2fccad26ec42e7efaf47a860e6900464f4cac5",
+    "STPhrases.txt" to "1411418f98dd7666a4ee673619654ed1e0518ec97953315cc10656c30c7015bb",
+)
+val verifyOpenCcAssets = tasks.register("verifyOpenCcAssets") {
+    doLast {
+        openCcHashes.forEach { (name, expected) ->
+            val file = openCcDictionaryRoot.resolve(name)
+            check(file.isFile) { "Pinned OpenCC dictionary is missing: $name" }
             val actual = MessageDigest.getInstance("SHA-256")
-                .digest(dictionaryRoot.resolve(name).readBytes()).joinToString("") { "%02x".format(it) }
-            check(actual == expected) { "Pinned OpenCC dictionary checksum mismatch" }
+                .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+            check(actual == expected) { "Pinned OpenCC dictionary checksum mismatch: $name" }
         }
     }
+}
+val prepareOpenCcAssets = tasks.register<Sync>("prepareOpenCcAssets") {
+    onlyIf { hasNativeRime }
+    from(openCcDictionaryRoot) { include(openCcHashes.keys) }
+    into(openCcAssets.map { it.dir("rime/opencc") })
 }
 
 android {
@@ -121,4 +125,4 @@ dependencies {
     testImplementation(project(":engine-english"))
 }
 
-tasks.named("preBuild").configure { dependsOn(prepareOpenCcAssets, prepareSyllableAssets) }
+tasks.named("preBuild").configure { dependsOn(verifyOpenCcAssets, prepareOpenCcAssets, prepareSyllableAssets) }

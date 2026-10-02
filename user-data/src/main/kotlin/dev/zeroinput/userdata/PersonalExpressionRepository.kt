@@ -112,13 +112,21 @@ class PersonalExpressionRepository(
         revision.incrementAndGet()
         synchronized(lock) {
             deletionPending = true
+            var failure: Throwable? = null
             try {
                 store.delete(deleteKey = true)
+            } catch (error: Throwable) {
+                failure = error
+            }
+            try {
                 if (exportCipher.hasKey()) exportCipher.deleteKey()
-                deletionPending = false
-            } catch (_: Exception) {
+            } catch (error: Throwable) {
+                failure = failure?.also { it.addSuppressed(error) } ?: error
+            }
+            if (failure != null) {
                 fail(ExpressionFailure.STORAGE)
             }
+            deletionPending = false
         }
     }
 

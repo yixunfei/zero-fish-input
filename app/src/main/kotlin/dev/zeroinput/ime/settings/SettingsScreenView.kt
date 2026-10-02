@@ -81,6 +81,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onAiDataClearRequested: () -> Unit = {}
 
     private var suppressSwitchCallbacks = false
+    private var aiControlsEnabled = true
     private val content = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(20), dp(18), dp(20), dp(32))
@@ -93,6 +94,14 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     }
 
     fun showFuzzySettings() { chineseSettings.showFuzzySettings() }
+
+    /** Prevents a second AI mutation from racing the encrypted settings write. */
+    fun setAiControlsEnabled(enabled: Boolean) {
+        aiControlsEnabled = enabled
+        aiEnabledSwitch.isEnabled = enabled
+        aiNetworkSwitch.isEnabled = enabled && aiEnabledSwitch.isChecked
+    }
+
     private val languagePackContent = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
@@ -162,7 +171,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(soundEffectsSwitch, state.soundEffectsEnabled)
             updateSwitch(associationSwitch, state.wordAssociationsEnabled)
             updateSwitch(aiEnabledSwitch, state.aiEnabled)
-            updateSwitch(aiNetworkSwitch, state.aiNetworkAllowed)
+            updateSwitch(aiNetworkSwitch, state.aiEnabled && state.aiNetworkAllowed)
+            aiNetworkSwitch.isEnabled = aiControlsEnabled && aiEnabledSwitch.isChecked
         } finally {
             suppressSwitchCallbacks = false
         }
@@ -324,7 +334,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             addView(TextView(context).apply {
                 text = buildString {
                     append(pack.languageTag).append(" · ").append(pack.version)
-                    if (!pack.available) append(" · 不可用")
+                     if (!pack.available) append(" · ").append(context.getString(R.string.language_pack_unavailable))
                 }
                 textSize = 12f
                 alpha = 0.66f
@@ -334,13 +344,13 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         addView(MaterialSwitch(context).apply {
             isChecked = pack.enabled
             isEnabled = true
-            contentDescription = "启用 ${pack.displayName}"
+             contentDescription = context.getString(R.string.language_pack_enable, pack.displayName)
             setOnCheckedChangeListener { _, checked -> onLanguagePackEnabledChanged(pack.key, checked) }
         })
-        addView(commandButton(if (pack.selected) "使用中" else "使用") {
+         addView(commandButton(context.getString(if (pack.selected) R.string.language_pack_in_use else R.string.language_pack_use)) {
             if (pack.available) onLanguagePackSelected(pack.key)
         }.apply { isEnabled = pack.available })
-        addView(commandButton("删除") { onLanguagePackDeleteRequested(pack.key) })
+         addView(commandButton(context.getString(R.string.language_pack_delete)) { onLanguagePackDeleteRequested(pack.key) })
     }
 
     private fun settingSwitch(label: String, callback: (Boolean) -> Unit) = MaterialSwitch(context).apply {

@@ -150,6 +150,37 @@ class AiSettingsFailureTest {
         }
     }
 
+    @Test fun disablingAiAlsoDisablesNetworkAndPersistsBothSwitches() {
+        val original = graph.aiConfiguration.read()
+        saveConfiguration(AiConfiguration(enabled = true, networkAllowed = true,
+            endpoint = "https://provider.example/fixture", model = "fixture-model"))
+        var activity: MainActivity? = null
+        try {
+            activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+            openSettings(activity)
+            onMain {
+                val switches = windows().filterIsInstance<MaterialSwitch>().filter { it.isShown }
+                val aiEnabled = switches.single { it.text == activity.getString(R.string.ai_enabled) }
+                val aiNetwork = switches.single { it.text == activity.getString(R.string.ai_network) }
+                assertTrue(aiEnabled.isChecked)
+                assertTrue(aiNetwork.isChecked)
+                aiEnabled.performClick()
+            }
+            await {
+                graph.aiConfigurationSnapshot()?.let { !it.enabled && !it.networkAllowed } == true
+            }
+            onMain {
+                val switches = windows().filterIsInstance<MaterialSwitch>().filter { it.isShown }
+                assertFalse(switches.single { it.text == activity.getString(R.string.ai_enabled) }.isChecked)
+                assertFalse(switches.single { it.text == activity.getString(R.string.ai_network) }.isChecked)
+            }
+        } finally {
+            activity?.let { onMain { it.finish() } }
+            saveConfiguration(original)
+        }
+    }
+
     private fun saveConfiguration(value: AiConfiguration) {
         val done = CountDownLatch(1)
         var success = false

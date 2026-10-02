@@ -1176,8 +1176,8 @@ class ZeroInputService : InputMethodService() {
                 }
                 val secureItems = if (secureClipboardEnabled) {
                     runCatching {
-                        graph.secureClipboard.summaries().map {
-                            SecureClipboardItemUi(it.id, it.displayName)
+                        graph.secureClipboard.summaries().mapIndexed { index, item ->
+                            SecureClipboardItemUi(item.id, getString(R.string.secure_clipboard_ordinal, index + 1))
                         }
                     }.getOrDefault(emptyList())
                 } else {

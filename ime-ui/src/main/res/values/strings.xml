@@ -158,4 +158,6 @@
     <string name="handwriting_enter">回车</string>
     <string name="handwriting_candidate">候选字</string>
     <string name="handwriting_candidate_value">输入 %1$s</string>
+    <string name="language_sensitive_protection">敏感输入保护中</string>
+    <string name="language_switch">切换语言</string>
 </resources>

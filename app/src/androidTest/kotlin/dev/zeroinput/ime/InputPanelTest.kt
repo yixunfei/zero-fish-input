@@ -261,6 +261,19 @@ class InputPanelTest {
         assertTrue("Panel changes must invalidate pending authenticated actions", interactions >= 5)
     }
 
+    @Test
+    fun secureClipboardManagementUsesACompactActionTarget() = onMain {
+        val panel = panel(false)
+        measure(panel, 320)
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)).performClick()
+        panel.renderSecureClipboard(false, emptyList())
+        measure(panel, 320)
+        val manage = button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_manage))
+        assertTrue("Clipboard management must remain a compact toolbar action", manage.width <= dp(panel, 56))
+        assertTrue("Clipboard management must remain inside the panel", manage.right <= panel.width)
+        panel.release()
+    }
+
     @Test fun handwritingPanelFitsSmallLayoutsAndSpaceRequiresAcceptedCandidate() = onMain {
         for (landscape in listOf(false, true)) {
             val panel = panel(false, landscape)

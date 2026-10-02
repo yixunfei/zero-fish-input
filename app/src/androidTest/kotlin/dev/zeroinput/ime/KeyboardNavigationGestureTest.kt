@@ -83,6 +83,40 @@ class KeyboardNavigationGestureTest {
         assertEquals(0, selections)
     }
 
+    @Test fun firstExpandedCandidateSwipeRequestsNextPageWhenTheFirstGridFits() = withPanel { panel ->
+        val pages = mutableListOf<PageDirection>()
+        val firstPage = List(1) { Candidate("first", "首页") }
+        panel.onCandidatePageChanged = { direction ->
+            pages += direction
+            panel.renderSession(ready.copy(snapshot = EngineSnapshot(
+                "ni", "ni", firstPage + Candidate("second", "后续"),
+                hasPreviousPage = true,
+            )))
+        }
+        panel.renderSession(ready.copy(snapshot = EngineSnapshot(
+            "ni", "ni", firstPage, hasNextPage = true,
+        )))
+        tap(panel, UiR.string.expand_candidates)
+        val grid = descendants(panel).filterIsInstance<RecyclerView>().first { it.isShown }
+        swipeVertical(grid.parent as ViewGroup, -1)
+        assertEquals(listOf(PageDirection.NEXT), pages)
+        assertNotNull(descendants(panel).firstOrNull {
+            it.isShown && it.contentDescription == panel.context.getString(UiR.string.candidate_description, "后续")
+        })
+    }
+
+    @Test fun cancelledVerticalCandidateSwipeDoesNotRequestPage() = withPanel { panel ->
+        val pages = mutableListOf<PageDirection>()
+        panel.onCandidatePageChanged = { pages += it }
+        panel.renderSession(ready.copy(snapshot = EngineSnapshot(
+            "ni", "ni", listOf(Candidate("first", "首页")), hasNextPage = true,
+        )))
+        tap(panel, UiR.string.expand_candidates)
+        val grid = descendants(panel).filterIsInstance<RecyclerView>().first { it.isShown }
+        swipeVertical(grid.parent as ViewGroup, -1, cancel = true)
+        assertTrue(pages.isEmpty())
+    }
+
     @Test fun compactCandidateStripLoadsTheNextPageAtItsEdge() = withPanel { panel ->
         var pages = 0
         panel.onCandidatePageChanged = { pages++ }
@@ -140,6 +174,20 @@ class KeyboardNavigationGestureTest {
         for ((index, action) in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE,
             if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP).withIndex()) {
             MotionEvent.obtain(down, down + index * 60, action, if (index == 0) start else end, y, 0).also {
+                view.dispatchTouchEvent(it); it.recycle()
+            }
+        }
+    }
+
+    private fun swipeVertical(view: ViewGroup, direction: Int, cancel: Boolean = false) {
+        val height = view.height.coerceAtLeast(200).toFloat()
+        val start = height * if (direction < 0) 0.8f else 0.2f
+        val end = height - start
+        val x = view.width / 2f
+        val down = SystemClock.uptimeMillis()
+        for ((index, action) in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE,
+            if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP).withIndex()) {
+            MotionEvent.obtain(down, down + index * 60, action, x, if (index == 0) start else end, 0).also {
                 view.dispatchTouchEvent(it); it.recycle()
             }
         }

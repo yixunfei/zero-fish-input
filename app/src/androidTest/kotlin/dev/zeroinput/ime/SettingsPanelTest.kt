@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.materialswitch.MaterialSwitch
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
@@ -94,6 +95,45 @@ class SettingsPanelTest {
         } finally { repository.chineseInputOptions = original }
     }
 
+    @Test fun aiSwitchesExposeStateAndCanBeLockedDuringPersistence() = onMain {
+        val target = InstrumentationRegistry.getInstrumentation().targetContext
+        val panel = SettingsScreenView(ContextThemeWrapper(target, R.style.Theme_ZeroInput))
+        panel.render(SettingsScreenState(
+            isEnabled = false,
+            isCurrent = false,
+            learningEnabled = true,
+            incognitoMode = false,
+            secureClipboardEnabled = false,
+            hapticsEnabled = true,
+            engineStatus = target.getString(R.string.engine_status_ready),
+            aiEnabled = true,
+            aiNetworkAllowed = true,
+        ))
+        val switches = descendants(panel).filterIsInstance<MaterialSwitch>()
+        val enabled = switches.single { it.text == target.getString(R.string.ai_enabled) }
+        val network = switches.single { it.text == target.getString(R.string.ai_network) }
+        assertTrue(enabled.isChecked)
+        assertTrue(network.isChecked)
+
+        panel.setAiControlsEnabled(false)
+        assertTrue(!enabled.isEnabled && !network.isEnabled)
+        panel.setAiControlsEnabled(true)
+        assertTrue(enabled.isEnabled && network.isEnabled)
+
+        panel.render(SettingsScreenState(
+            isEnabled = false,
+            isCurrent = false,
+            learningEnabled = true,
+            incognitoMode = false,
+            secureClipboardEnabled = false,
+            hapticsEnabled = true,
+            engineStatus = target.getString(R.string.engine_status_ready),
+            aiEnabled = false,
+            aiNetworkAllowed = true,
+        ))
+        assertTrue(!network.isEnabled && !network.isChecked)
+    }
+
     private fun verifyPanel(locale: Locale, night: Boolean) {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val configuration = Configuration(target.resources.configuration).apply {
@@ -141,4 +181,10 @@ class SettingsPanelTest {
     private fun descendants(view: View): List<View> = if (view is ViewGroup) {
         listOf(view) + (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) }
     } else listOf(view)
+
+    private fun onMain(action: () -> Unit) {
+        var result: Result<Unit>? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { result = runCatching(action) }
+        checkNotNull(result).getOrThrow()
+    }
 }

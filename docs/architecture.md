@@ -123,11 +123,12 @@ use the same view operation through the IME service. The keyboard root retains
 the platform dismissal behavior. UI-only navigation still invokes the existing
 interaction invalidation boundary.
 
-Horizontal gesture ownership is shared by expression and candidate surfaces.
-The surface cancels child clicks before taking a drag, rejects vertical/multiple
-pointer gestures, and accepts DOWN even when its grid is empty. Candidate paging
-continues to use the bounded core window and engine routes. Explicit page loads
-reveal the newly loaded candidates; scrolling retains existing anchor behavior.
+Horizontal gesture ownership remains with expression surfaces. Expanded candidates
+use a vertical RecyclerView: the surface cancels child clicks before taking an
+edge drag, rejects cross-axis/multiple-pointer gestures, and accepts DOWN even
+when the first grid fits without scrolling. Candidate paging continues to use
+the bounded core window and engine routes. Explicit page loads reveal the newly
+loaded candidates; ordinary scrolling retains existing anchor behavior.
 
 The fuzzy master preference preserves the selected pair mask. Engines and schema
 identifiers use its effective mask; disabling selected rules resolves to the

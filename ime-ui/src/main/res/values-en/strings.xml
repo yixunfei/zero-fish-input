@@ -154,4 +154,6 @@
     <string name="handwriting_enter">Enter</string>
     <string name="handwriting_candidate">Candidate</string>
     <string name="handwriting_candidate_value">Insert %1$s</string>
+    <string name="language_sensitive_protection">Sensitive input protection enabled</string>
+    <string name="language_switch">Switch language</string>
 </resources>

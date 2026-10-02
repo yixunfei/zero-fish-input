@@ -35,7 +35,8 @@ internal class ClipboardGuardOverlay(
     private var lastEvent: String? = null
     private var lastStatus: ClipboardGuardStatus? = null
     private val startedActivities = Collections.newSetFromMap(WeakHashMap<Activity, Boolean>())
-    private var watching = false
+    private var receiverRegistered = false
+    private var appOpsWatching = false
     private var closed = false
     private val expire = Runnable { hide() }
     private val permissionChanged = AppOpsManager.OnOpChangedListener { _, _ ->
@@ -89,8 +90,9 @@ internal class ClipboardGuardOverlay(
             window = view
             manager.addView(view, parameters)
             ContextCompat.registerReceiver(context, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
-            watching = true
+            receiverRegistered = true
             appOps.startWatchingMode(AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, context.packageName, permissionChanged)
+            appOpsWatching = true
             main.postDelayed(expire, options.overlaySeconds * 1_000L)
             true
         } catch (_: RuntimeException) { hide(); false }
@@ -116,10 +118,13 @@ internal class ClipboardGuardOverlay(
         main.removeCallbacks(expire)
         window?.let { runCatching { manager.removeViewImmediate(it) } }
         window = null
-        if (watching) {
+        if (receiverRegistered) {
             runCatching { context.unregisterReceiver(screenOff) }
+            receiverRegistered = false
+        }
+        if (appOpsWatching) {
             runCatching { appOps.stopWatchingMode(permissionChanged) }
-            watching = false
+            appOpsWatching = false
         }
     }
 

@@ -133,6 +133,7 @@ class ZeroInputView @JvmOverloads constructor(
     val canNavigateBack: Boolean get() = !released && (manualTools || mode != PanelMode.KEYBOARD || keyboard.canNavigateBack)
     private var maximumContentHeight = Int.MAX_VALUE
     private var lastViewport = -1
+    private var lastLandscape = false
     private var engineStatus = InputEngineStatus.HIDDEN
     /** Rendered session status, independent of the optional diagnostic text. */
     val renderedEngineStatus: InputEngineStatus get() = engineStatus
@@ -199,6 +200,8 @@ class ZeroInputView @JvmOverloads constructor(
         .apply { layoutParams = LayoutParams(dp(48), dp(48)) }
     private val toolbar = android.widget.HorizontalScrollView(context).apply {
         isHorizontalScrollBarEnabled = false
+        isFillViewport = true
+        overScrollMode = View.OVER_SCROLL_NEVER
         addView(createToolbar())
     }
     private val header = FrameLayout(context).apply {
@@ -272,7 +275,9 @@ class ZeroInputView @JvmOverloads constructor(
             "En"
         }
         languageButton.text = if (state.privacy.isSensitive) "🔒" else label
-        languageButton.contentDescription = if (state.privacy.isSensitive) "敏感输入保护中" else "切换中英文"
+        languageButton.contentDescription = context.getString(
+            if (state.privacy.isSensitive) R.string.language_sensitive_protection else R.string.language_switch,
+        )
         keyboard.setLanguageLabel(label)
         keyboard.setComposing(state.snapshot.isComposing)
         if (mode != PanelMode.AI) candidateStrip.render(state.snapshot)
@@ -377,20 +382,21 @@ class ZeroInputView @JvmOverloads constructor(
         }
         val reminder = if (clipboardGuard.isVisible) dp(48) else 0
         val preparationHeight = if (enginePreparation.isVisible) enginePreparation.preferredHeight else 0
-        val bodyLimit = (limit - header.layoutParams.height - paddingTop - paddingBottom - reminder - preparationHeight)
+        val bodyLimit = (limit - header.layoutParams.height - reminder - preparationHeight)
             .coerceAtLeast(dp(144))
-        if (landscape && bodyLimit != lastViewport) {
+        if (bodyLimit != lastViewport || landscape != lastLandscape) {
             lastViewport = bodyLimit
+            lastLandscape = landscape
             maximumContentHeight = bodyLimit
-            keyboard.setCompactLandscape(bodyLimit < dp(224))
+            keyboard.setCompactLandscape(landscape && bodyLimit < dp(224))
             readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
             updatePanelLayout()
         }
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(limit, MeasureSpec.AT_MOST))
+        val outerLimit = (limit + insetHeight).coerceAtMost(parentLimit)
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(outerLimit, MeasureSpec.AT_MOST))
         // FrameLayout may retain a larger WRAP_CONTENT child measurement while
         // the IME window is resized for navigation-bar insets. Clamp the final
         // outer size as well as the child budget to avoid stale overflow.
-        val outerLimit = limit + insetHeight
         if (measuredHeight > outerLimit) setMeasuredDimension(measuredWidth, outerLimit)
     }
 
@@ -570,7 +576,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun createToolbar(): View = LinearLayout(context).apply {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
+        layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(48))
         addView(languageButton)
         addView(aiButton)
         addView(panelIconButton(context, android.R.drawable.ic_menu_crop, R.string.keyboard_placement) {

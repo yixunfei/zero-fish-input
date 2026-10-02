@@ -5,7 +5,9 @@ import dev.zeroinput.security.EncryptedStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.io.IOException
 
 class UserLexiconRepositoryTest {
     @Test
@@ -43,14 +45,47 @@ class UserLexiconRepositoryTest {
         assertTrue(repository.list().isEmpty())
     }
 
+    @Test
+    fun `failed clear still attempts export key deletion and blocks until retry`() {
+        val store = MemoryStore()
+        val cipher = TrackingExportCipher()
+        val repository = UserLexiconRepository(store, cipher)
+        repository.addPhrase("hello", "hello", InputLanguage.ENGLISH)
+        store.failDelete = true
+
+        assertThrows(IOException::class.java) { repository.clear() }
+        assertEquals(1, store.deleteAttempts)
+        assertEquals(1, cipher.deleteAttempts)
+        assertThrows(IllegalStateException::class.java) { repository.list() }
+
+        store.failDelete = false
+        repository.clear()
+        assertEquals(2, store.deleteAttempts)
+        assertEquals(2, cipher.deleteAttempts)
+        assertTrue(repository.list().isEmpty())
+    }
+
     private class MemoryStore : EncryptedStore {
         var bytes: ByteArray? = null
         var failWrite = false
+        var failDelete = false
+        var deleteAttempts = 0
         override fun read(): ByteArray? = bytes?.copyOf()
         override fun write(plaintext: ByteArray) {
             if (failWrite) throw java.io.IOException("write failed")
             bytes = plaintext.copyOf()
         }
-        override fun delete(deleteKey: Boolean) { bytes = null }
+        override fun delete(deleteKey: Boolean) {
+            deleteAttempts += 1
+            if (failDelete) throw java.io.IOException("delete failed")
+            bytes = null
+        }
+    }
+
+    private class TrackingExportCipher : EncryptedExportCipher {
+        var deleteAttempts = 0
+        override fun encrypt(plaintext: ByteArray, associatedData: ByteArray): ByteArray = plaintext.copyOf()
+        override fun decrypt(payload: ByteArray, associatedData: ByteArray): ByteArray = payload.copyOf()
+        override fun deleteKey() { deleteAttempts += 1 }
     }
 }

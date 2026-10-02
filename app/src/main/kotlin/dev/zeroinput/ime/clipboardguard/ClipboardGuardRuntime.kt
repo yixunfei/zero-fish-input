@@ -13,6 +13,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /** Application-owned runtime; only the worker touches clipboard APIs and session policy. */
@@ -27,6 +28,7 @@ internal class ClipboardGuardRuntime(
     private val revision = AtomicLong()
     private val imeAttached = AtomicBoolean()
     private val refreshQueued = AtomicBoolean()
+    private val refreshAttempts = AtomicInteger()
     private val eventQueued = AtomicBoolean()
     private val clearQueued = AtomicBoolean()
     private val inspectQueued = AtomicBoolean()
@@ -131,11 +133,41 @@ internal class ClipboardGuardRuntime(
         revision.incrementAndGet()
         main.post { overlay.hide() }
         if (!refreshQueued.compareAndSet(false, true)) return
-        if (!enqueue {
-            refreshQueued.set(false)
-            refresh()
-        }) refreshQueued.set(false)
+        refreshAttempts.set(0)
+        enqueueRefresh()
     }
+
+    private fun enqueueRefresh() {
+        if (closed.get()) {
+            refreshQueued.set(false)
+            return
+        }
+        if (enqueue {
+            try {
+                refresh()
+            } finally {
+                val changedWhileRefreshing = !closed.get() && lease != revision.get()
+                refreshQueued.set(false)
+                refreshAttempts.set(0)
+                if (changedWhileRefreshing && refreshQueued.compareAndSet(false, true)) {
+                    enqueueRefresh()
+                }
+            }
+        }) return
+        // A full worker queue must never move clipboard or preference work onto
+        // the caller, which may be the IME input thread. Retry asynchronously.
+        val attempt = refreshAttempts.incrementAndGet()
+        if (attempt > MAX_REFRESH_RETRIES) {
+            refreshQueued.set(false)
+            refreshAttempts.set(0)
+            publish(ClipboardGuardState(options, ClipboardGuardStatus.FAILED))
+            return
+        }
+        main.postDelayed({ if (refreshQueued.get()) enqueueRefresh() }, retryDelay(attempt))
+    }
+
+    private fun retryDelay(attempt: Int): Long =
+        (REFRESH_RETRY_DELAY_MS shl (attempt - 1).coerceAtMost(4)).coerceAtMost(MAX_REFRESH_RETRY_DELAY_MS)
 
     private fun refresh() {
         detachPlatform()
@@ -255,6 +287,10 @@ internal class ClipboardGuardRuntime(
     }
 
     private companion object {
+        const val REFRESH_RETRY_DELAY_MS = 50L
+        const val MAX_REFRESH_RETRIES = 6
+        const val MAX_REFRESH_RETRY_DELAY_MS = 1_000L
+
         fun isSelectedIme(context: Context): Boolean = try {
             val selected = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
             selected != null && ComponentName.unflattenFromString(selected) == ComponentName(context, ZeroInputService::class.java)

@@ -37,7 +37,7 @@ class SecureClipboardVault(
             .mapIndexed { index, summary ->
                 SecureClipboardSummary(
                     id = summary.id,
-                    displayName = "安全片段 ${index + 1}",
+                    displayName = "",
                     updatedAtEpochMillis = summary.updatedAtEpochMillis,
                 )
             }
@@ -128,7 +128,21 @@ class SecureClipboardVault(
             deletionPending = true
             indexCache = emptyList()
             indexNeedsRepair = true
-            try { store.delete(deleteKey = true) } finally { indexStore.delete(deleteKey = true) }
+            var failure: Throwable? = null
+            try {
+                store.delete(deleteKey = true)
+            } catch (error: Throwable) {
+                failure = error
+            }
+            try {
+                indexStore.delete(deleteKey = true)
+            } catch (error: Throwable) {
+                failure = failure?.also { it.addSuppressed(error) } ?: error
+            }
+            if (failure != null) {
+                deletionPending = true
+                throw failure
+            }
             deletionPending = false
             indexNeedsRepair = false
         }
@@ -258,7 +272,7 @@ class SecureClipboardVault(
         require(ID_PATTERN.matches(it)) { "Invalid secure clipboard entry id" }
     }
 
-    private fun validateLabel(value: String): String = value.trim().take(MAX_LABEL_LENGTH).ifBlank { "私密片段" }
+    private fun validateLabel(value: String): String = value.trim().take(MAX_LABEL_LENGTH)
 
     private fun validateValue(value: String): String = value.also {
         require(it.isNotBlank() && it.length <= MAX_VALUE_LENGTH) { "Invalid secure clipboard value" }

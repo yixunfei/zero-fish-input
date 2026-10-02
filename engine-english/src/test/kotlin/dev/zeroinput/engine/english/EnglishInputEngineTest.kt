@@ -137,15 +137,4 @@ class EnglishInputEngineTest {
         assertEquals("hello ", engine.selectCandidate(helloIndex).committedText)
     }
 
-    @Test fun `correction is explicit and disabled by default`() {
-        val disabled = EnglishInputEngine(lexicon = listOf("the"))
-        disabled.start(context)
-        "teh".forEach { disabled.handle(EngineKey.Character(it.toString())) }
-        assertTrue(disabled.snapshot.candidates.none { it.text == "the" })
-
-        val enabled = EnglishInputEngine(lexicon = listOf("the"), correctionsEnabled = true)
-        enabled.start(context)
-        "teh".forEach { enabled.handle(EngineKey.Character(it.toString())) }
-        assertTrue(enabled.snapshot.candidates.any { it.text == "the" && it.comment == "Did you mean?" })
-    }
 }
