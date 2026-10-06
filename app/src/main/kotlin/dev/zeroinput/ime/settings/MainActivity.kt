@@ -276,7 +276,7 @@ class MainActivity : AppCompatActivity() {
         val probe = dev.zeroinput.ime.ai.AiProviderProbe(
             provider = { snapshot -> dev.zeroinput.ime.ai.OpenAiCompatibleProvider(
                 { if (graph.aiDataGeneration.isCurrent(data)) snapshot else AiConfiguration() },
-                graph.aiExecutor, graph.aiCancellationExecutor) },
+                graph.aiProbeExecutor, graph.aiCancellationExecutor) },
             current = { active.get() && !isFinishing && !isDestroyed && graph.aiDataGeneration.isCurrent(data) },
             post = { callback -> screen.post { callback() } },
             render = render,

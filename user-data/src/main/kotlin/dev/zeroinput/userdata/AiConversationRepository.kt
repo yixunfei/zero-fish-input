@@ -68,7 +68,9 @@ class AiConversationRepository(private val store: EncryptedStore) {
         val bytes = store.read() ?: return emptyList()
         return try {
             require(bytes.size <= MAX_STORE_BYTES)
-            val root = JSONObject(String(bytes, StandardCharsets.UTF_8))
+            var encoded = String(bytes, StandardCharsets.UTF_8)
+            val root = JSONObject(encoded)
+            encoded = ""
             require(root.getInt("format") == 1)
             val array = root.getJSONArray("conversations")
             require(array.length() <= AiLimits.MAX_CONVERSATIONS)

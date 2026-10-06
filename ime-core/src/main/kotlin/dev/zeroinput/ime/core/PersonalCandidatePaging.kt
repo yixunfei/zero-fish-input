@@ -84,7 +84,7 @@ internal class PersonalCandidatePaging {
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         return native.copy(candidates = items, highlightedIndex = if (offset > 0) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
-            hasPreviousPage = !includesNative || native.hasPreviousPage,
+            hasPreviousPage = !includesNative,
             hasNextPage = if (isBrowsing) pages.lastEntry()?.value?.hasMore == true else native.hasNextPage || first.hasMore)
     }
 

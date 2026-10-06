@@ -46,6 +46,10 @@ class AppGraph(context: Context) : AutoCloseable {
         name = "zeroinput-ai-worker",
         queueCapacity = 1,
     )
+    internal val aiProbeExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-ai-probe",
+        queueCapacity = 1,
+    )
     internal val aiCancellationExecutor: ExecutorService = BoundedExecutors.singleThread(
         name = "zeroinput-ai-cancel",
         queueCapacity = 2,
@@ -339,6 +343,7 @@ class AppGraph(context: Context) : AutoCloseable {
         aiCoordinator.close()
         aiContentInbox.clear()
         aiExecutor.shutdownNow()
+        aiProbeExecutor.shutdownNow()
         aiDocumentExecutor.shutdownNow()
         aiImportSettingsObserver.close()
         aiCancellationExecutor.shutdown()

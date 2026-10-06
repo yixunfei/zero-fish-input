@@ -58,7 +58,7 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
             } catch (error: Throwable) {
                 deletionPending = true
                 throw error
-            }
+            } finally { deletionPending = false }
         }
     }
 

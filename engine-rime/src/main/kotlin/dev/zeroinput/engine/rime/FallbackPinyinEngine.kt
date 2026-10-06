@@ -66,7 +66,7 @@ internal class FallbackPinyinEngine(
     }
 
     override fun restoreComposition(input: String): EngineUpdate {
-        if (input.length !in 1..MAX_INPUT || input.any { it !in 'a'..'z' && it != '\'' &&
+        if (input.length !in 1..MAX_INPUT || input.any { it !in 'a'..'z' && it !in '2'..'9' && it != '\'' &&
                 !(doublePinyinScheme == DoublePinyinScheme.MICROSOFT && it == ';') }) {
             return EngineUpdate(snapshot, consumed = false)
         }
@@ -102,10 +102,11 @@ internal class FallbackPinyinEngine(
 
     private fun character(text: String): EngineUpdate {
         val letter = text.singleOrNull()?.lowercaseChar()
-        if (letter != null && (letter in 'a'..'z' || letter == '\'' ||
-                doublePinyinScheme == DoublePinyinScheme.MICROSOFT && letter == ';')) {
+        val normalized = letter?.let { if (it in '2'..'9') nineKeyRepresentative(it) else it }
+        if (normalized != null && (normalized in 'a'..'z' || normalized == '\'' ||
+                doublePinyinScheme == DoublePinyinScheme.MICROSOFT && normalized == ';')) {
             if (input.length == MAX_INPUT) return EngineUpdate(snapshot, consumed = false)
-            input.append(letter)
+            input.append(normalized)
             syllableOnly = false
             return refresh()
         }
@@ -128,6 +129,11 @@ internal class FallbackPinyinEngine(
     private fun commitRawInput(): EngineUpdate {
         val raw = input.toString()
         return EngineUpdate(reset(), raw, learnable = false)
+    }
+
+    private fun nineKeyRepresentative(digit: Char): Char = when (digit) {
+        '2' -> 'a'; '3' -> 'd'; '4' -> 'g'; '5' -> 'j';
+        '6' -> 'm'; '7' -> 'p'; '8' -> 't'; '9' -> 'w'; else -> digit
     }
 
     private fun consumedLength(): Int = segments.sumOf { it.consumed }

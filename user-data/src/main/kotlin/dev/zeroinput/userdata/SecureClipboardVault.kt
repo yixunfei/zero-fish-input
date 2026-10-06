@@ -54,9 +54,7 @@ class SecureClipboardVault(
         require(grant.consume()) { "Authentication expired or was already used" }
         val entries = load()
         checkOperationActive(expectedGeneration, isActive)
-        entries.firstOrNull { it.id == id }?.value.also { value ->
-            if (value == null) persistIndex(entries)
-        }
+        entries.firstOrNull { it.id == id }?.value
     }
 
     fun metadata(grant: AuthenticationGrant, expectedGeneration: Long = captureGeneration()): List<SecureClipboardMetadata> {
@@ -163,7 +161,9 @@ class SecureClipboardVault(
         checkStorageAvailable()
         val bytes = store.read() ?: return emptyList()
         return try {
-            val root = JSONObject(String(bytes, StandardCharsets.UTF_8))
+            var encoded = String(bytes, StandardCharsets.UTF_8)
+            val root = JSONObject(encoded)
+            encoded = ""
             require(root.getInt("format") == FORMAT_VERSION) { "Unsupported secure clipboard format" }
             val array = root.getJSONArray("entries")
             require(array.length() <= MAX_ENTRIES) { "Secure clipboard has too many entries" }
@@ -199,7 +199,9 @@ class SecureClipboardVault(
     private fun loadIndex(): List<StoredSummary> {
         val bytes = indexStore.read() ?: return emptyList()
         return try {
-            val root = JSONObject(String(bytes, StandardCharsets.UTF_8))
+            var encoded = String(bytes, StandardCharsets.UTF_8)
+            val root = JSONObject(encoded)
+            encoded = ""
             require(root.getInt("format") == INDEX_FORMAT_VERSION) { "Unsupported secure clipboard index" }
             val array = root.getJSONArray("entries")
             require(array.length() <= MAX_ENTRIES) { "Secure clipboard index has too many entries" }

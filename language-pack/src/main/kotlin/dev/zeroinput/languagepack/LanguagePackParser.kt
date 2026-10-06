@@ -53,13 +53,8 @@ internal object LanguagePackParser {
     private fun JSONObject.requiredInteger(name: String): Long = when (val value = opt(name)) {
         is Int -> value.toLong()
         is Long -> value
-        is Number -> value.toDouble().let { numeric ->
-            require(numeric.isFinite() && numeric % 1.0 == 0.0 &&
-                numeric >= Long.MIN_VALUE.toDouble() && numeric <= Long.MAX_VALUE.toDouble()) {
-                "Invalid language pack integer field"
-            }
-            numeric.toLong()
-        }
+        is Number -> runCatching { java.math.BigDecimal(value.toString()).toBigIntegerExact().longValueExact() }
+            .getOrElse { throw IllegalArgumentException("Invalid language pack integer field") }
         else -> throw IllegalArgumentException("Invalid language pack integer field")
     }
 

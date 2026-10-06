@@ -20,7 +20,13 @@ internal class AiStreamDelivery(
             if (closed || ended) return
             when (event) {
                 AiStreamEvent.Started -> return
-                is AiStreamEvent.Delta -> delta.append(event.text.take((AiLimits.MAX_OUTPUT_CHARS - delta.length).coerceAtLeast(0)))
+                is AiStreamEvent.Delta -> {
+                    val remaining = AiLimits.MAX_OUTPUT_CHARS - delta.length
+                    if (event.text.length > remaining) {
+                        terminal = AiStreamEvent.Failed(dev.zeroinput.ai.api.AiProviderError.Response("AI output exceeded limit"))
+                        ended = true
+                    } else delta.append(event.text)
+                }
                 else -> { terminal = event; ended = true }
             }
             if (posted) false else { posted = true; true }

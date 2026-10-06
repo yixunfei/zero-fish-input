@@ -132,15 +132,19 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).apply {
                 filterTouchesWhenObscured = true
                 setOnClickListener {
-                    val secret = value.editText?.text?.toString().orEmpty()
-                    if (secret.isBlank()) {
+                    val secret = value.editText?.text?.toString().orEmpty().toCharArray()
+                    if (secret.isEmpty() || secret.concatToString().isBlank()) {
+                        secret.fill('\u0000')
                         value.error = context.getString(R.string.secure_item_required)
                         return@setOnClickListener
                     }
                     val itemLabel = label.editText?.text?.toString().orEmpty()
                     val generation = graph.secureClipboard.captureGeneration()
                     dialog.dismiss()
-                    authenticate(false) { grant -> addItem(itemLabel, secret, grant, generation) }
+                    authenticate(false) { grant ->
+                        try { addItem(itemLabel, secret.concatToString(), grant, generation) }
+                        finally { secret.fill('\u0000') }
+                    }
                 }
             }
         }

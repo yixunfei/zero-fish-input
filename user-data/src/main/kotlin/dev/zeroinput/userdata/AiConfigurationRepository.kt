@@ -93,7 +93,9 @@ class AiConfigurationRepository(
         val bytes = store.read() ?: return AiConfiguration()
         return try {
             require(bytes.size <= MAX_CONFIG_BYTES)
-            val root = JSONObject(String(bytes, StandardCharsets.UTF_8))
+            var encoded = String(bytes, StandardCharsets.UTF_8)
+            val root = JSONObject(encoded)
+            encoded = ""
             when (root.getInt("format")) {
                 in 1..3 -> {
                     // The pre-provider format contained a single endpoint/key. The

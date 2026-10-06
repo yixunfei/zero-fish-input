@@ -62,7 +62,7 @@ class OpenAiCompatibleProvider internal constructor(
                 try { cancellationExecutor.execute { runCatching { http.disconnect() } } }
                 catch (_: java.util.concurrent.RejectedExecutionException) { /* Worker finally/timeout closes it. */ }
             }
-            dev.zeroinput.ime.concurrency.BoundedExecutors.purge(executor)
+            dev.zeroinput.ime.concurrency.BoundedExecutors.cancelQueued(executor)
         }
         val task = java.util.concurrent.FutureTask<Unit> {
             if (resources.start()) {

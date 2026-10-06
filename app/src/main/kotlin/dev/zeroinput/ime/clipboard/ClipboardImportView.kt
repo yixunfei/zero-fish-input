@@ -32,6 +32,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         visibility = GONE
     }
     private val labelInput = TextInputEditText(context).apply {
+        isSaveEnabled = false
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING or EditorInfo.IME_FLAG_NO_EXTRACT_UI
         filters = arrayOf(InputFilter.LengthFilter(SecureClipboardVault.MAX_LABEL_LENGTH))

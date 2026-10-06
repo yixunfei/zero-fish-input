@@ -23,11 +23,13 @@ internal object ClipboardImportIntent {
         if (value.length !in 1..SecureClipboardVault.MAX_VALUE_LENGTH) return null
         val clip = intent.clipData
         if (clip != null) {
-            if (clip.itemCount != 1) return null
+            if (clip.itemCount != 1) return ClipboardImportText.parse(value)
             val item = clip.getItemAt(0)
-            if (item.uri != null || item.intent != null || item.htmlText != null) return null
-            val duplicate = item.text ?: return null
-            if (duplicate.length != value.length || duplicate.indices.any { duplicate[it] != value[it] }) return null
+            if (item.uri != null || item.intent != null || item.htmlText != null) return ClipboardImportText.parse(value)
+            val duplicate = item.text
+            if (duplicate == null || duplicate.length != value.length || duplicate.indices.any { duplicate[it] != value[it] }) {
+                return ClipboardImportText.parse(value)
+            }
         }
         return ClipboardImportText.parse(value)
     }

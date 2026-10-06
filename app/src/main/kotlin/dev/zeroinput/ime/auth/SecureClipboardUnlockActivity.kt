@@ -40,6 +40,16 @@ class SecureClipboardUnlockActivity : AppCompatActivity() {
         finishedGrant = null
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        if (requestId.isNotEmpty()) AuthenticationBroker.complete(requestId, null)
+        completed = false
+        finishedGrant = null
+        requestId = intent.getStringExtra(EXTRA_REQUEST_ID).orEmpty()
+        setIntent(intent)
+        if (requestId.isEmpty()) finish() else authenticate()
+    }
+
     private fun authenticate() {
         if (!canAuthenticate()) {
             complete(null)
