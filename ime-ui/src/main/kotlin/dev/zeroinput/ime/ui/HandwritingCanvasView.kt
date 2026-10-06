@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.DashPathEffect
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -24,6 +25,17 @@ internal class HandwritingCanvasView @JvmOverloads constructor(context: Context,
         strokeJoin = Paint.Join.ROUND
         strokeWidth = resources.displayMetrics.density * 4f
     }
+    private val boundary = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = MaterialColors.getColor(context, com.google.android.material.R.attr.colorOutline, Color.GRAY)
+        style = Paint.Style.STROKE
+        strokeWidth = resources.displayMetrics.density * 1.5f
+    }
+    private val guide = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = MaterialColors.getColor(context, com.google.android.material.R.attr.colorOutlineVariant, Color.GRAY)
+        style = Paint.Style.STROKE
+        strokeWidth = resources.displayMetrics.density
+        pathEffect = DashPathEffect(floatArrayOf(resources.displayMetrics.density * 4f, resources.displayMetrics.density * 4f), 0f)
+    }
     private val path = Path()
 
     init {
@@ -36,8 +48,19 @@ internal class HandwritingCanvasView @JvmOverloads constructor(context: Context,
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        drawGuides(canvas)
         strokes.forEach { drawStroke(canvas, it, it.size) }
         if (currentSize > 0) drawStroke(canvas, current, currentSize)
+    }
+
+    private fun drawGuides(canvas: Canvas) {
+        if (width <= 0 || height <= 0) return
+        val inset = boundary.strokeWidth
+        val right = width.toFloat() - inset
+        val bottom = height.toFloat() - inset
+        canvas.drawRoundRect(inset, inset, right, bottom, dp(8f), dp(8f), boundary)
+        canvas.drawLine(width / 2f, inset, width / 2f, bottom, guide)
+        canvas.drawLine(inset, height / 2f, right, height / 2f, guide)
     }
 
     private fun drawStroke(canvas: Canvas, points: FloatArray, size: Int) {
@@ -116,17 +139,27 @@ internal class HandwritingCanvasView @JvmOverloads constructor(context: Context,
     fun hasStrokes(): Boolean = strokes.isNotEmpty() || currentSize > 0
 
     private fun compactCurrent() {
-        // Preserve the whole stroke and its final point rather than truncating long gestures.
-        var target = 2
-        var source = 4
-        while (source < currentSize) {
-            current[target++] = current[source++]
-            current[target++] = current[source++]
-            source += 2
+        // Keep both endpoints and distribute the remaining samples over the full gesture.
+        val sourcePoints = currentSize / 2
+        // Leave headroom for subsequent motion events so a long stroke is not
+        // compacted for every single point after reaching the hard limit.
+        val targetPoints = COMPACT_TARGET_POINTS
+        if (sourcePoints <= targetPoints) return
+        val lastSource = sourcePoints - 1
+        var targetPoint = 0
+        while (targetPoint < targetPoints) {
+            val sourcePoint = (targetPoint.toLong() * lastSource / (targetPoints - 1)).toInt()
+            val source = sourcePoint * 2
+            val target = targetPoint * 2
+            current[target] = current[source]
+            current[target + 1] = current[source + 1]
+            targetPoint++
         }
-        current.fill(0f, target, currentSize)
-        currentSize = target
+        current.fill(0f, targetPoints * 2, currentSize)
+        currentSize = targetPoints * 2
     }
+
+    private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
     private fun notifyStrokes() {
         val copied = snapshot()
@@ -170,5 +203,6 @@ internal class HandwritingCanvasView @JvmOverloads constructor(context: Context,
     private companion object {
         const val MAX_STROKES = 48
         const val MAX_POINTS = 512
+        const val COMPACT_TARGET_POINTS = MAX_POINTS * 3 / 4
     }
 }

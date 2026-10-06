@@ -17,7 +17,6 @@ import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.ZeroInputView
 import dev.zeroinput.engine.api.ChineseInputOptions
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,14 +34,12 @@ class InputPipelineTest {
         val originalMethod = shell("settings get secure default_input_method").trim()
         val settings = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph.settings
         val originalOptions = settings.chineseInputOptions
-        val originalEngine = settings.chineseEngine
         val originalPack = settings.lastLanguagePackKey
         val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
         var activity: InputFixtureActivity? = null
         try {
             onMain {
                 settings.chineseInputOptions = ChineseInputOptions()
-                settings.chineseEngine = ChineseEngineChoice.RIME
                 settings.lastLanguagePackKey = null
             }
             shell("ime enable $method")
@@ -74,16 +71,11 @@ class InputPipelineTest {
             instrumentation.waitForIdleSync()
             verifyBurst(panel, activity, listOf("6 MNO", "4 GHI", "4 GHI", "2 ABC", "6 MNO"),
                 "rime-nine", KeyboardAction.Space, "你好")
-            onMain { settings.chineseEngine = ChineseEngineChoice.DICTIONARY_TEST }
-            awaitReady(panel)
-            instrumentation.waitForIdleSync()
-            verifyBurst(panel, activity, "nihao".map(Char::toString), "dictionary-full", KeyboardAction.Space, "你好")
         } finally {
             activity?.let { onMain { it.finish() } }
             if (originalMethod.isNotBlank() && originalMethod != "null") shell("ime set $originalMethod")
             onMain {
                 settings.chineseInputOptions = originalOptions
-                settings.chineseEngine = originalEngine
                 settings.lastLanguagePackKey = originalPack
             }
         }

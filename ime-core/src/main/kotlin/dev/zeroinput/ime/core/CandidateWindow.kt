@@ -47,7 +47,8 @@ internal class CandidateWindow {
         val seen = HashSet<String>()
         for ((page, snapshot) in pages) for ((index, candidate) in snapshot.candidates.withIndex()) {
             if (!seen.add(candidate.text)) continue
-            val id = "page:$page:${candidate.id}"
+            // Preserve initial-page identities when browsing appends rows.
+            val id = if (page == 0) candidate.id else "page:$page:${candidate.id}"
             visible += candidate.copy(id = id)
             updatedRoutes[id] = Route(page, index, candidate.id, candidate.text)
         }

@@ -43,11 +43,27 @@ class KeyboardWindowIntegrationTest {
                 val bounds = view.inputBounds()
                 assertTrue(bounds.left >= 0 && bounds.top >= 0 && bounds.right <= view.width && bounds.bottom <= view.height)
                 val insets = WindowInsetsCompat.toWindowInsetsCompat(requireNotNull(activity.window.decorView.rootWindowInsets))
-                assertTrue("Floating IME must not reserve its full-screen host", insets.getInsets(WindowInsetsCompat.Type.ime()).bottom < bounds.height())
+                val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                assertTrue("Floating IME must not reserve its full-screen host", imeBottom < view.height)
                 activity.editor.setOnTouchListener { _, event -> if (event.actionMasked == MotionEvent.ACTION_DOWN) touches++; false }
-                activity.editor.getLocationOnScreen(point)
-                point[0] += activity.editor.width / 2
-                point[1] += activity.editor.height / 2
+                val hostOrigin = IntArray(2).also(view::getLocationOnScreen)
+                bounds.offset(hostOrigin[0], hostOrigin[1])
+                val editorBounds = android.graphics.Rect()
+                assertTrue(activity.editor.getGlobalVisibleRect(editorBounds))
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                editorBounds.left += bars.left + 24
+                editorBounds.top += bars.top + 24
+                editorBounds.right -= bars.right + 24
+                editorBounds.bottom -= bars.bottom + 24
+                val outside = listOf(
+                    editorBounds.centerX() to editorBounds.top + editorBounds.height() / 4,
+                    editorBounds.left to editorBounds.top,
+                    editorBounds.right to editorBounds.top,
+                    editorBounds.left to editorBounds.bottom,
+                ).firstOrNull { (x, y) -> !bounds.contains(x, y) }
+                assertNotNull("The fixture needs an editor point outside the floating keyboard", outside)
+                point[0] = requireNotNull(outside).first
+                point[1] = outside.second
             }
             tap(point[0].toFloat(), point[1].toFloat())
             await { touches > 0 }
@@ -119,11 +135,9 @@ class KeyboardWindowIntegrationTest {
     private fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
     private fun tap(x: Float, y: Float) {
-        val now = SystemClock.uptimeMillis()
-        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
-            val event = MotionEvent.obtain(now, now + if (action == MotionEvent.ACTION_UP) 50 else 0, action, x, y, 0)
-            try { instrumentation.uiAutomation.injectInputEvent(event, true) } finally { event.recycle() }
-        }
+        instrumentation.waitForIdleSync()
+        shell("input tap ${x.toInt()} ${y.toInt()}")
+        instrumentation.waitForIdleSync()
     }
     private fun await(condition: () -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 15_000

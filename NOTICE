@@ -6,6 +6,10 @@ from the Rime Luna Pinyin and Rime Essay projects. It also includes software
 from Boost, OpenCC, LevelDB, yaml-cpp, marisa-trie, AndroidX, Material
 Components for Android, Kotlin, and the Android NDK.
 
+Background photo orientation uses AndroidX ExifInterface 1.4.1,
+Copyright The Android Open Source Project, under Apache License 2.0
+(LICENSES/Apache-2.0.txt).
+
 The bundled OpenCC conversion data includes TSCharacters, TSPhrases,
 STCharacters and STPhrases from the pinned OpenCC source distribution,
 under the Apache License, Version 2.0.

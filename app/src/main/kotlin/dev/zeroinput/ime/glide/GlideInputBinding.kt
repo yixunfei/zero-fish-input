@@ -49,6 +49,8 @@ internal class GlideInputBinding(
     private fun select(candidate: GlideCandidate) {
         val selection = coordinator.consume(candidate) ?: return
         beforeAction()
+        replay?.cancel()
+        replay = null
         val binding = identity() ?: return
         val target = controller() ?: return
         val ticket = revision.get()

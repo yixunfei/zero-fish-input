@@ -65,12 +65,13 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_WORD_ASSOCIATIONS, true)
         set(value) = edit(KEY_WORD_ASSOCIATIONS, value)
 
+    var pairedSymbolsEnabled: Boolean
+        get() = preferences.getBoolean(KEY_PAIRED_SYMBOLS, true)
+        set(value) = edit(KEY_PAIRED_SYMBOLS, value)
+
     var keyboardAppearance: KeyboardAppearance
-        get() = KeyboardAppearance(
-            KeyboardTheme.entries.firstOrNull { it.name == preferences.getString(KEY_THEME, null) } ?: KeyboardTheme.CLASSIC,
-            KeyboardHeight.entries.firstOrNull { it.name == preferences.getString(KEY_HEIGHT, null) } ?: KeyboardHeight.STANDARD,
-        )
-        set(value) { preferences.edit().putString(KEY_THEME, value.theme.name).putString(KEY_HEIGHT, value.height.name).apply() }
+        get() = AppearancePreferences(preferences).read()
+        set(value) { AppearancePreferences(preferences).write(value) }
 
     var lastLanguage: InputLanguage
         get() = runCatching {
@@ -137,11 +138,6 @@ class SettingsRepository(context: Context) {
                 .apply()
         }
 
-    var chineseEngine: ChineseEngineChoice
-        get() = ChineseEngineChoice.entries.firstOrNull { it.name == preferences.getString(KEY_CHINESE_ENGINE, null) }
-            ?: ChineseEngineChoice.RIME
-        set(value) { preferences.edit().putString(KEY_CHINESE_ENGINE, value.name).apply() }
-
     fun privacyConfiguration() = PrivacyConfiguration(
         learningEnabled = learningEnabled,
         incognitoMode = incognitoMode,
@@ -159,6 +155,7 @@ class SettingsRepository(context: Context) {
         const val KEY_HAPTICS = "keyboard.haptics"
         const val KEY_SOUND_EFFECTS = "keyboard.sound-effects"
         const val KEY_WORD_ASSOCIATIONS = "keyboard.word-associations"
+        const val KEY_PAIRED_SYMBOLS = "keyboard.paired-symbols"
         const val KEY_THEME = "keyboard.theme"
         const val KEY_HEIGHT = "keyboard.height"
         const val KEY_LANGUAGE = "keyboard.language"
@@ -171,7 +168,6 @@ class SettingsRepository(context: Context) {
         const val KEY_PAGE_SIZE = "chinese.page-size"
         const val KEY_NINE_KEY = "chinese.nine-key"
         const val KEY_DOUBLE_PINYIN = "chinese.double-pinyin"
-        const val KEY_CHINESE_ENGINE = "chinese.engine"
         const val KEY_TYPO_CORRECTION = "chinese.experimental-typo-correction"
         const val KEY_MODEL_RANKING = "chinese.experimental-model-ranking"
     }

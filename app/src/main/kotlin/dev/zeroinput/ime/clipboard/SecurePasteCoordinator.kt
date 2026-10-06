@@ -45,7 +45,7 @@ internal class SecurePasteCoordinator(
         context.contentResolver.registerContentObserver(Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
             false, defaultImeObserver)
         observingIme = true
-        main.postDelayed(expire, 60_000L)
+        main.postDelayed(expire, 30_000L)
         authentication = AuthenticationBroker.requestCancellable(context) { grant ->
             if (pending === consent) {
                 authentication = null

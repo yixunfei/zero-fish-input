@@ -48,6 +48,10 @@ internal class GlideCoordinator(
                     val backend = decoder ?: createDecoder().also { decoder = it }
                     if (cancelled()) emptyList() else backend.decode(request, cancelled)
                 }
+                if (result.isFailure) {
+                    runCatching { decoder?.close() }
+                    decoder = null
+                }
                 if (cancelled()) return@submit
                 schedule(ticket, identity, result)
             }

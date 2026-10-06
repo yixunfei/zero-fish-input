@@ -1,6 +1,9 @@
 package dev.zeroinput.ai.api
 
 import java.util.UUID
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
 
 enum class AiAction(val promptInstruction: String) {
     ASK("回答用户的问题"),
@@ -48,13 +51,40 @@ data class AiRequest(
     val input: String,
     val targetLanguage: String? = null,
     val history: List<AiMessage> = emptyList(),
+    val attachments: List<AiAttachment> = emptyList(),
+    val outputTokenLimit: Int? = null,
 ) {
     init {
         require(input.isNotBlank()) { "AI input must not be blank" }
         require(input.length <= AiLimits.MAX_INPUT_CHARS) { "AI input is too large" }
+        require(outputTokenLimit == null || outputTokenLimit in 1..4096) { "Invalid output limit" }
         require(history.size <= AiLimits.MAX_HISTORY_MESSAGES) { "AI history is too large" }
         require(targetLanguage == null || targetLanguage.length in 2..32) { "Invalid target language" }
+        require(attachments.size <= AiLimits.MAX_ATTACHMENTS) { "Too many AI attachments" }
+        require(attachments.sumOf { it.bytes.size } <= AiLimits.MAX_ATTACHMENT_BYTES) { "AI attachments are too large" }
     }
+}
+
+/** Transient content; draft owners retain their bytes and submit independent request copies. */
+class AiAttachment(val mimeType: String, val bytes: ByteArray, val displayName: String) {
+    init {
+        require(mimeType in setOf("text/plain", "image/jpeg", "image/png", "image/webp",
+            "audio/wav", "audio/mpeg"))
+        require(bytes.isNotEmpty() && bytes.size <= AiLimits.MAX_ATTACHMENT_BYTES)
+        require(displayName.length in 1..128 && displayName.none(Char::isISOControl))
+        if (mimeType == "text/plain") {
+            val decoded = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes))
+            try {
+                require(decoded.remaining() <= AiLimits.MAX_INPUT_CHARS)
+                require(decoded.none { it.isISOControl() && it !in "\n\r\t" })
+            } finally {
+                if (decoded.hasArray()) decoded.array().fill('\u0000')
+            }
+        }
+    }
+
+    override fun toString(): String = "AiAttachment(redacted)"
 }
 
 sealed interface AiStreamEvent {
@@ -70,15 +100,19 @@ interface AiRequestHandle {
 }
 
 interface AiProvider {
+    /** Owns request attachment bytes from entry, including rejection, cancellation and failure. */
     fun stream(request: AiRequest, listener: (AiStreamEvent) -> Unit): AiRequestHandle
 }
 
 sealed class AiProviderError(message: String, cause: Throwable? = null) : Exception(message, cause) {
     class Configuration(message: String) : AiProviderError(message)
-    class Network(message: String, cause: Throwable? = null) : AiProviderError(message, cause)
+    class Network(message: String, cause: Throwable? = null,
+        val reason: AiNetworkFailure = AiNetworkFailure.CONNECTION) : AiProviderError(message, cause)
     class Response(message: String) : AiProviderError(message)
     class Policy(message: String) : AiProviderError(message)
 }
+
+enum class AiNetworkFailure { CONNECTION, TIMEOUT, AUTHENTICATION, MODEL_OR_ENDPOINT, RATE_LIMIT, SERVICE }
 
 data class AiGenerationPolicy(
     val enabled: Boolean,
@@ -108,4 +142,6 @@ object AiLimits {
     const val MAX_HISTORY_MESSAGES = 20
     const val MAX_CONVERSATIONS = 32
     const val MAX_TIMEOUT_MS = 120_000L
+    const val MAX_ATTACHMENTS = 2
+    const val MAX_ATTACHMENT_BYTES = 1_000_000
 }

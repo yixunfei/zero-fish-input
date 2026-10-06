@@ -98,6 +98,16 @@
             android:theme="@style/Theme.ZeroInput.PrivateImport"
             android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
+        <activity
+            android:name=".ai.AiComposeActivity"
+            android:label="@string/ai_import_title"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:allowTaskReparenting="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ZeroInput.PrivateImport"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".ZeroInputService"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|locale|layoutDirection|uiMode"

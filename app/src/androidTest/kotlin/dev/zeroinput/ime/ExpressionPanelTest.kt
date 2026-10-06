@@ -138,6 +138,39 @@ class ExpressionPanelTest {
         }
     }
 
+    @Test fun rapidSearchReplacesOneSnapshotWithoutPublishingAnIntermediateEmptyList() {
+        val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardPreviewFixtureActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyboardPreviewFixtureActivity
+        lateinit var panel: EmojiPanelView
+        val notifications = mutableListOf<Int>()
+        try {
+            onMain {
+                panel = EmojiPanelView(context(false, 320))
+                activity.keyboard.release()
+                activity.setContentView(panel)
+                panel.renderPersonal(true, PersonalExpressionsUi(), emptyList())
+                click(panel, UiR.string.expression_kaomoji)
+                click(panel, UiR.string.expression_search)
+            }
+            instrumentation.waitForIdleSync()
+            onMain {
+                val adapter = checkNotNull(visible(panel).filterIsInstance<RecyclerView>().single().adapter)
+                assertTrue(adapter.itemCount > 0)
+                adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+                    override fun onChanged() { notifications += adapter.itemCount }
+                })
+                listOf("k", "ka", "kai", "kaix", "kaixin").forEach(panel::renderQuery)
+                assertTrue("Existing rows remain until the replacement is ready", adapter.itemCount > 0)
+                assertTrue(notifications.isEmpty())
+            }
+            await { notifications.isNotEmpty() }
+            onMain {
+                assertEquals(1, notifications.size)
+                assertTrue(notifications.single() > 0)
+            }
+        } finally { onMain { activity.finish() } }
+    }
+
     private fun await(condition: () -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 5000
         while (SystemClock.uptimeMillis() < deadline) {

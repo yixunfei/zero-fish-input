@@ -63,7 +63,7 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         optionSwitch(fuzzyLabel(pair)) { update(options.withFuzzy(pair, it)) }
     }
     private val fuzzyEnabled = optionSwitch(R.string.fuzzy_pinyin_enabled) {
-        update(options.copy(fuzzyPinyinEnabled = it))
+        update(options.withAllFuzzy(it))
     }
 
     init {
@@ -98,9 +98,9 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
             typoCorrection.isChecked = value.experimentalTypoCorrection
             typoCorrection.isEnabled = EngineCapability.TYPO_CORRECTION in capabilities && value.keyboardLayout == ChineseKeyboardLayout.FULL
             pages.check(pageButtons.getValue(value.candidatePageSize).id)
-            fuzzyEnabled.isChecked = value.fuzzyPinyinEnabled
+            fuzzyEnabled.isChecked = value.effectiveFuzzyPinyinMask != 0
             fuzzyEnabled.isEnabled = EngineCapability.FUZZY_PINYIN in capabilities
-            fuzzySwitches.forEach { (pair, view) -> view.isChecked = value.isFuzzySelected(pair) }
+            fuzzySwitches.forEach { (pair, view) -> view.isChecked = value.isFuzzyEnabled(pair) }
             scriptButtons.values.forEach { it.isEnabled = EngineCapability.CHINESE_SCRIPT in capabilities }
             layoutButtons.values.forEach { it.isEnabled = EngineCapability.NINE_KEY_PINYIN in capabilities }
             doublePinyinButtons.values.forEach { it.isEnabled =
@@ -117,6 +117,13 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
     private fun update(value: ChineseInputOptions) {
         if (rendering || value == options) return
         options = value
+        rendering = true
+        try {
+            fuzzyEnabled.isChecked = value.effectiveFuzzyPinyinMask != 0
+            fuzzySwitches.forEach { (pair, view) -> view.isChecked = value.isFuzzyEnabled(pair) }
+        } finally {
+            rendering = false
+        }
         onOptionsChanged(value)
     }
 

@@ -79,6 +79,7 @@ data class GlideLexiconEntry(
 }
 
 /** Worker-only bounded decoding. Cancellation returns no candidates and retains no trace. */
-fun interface GlideDecoder {
+fun interface GlideDecoder : AutoCloseable {
     fun decode(request: GlideRequest, isCancelled: () -> Boolean): List<GlideCandidate>
+    override fun close() = Unit
 }

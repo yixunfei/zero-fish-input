@@ -108,6 +108,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.material)
     testImplementation(libs.junit)
     testImplementation(libs.json)

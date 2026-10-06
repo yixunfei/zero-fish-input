@@ -164,6 +164,7 @@ class InputSessionController(
             when (command) {
                 is InputCommand.Text -> handleKey(activeEngine, EngineKey.Character(command.value))
                 is InputCommand.LiteralText -> commitLiteral(activeEngine, command.value)
+                is InputCommand.PairedText -> commitPaired(activeEngine, command.opening, command.closing)
                 InputCommand.Backspace -> handleKey(activeEngine, EngineKey.Backspace, fallbackBackspace = true)
                 InputCommand.Space -> {
                     if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
@@ -244,6 +245,18 @@ class InputSessionController(
      * that owns this controller (the IME main thread in the Android service).
      */
     fun refreshPersonalization() {
+        publish(rawEngineSnapshot)
+    }
+
+    /** Re-runs the current association context after its predictor is ready. */
+    fun refreshWordAssociations() {
+        if (!associationsAllowed()) {
+            invalidateWordAssociations()
+            return
+        }
+        associations.refresh { value ->
+            (engine as? CandidateTextNormalizer)?.normalizeCandidateText(value) ?: value
+        }
         publish(rawEngineSnapshot)
     }
 
@@ -545,6 +558,19 @@ class InputSessionController(
         publish(rawEngineSnapshot)
     }
 
+    private fun commitPaired(activeEngine: InputEngine, opening: String, closing: String) {
+        if (opening.isEmpty() || closing.isEmpty()) return
+        if (state.modelRanked) selectCandidate(activeEngine, state.snapshot.highlightedIndex)
+        if (state.snapshot.isComposing) {
+            val before = state.snapshot
+            if (before.candidates.isNotEmpty()) selectCandidate(activeEngine, before.highlightedIndex)
+            flushUnconsumedComposition(activeEngine, state.snapshot)
+        }
+        connection.commitPairedText(opening + closing, opening.length)
+        associations.clear()
+        publish(rawEngineSnapshot)
+    }
+
     private fun performEnterAction() {
         val action = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
         val handled = EditorInputOptions.enterAction(editorInfo) != EnterAction.NEW_LINE &&
@@ -624,6 +650,7 @@ class InputSessionController(
         when (command) {
             is InputCommand.Text -> connection.commitText(command.value)
             is InputCommand.LiteralText -> connection.commitText(command.value)
+            is InputCommand.PairedText -> connection.commitPairedText(command.opening + command.closing, command.opening.length)
             InputCommand.Backspace -> connection.deleteBeforeCursor()
             InputCommand.Space -> connection.commitText(" ")
             InputCommand.Enter -> performEnterAction()

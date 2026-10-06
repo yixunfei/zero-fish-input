@@ -4,11 +4,45 @@ import dev.zeroinput.ai.api.*
 import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.userdata.AiConfiguration
 import dev.zeroinput.userdata.AiConversationRepository
+import dev.zeroinput.userdata.AiProviderProfile
 import java.util.concurrent.Executor
 import org.junit.Assert.*
 import org.junit.Test
 
 class AiWorkbenchControllerTest {
+    @Test fun disablingPersistenceWithoutAnObserverCannotSendPreviouslySelectedHistory() {
+        for (refresh in listOf(false, true)) {
+            val f = Fixture()
+            f.controller.submit(AiAction.ASK, "first", null)
+            f.provider.emit(AiStreamEvent.Completed("answer"))
+            f.flush()
+            f.persistenceEnabled = false
+            if (refresh) f.controller.refreshConversations()
+            f.controller.submit(AiAction.ASK, "new", null)
+            assertNull(f.provider.requests.last().conversationId)
+            assertTrue(f.provider.requests.last().history.isEmpty())
+        }
+    }
+
+    @Test fun disablingPersistenceDropsPendingHistoryAndCompletionWithoutAnObserver() {
+        val f = Fixture()
+        f.repository.upsert(AiConversation(id = "saved", title = "fixture",
+            messages = listOf(AiMessage(AiRole.USER, "old"))))
+        f.controller.selectConversation("saved")
+        f.worker.drain()
+        f.persistenceEnabled = false
+        f.ui.drain()
+        f.controller.submit(AiAction.ASK, "new", null)
+        assertTrue(f.provider.requests.last().history.isEmpty())
+        f.persistenceEnabled = true
+        f.controller.submit(AiAction.ASK, "another", null)
+        f.provider.emit(AiStreamEvent.Completed("late"))
+        f.persistenceEnabled = false
+        f.flush()
+        assertNull(f.controller.consumeResult())
+        assertEquals(1, f.repository.list().size)
+    }
+
     @Test fun queuedCompletionCannotReachAnotherEditorOrPersistAfterInvalidation() {
         val f = Fixture()
         f.controller.submit(AiAction.ASK, "fixture", null)
@@ -109,6 +143,44 @@ class AiWorkbenchControllerTest {
         assertEquals(2, f.provider.requests.last().history.size)
     }
 
+    @Test fun refreshingHistoryWithoutPersistenceKeepsTheTransientConversationAndResult() {
+        val f = Fixture(save = false)
+        f.controller.submit(AiAction.ASK, "first", null)
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.flush()
+        f.controller.refreshConversations()
+        f.flush()
+        assertEquals("answer", f.controller.consumeResult())
+        f.controller.submit(AiAction.ASK, "continue", null)
+        assertEquals(listOf("first", "answer"), f.provider.requests.last().history.map { it.content })
+    }
+
+    @Test fun refreshingHistoryWithoutPersistenceDoesNotCancelAnActiveRequest() {
+        val f = Fixture(save = false)
+        f.controller.submit(AiAction.ASK, "fixture", null)
+        f.controller.refreshConversations()
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.flush()
+        assertEquals("answer", f.controller.consumeResult())
+    }
+
+    @Test fun settingsInvalidationClearsSelectedConversationWithoutDeletingFromThePanel() {
+        val f = Fixture()
+        f.controller.submit(AiAction.ASK, "fixture", null)
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.flush()
+        val id = f.repository.list().single().id
+        f.controller.selectConversation(id)
+        f.flush()
+        f.persistenceEnabled = false
+        f.controller.invalidate()
+        f.controller.refreshConversations()
+        f.flush()
+        assertEquals(id, f.repository.list().single().id)
+        f.controller.submit(AiAction.ASK, "new", null)
+        assertNull(f.provider.requests.last().conversationId)
+    }
+
     @Test fun lateConversationLoadCannotReplaceANewChat() {
         val f = Fixture()
         f.repository.upsert(AiConversation(id = "saved", title = "fixture"))
@@ -137,9 +209,26 @@ class AiWorkbenchControllerTest {
         val generation = AiDataGeneration()
         val repository = AiConversationRepository(MemoryStore())
         var allowed = true
+        var persistenceEnabled = save
         val events = mutableListOf<AiStreamEvent>()
+        private val profile = AiProviderProfile(
+            id = "fixture",
+            name = "Fixture",
+            endpoint = "https://provider.example/v1/chat/completions",
+            apiKey = "fixture-key",
+            models = listOf("fixture-model"),
+            selectedModel = "fixture-model",
+        )
         val controller = AiWorkbenchController(AiCoordinator(provider), repository, worker,
-            { AiConfiguration(enabled = true, networkAllowed = true, saveConversations = save) },
+            {
+                AiConfiguration(
+                    enabled = true,
+                    networkAllowed = true,
+                    saveConversations = persistenceEnabled,
+                    providers = listOf(profile),
+                    selectedProviderId = profile.id,
+                )
+            },
             generation, { ui.execute(it); true }, { allowed }, events::add, {}, {})
         fun flush() { repeat(3) { ui.drain(); worker.drain() }; ui.drain() }
     }

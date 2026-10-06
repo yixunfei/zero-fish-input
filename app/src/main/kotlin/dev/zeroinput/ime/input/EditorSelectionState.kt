@@ -32,6 +32,9 @@ internal class EditorSelectionState(start: Int, end: Int) {
 
     fun updated(start: Int, end: Int, composingStart: Int = -1, composingEnd: Int = -1,
         previousStart: Int = -1, previousEnd: Int = -1): Boolean {
+        // The platform callback has no editor token. Reject unrelated known
+        // origins before they can acknowledge or change this session's state.
+        if (!acceptsPrevious(previousStart, previousEnd)) return false
         val previous = observed
         observed = Selection(start, end, composingStart, composingEnd)
         if (unanchored.isNotEmpty() && anchorUnknownSelection()) return false
@@ -40,6 +43,14 @@ internal class EditorSelectionState(start: Int, end: Int) {
         val expected = pending.lastIndexOf(observed)
         if (expected >= 0) {
             repeat(expected + 1) { remember(pending.removeFirst()) }
+            return false
+        }
+        if (isDelayedCursorMove(previousStart, previousEnd)) {
+            // A selection callback can arrive after a newer preedit has
+            // already advanced the cursor.  The old callback identifies the
+            // composition origin as its previous position; treating it as a
+            // real move would finish the newer composition.
+            observed = previous
             return false
         }
         if (observed in acknowledged &&
@@ -63,6 +74,22 @@ internal class EditorSelectionState(start: Int, end: Int) {
 
     fun verifiedRange(length: Int): CommitRange? = committed?.takeIf {
         pending.isEmpty() && observed == Selection(it.end, it.end) && it.end - it.start == length
+    }
+
+    /** Returns the best known insertion anchor for an immediate cursor move. */
+    fun insertionStart(): Int? {
+        if (predicted.start < 0 || predicted.end < 0) return null
+        return composingStart ?: minOf(predicted.start, predicted.end)
+    }
+
+    /** Registers a selection that may be acknowledged synchronously by Android. */
+    fun expectSelection(position: Int) {
+        if (position < 0) return
+        predicted = Selection(position, position)
+        if (pending.size == 32) recordDiscarded(pending.removeFirst())
+        pending.addLast(predicted)
+        composingStart = null
+        committed = null
     }
 
     fun selectedLength(): Int? = observed.takeIf {
@@ -156,6 +183,15 @@ internal class EditorSelectionState(start: Int, end: Int) {
         acknowledged.addLast(selection)
     }
 
+    private fun acceptsPrevious(start: Int, end: Int): Boolean {
+        if (start < 0 || end < 0 || observed.start < 0 || observed.end < 0) return true
+        fun Selection.matches() = this.start == start && this.end == end
+        return observed.matches() || predicted.matches() || pending.any { it.matches() } ||
+            acknowledged.any { it.matches() } || discardedCompositions.any {
+                start == end && (start == it.origin || start in it.firstEnd..it.lastEnd)
+            }
+    }
+
     private fun isDelayedComposingAcknowledgement(previousStart: Int, previousEnd: Int): Boolean {
         return previousStart >= 0 && previousEnd >= 0 &&
             (previousStart != predicted.start || previousEnd != predicted.end) &&
@@ -163,6 +199,13 @@ internal class EditorSelectionState(start: Int, end: Int) {
             discardedCompositions.any { discarded ->
                 observed.composingStart == discarded.origin && observed.start in discarded.firstEnd..discarded.lastEnd
             }
+    }
+
+    private fun isDelayedCursorMove(previousStart: Int, previousEnd: Int): Boolean {
+        val origin = predicted.composingStart
+        return origin >= 0 && previousStart == origin && previousEnd == origin &&
+            predicted.start > origin && observed.composingStart < 0 && observed.composingEnd < 0 &&
+            observed.start == observed.end && observed.start <= origin
     }
 
     private fun recordDiscarded(selection: Selection) {

@@ -13,7 +13,8 @@ class HandwritingRequestTest {
         assertNull(HandwritingRequest.copyOf(listOf(FloatArray(1026))))
         assertNull(HandwritingRequest.copyOf(listOf(floatArrayOf(.2f))))
         assertNull(HandwritingRequest.copyOf(listOf(floatArrayOf(Float.NaN, .3f))))
-        assertNull(HandwritingRequest.copyOf(listOf(floatArrayOf(.2f, 1.1f))))
+        val clamped = requireNotNull(HandwritingRequest.copyOf(listOf(floatArrayOf(.2f, 1.1f))))
+        clamped.run { owned -> assertArrayEquals(floatArrayOf(.2f, 1f), owned.first(), 0f) }
     }
 
     @Test fun requestOwnsAnIndependentCopyAndRunsOnlyOnce() {

@@ -25,6 +25,10 @@ internal class ClipboardImportRequest(private val text: CharArray) : AutoCloseab
         else -> null
     }
 
+    /** Copies the user-selected share text for the separate AI context confirmation. */
+    @Synchronized
+    fun copyForAi(): String? = if (phase == Phase.REVIEW) String(text) else null
+
     fun isSaving(): Boolean = phase == Phase.SAVING
 
     @Synchronized

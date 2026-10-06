@@ -15,7 +15,36 @@ enum class KeyboardHeight(val label: Int, private val portrait: Int, private val
     fun rowHeight(landscape: Boolean): Int = if (landscape) this.landscape else portrait
 }
 
+enum class KeyboardMaterial(val label: Int) {
+    CLASSIC(R.string.material_classic), FLAT(R.string.material_flat),
+    RAISED(R.string.material_raised), SOFT(R.string.material_soft),
+    METAL(R.string.material_metal), FROSTED(R.string.material_frosted),
+}
+
+enum class KeyboardBackground(val label: Int) {
+    SOLID(R.string.background_solid), GRADIENT(R.string.background_gradient),
+    TEXTURE(R.string.background_texture), IMAGE(R.string.background_image),
+}
+
 data class KeyboardAppearance(
     val theme: KeyboardTheme = KeyboardTheme.CLASSIC,
     val height: KeyboardHeight = KeyboardHeight.STANDARD,
-)
+    val material: KeyboardMaterial = KeyboardMaterial.FLAT,
+    val borders: Boolean = false,
+    val cornerRadius: Int = 8,
+    val keySpacing: Int = 2,
+    val background: KeyboardBackground = KeyboardBackground.SOLID,
+    val backgroundColor: Int? = null,
+    val backgroundOpacity: Int = 100,
+    val backgroundDim: Int = 15,
+    val backgroundBlur: Int = 0,
+    val imageRevision: String = "",
+) {
+    fun sanitized(): KeyboardAppearance = copy(
+        cornerRadius = cornerRadius.coerceIn(0, 20), keySpacing = keySpacing.coerceIn(0, 6),
+        backgroundOpacity = backgroundOpacity.coerceIn(0, 100), backgroundDim = backgroundDim.coerceIn(0, 80),
+        backgroundBlur = backgroundBlur.coerceIn(0, 20),
+        backgroundColor = backgroundColor?.let { it or 0xff000000.toInt() },
+        imageRevision = imageRevision.takeIf { it.matches(Regex("[a-f0-9-]{36}")) }.orEmpty(),
+    )
+}

@@ -34,6 +34,8 @@ internal class ExpressionBrowserState {
 
     fun clearQuery() { query = "" }
 
+    fun replaceQuery(value: String) { clearQuery(); append(value) }
+
     /** Capture on the UI thread; resolve on the panel worker without retaining this mutable state. */
     fun request() = ExpressionQuery(EmojiCatalog.snapshot, category, group, searchActive, query, personal, recent)
 

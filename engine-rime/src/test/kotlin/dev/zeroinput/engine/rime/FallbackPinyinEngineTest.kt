@@ -11,6 +11,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FallbackPinyinEngineTest {
+    @Test fun `leading separators are consumed by whole phrase completions`() {
+        for (raw in listOf("'nih", "''ni'h", "'nihao'")) {
+            val engine = FallbackPinyinEngine()
+            engine.restoreComposition(raw)
+            val update = engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "你好" })
+            assertEquals(raw, "你好", update.committedText)
+            assertEquals("nihao", update.committedInput)
+            assertFalse(update.snapshot.isComposing)
+        }
+    }
+
+    @Test fun `segment selection followed by completion consumes separators exactly once`() {
+        val engine = FallbackPinyinEngine()
+        engine.restoreComposition("''ni''ai'")
+        engine.selectSyllable()
+        engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "你" })
+        assertEquals("你ai'", engine.snapshot.composition)
+        engine.undoSelection()
+        assertEquals("''ni''ai'", engine.snapshot.composition)
+        engine.selectSyllable()
+        engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "你" })
+        val update = engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "爱" })
+        assertEquals("你爱", update.committedText)
+        assertEquals("niai", update.committedInput)
+        assertFalse(update.snapshot.isComposing)
+    }
+
     @Test
     fun `extended fuzzy pairs remain available on the immediate engine`() {
         val options = ChineseInputOptions()

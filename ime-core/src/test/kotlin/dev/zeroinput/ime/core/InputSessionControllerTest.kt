@@ -115,8 +115,8 @@ class InputSessionControllerTest {
         }
     }
 
-    @Test fun `space selects a later personal page while enter preserves the typed input`() {
-        for (command in listOf(InputCommand.Space, InputCommand.Enter)) {
+    @Test fun `appended personal rows can be selected while space follows the highlight and enter preserves input`() {
+        for (command in listOf(InputCommand.Space, InputCommand.Enter, InputCommand.SelectCandidate(0))) {
             val editor = RecordingConnection()
             val store = object : dev.zeroinput.engine.api.PagedPersonalizationStore {
                 override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int) =
@@ -130,9 +130,18 @@ class InputSessionControllerTest {
             controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
             controller.handle(InputCommand.Text("ni"))
             controller.handle(InputCommand.ChangeCandidatePage(PageDirection.NEXT))
-            assertEquals("词组8", controller.state.snapshot.candidates.first().text)
-            controller.handle(command)
-            assertEquals(listOf(if (command == InputCommand.Enter) "ni" else "词组8"), editor.commits)
+            val snapshot = controller.state.snapshot
+            assertEquals("词组0", snapshot.candidates.first().text)
+            val later = snapshot.candidates.indexOfFirst { it.text == "词组8" }
+            assertTrue(later > 0)
+            val expected = when (command) {
+                InputCommand.Enter -> "ni"
+                InputCommand.Space -> snapshot.candidates[snapshot.highlightedIndex].text
+                else -> "词组8"
+            }
+            controller.handle(if (command is InputCommand.SelectCandidate)
+                InputCommand.SelectCandidate(later, snapshot.candidates[later].id) else command)
+            assertEquals(listOf(expected), editor.commits)
             controller.close()
         }
     }

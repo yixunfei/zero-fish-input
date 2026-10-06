@@ -5,56 +5,50 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Space
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import dev.zeroinput.engine.api.Candidate
 import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.PageDirection
 
+/** A continuous viewport over the core's bounded candidate window. */
 internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: (Int) -> Unit = {}
     var onPageChanged: (PageDirection) -> Unit = {}
     private val layout = GridLayoutManager(context, 3)
     private val adapter = CandidateAdapter()
+    private var lastSnapshot = EngineSnapshot.Empty
+    private var revision = 0L
+    private var pending: PageDirection? = null
+    private var dispatchTask: Runnable? = null
+    private var attempted: Pair<EngineSnapshot, PageDirection>? = null
+    private var explicitRequest = false
+    private val prefetch = Runnable { prefetch(PageDirection.NEXT) }
     private val scroll = RecyclerView(context).apply {
         layoutManager = layout
         adapter = this@ExpandedCandidatesView.adapter
         setHasFixedSize(true)
         itemAnimator = null
+        isSaveEnabled = false
         setItemViewCacheSize(6)
         addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
-                if (dy > 0 && !view.canScrollVertically(1)) requestPage(PageDirection.NEXT, defer = true)
-                if (dy < 0 && !view.canScrollVertically(-1)) requestPage(PageDirection.PREVIOUS, defer = true)
+                updateNavigation()
+                if (dy != 0) prefetch(if (dy > 0) PageDirection.NEXT else PageDirection.PREVIOUS)
             }
         })
     }
     private val previous = panelIconButton(context, android.R.drawable.ic_media_previous, R.string.previous_candidates) {
-        requestPage(PageDirection.PREVIOUS)
+        browse(PageDirection.PREVIOUS)
     }
     private val next = panelIconButton(context, android.R.drawable.ic_media_next, R.string.next_candidates) {
-        requestPage(PageDirection.NEXT)
+        browse(PageDirection.NEXT)
     }
-    private val browser = HorizontalSwipeFrameLayout(context, SwipeAxis.VERTICAL).apply {
-        canSwipe = { direction ->
-            val step = if (direction == PageDirection.NEXT) 1 else -1
-            val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage
-            else lastSnapshot.hasPreviousPage
-            available && !scroll.canScrollVertically(step)
-        }
-        onSwipe = { direction ->
-            requestPage(direction)
-        }
-        addView(scroll)
-    }
-    private var lastSnapshot = EngineSnapshot.Empty
-    private var pending = false
-    private var revision = 0L
-    private var requestedPage: PageDirection? = null
 
     init {
         orientation = VERTICAL
-        addView(browser, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(previous, LayoutParams(dp(48), dp(48)))
@@ -65,66 +59,95 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
-        // Keep cells readable on split-screen phones while using the extra
-        // width available in landscape.  The bounded range preserves stable
-        // touch targets and avoids a layout jump for ordinary portrait widths.
         val columns = (width / dp(112)).coerceIn(2, 4)
         if (layout.spanCount != columns) layout.spanCount = columns
+        schedulePrefetch()
     }
 
     fun render(snapshot: EngineSnapshot) {
-        pending = false
-        val pageRequest = requestedPage
-        requestedPage = null
+        dispatchTask?.let(::removeCallbacks)
+        dispatchTask = null
+        val request = pending
+        val explicit = explicitRequest
+        pending = null
+        explicitRequest = false
         if (snapshot == lastSnapshot) return
-        browser.cancelSwipe()
         val position = layout.findFirstVisibleItemPosition()
         val anchor = adapter.items.getOrNull(position)?.id
         val offset = layout.findViewByPosition(position)?.top ?: 0
+        val old = adapter.items
         val sameInput = snapshot.rawInput == lastSnapshot.rawInput && snapshot.composition == lastSnapshot.composition
-        val oldTexts = lastSnapshot.candidates.map { it.text }.toSet()
-        val newPageAnchor = if (pageRequest == PageDirection.NEXT)
-            snapshot.candidates.indexOfFirst { it.text !in oldTexts } else -1
+        val oldIds = old.mapTo(HashSet()) { it.id }
+        val newPage = snapshot.candidates.indexOfFirst { it.id !in oldIds }
+        val removedHead = old.firstOrNull()?.id?.let { id -> snapshot.candidates.none { it.id == id } } == true
         lastSnapshot = snapshot
         revision++
         adapter.replace(snapshot.candidates, snapshot.highlightedIndex)
         val preserved = if (sameInput) snapshot.candidates.indexOfFirst { it.id == anchor } else -1
         when {
-            newPageAnchor >= 0 -> layout.scrollToPositionWithOffset(newPageAnchor, 0)
-            pageRequest == PageDirection.PREVIOUS -> layout.scrollToPositionWithOffset(0, 0)
-            else -> layout.scrollToPositionWithOffset(preserved.coerceAtLeast(0), if (preserved >= 0) offset else 0)
+            !sameInput -> { scroll.stopScroll(); layout.scrollToPositionWithOffset(0, 0) }
+            explicit && newPage >= 0 -> layout.scrollToPositionWithOffset(newPage, 0)
+            preserved >= 0 && preserved != position -> layout.scrollToPositionWithOffset(preserved, offset)
         }
-        previous.isEnabled = snapshot.hasPreviousPage
+        updateNavigation()
+        // Stop filling when the bounded core window starts evicting rows.
+        if (!removedHead && request != PageDirection.PREVIOUS) schedulePrefetch()
+    }
+
+    private fun schedulePrefetch() {
+        removeCallbacks(prefetch)
+        post(prefetch)
+    }
+
+    private fun prefetch(direction: PageDirection) {
+        if (!isShown || scroll.height == 0 || adapter.itemCount == 0) return
+        val margin = layout.spanCount * 2
+        val nearEdge = if (direction == PageDirection.NEXT)
+            layout.findLastVisibleItemPosition() >= adapter.itemCount - 1 - margin
+        else layout.findFirstVisibleItemPosition() in 0..margin
+        if (nearEdge) requestPage(direction, explicit = false)
+    }
+
+    private fun browse(direction: PageDirection) {
+        val step = if (direction == PageDirection.NEXT) 1 else -1
+        val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage else lastSnapshot.hasPreviousPage
+        if (available) requestPage(direction, explicit = true)
+        else if (scroll.canScrollVertically(step)) scroll.smoothScrollBy(0, step * scroll.height.coerceAtLeast(dp(48)))
+    }
+
+    private fun requestPage(direction: PageDirection, explicit: Boolean) {
+        val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage else lastSnapshot.hasPreviousPage
+        if (!available || !explicit && (pending != null || attempted == (lastSnapshot to direction))) return
+        dispatchTask?.let(::removeCallbacks)
+        pending = direction
+        explicitRequest = explicit
+        attempted = lastSnapshot to direction
+        val expected = revision
+        // Never mutate the adapter from RecyclerView's layout/scroll callback.
+        val dispatch = Runnable {
+            dispatchTask = null
+            if (revision == expected && isShown) onPageChanged(direction)
+            if (revision == expected) { pending = null; explicitRequest = false }
+        }
+        dispatchTask = dispatch
+        if (!explicit || scroll.isComputingLayout) post(dispatch) else dispatch.run()
+    }
+
+    private fun updateNavigation() {
+        previous.isEnabled = lastSnapshot.hasPreviousPage || scroll.canScrollVertically(-1)
+        next.isEnabled = lastSnapshot.hasNextPage || scroll.canScrollVertically(1)
         previous.alpha = if (previous.isEnabled) 1f else 0.35f
-        next.isEnabled = snapshot.hasNextPage
         next.alpha = if (next.isEnabled) 1f else 0.35f
     }
 
-    private fun requestPage(direction: PageDirection, defer: Boolean = false) {
-        val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage else lastSnapshot.hasPreviousPage
-        if (pending || !available) return
-        pending = true
-        val expected = revision
-        // Paging can render synchronously. Always leave RecyclerView's scroll
-        // callback before notifying the adapter.
-        val dispatch = {
-            if (revision == expected && isShown) {
-                requestedPage = direction
-                onPageChanged(direction)
-                // Keep the direction through a callback that posts its render,
-                // while avoiding a stale anchor when no update is delivered.
-                if (revision == expected && requestedPage == direction) post {
-                    if (revision == expected && requestedPage == direction) requestedPage = null
-                }
-            }
-            pending = false
-        }
-        if (defer || scroll.isComputingLayout) post(dispatch) else dispatch()
-    }
-
     fun clear() {
-        browser.cancelSwipe()
+        removeCallbacks(prefetch)
+        dispatchTask?.let(::removeCallbacks)
+        dispatchTask = null
+        scroll.stopScroll()
         revision++
+        pending = null
+        attempted = null
         render(EngineSnapshot.Empty)
         for (index in 0 until scroll.childCount) (scroll.getChildAt(index) as? CandidateItemView)?.clear()
     }
@@ -135,11 +158,19 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         private var highlighted = 0
 
         fun replace(values: List<Candidate>, selected: Int) {
+            val old = items
+            val oldHighlight = highlighted
+            // The core bounds both lists. Page insertion/eviction needs no moves.
+            val changes = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                override fun getOldListSize() = old.size
+                override fun getNewListSize() = values.size
+                override fun areItemsTheSame(a: Int, b: Int) = old[a].id == values[b].id
+                override fun areContentsTheSame(a: Int, b: Int) =
+                    old[a] == values[b] && a == b && (a == oldHighlight) == (b == selected)
+            }, false)
             items = values
             highlighted = selected
-            // Paging replaces a bounded, non-animating grid. A full refresh
-            // avoids DiffUtil's synchronous O(n) comparison on every gesture.
-            notifyDataSetChanged()
+            changes.dispatchUpdatesTo(this)
         }
 
         override fun getItemCount(): Int = items.size
@@ -160,6 +191,5 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
     }
 
     private class CandidateHolder(val view: CandidateItemView) : RecyclerView.ViewHolder(view)
-
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

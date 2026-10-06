@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="panel_expand">Expand panel</string>
+    <string name="panel_collapse">Collapse panel</string>
+    <string name="expression_search_input">Enter an expression search term</string>
     <string name="key_semicolon">Semicolon, Microsoft double pinyin ing</string>
     <!-- Hexadecimal editor flags are identifiers, not plural quantities. -->
     <string name="input_diagnostics_format" tools:ignore="PluralsCandidate">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
@@ -76,7 +79,7 @@
     <string name="expression_no_favorites">No favorites</string>
     <string name="expression_no_custom">No custom kaomoji</string>
     <string name="expression_no_recent">No recent expressions</string>
-    <string name="keyboard_theme_classic">Classic</string>
+    <string name="keyboard_theme_classic">Mist blue (default)</string>
     <string name="keyboard_theme_gray">Minimal gray</string>
     <string name="keyboard_theme_mint">Mint</string>
     <string name="keyboard_theme_rose">Rose</string>
@@ -107,6 +110,17 @@
     <string name="secure_clipboard_cancel_paste">Cancel paste</string>
     <string name="word_associations">Next word</string>
     <string name="ai_toolbar_label">AI</string>
+    <string name="ai_more">More actions</string>
+    <string name="ai_draft_mode">AI draft · %1$s</string>
+    <string name="ai_result_mode">AI result · %1$s</string>
+    <string name="ai_input_chinese">Pinyin</string>
+    <string name="ai_input_english">English</string>
+    <string name="ai_generating">Generating…</string>
+    <string name="ai_timeout">Request timed out. Check your network and retry.</string>
+    <string name="ai_authentication_failed">Authentication failed. Check your API key and model access.</string>
+    <string name="ai_model_unavailable">Model or endpoint not found. Check the model name and service URL.</string>
+    <string name="ai_rate_limited">Request limited. Check your quota or retry later.</string>
+    <string name="ai_service_unavailable">Service temporarily unavailable. Please retry later.</string>
     <string name="ai_open">Open AI workbench</string>
     <string name="ai_entry_unavailable">AI unavailable. Tap for details</string>
     <string name="ai_entry_privacy_blocked">AI is blocked by this field or your privacy settings.</string>
@@ -114,7 +128,11 @@
     <string name="ai_target_language_hint">Translation language</string>
     <string name="ai_submit">Send</string>
     <string name="ai_cancel">Stop</string>
-    <string name="ai_insert">Insert result</string>
+    <string name="ai_insert">Insert</string>
+    <string name="ai_settings">Settings</string>
+    <string name="ai_add_content">Add content</string>
+    <string name="ai_import_content">Use selected content</string>
+    <string name="ai_remove_attachment">Remove %1$s</string>
     <string name="ai_input_required">Enter some text</string>
     <string name="ai_request_failed">Unable to complete. Check AI settings and try again.</string>
     <string name="ai_policy_unavailable">AI is unavailable. Check the AI and network switches in settings and this field’s privacy restrictions.</string>
@@ -133,7 +151,7 @@
     <string name="ai_user_message">You: %1$s</string>
     <string name="ai_assistant_message">AI: %1$s</string>
     <string name="ai_edit">Edit</string>
-    <string name="ai_read">Hide keyboard</string>
+    <string name="ai_read">Preview</string>
     <string name="fuzzy_short">Fuzzy</string>
     <string name="fuzzy_toggle">Toggle fuzzy pinyin</string>
     <string name="fuzzy_choose_rules">Choose fuzzy pinyin rules in settings first</string>
@@ -152,6 +170,8 @@
     <string name="handwriting_delete">Delete</string>
     <string name="handwriting_space">Space</string>
     <string name="handwriting_enter">Enter</string>
+    <string name="handwriting_fullscreen">Full screen</string>
+    <string name="handwriting_exit_fullscreen">Exit full screen</string>
     <string name="handwriting_candidate">Candidate</string>
     <string name="handwriting_candidate_value">Insert %1$s</string>
     <string name="language_sensitive_protection">Sensitive input protection enabled</string>

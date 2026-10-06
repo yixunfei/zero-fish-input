@@ -49,6 +49,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
         screen = ClipboardImportView(this).also {
             it.onCancel = ::discardAndFinish
             it.onAction = ::performAction
+            it.onAiAction = ::importAiContext
             it.showReview(requireNotNull(request).length, graph.settings.secureClipboardEnabled)
             setContentView(it)
         }
@@ -104,6 +105,18 @@ open class ClipboardImportActivity : AppCompatActivity() {
             ClipboardImportRequest.Phase.AUTHORIZED -> save(current)
             else -> Unit
         }
+    }
+
+    private fun importAiContext() {
+        if (!resumed || !hasWindowFocus() || isFinishing ||
+            !graph.settings.learningEnabled || graph.settings.incognitoMode) return
+        val current = request ?: return
+        val text = current.copyForAi() ?: return
+        graph.aiContentInbox.put(
+            dev.zeroinput.ime.ai.AiImportedContent(text.toCharArray(), emptyList())
+        )
+        Toast.makeText(this, R.string.ai_import_ready, Toast.LENGTH_LONG).show()
+        discardAndFinish()
     }
 
     private fun authenticate(current: ClipboardImportRequest) {
@@ -181,6 +194,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
         grant = null
         screen?.clearText()
         screen?.onAction = {}
+        screen?.onAiAction = {}
         screen?.onCancel = {}
         authentication?.close()
         authentication = null

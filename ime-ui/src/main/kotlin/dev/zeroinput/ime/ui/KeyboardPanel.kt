@@ -39,6 +39,10 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var heightPreset = KeyboardHeight.STANDARD
     private var heightScale = 1f
     private var compact = false
+    private var pairedSymbolsEnabled = true
+    private var symbolSwipeStartX = 0f
+    private var symbolSwipeStartY = 0f
+    private var symbolSwipeActive = false
     private var geometry = emptyList<List<Float>>()
     private val keys = mutableListOf<KeyboardKeyView>()
     private val glide = GlideTouchTracker(this, ::glideKeys)
@@ -47,6 +51,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     var onGlideRequest: (GlideRequest, GlideLetterCase) -> Unit = { _, _ -> }
     private var radius = 0f
     private var inset = 0
+    private var appearance = KeyboardAppearance()
     private var colorsResolved = false
     private var surfaceColor = 0
     private var surfaceVariantColor = 0
@@ -78,11 +83,51 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun configureGlide(layout: GlideLayout?) { glideLayout = layout; updateGlideLayout() }
 
+    fun applyAppearance(value: KeyboardAppearance) {
+        appearance = value.sanitized()
+        radius = if (appearance.material == KeyboardMaterial.CLASSIC) 0f else dp(appearance.cornerRadius).toFloat()
+        inset = if (appearance.material == KeyboardMaterial.CLASSIC) 0 else dp(appearance.keySpacing)
+        render()
+    }
+
     private fun updateGlideLayout() {
         glide.layout = if (page == KeyboardPage.LETTERS && editor.layout == EditorLayout.TEXT) glideLayout else null
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    symbolSwipeStartX = event.x
+                    symbolSwipeStartY = event.y
+                    symbolSwipeActive = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.x - symbolSwipeStartX
+                    val dy = event.y - symbolSwipeStartY
+                    if (!symbolSwipeActive && kotlin.math.abs(dx) > dp(24) && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.2f) {
+                        symbolSwipeActive = true
+                        cancelPendingGestures()
+                        val cancel = MotionEvent.obtain(event)
+                        try { cancel.action = MotionEvent.ACTION_CANCEL; super.dispatchTouchEvent(cancel) }
+                        finally { cancel.recycle() }
+                    }
+                    if (symbolSwipeActive) return true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (symbolSwipeActive) {
+                        val direction = event.x - symbolSwipeStartX
+                        onUserInteraction()
+                        page = if (direction < 0) KeyboardPage.MORE_SYMBOLS else KeyboardPage.SYMBOLS
+                        render()
+                        symbolSwipeActive = false
+                        return true
+                    }
+                    symbolSwipeActive = false
+                }
+                MotionEvent.ACTION_CANCEL -> symbolSwipeActive = false
+            }
+        }
         if (glide.touch(event)) {
             if (event.actionMasked == MotionEvent.ACTION_MOVE) {
                 val cancel = MotionEvent.obtain(event)
@@ -139,6 +184,11 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         compact = value
         render()
         for (index in 0 until childCount) getChildAt(index).layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, rowHeight())
+    }
+
+    fun setPairedSymbolsEnabled(value: Boolean) {
+        if (pairedSymbolsEnabled == value) return
+        pairedSymbolsEnabled = value
     }
 
     fun startEditor(value: EditorInputOptions) {
@@ -342,13 +392,15 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             context.getString(when (shift) { Shift.OFF -> R.string.key_lowercase; Shift.ON -> R.string.key_uppercase; Shift.LOCKED -> R.string.key_caps_lock }) else null)
         view.setColors(
             if (selected) primaryContainerColor else when (spec.style) {
-                KeyStyle.NORMAL -> surfaceColor
+                KeyStyle.NORMAL -> if (appearance.material == KeyboardMaterial.CLASSIC) surfaceColor else
+                    androidx.core.graphics.ColorUtils.blendARGB(surfaceColor, Color.WHITE,
+                        if (androidx.core.graphics.ColorUtils.calculateLuminance(surfaceColor) > 0.5) 0.9f else 0.06f)
                 KeyStyle.MODIFIER -> surfaceVariantColor
                 KeyStyle.PRIMARY -> primaryContainerColor
             },
             primaryContainerColor,
             outlineColor,
-            radius, inset,
+            radius, inset, appearance,
         )
     }
 
@@ -372,6 +424,9 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
                 onAction(action)
                 if (shift == Shift.ON) { shift = Shift.OFF; render() }
             }
+            is KeyboardAction.PairedText -> onAction(
+                if (pairedSymbolsEnabled) action else KeyboardAction.LiteralText(action.opening),
+            )
             else -> onAction(action)
         }
     }

@@ -19,14 +19,14 @@ class AiRepositoryTest {
     @Test
     fun configurationRoundTripWipesBuffersAndKeepsApiKeyOutOfTheMemoryContract() {
         val store = MemoryStore()
+        val profile = providerProfile()
         val value = AiConfiguration(
             enabled = true,
             networkAllowed = true,
-            endpoint = "https://provider.example/v1/chat/completions",
-            model = "local-compatible",
-            apiKey = "fixture-api-key",
             timeoutMs = 30_000L,
             saveConversations = true,
+            providers = listOf(profile),
+            selectedProviderId = profile.id,
         )
 
         AiConfigurationRepository(store).write(value)
@@ -41,28 +41,67 @@ class AiRepositoryTest {
     fun failedConfigurationWriteDoesNotPublishTheNewCache() {
         val store = MemoryStore()
         val repository = AiConfigurationRepository(store)
-        val original = AiConfiguration(apiKey = "original")
+        val original = AiConfiguration(
+            providers = listOf(providerProfile(apiKey = "original")),
+            selectedProviderId = "fixture",
+        )
         repository.write(original)
         store.failWrite = true
 
         assertThrows(IOException::class.java) {
-            repository.write(original.copy(model = "new-model"))
+            repository.write(original.copy(providers = listOf(providerProfile(selectedModel = "new-model"))))
         }
         assertEquals(original, repository.read())
+    }
+
+    @Test
+    fun multipleProvidersAndPerModelCapabilitiesRoundTrip() {
+        val store = MemoryStore()
+        val first = AiProviderProfile("one", "First", "https://first.example/v1/chat/completions",
+            "key-one", listOf("text", "vision"), "vision", imageModels = setOf("vision"))
+        val second = AiProviderProfile("two", "Second", "https://second.example/v1/chat/completions",
+            "key-two", listOf("audio"), "audio", audioModels = setOf("audio"))
+        val value = AiConfiguration(providers = listOf(first, second), selectedProviderId = second.id,
+            saveConversations = true)
+
+        AiConfigurationRepository(store).write(value)
+        val restored = AiConfigurationRepository(store).read()
+
+        assertEquals(value, restored)
+        assertEquals("key-two", restored.activeKey())
+        assertTrue(restored.activeProvider()?.supportsAudio == true)
+        assertTrue(restored.copy(selectedProviderId = first.id).activeProvider()?.supportsImages == true)
+        assertTrue(restored.copy(selectedProviderId = first.id,
+            providers = listOf(first.copy(selectedModel = "text"), second)).activeProvider()?.supportsImages == false)
+    }
+
+    @Test
+    fun providerWithoutSelectionOrInvalidModelCapabilityIsRejected() {
+        val repository = AiConfigurationRepository(MemoryStore())
+        val profile = AiProviderProfile("one", "First", "https://example.test/v1/chat/completions",
+            "key", listOf("text"), "text")
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.write(AiConfiguration(providers = listOf(profile)))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.write(AiConfiguration(providers = listOf(profile.copy(imageModels = setOf("missing"))),
+                selectedProviderId = profile.id))
+        }
     }
 
     @Test
     fun configurationRejectsInvalidPortsAndHeaderControlsBeforePersisting() {
         val store = MemoryStore()
         val repository = AiConfigurationRepository(store)
-        val original = AiConfiguration(apiKey = "original")
+        val originalProfile = providerProfile(apiKey = "original")
+        val original = AiConfiguration(providers = listOf(originalProfile), selectedProviderId = originalProfile.id)
         repository.write(original)
         val originalBytes = checkNotNull(store.bytes).copyOf()
         val invalid = listOf(
-            original.copy(endpoint = "https://provider.example:65536/v1/chat/completions"),
-            original.copy(endpoint = "https://provider.example:0/v1/chat/completions"),
-            original.copy(apiKey = "fixture\r\nheader"),
-            original.copy(apiKey = "fixture\u0000key"),
+            original.copy(providers = listOf(originalProfile.copy(endpoint = "https://provider.example:65536/v1/chat/completions"))),
+            original.copy(providers = listOf(originalProfile.copy(endpoint = "https://provider.example:0/v1/chat/completions"))),
+            original.copy(providers = listOf(originalProfile.copy(apiKey = "fixture\r\nheader"))),
+            original.copy(providers = listOf(originalProfile.copy(apiKey = "fixture\u0000key"))),
         )
         invalid.forEach { value ->
             assertThrows(IllegalArgumentException::class.java) { repository.write(value) }
@@ -80,6 +119,68 @@ class AiRepositoryTest {
 
         assertThrows(IllegalStateException::class.java) { repository.read() }
         assertArrayEquals(original, store.bytes)
+    }
+
+    @Test
+    fun legacyConfigurationIsClearedWithoutCompatibilityMigration() {
+        for (format in 1..3) {
+            val store = MemoryStore()
+            store.bytes = JSONObject()
+                .put("format", format)
+                .put("enabled", true)
+                .put("networkAllowed", true)
+                .put("saveConversations", true)
+                .put("endpoint", "https://legacy.example/v1/chat/completions")
+                .put("model", "legacy-model")
+                .put("apiKey", "legacy-key")
+                .toString()
+                .toByteArray()
+            val repository = AiConfigurationRepository(store)
+
+            assertEquals(AiConfiguration(), repository.read())
+            assertTrue(store.deletedKey)
+            assertNull(store.bytes)
+            assertTrue(checkNotNull(store.lastRead).all { it == 0.toByte() })
+        }
+    }
+
+    @Test
+    fun currentFormatRejectsLegacyProviderWideCapabilities() {
+        val store = MemoryStore()
+        val repository = AiConfigurationRepository(store)
+        repository.write(AiConfiguration(providers = listOf(providerProfile()), selectedProviderId = "fixture"))
+        val root = JSONObject(String(checkNotNull(store.bytes), Charsets.UTF_8))
+        val profile = root.getJSONArray("providers").getJSONObject(0)
+        profile.remove("imageModels")
+        profile.remove("audioModels")
+        profile.put("supportsImages", true)
+        profile.put("supportsAudio", true)
+        store.bytes = root.toString().toByteArray(Charsets.UTF_8)
+        val original = checkNotNull(store.bytes).copyOf()
+
+        assertThrows(IllegalStateException::class.java) { AiConfigurationRepository(store).read() }
+        assertArrayEquals(original, store.bytes)
+        assertTrue(checkNotNull(store.lastRead).all { it == 0.toByte() })
+    }
+
+    @Test
+    fun failedLegacyConfigurationPurgeLocksReadsAndWritesUntilClearSucceeds() {
+        val store = MemoryStore().apply {
+            bytes = JSONObject().put("format", 2).toString().toByteArray()
+            failDelete = true
+        }
+        val repository = AiConfigurationRepository(store)
+
+        assertThrows(IllegalStateException::class.java) { repository.read() }
+        store.failDelete = false
+        assertThrows(IllegalStateException::class.java) { repository.read() }
+        assertThrows(IllegalStateException::class.java) { repository.write(AiConfiguration()) }
+        repository.clear()
+        assertEquals(AiConfiguration(), repository.read())
+        assertTrue(store.deletedKey)
+        assertNull(store.bytes)
+        repository.write(AiConfiguration())
+        assertEquals(AiConfiguration(), AiConfigurationRepository(store).read())
     }
 
     @Test
@@ -218,14 +319,28 @@ class AiRepositoryTest {
         assertTrue(history.list().isEmpty())
 
         val configuration = AiConfigurationRepository(store)
-        configuration.write(AiConfiguration(apiKey = "fixture"))
+        val profile = providerProfile(apiKey = "fixture")
+        configuration.write(AiConfiguration(providers = listOf(profile), selectedProviderId = profile.id))
         store.failDelete = true
         assertThrows(IOException::class.java) { configuration.clear() }
         assertThrows(IllegalStateException::class.java) { configuration.read() }
         store.failDelete = false
         configuration.clear()
-        assertEquals("", configuration.read().apiKey)
+        assertEquals("", configuration.read().activeKey())
     }
+
+    private fun providerProfile(
+        endpoint: String = "https://provider.example/v1/chat/completions",
+        apiKey: String = "fixture-api-key",
+        selectedModel: String = "local-compatible",
+    ) = AiProviderProfile(
+        id = "fixture",
+        name = "Fixture",
+        endpoint = endpoint,
+        apiKey = apiKey,
+        models = listOf("local-compatible", "new-model"),
+        selectedModel = selectedModel,
+    )
 
     private class MemoryStore : EncryptedStore {
         var bytes: ByteArray? = null

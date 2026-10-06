@@ -25,7 +25,7 @@ class PinyinAlgebraTest {
             assertEquals(2, PinyinAlgebra.rules(enabled).size)
             assertTrue(enabled.isFuzzyEnabled(pair))
             assertFalse(initial.isFuzzyEnabled(pair))
-            assertEquals(initial, enabled.withFuzzy(pair, false))
+            assertEquals(initial.withAllFuzzy(false), enabled.withFuzzy(pair, false))
             assertNotEquals(PinyinAlgebra.schemaId(initial), PinyinAlgebra.schemaId(enabled))
         }
     }

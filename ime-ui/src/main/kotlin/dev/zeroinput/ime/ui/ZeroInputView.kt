@@ -42,6 +42,12 @@ class ZeroInputView @JvmOverloads constructor(
     var onCandidateSelected: (Int, String) -> Unit = { _, _ -> }
     var onCandidatePageChanged: (PageDirection) -> Unit = {}
     var onEmojiSelected: (EmojiEntry) -> Unit = {}
+    var onSearchVisibilityChanged: (Boolean) -> Unit = {}
+    var onSearchAction: (KeyboardAction) -> Unit = {}
+    var onSearchClearRequested: () -> Unit = {}
+    val isSearchEditing: Boolean get() = mode == PanelMode.EMOJI && emoji.isSearchActive
+    private var searchSnapshot = EngineSnapshot.Empty
+    private var searchCandidatesExpanded = false
     var onExpressionFavoriteRequested: (EmojiEntry, Boolean) -> Unit = { _, _ -> }
     var onExpressionManagementRequested: (String?) -> Unit = {}
     var onSecureClipboardSelected: (String) -> Unit = {}
@@ -65,6 +71,7 @@ class ZeroInputView @JvmOverloads constructor(
         else -> GlideLayout.PINYIN_QWERTY
     }
     var onPlacementRequested: (View) -> Unit = {}
+    var onPanelExpansionChanged: () -> Unit = {}
     private var externalInsets = false
     var onClipboardGuardRequested: () -> Unit = {}
     var onSecureClipboardManagementRequested: () -> Unit = {}
@@ -77,6 +84,10 @@ class ZeroInputView @JvmOverloads constructor(
     var onAiNewConversation: () -> Unit = {}
     var onAiVisibilityChanged: (Boolean) -> Unit = {}
     var onAiDraftChanged: (KeyboardAction) -> Unit = {}
+    var onAiSettingsRequested: () -> Unit = {}
+    var onAiAddContentRequested: () -> Unit = {}
+    var onAiImportContentRequested: () -> Unit = {}
+    var onAiRemoveAttachment: (Int) -> Unit = {}
     val isAiOpen: Boolean get() = mode == PanelMode.AI
     val isAiEditing: Boolean get() = mode == PanelMode.AI && ai.editing
     private var aiSnapshot = EngineSnapshot.Empty
@@ -131,7 +142,10 @@ class ZeroInputView @JvmOverloads constructor(
     private var manualTools = false
     private var released = false
     val canNavigateBack: Boolean get() = !released && (manualTools || mode != PanelMode.KEYBOARD || keyboard.canNavigateBack)
-    private var maximumContentHeight = Int.MAX_VALUE
+    private var availablePanelHeight = 0
+    private var panelChromeHeight = 0
+    private var panelExpansion = PanelExpansion.COMPACT
+    val isPanelExpanded: Boolean get() = panelExpansion != PanelExpansion.COMPACT
     private var lastViewport = -1
     private var lastLandscape = false
     private var engineStatus = InputEngineStatus.HIDDEN
@@ -162,14 +176,8 @@ class ZeroInputView @JvmOverloads constructor(
     private val scriptButton = toolbarButton(context.getString(R.string.script_short_simplified), context.getString(R.string.switch_chinese_script)) {
         onScriptSwitchRequested()
     }
-    private var fuzzyConfigured = false
     private val fuzzyButton = toolbarButton(context.getString(R.string.fuzzy_short), context.getString(R.string.fuzzy_toggle)) {
-        if (fuzzyConfigured) onFuzzySwitchRequested()
-        else {
-            onUserInteraction()
-            Toast.makeText(context, R.string.fuzzy_choose_rules, Toast.LENGTH_SHORT).show()
-            onFuzzySettingsRequested()
-        }
+        onFuzzySwitchRequested()
     }
     private val keyboard = KeyboardPanel(context)
     private val readings = ReadingChoicesView(context).apply { onSelected = { onReadingSelected(it) } }
@@ -204,12 +212,16 @@ class ZeroInputView @JvmOverloads constructor(
         overScrollMode = View.OVER_SCROLL_NEVER
         addView(createToolbar())
     }
+    private val expansionButton = panelIconButton(context, R.drawable.ic_panel_expand, R.string.panel_expand) {
+        changePanelExpansion(if (isPanelExpanded) PanelExpansion.COMPACT else PanelExpansion.EXPANDED)
+    }
     private val header = FrameLayout(context).apply {
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(if (landscape) 48 else 72))
         addView(toolbar, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48), Gravity.CENTER_VERTICAL))
         addView(candidateStrip, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(glideSuggestions, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(expansionButton, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
     }
     private val backNavigation = PanelBackNavigation(this, { canNavigateBack }) { navigateBack() }
 
@@ -261,26 +273,16 @@ class ZeroInputView @JvmOverloads constructor(
         sensitive = state.privacy.isSensitive
         glidePolicyAllowed = state.privacy.suggestionsAllowed &&
             (state.language != InputLanguage.ENGLISH || state.privacy.predictionsAllowed)
-        aiAvailable = !state.privacy.isSensitive && state.privacy.personalizationAllowed &&
-            state.privacy.suggestionsAllowed && state.privacy.predictionsAllowed
+        aiAvailable = !state.privacy.isSensitive && state.privacy.suggestionsAllowed && state.privacy.independentAiAllowed
         if (!aiAvailable && mode == PanelMode.AI) showMode(PanelMode.KEYBOARD, userInitiated = false)
         canReconvert = state.canReconvert
         capabilities = state.engineDescriptor?.capabilities.orEmpty()
         currentSnapshot = state.snapshot
-        val label = if (state.languagePackKey != null) {
-            "包"
-        } else if (state.language == InputLanguage.CHINESE) {
-            "中"
-        } else {
-            "En"
+        if (mode != PanelMode.AI && !isSearchEditing) {
+            renderEditorLanguage()
+            keyboard.setComposing(state.snapshot.isComposing)
+            candidateStrip.render(state.snapshot)
         }
-        languageButton.text = if (state.privacy.isSensitive) "🔒" else label
-        languageButton.contentDescription = context.getString(
-            if (state.privacy.isSensitive) R.string.language_sensitive_protection else R.string.language_switch,
-        )
-        keyboard.setLanguageLabel(label)
-        keyboard.setComposing(state.snapshot.isComposing)
-        if (mode != PanelMode.AI) candidateStrip.render(state.snapshot)
         scriptButton.visibility = if (mode != PanelMode.AI && state.language == InputLanguage.CHINESE && state.languagePackKey == null &&
             state.privacy.suggestionsAllowed && EngineCapability.CHINESE_SCRIPT in capabilities) View.VISIBLE else View.GONE
         layoutButton.visibility = if (mode == PanelMode.KEYBOARD && state.language == InputLanguage.CHINESE && state.languagePackKey == null &&
@@ -291,8 +293,28 @@ class ZeroInputView @JvmOverloads constructor(
             if (state.snapshot.candidates.isEmpty()) showMode(PanelMode.KEYBOARD, userInitiated = false)
             else expandedCandidates.render(state.snapshot)
         }
-        if (mode != PanelMode.AI && !state.snapshot.isComposing) expandedCandidates.clear()
+        if (mode != PanelMode.AI && !isSearchEditing && !state.snapshot.isComposing) expandedCandidates.clear()
         refreshHeader()
+    }
+
+    private fun renderEditorLanguage() {
+        val label = when {
+            currentPack != null -> "包"
+            currentLanguage == InputLanguage.CHINESE -> "中"
+            else -> "En"
+        }
+        languageButton.text = if (sensitive) "🔒" else label
+        languageButton.contentDescription = context.getString(
+            if (sensitive) R.string.language_sensitive_protection else R.string.language_switch,
+        )
+        keyboard.setLanguageLabel(label)
+    }
+
+    private fun renderDraftLanguage(language: InputLanguage) {
+        val label = if (language == InputLanguage.CHINESE) "中" else "En"
+        keyboard.setLanguageLabel(label)
+        languageButton.text = label
+        languageButton.contentDescription = context.getString(R.string.language_switch)
     }
 
     fun renderEngineStatus(status: InputEngineStatus) {
@@ -324,6 +346,20 @@ class ZeroInputView @JvmOverloads constructor(
         showMode(PanelMode.KEYBOARD, userInitiated = false)
     }
 
+    fun applyAppearance(appearance: KeyboardAppearance, image: android.graphics.Bitmap? = null) {
+        if (released) return
+        val value = appearance.sanitized()
+        keyboard.applyAppearance(value)
+        setKeyboardHeight(value.height)
+        val surface = resolveColor(com.google.android.material.R.attr.colorSurface, Color.GRAY)
+        // Arbitrary user photos/colors must not compromise candidate and toolbar contrast.
+        header.setBackgroundColor(if (value.background != KeyboardBackground.SOLID || value.backgroundColor != null)
+            androidx.core.graphics.ColorUtils.setAlphaComponent(surface, 242) else Color.TRANSPARENT)
+        background = KeyboardBackgroundDrawable(value, surface,
+            resolveColor(com.google.android.material.R.attr.colorPrimaryContainer, Color.GRAY),
+            image, resources.displayMetrics.density)
+    }
+
     fun setKeyboardHeight(height: KeyboardHeight) {
         keyboard.setHeight(height)
         readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
@@ -343,6 +379,10 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun configureSoundEffects(value: Boolean) {
         keyboard.keySoundEffectsEnabled = value
+    }
+
+    fun configurePairedSymbols(value: Boolean) {
+        keyboard.setPairedSymbolsEnabled(value)
     }
 
     fun configureGlide(enabled: Boolean) { glideEnabled = enabled; keyboard.configureGlide(availableGlideLayout) }
@@ -366,29 +406,29 @@ class ZeroInputView @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val available = dp(resources.configuration.screenHeightDp)
-        val measuredRootHeight = rootView.takeIf { it !== this }?.height ?: 0
         val requestedLimit = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) available
             else MeasureSpec.getSize(heightMeasureSpec)
-        val parentLimit = if (measuredRootHeight > 0) minOf(requestedLimit, measuredRootHeight)
-            else requestedLimit
+        // The previous IME root height is the collapsed window, not a limit on
+        // its next layout. Only the current parent measure spec is authoritative.
+        val parentLimit = requestedLimit
         // Insets are part of this view's measured size. Reserve them before
         // measuring children so the keyboard cannot extend below the IME window.
         val insetHeight = paddingTop + paddingBottom
-        val contentLimit = (parentLimit - insetHeight).coerceAtLeast(dp(192))
-        val limit = if (landscape && available > 0) {
+        val contentLimit = (parentLimit - insetHeight).coerceAtLeast(0)
+        val limit = if (landscape && available > 0 && panelExpansion != PanelExpansion.FULLSCREEN) {
             minOf(contentLimit, (available - dp(48)).coerceAtLeast(dp(192)))
         } else {
             contentLimit
         }
         val reminder = if (clipboardGuard.isVisible) dp(48) else 0
         val preparationHeight = if (enginePreparation.isVisible) enginePreparation.preferredHeight else 0
-        val bodyLimit = (limit - header.layoutParams.height - reminder - preparationHeight)
-            .coerceAtLeast(dp(144))
+        panelChromeHeight = header.layoutParams.height + reminder + preparationHeight
+        availablePanelHeight = limit
+        val bodyLimit = (limit - panelChromeHeight).coerceAtLeast(0)
         if (bodyLimit != lastViewport || landscape != lastLandscape) {
             lastViewport = bodyLimit
             lastLandscape = landscape
-            maximumContentHeight = bodyLimit
-            keyboard.setCompactLandscape(landscape && bodyLimit < dp(224))
+            keyboard.setCompactLandscape(bodyLimit < dp(if (isSearchEditing) 480 else 224))
             readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
             updatePanelLayout()
         }
@@ -404,11 +444,9 @@ class ZeroInputView @JvmOverloads constructor(
         val label = context.getString(if (options.script == ChineseScript.SIMPLIFIED)
             R.string.script_short_simplified else R.string.script_short_traditional)
         if (scriptButton.text != label) scriptButton.text = label
-        fuzzyConfigured = options.fuzzyPinyinMask != 0
         fuzzyButton.isSelected = options.effectiveFuzzyPinyinMask != 0
         fuzzyButton.contentDescription = context.getString(when {
-            !fuzzyConfigured -> R.string.fuzzy_choose_rules
-            options.fuzzyPinyinEnabled -> R.string.fuzzy_disable
+            fuzzyButton.isSelected -> R.string.fuzzy_disable
             else -> R.string.fuzzy_enable
         })
         ViewCompat.setStateDescription(fuzzyButton, context.getString(
@@ -433,7 +471,8 @@ class ZeroInputView @JvmOverloads constructor(
             mode != PanelMode.EMOJI && mode != PanelMode.AI && editorOptions.layout == EditorLayout.TEXT
         keyboard.setKeyboardLayout(if (nineKey) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL)
         keyboard.setDoublePinyinScheme(if (currentLanguage == InputLanguage.CHINESE && currentPack == null &&
-            !sensitive && !nineKey && editorOptions.layout == EditorLayout.TEXT) doublePinyinScheme else DoublePinyinScheme.OFF)
+            !sensitive && !nineKey && mode != PanelMode.EMOJI && mode != PanelMode.AI &&
+            editorOptions.layout == EditorLayout.TEXT) doublePinyinScheme else DoublePinyinScheme.OFF)
         readings.visibility = if (nineKey) View.VISIBLE else View.GONE
         val label = context.getString(if (nineKey) R.string.layout_full_short else R.string.layout_nine_short)
         if (layoutButton.text != label) layoutButton.text = label
@@ -444,6 +483,8 @@ class ZeroInputView @JvmOverloads constructor(
 
     /** Retire both public bindings and callbacks before replacing the themed view. */
     fun release() {
+        background = null
+        emoji.clearSession()
         released = true
         backNavigation.clear()
         enginePreparation.render(InputEngineStatus.HIDDEN)
@@ -452,6 +493,9 @@ class ZeroInputView @JvmOverloads constructor(
         onCandidateSelected = { _, _ -> }
         onCandidatePageChanged = {}
         onEmojiSelected = {}
+        onSearchVisibilityChanged = {}
+        onSearchAction = {}
+        onSearchClearRequested = {}
         onExpressionFavoriteRequested = { _, _ -> }
         onExpressionManagementRequested = {}
         onSecureClipboardSelected = {}
@@ -464,6 +508,7 @@ class ZeroInputView @JvmOverloads constructor(
         onGlideCandidateSelected = {}
         glideSuggestions.clear()
         onPlacementRequested = {}
+        onPanelExpansionChanged = {}
         onClipboardGuardRequested = {}
         onSecureClipboardManagementRequested = {}
         onAiSubmit = { _, _, _ -> }
@@ -475,6 +520,10 @@ class ZeroInputView @JvmOverloads constructor(
         onAiNewConversation = {}
         onAiVisibilityChanged = {}
         onAiDraftChanged = {}
+        onAiSettingsRequested = {}
+        onAiAddContentRequested = {}
+        onAiImportContentRequested = {}
+        onAiRemoveAttachment = {}
         onUserInteraction = {}
         onTouchStarted = {}
         onTouchFinished = {}
@@ -515,11 +564,30 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun clearExpressionSession() { emoji.clearSession() }
 
+    fun renderSearchDraft(text: String, state: InputSessionState) {
+        if (!isSearchEditing) return
+        searchSnapshot = state.snapshot
+        emoji.renderQuery(text)
+        candidateStrip.render(state.snapshot)
+        keyboard.setComposing(state.snapshot.isComposing)
+        renderDraftLanguage(state.language)
+        if (searchCandidatesExpanded) {
+            if (state.snapshot.candidates.isEmpty()) setSearchCandidatesExpanded(false)
+            else expandedCandidates.render(state.snapshot)
+        }
+        refreshHeader()
+    }
+
     fun renderSecureClipboard(enabled: Boolean, items: List<SecureClipboardItemUi>) {
         secureClipboard.render(enabled, items)
     }
 
     fun renderAi(event: AiStreamEvent) { ai.render(event) }
+
+    fun renderAiImportedContent(available: Boolean, names: List<String>) {
+        ai.renderImportedContent(available, names)
+        updatePanelLayout()
+    }
 
     fun clearAiSession() {
         ai.reset()
@@ -529,7 +597,7 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun renderAiDraft(text: String, state: InputSessionState) {
-        ai.renderDraft(text)
+        ai.renderDraft(text, state.language)
         aiSnapshot = state.snapshot
         if (mode == PanelMode.AI) {
             candidateStrip.render(state.snapshot)
@@ -538,7 +606,7 @@ class ZeroInputView @JvmOverloads constructor(
                 else expandedCandidates.render(state.snapshot)
             }
             keyboard.setComposing(state.snapshot.isComposing)
-            keyboard.setLanguageLabel(if (state.language == InputLanguage.CHINESE) "中" else "En")
+            renderDraftLanguage(state.language)
             refreshHeader()
         }
     }
@@ -565,6 +633,7 @@ class ZeroInputView @JvmOverloads constructor(
         cancelPendingGestures()
         when {
             manualTools -> { onUserInteraction(); manualTools = false; refreshHeader() }
+            isSearchEditing && searchCandidatesExpanded -> { onUserInteraction(); setSearchCandidatesExpanded(false) }
             mode == PanelMode.AI && aiCandidatesExpanded -> { onUserInteraction(); setAiCandidatesExpanded(false) }
             mode == PanelMode.EMOJI && emoji.closeSearch() -> Unit
             mode != PanelMode.KEYBOARD -> showMode(PanelMode.KEYBOARD)
@@ -605,15 +674,15 @@ class ZeroInputView @JvmOverloads constructor(
         keyboard.onClearComposition = {
             if (mode == PanelMode.EMOJI && emoji.isSearchActive) {
                 onUserInteraction()
-                emoji.clearQuery()
-                true
+                onClearCompositionRequested()
             } else onClearCompositionRequested()
         }
         candidateStrip.onCandidateSelected = ::selectVisibleCandidate
         candidateStrip.onUndoSelectionRequested = { onUndoSelectionRequested() }
         candidateStrip.onSyllableRequested = { onSyllableRequested() }
         candidateStrip.onExpandRequested = {
-            if (mode == PanelMode.AI) setAiCandidatesExpanded(!aiCandidatesExpanded)
+            if (isSearchEditing) setSearchCandidatesExpanded(!searchCandidatesExpanded)
+            else if (mode == PanelMode.AI) setAiCandidatesExpanded(!aiCandidatesExpanded)
             else if (mode == PanelMode.CANDIDATES) showMode(PanelMode.KEYBOARD)
             else if (currentSnapshot.candidates.isNotEmpty()) showMode(PanelMode.CANDIDATES)
         }
@@ -623,6 +692,7 @@ class ZeroInputView @JvmOverloads constructor(
         candidateStrip.onToolsRequested = {
             onUserInteraction()
             if (mode == PanelMode.AI) setAiCandidatesExpanded(false)
+            if (isSearchEditing) setSearchCandidatesExpanded(false)
             manualTools = true
             toolbar.scrollTo(0, 0)
             refreshHeader()
@@ -633,11 +703,21 @@ class ZeroInputView @JvmOverloads constructor(
         emoji.onEmojiSelected = { onEmojiSelected(it) }
         emoji.onFavoriteRequested = { entry, selected -> onExpressionFavoriteRequested(entry, selected) }
         emoji.onManageRequested = { onExpressionManagementRequested(it) }
-        emoji.onSearchModeChanged = { searchActive -> updateEmojiSearchLayout(searchActive) }
+        emoji.onSearchModeChanged = { searchActive ->
+            searchSnapshot = EngineSnapshot.Empty
+            searchCandidatesExpanded = false
+            onSearchVisibilityChanged(searchActive && mode == PanelMode.EMOJI)
+            updateEmojiSearchLayout(searchActive)
+            refreshHeader()
+        }
+        emoji.onQueryClearRequested = { onSearchClearRequested() }
         emoji.onUserInteraction = { onUserInteraction() }
         handwriting.onStrokesChanged = { onHandwritingStrokesChanged(it) }
         handwriting.onCandidateSelected = { onHandwritingCandidateSelected(it) }
         handwriting.onEditAction = { onKeyboardAction(it) }
+        handwriting.onFullScreenChanged = { fullScreen ->
+            changePanelExpansion(if (fullScreen) PanelExpansion.FULLSCREEN else PanelExpansion.COMPACT)
+        }
         secureClipboard.onItemSelected = { onSecureClipboardSelected(it) }
         secureClipboard.onCopySelectionRequested = { onCopySelectionRequested() }
         secureClipboard.onPasteConfirmed = { onPasteConfirmed() }
@@ -646,12 +726,20 @@ class ZeroInputView @JvmOverloads constructor(
             onUserInteraction()
             onSecureClipboardManagementRequested()
         }
+        bindAiCallbacks()
+    }
+
+    private fun bindAiCallbacks() {
         ai.onSubmit = { action, input, target -> onAiSubmit(action, input, target) }
         ai.onCancel = { onAiCancel() }
         ai.onInsert = { onAiInsert(it) }
         ai.onConversationSelected = { onAiConversationSelected(it) }
         ai.onConversationDeleted = { onAiConversationDeleted(it) }
         ai.onNewConversation = { onAiNewConversation() }
+        ai.onSettings = { onAiSettingsRequested() }
+        ai.onAddContent = { onAiAddContentRequested() }
+        ai.onImportContent = { onAiImportContentRequested() }
+        ai.onRemoveAttachment = { onAiRemoveAttachment(it) }
         ai.onEditingChanged = {
             if (mode == PanelMode.AI) {
                 if (!it) setAiCandidatesExpanded(false)
@@ -668,26 +756,7 @@ class ZeroInputView @JvmOverloads constructor(
         manualTools = false
         refreshHeader()
         if (mode == PanelMode.EMOJI && emoji.isSearchActive) {
-            when (action) {
-                is KeyboardAction.Text -> {
-                    onUserInteraction()
-                    emoji.appendQuery(action.value)
-                }
-                is KeyboardAction.LiteralText -> {
-                    onUserInteraction()
-                    emoji.appendQuery(action.value)
-                }
-                KeyboardAction.Backspace -> {
-                    onUserInteraction()
-                    emoji.removeQueryCharacter()
-                }
-                KeyboardAction.Space -> {
-                    onUserInteraction()
-                    emoji.appendQuery(" ")
-                }
-                KeyboardAction.Enter -> onUserInteraction()
-                else -> onKeyboardAction(action)
-            }
+            onSearchAction(action)
         } else if (mode == PanelMode.AI && ai.editing) {
             onAiDraftChanged(action)
         } else if (mode == PanelMode.AI) {
@@ -701,7 +770,7 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     private fun selectVisibleCandidate(index: Int) {
-        val snapshot = if (mode == PanelMode.AI) aiSnapshot else currentSnapshot
+        val snapshot = visibleSnapshot()
         snapshot.candidates.getOrNull(index)?.let { onCandidateSelected(index, it.id) }
     }
 
@@ -729,8 +798,16 @@ class ZeroInputView @JvmOverloads constructor(
             if (userInitiated) onUserInteraction()
             if (target == PanelMode.AI && !aiAvailable) return
             manualTools = false
+            panelExpansion = PanelExpansion.COMPACT
+            handwriting.setFullScreen(false)
+            onPanelExpansionChanged()
         }
+        if (leavingSearch) emoji.closeSearch()
         mode = target
+        if (target != PanelMode.AI && !isSearchEditing) {
+            renderEditorLanguage()
+            keyboard.setComposing(currentSnapshot.isComposing)
+        }
         if (handwritingChanged) {
             handwriting.clear()
             onHandwritingVisibilityChanged(target == PanelMode.HANDWRITING)
@@ -778,15 +855,53 @@ class ZeroInputView @JvmOverloads constructor(
         setPanelVisible(ai, !aiCandidatesExpanded)
         setPanelVisible(keyboardContainer, !aiCandidatesExpanded && ai.editing)
         if (aiCandidatesExpanded) expandedCandidates.render(aiSnapshot) else expandedCandidates.clear()
+        updatePanelLayout()
         refreshHeader()
+    }
+
+    private fun setSearchCandidatesExpanded(expanded: Boolean) {
+        if (!isSearchEditing) return
+        searchCandidatesExpanded = expanded && searchSnapshot.candidates.isNotEmpty()
+        candidateStrip.setExpanded(searchCandidatesExpanded)
+        setPanelVisible(expandedCandidates, searchCandidatesExpanded)
+        setPanelVisible(emoji, !searchCandidatesExpanded)
+        setPanelVisible(keyboardContainer, !searchCandidatesExpanded)
+        if (searchCandidatesExpanded) expandedCandidates.render(searchSnapshot) else expandedCandidates.clear()
+        updatePanelLayout()
+        refreshHeader()
+    }
+
+    private fun visibleSnapshot(): EngineSnapshot = when {
+        mode == PanelMode.AI -> aiSnapshot
+        isSearchEditing -> searchSnapshot
+        else -> currentSnapshot
+    }
+
+    private fun changePanelExpansion(value: PanelExpansion) {
+        onUserInteraction()
+        cancelPendingGestures()
+        panelExpansion = value
+        onPanelExpansionChanged()
+        handwriting.setFullScreen(value == PanelExpansion.FULLSCREEN)
+        updatePanelLayout()
+        refreshHeader()
+        requestLayout()
     }
 
     private fun refreshHeader() {
         backNavigation.refresh()
+        expansionButton.visibility = if (mode == PanelMode.KEYBOARD) GONE else VISIBLE
+        expansionButton.rotation = if (isPanelExpanded) 180f else 0f
+        expansionButton.contentDescription = context.getString(if (isPanelExpanded) R.string.panel_collapse else R.string.panel_expand)
+        for (view in listOf(toolbar, candidateStrip)) {
+            val params = view.layoutParams as FrameLayout.LayoutParams
+            val margin = if (expansionButton.isVisible) dp(48) else 0
+            if (params.marginEnd != margin) { params.marginEnd = margin; view.layoutParams = params }
+        }
         aiButton.renderAiEntryAvailability(aiAvailable)
         reconvertButton.visibility = if (canReconvert && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         candidateStrip.renderReconversion(canReconvert && mode == PanelMode.KEYBOARD)
-        val visibleSnapshot = if (mode == PanelMode.AI) aiSnapshot else currentSnapshot
+        val visibleSnapshot = visibleSnapshot()
         val hasCandidates = visibleSnapshot.isComposing || visibleSnapshot.candidates.isNotEmpty()
         // Keep the idle entry discoverable without reducing the four-candidate
         // capacity of a compact composing row. Tools retains its leading AI entry.
@@ -801,14 +916,15 @@ class ZeroInputView @JvmOverloads constructor(
         val showCandidates = !manualTools && when (mode) {
             PanelMode.AI -> ai.editing && hasCandidates
             PanelMode.KEYBOARD, PanelMode.CANDIDATES -> diagnosticsVisible || hasCandidates || needsStatus
-            PanelMode.EMOJI, PanelMode.SECURE_CLIPBOARD, PanelMode.HANDWRITING -> false
+            PanelMode.EMOJI -> isSearchEditing && hasCandidates
+            PanelMode.SECURE_CLIPBOARD, PanelMode.HANDWRITING -> false
         }
         candidateStrip.visibility = if (showCandidates) VISIBLE else GONE
         toolbar.visibility = if (showCandidates) GONE else VISIBLE
         glideSuggestions.visibility = if (glideSuggestionsActive && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         if (glideSuggestions.visibility == VISIBLE) { candidateStrip.visibility = GONE; toolbar.visibility = GONE }
         returnButton.visibility = if (mode != PanelMode.KEYBOARD || manualTools) VISIBLE else GONE
-        if (mode == PanelMode.AI) { scriptButton.visibility = GONE; layoutButton.visibility = GONE }
+        if (mode == PanelMode.AI || isSearchEditing) { scriptButton.visibility = GONE; layoutButton.visibility = GONE }
         else if (returnButton.isVisible) layoutButton.visibility = GONE
         else layoutButton.visibility = if (currentLanguage == InputLanguage.CHINESE && currentPack == null && !sensitive &&
             EngineCapability.NINE_KEY_PINYIN in capabilities && editorOptions.layout == EditorLayout.TEXT) VISIBLE else GONE
@@ -822,36 +938,50 @@ class ZeroInputView @JvmOverloads constructor(
     private fun updateEmojiSearchLayout(searchActive: Boolean) {
         if (mode != PanelMode.EMOJI) return
         setPanelVisible(keyboardContainer, searchActive)
+        setPanelVisible(expandedCandidates, false)
+        setPanelVisible(emoji, true)
+        candidateStrip.setExpanded(false)
+        candidateStrip.render(if (searchActive) searchSnapshot else currentSnapshot)
         keyboard.startEditor(if (searchActive) EditorInputOptions() else editorOptions)
-        if (searchActive) keyboard.setKeyboardLayout(ChineseKeyboardLayout.FULL)
+        if (searchActive) {
+            keyboard.setKeyboardLayout(ChineseKeyboardLayout.FULL)
+            keyboard.setDoublePinyinScheme(DoublePinyinScheme.OFF)
+            // Reserve room for both results and all key rows on entering search.
+            panelExpansion = PanelExpansion.EXPANDED
+            onPanelExpansionChanged()
+        } else {
+            renderEditorLanguage()
+            keyboard.setComposing(currentSnapshot.isComposing)
+        }
         updatePanelLayout()
     }
 
     private fun updatePanelLayout() {
-        val searchActive = mode == PanelMode.EMOJI && emoji.isSearchActive
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val panelHeight = minOf(dp(if (landscape) EMOJI_SEARCH_HEIGHT_DP else EMOJI_PANEL_HEIGHT_DP), maximumContentHeight)
-        val aiEditing = mode == PanelMode.AI && ai.editing
-        val splitSearch = (searchActive || aiEditing) && landscape
+        val aiEditing = mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded
+        val searchActive = isSearchEditing && !searchCandidatesExpanded
+        val editing = searchActive || aiEditing
+        val splitSearch = editing && landscape
+        val compactPanel = dp(if (landscape) EMOJI_SEARCH_HEIGHT_DP else PANEL_HEIGHT_DP)
+        val defaultHeight = when {
+            editing && !splitSearch -> keyboard.preferredHeight + dp(if (searchActive) 224 else ai.editingHeightDp)
+            mode == PanelMode.CANDIDATES || aiCandidatesExpanded || searchCandidatesExpanded -> keyboard.preferredHeight
+            mode == PanelMode.AI && !editing -> dp(360)
+            else -> compactPanel
+        }
+        val viewport = availablePanelHeight.takeIf { it > 0 } ?: dp(resources.configuration.screenHeightDp)
+        val body = PanelSizePolicy.bodyHeight(panelExpansion, viewport, panelChromeHeight, defaultHeight)
+        val detailHeight = if (editing && !splitSearch) (body - keyboard.preferredHeight).coerceAtLeast(0) else body
         content.orientation = if (splitSearch) HORIZONTAL else VERTICAL
-        emoji.layoutParams = when {
-            splitSearch -> LayoutParams(0, panelHeight, 1f)
-            searchActive -> LayoutParams(LayoutParams.MATCH_PARENT, dp(EMOJI_SEARCH_HEIGHT_DP))
-            else -> LayoutParams(LayoutParams.MATCH_PARENT, panelHeight)
-        }
-        keyboardContainer.layoutParams = if (splitSearch) {
-            LayoutParams(0, LayoutParams.WRAP_CONTENT, 2f)
-        } else {
-            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        }
-        secureClipboard.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, minOf(dp(PANEL_HEIGHT_DP), maximumContentHeight))
-        handwriting.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, minOf(dp(PANEL_HEIGHT_DP), maximumContentHeight))
-        ai.layoutParams = when {
-            aiEditing && landscape -> LayoutParams(0, panelHeight, 1f)
-            aiEditing -> LayoutParams(LayoutParams.MATCH_PARENT, dp(144))
-            else -> LayoutParams(LayoutParams.MATCH_PARENT, minOf(dp(360), maximumContentHeight))
-        }
-        expandedCandidates.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, keyboard.preferredHeight)
+        emoji.layoutParams = if (splitSearch) LayoutParams(0, body, 1f)
+            else LayoutParams(LayoutParams.MATCH_PARENT, if (searchActive) detailHeight else body)
+        keyboardContainer.layoutParams = if (splitSearch) LayoutParams(0, LayoutParams.WRAP_CONTENT, 2f)
+            else LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        secureClipboard.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
+        handwriting.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
+        ai.layoutParams = if (splitSearch) LayoutParams(0, body, 1f)
+            else LayoutParams(LayoutParams.MATCH_PARENT, if (aiEditing) detailHeight else body)
+        expandedCandidates.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
     }
 
     private fun toolbarButton(label: String, description: String, action: () -> Unit) = MaterialButton(context).apply {
@@ -898,7 +1028,6 @@ class ZeroInputView @JvmOverloads constructor(
 
     private companion object {
         const val PANEL_HEIGHT_DP = 260
-        const val EMOJI_PANEL_HEIGHT_DP = 260
         const val EMOJI_SEARCH_HEIGHT_DP = 224
     }
 }

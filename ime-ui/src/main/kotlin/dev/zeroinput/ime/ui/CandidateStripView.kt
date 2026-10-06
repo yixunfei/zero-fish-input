@@ -56,6 +56,12 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         onSwipe = { direction -> requestedPage = direction; onPageChanged(direction); requestedPage = null }
         addView(scroll)
     }
+    private val previousPage = panelIconButton(context, android.R.drawable.ic_media_previous, R.string.previous_candidates) {
+        if (previousSnapshot?.hasPreviousPage == true) onPageChanged(PageDirection.PREVIOUS)
+    }
+    private val nextPage = panelIconButton(context, android.R.drawable.ic_media_next, R.string.next_candidates) {
+        if (previousSnapshot?.hasNextPage == true) onPageChanged(PageDirection.NEXT)
+    }
     private val tools = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.keyboard_tools) { onToolsRequested() }
     private val reconvert = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.reconvert_last_word) {
         onReconvertRequested()
@@ -89,7 +95,9 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             addView(ai, LayoutParams(dp(48), dp(48)))
             addView(undo, LayoutParams(dp(48), dp(48)))
             addView(syllable, LayoutParams(dp(48), dp(48)))
+            addView(previousPage, LayoutParams(dp(48), dp(48)))
             addView(browser, LayoutParams(0, dp(48), 1f))
+            addView(nextPage, LayoutParams(dp(48), dp(48)))
             addView(retry, LayoutParams(dp(48), dp(48)))
             addView(expand, LayoutParams(dp(48), dp(48)))
         }, if (landscape) LayoutParams(0, dp(48), 3f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
@@ -125,6 +133,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             if (candidate != null) button.bind(candidate, index, index == snapshot.highlightedIndex) else button.clear()
         }
         expand.visibility = if (snapshot.candidates.isEmpty() || associations) View.INVISIBLE else View.VISIBLE
+        previousPage.visibility = if (snapshot.hasPreviousPage && !associations) View.VISIBLE else View.GONE
+        nextPage.visibility = if (snapshot.hasNextPage && !associations) View.VISIBLE else View.GONE
+        previousPage.isEnabled = snapshot.hasPreviousPage && !associations
+        nextPage.isEnabled = snapshot.hasNextPage && !associations
         if (changedInput) scroll.scrollTo(0, 0)
         if (changedInput && snapshot.candidates.isNotEmpty()) {
             val announcement = snapshot.candidates.first().text

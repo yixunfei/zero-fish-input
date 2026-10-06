@@ -43,6 +43,9 @@ internal class SecurePasteConsent(
     }
 
     fun editorChanged(identity: PasteEditorIdentity?): Boolean {
+        // This callback reports an external selection edit, not return navigation.
+        // Credential edits before binding are ignored; source edits or any edit
+        // after return binding revoke the consent, even with the same public ID.
         if (targetSession != null || identity == source) close()
         return valid()
     }

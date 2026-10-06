@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.view.inspector.WindowInspector
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.AdapterView
 import android.view.WindowManager
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -16,6 +17,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.ime.settings.MainActivity
 import dev.zeroinput.userdata.AiConfiguration
+import dev.zeroinput.userdata.AiProviderProfile
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
@@ -35,9 +37,8 @@ class AiSettingsFailureTest {
         val key = "public-draft-key"
         onMain {
             field(R.string.ai_endpoint_hint).setText(endpoint)
-            field(R.string.ai_model_hint).setText(model)
+            field(R.string.ai_models_hint).setText(model)
             field(R.string.ai_key_hint).setText(key)
-            conversationSwitch().isChecked = !original.saveConversations
             screen.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
         }
         await { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(screen) == Stage.STOPPED }
@@ -47,16 +48,14 @@ class AiSettingsFailureTest {
         await { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(screen) == Stage.RESUMED }
         onMain {
             assertEquals(endpoint, field(R.string.ai_endpoint_hint).text.toString())
-            assertEquals(model, field(R.string.ai_model_hint).text.toString())
+            assertEquals(model, field(R.string.ai_models_hint).text.toString())
             assertEquals(key, field(R.string.ai_key_hint).text.toString())
-            assertEquals(!original.saveConversations, conversationSwitch().isChecked)
             dialogSave().performClick()
         }
-        await { graph.aiConfigurationSnapshot()?.model == model }
+        await { graph.aiConfigurationSnapshot()?.activeModel() == model }
         val saved = graph.aiConfiguration.read()
-        assertEquals(endpoint, saved.endpoint)
-        assertEquals(key, saved.apiKey)
-        assertEquals(!original.saveConversations, saved.saveConversations)
+        assertEquals(endpoint, saved.activeEndpoint())
+        assertEquals(key, saved.activeKey())
     }
 
     @Test fun cancellingProviderDraftClearsFieldsAndDoesNotPersistIt() = withSettings { screen ->
@@ -69,8 +68,8 @@ class AiSettingsFailureTest {
         assertEquals(original, graph.aiConfiguration.read())
         openSettings(screen)
         onMain {
-            assertEquals(original.endpoint, field(R.string.ai_endpoint_hint).text.toString())
-            assertEquals(original.model, field(R.string.ai_model_hint).text.toString())
+            assertEquals("https://api.openai.com/v1/chat/completions", field(R.string.ai_endpoint_hint).text.toString())
+            assertEquals("gpt-4o-mini", field(R.string.ai_models_hint).text.toString())
             assertTrue(field(R.string.ai_key_hint).text.isNullOrEmpty())
         }
     }
@@ -89,7 +88,7 @@ class AiSettingsFailureTest {
     }
 
     private fun fillDraft(): List<EditText> = onMain {
-        listOf(field(R.string.ai_endpoint_hint), field(R.string.ai_model_hint), field(R.string.ai_key_hint))
+        listOf(field(R.string.ai_endpoint_hint), field(R.string.ai_models_hint), field(R.string.ai_key_hint))
             .onEach { it.setText("public-unsaved-fixture") }
     }
 
@@ -117,8 +116,9 @@ class AiSettingsFailureTest {
 
     @Test fun rejectedEndpointRetainsSavedFieldsAndKeepsNetworkSwitchesOff() {
         val original = graph.aiConfiguration.read()
-        val fixture = AiConfiguration(enabled = true, endpoint = "https://provider.example/fixture",
-            model = "fixture-model", apiKey = "public-fixture-key")
+        val profile = AiProviderProfile("fixture", "Fixture", "https://provider.example/fixture",
+            "public-fixture-key", listOf("fixture-model"), "fixture-model")
+        val fixture = AiConfiguration(enabled = true, providers = listOf(profile), selectedProviderId = profile.id)
         saveConfiguration(fixture)
         var activity: MainActivity? = null
         try {
@@ -130,20 +130,19 @@ class AiSettingsFailureTest {
                 field(R.string.ai_endpoint_hint).setText("http://invalid.example/fixture")
                 dialogSave().performClick()
             }
-            await { graph.aiConfigurationSnapshot() == null && fieldOrNull(R.string.ai_endpoint_hint) == null }
-            openSettings(screen)
+            await { graph.aiConfigurationSnapshot() == null && fieldOrNull(R.string.ai_endpoint_hint)?.error != null }
             onMain {
-                assertEquals(fixture.endpoint, field(R.string.ai_endpoint_hint).text.toString())
-                assertEquals(fixture.model, field(R.string.ai_model_hint).text.toString())
+                field(R.string.ai_endpoint_hint).setText(profile.endpoint)
+                assertEquals(profile.selectedModel, field(R.string.ai_models_hint).text.toString())
                 dialogSave().performClick()
             }
             await { graph.aiConfigurationSnapshot() != null }
             val saved = checkNotNull(graph.aiConfigurationSnapshot())
             assertFalse(saved.enabled)
             assertFalse(saved.networkAllowed)
-            assertEquals(fixture.endpoint, saved.endpoint)
-            assertEquals(fixture.model, saved.model)
-            assertEquals(fixture.apiKey, saved.apiKey)
+            assertEquals(profile.endpoint, saved.activeEndpoint())
+            assertEquals(profile.selectedModel, saved.activeModel())
+            assertEquals(profile.apiKey, saved.activeKey())
         } finally {
             activity?.let { onMain { it.finish() } }
             saveConfiguration(original)
@@ -152,8 +151,10 @@ class AiSettingsFailureTest {
 
     @Test fun disablingAiAlsoDisablesNetworkAndPersistsBothSwitches() {
         val original = graph.aiConfiguration.read()
+        val profile = AiProviderProfile("fixture", "Fixture", "https://provider.example/fixture",
+            "public-fixture-key", listOf("fixture-model"), "fixture-model")
         saveConfiguration(AiConfiguration(enabled = true, networkAllowed = true,
-            endpoint = "https://provider.example/fixture", model = "fixture-model"))
+            providers = listOf(profile), selectedProviderId = profile.id))
         var activity: MainActivity? = null
         try {
             activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
@@ -191,14 +192,34 @@ class AiSettingsFailureTest {
 
     private fun openSettings(activity: MainActivity) = await {
         if (fieldOrNull(R.string.ai_endpoint_hint) == null) {
-            views(activity.window.decorView).filterIsInstance<TextView>().single {
-                it.text.toString() == activity.getString(R.string.ai_settings)
-            }.performClick()
+            val visible = WindowInspector.getGlobalWindowViews().lastOrNull()?.let(::views).orEmpty()
+                .filterIsInstance<TextView>().filter { it.isShown }
+            val edit = visible.firstOrNull { it.text.toString() == activity.getString(R.string.ai_edit_provider) }
+            val add = visible.firstOrNull { it.id == android.R.id.button1 && it.text.toString() == activity.getString(R.string.ai_add_provider) }
+            when {
+                edit != null -> clickItem(edit)
+                add != null -> {
+                    val entry = visible.firstOrNull { it.text.toString().contains(" · ") }
+                    if (entry != null) clickItem(entry) else add.performClick()
+                }
+                else -> views(activity.window.decorView).filterIsInstance<TextView>().single {
+                    it.text.toString() == activity.getString(R.string.ai_settings)
+                }.performClick()
+            }
         }
+        fieldOrNull(R.string.ai_provider_name)?.let { if (it.text.isNullOrBlank()) it.setText("Fixture") }
         fieldOrNull(R.string.ai_endpoint_hint) != null
     }
 
     private fun field(id: Int) = checkNotNull(fieldOrNull(id))
+    private fun clickItem(view: View) {
+        val parent = view.parent as? AdapterView<*>
+        if (parent == null) view.performClick()
+        else {
+            val position = parent.getPositionForView(view)
+            parent.performItemClick(view, position, parent.getItemIdAtPosition(position))
+        }
+    }
     private fun fieldOrNull(id: Int) = windows().filterIsInstance<EditText>().firstOrNull {
         it.isShown && it.hint?.toString() == it.context.getString(id)
     }

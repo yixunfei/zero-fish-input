@@ -7,10 +7,14 @@ history, training feedback or handwriting telemetry participates.
 ## Runtime pipeline
 
 1. The canvas retains at most 48 strokes and 512 coordinate pairs per stroke.
-   Both axes share a physical scale; a new stroke invalidates old candidates on
-   touch-down. Resize, panel/session changes and multi-pointer cancellation cannot
-   combine stale coordinates or candidates with later input.
-2. One replaceable request passes a 260 ms debounce and bounded worker queue.
+   Once a stroke reaches the limit, it is reduced to a 3/4-sized uniform sample
+   that always keeps its first and latest points. This bounds long-press copying
+   cost while preserving gesture endpoints. Both axes share a physical scale; a
+   new stroke invalidates old candidates on touch-down. Resize, panel/session
+   changes and multi-pointer cancellation cannot combine stale coordinates or
+   candidates with later input. The writing surface can expand to the measured
+   IME content height for full-screen handwriting and remains bounded by insets.
+2. One replaceable request passes a 180 ms debounce and bounded worker queue.
    Malformed, nonfinite and oversized strokes fail before copying/model creation.
 3. A pure Kotlin stroke classifier evaluates two pinned Tegaki Zinnia models.
    Coordinates are centered and uniformly scaled into a 0.9-wide square. The

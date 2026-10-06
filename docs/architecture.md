@@ -124,16 +124,36 @@ the platform dismissal behavior. UI-only navigation still invokes the existing
 interaction invalidation boundary.
 
 Horizontal gesture ownership remains with expression surfaces. Expanded candidates
-use a vertical RecyclerView: the surface cancels child clicks before taking an
-edge drag, rejects cross-axis/multiple-pointer gestures, and accepts DOWN even
-when the first grid fits without scrolling. Candidate paging continues to use
-the bounded core window and engine routes. Explicit page loads reveal the newly
-loaded candidates; ordinary scrolling retains existing anchor behavior.
+use RecyclerView's native vertical dragging and fling. Two rows before an edge,
+one posted page request extends the core window. Bounded list diffs append/remove
+rows without full refresh or resetting the viewport; eviction preserves a visible
+candidate and its pixel offset. Initial-page IDs stay stable when browsing begins.
+Public engine pages and personal pages each retain at most six pages. Personal
+pages append after native exhaustion, clear on revision/privacy changes, and keep
+existing candidate identity/selection verification. Explicit page buttons remain
+available for accessibility.
 
-The fuzzy master preference preserves the selected pair mask. Engines and schema
-identifiers use its effective mask; disabling selected rules resolves to the
-plain schema rather than reusing a compiled fuzzy variant. The shortcut follows
-existing deferred configuration, warm-up identity and privacy checks.
+Secondary panels have a fixed expand/collapse action outside the scrolling toolbar.
+Expanded content uses at least 65% of the current available window (or the larger
+compact minimum); handwriting fullscreen fills the safe region. Current parent
+measure constraints determine the budget, never the previous collapsed root height.
+Expanded floating/one-hand panels temporarily use the available width without
+changing saved placement. Search/AI editing budgets include both results and keys;
+landscape places them side by side. Resizing a handwriting canvas clears its strokes.
+
+The fuzzy master and keyboard shortcut select all pairs when enabled and clear
+all pairs when disabled. Individual switches still select subsets and synchronize
+the master state. The existing preference fields, deferred configuration and
+engine/schema effective-mask contract remain unchanged.
+
+Expression search labels are explicit internal edit targets. `app/input/LocalDraftInput`
+owns an independent bounded conversion session, shared as an implementation with
+AI drafts but instantiated separately. Its only commit target is a memory buffer;
+it uses full pinyin/English and an empty personalization port. Search is limited
+to 64 UTF-16 units. Keys, candidates, paging, language switching and composition
+clear all route to that draft while editing. Panel/session/view/settings/subtype
+and privacy changes close the search session and invalidate warm-up delivery.
+No external editor connection or personal lookup is passed into either draft.
 
 Rime's single-syllable candidate navigation uses a temporary internal caret;
 ordinary typing/deletion resumes at the composition end. An acknowledged external
@@ -151,11 +171,30 @@ contracts. `app` owns the Android composition root, `AiCoordinator` and the only
 adapter, `OpenAiCompatibleProvider`; `user-data` owns separately encrypted AI configuration
 and optional conversation history. The provider accepts only HTTPS endpoints, disables redirects,
 uses bounded timeouts and response sizes, and sends data only after the user submits text from
-the keyboard AI panel. It never reads editor context, selections, the system clipboard or the
+the keyboard AI panel or explicitly tests the selected model in settings. The latter
+uses `AiProviderProbe`, a fixed public prompt, no history/attachments, a 16-token
+output cap and a 15-second timeout. It never reads editor context, selections, the system clipboard or the
 private clipboard vault.
+
+Provider configuration supports up to 16 profiles and 32 manually named models
+per profile, with image/audio support declared per model. `AiComposeActivity` owns
+explicit text review and the system document picker; `AiAttachmentReader` bounds
+reads on an application-owned document worker. `AiContentInbox` is a single expiring,
+memory-only transfer. A fresh user tap in the eligible IME claims the content and
+starts a new AI conversation; it never binds or retains an old editor connection.
+`AiWorkbenchController` copies selected attachments into each request. The provider
+owns and wipes request copies exactly once, including queued rejection and transport
+deadline cancellation; a running request releases them after serialization and
+transport cleanup. The service retains only separate draft buffers and wipes those
+on session, panel, settings and conversation transitions. Attachments never enter
+saved history. Provider connect, write and read phases share one absolute deadline
+measured from queue submission.
 
 AI is disabled by default and requires both the user enable switch and the explicit network
 switch. Sensitive/password/PIN/unknown, incognito and privacy-tightened sessions fail closed.
+`SessionPrivacy.independentAiAllowed` is shared by the UI and request gate. Only
+NO_SUGGESTIONS in ordinary text allows an independent AI draft without permitting
+personal data; combined identifier, no-learning or user privacy restrictions still block AI.
 The idle candidate header and the leading toolbar expose an AI icon without scrolling.
 During composition the existing candidate capacity is preserved; Tools exposes AI.
 In restricted editors it remains a dimmed explanation action, never a workbench
@@ -169,12 +208,20 @@ editor, settings, service or stored AI data changes. Conversation persistence is
 default, exposes summaries before selection, and uses a dedicated Keystore alias under
 `noBackupFilesDir`.
 
+`LocalDraftInput` retains at most one prepared engine until its current composition
+ends, resumes delivery after draft commands, and retries preparation on Rime readiness.
+Submission resolves the highlighted conversion candidate and remaining segments in
+the authoritative local buffer. Action selection does not submit; fixed primary
+commands and a draft-language indicator distinguish editing from result browsing.
+
 `AiConfigurationState` publishes loaded configuration and revokes it under the same
 short lock. Its revision is independent of editor/data generations: an editor
 privacy change cancels requests without discarding configuration initialization,
 and a delayed read or save cannot restore an endpoint after networking is revoked.
 Network cancellation disconnects on a bounded worker, avoiding TLS/IO locks on
-the IME thread. Streaming deltas share at most one pending UI callback.
+the IME thread. Streaming deltas share at most one pending UI callback. Selection
+callbacks are accepted only while the captured input connection is still the active
+session connection and their previous anchor belongs to that session.
 
 The provider settings dialog retains its bounded, view-owned draft while its
 Activity is temporarily stopped for an app switch. Saving is explicit; cancellation,
@@ -273,6 +320,12 @@ connection and interaction sequence. The unused grant expires within 30 seconds;
 settings/default-IME changes cancel it. Leaving or editing after return binding
 also cancels. Programmatic panel resets and background engine adoption do not
 count as new user confirmation, and never cause a paste. See ADR 0012.
+
+AI history persistence is owned by the serial configuration storage worker. Saving
+is explicit; writing a configuration with history disabled clears the encrypted
+history store and its key before the disabled state is published. A failed purge
+keeps the history repository fail-closed and the next explicit storage operation
+retries it, so a stale saved conversation cannot remain silently usable.
 
 The authentication Activity completes the broker handoff after its destruction,
 so a successful prompt cannot bind a source editor while authentication navigation
@@ -440,8 +493,8 @@ and are hash-checked during the build. No runtime downloads are involved.
 The input view shares one stable header between the toolbar and candidate strip:
 72dp in portrait (24dp composition/status plus 48dp candidates), 48dp in landscape.
 An explicit tools button opens the toolbar while composing without moving keys.
-Expanded candidates reuse the keyboard's measured row geometry, including density
-rounding. Candidate views are reused, reject clicks whose binding changed during
+Compact candidate browsing reuses the keyboard's measured row geometry, including
+density rounding; the separate panel expansion action increases the viewport. Candidate views are reused, reject clicks whose binding changed during
 the gesture, and clear their text when retired. Held backspace clears a composition
 once, or repeats editor deletion until release/cancellation; panel, session and
 privacy transitions cancel scheduled gesture callbacks.
@@ -463,12 +516,10 @@ request and a coalesced content-free delivery. Disabled input creates no model
 or worker. See [ADR 0011](adr/0011-experimental-model-ranking.md) and
 [model integration](model-integration.md).
 
-Rime remains the default Chinese engine. `engine-dictionary` is a separate JVM
-module with a small bundled Apache-2.0 reference dictionary and bounded prefix
-lookup. It implements the same engine lifecycle and advertises only punctuation
-and page-size support. The selected factory and full options snapshot travel in
-every warm-up request; unsupported controls are disabled and the effective
-keyboard stays full. No engine owns personalized storage.
+Rime is the sole built-in Chinese engine, with its existing controlled fallback.
+The test dictionary engine and engine-choice preference have been removed.
+`engine-dictionary` retains only public next-word indexes and glide decoding.
+Language packs and encrypted personalization remain separate capabilities.
 
 Chinese nine-key input is an optional Rime capability. Rime's algebra compiles
 telephone digits into its public spelling index on the preparation worker;
@@ -504,13 +555,26 @@ selection retain candidate conversion. The editor adapter registers expected
 selection and composing-span updates before platform calls, so synchronous
 callbacks and delayed acknowledgements cannot discard a subsequent key.
 
-`ime-ui/KeyboardAppearance` owns four resource overlays and three row heights.
-`app` persists only their enum names as nonsensitive settings and applies the
-overlay over the IME window theme. Appearance changes replace the view, release
-its old callbacks and personal bindings, then render the current controller
-snapshot. The existing settings invalidation also cancels pending authentication.
-The nonexported appearance Activity previews the real keyboard with no editor,
-engine or personal-data callbacks. There is no theme download or external asset.
+`ime-ui/KeyboardAppearance` owns independent palette, material, geometry and background
+values. Six materials share unchanged rectangular touch geometry. Dedicated key
+and background drawables do bounded rendering only; no file reads, bitmap decoding,
+EXIF parsing or blur occurs in the UI. Background opacity blends onto the opaque
+palette surface, leaving text opacity and the IME touch region unchanged.
+`app/settings/AppearancePreferences` persists nonsensitive choices and an image UUID,
+preserving existing palette/height keys with defaults for the additional fields.
+`KeyboardBackgroundStore` owns a bounded serial worker, the system-granted image
+import, and a dedicated AES-GCM file/key under noBackupFilesDir. It normalizes and
+re-encodes bounded PNG/JPEG/WebP rasters, strips metadata and atomically writes an
+independent revision before publishing its identifier. No URI permission is retained.
+Deletion revokes pending imports, clears the selected identifier, then removes files
+and the isolated key on the serial worker. Orphans are cleaned on startup/mutation.
+A separate bounded cancellation worker closes stalled provider descriptors; requests
+expire after 15 seconds. View-scoped `KeyboardAppearanceBinding` owns display bitmaps,
+cancels stale delivery and releases images on view replacement/hide/destruction.
+There is no application-wide decoded-image cache. Appearance changes keep the existing
+session/authentication invalidation. The nonexported secure appearance Activity previews
+the real keyboard without editor, engine or personal-data callbacks. No theme downloads,
+new permissions or exported components are introduced.
 
 Keyboard rows and keys are reused while their weight geometry is unchanged.
 One-shot Shift resets after a letter; a timed hold locks case. Binding revisions,

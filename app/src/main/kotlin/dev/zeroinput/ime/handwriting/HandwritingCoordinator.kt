@@ -41,9 +41,13 @@ internal class HandwritingRequest(private val strokes: List<FloatArray>) {
         fun copyOf(strokes: List<FloatArray>): HandwritingRequest? {
             if (strokes.size !in 1..48 || strokes.any { stroke ->
                 stroke.size !in 2..1024 || stroke.size % 2 != 0 ||
-                    stroke.any { !it.isFinite() || it !in 0f..1f }
+                    stroke.any { !it.isFinite() }
             }) return null
-            return HandwritingRequest(strokes.map(FloatArray::clone))
+            return HandwritingRequest(strokes.map { stroke ->
+                stroke.clone().also { copy ->
+                    for (index in copy.indices) copy[index] = copy[index].coerceIn(0f, 1f)
+                }
+            })
         }
     }
 }
@@ -61,6 +65,8 @@ internal class HandwritingCoordinator(
     private var task: Future<*>? = null
     private var taskRequest: HandwritingRequest? = null
     private var recognizer: HandwritingRecognizer? = null
+    private val deliveryLock = Any()
+    private var delivery: Runnable? = null
     @Volatile private var closed = false
 
     fun request(strokes: List<FloatArray>) {
@@ -94,8 +100,21 @@ internal class HandwritingCoordinator(
                             runCatching { recognizer?.close() }
                             recognizer = null
                         }
-                        if (!cancelled()) handler.post {
-                            if (!closed && generation.get() == ticket) deliver(outcome.getOrNull(), outcome.isFailure)
+                        if (!cancelled()) {
+                            lateinit var callback: Runnable
+                            callback = Runnable {
+                                synchronized(deliveryLock) { if (delivery === callback) delivery = null }
+                                if (!closed && generation.get() == ticket) {
+                                    deliver(outcome.getOrNull(), outcome.isFailure)
+                                }
+                            }
+                            synchronized(deliveryLock) {
+                                if (!closed && generation.get() == ticket) {
+                                    delivery?.let(handler::removeCallbacks)
+                                    delivery = callback
+                                    if (!handler.post(callback)) delivery = null
+                                }
+                            }
                         }
                     }
                 }
@@ -107,7 +126,7 @@ internal class HandwritingCoordinator(
         }
         pending = runnable
         pendingRequest = request
-        if (!handler.postDelayed(runnable, 260L)) {
+        if (!handler.postDelayed(runnable, DEBOUNCE_MS)) {
             pending = null
             pendingRequest = null
             request.cancelQueued()
@@ -129,6 +148,7 @@ internal class HandwritingCoordinator(
         task = null
         taskRequest?.cancelQueued()
         taskRequest = null
+        synchronized(deliveryLock) { delivery?.let(handler::removeCallbacks); delivery = null }
         BoundedExecutors.purge(worker)
     }
 
@@ -141,5 +161,9 @@ internal class HandwritingCoordinator(
             worker.execute { runCatching { recognizer?.close() }; recognizer = null }
         } catch (_: RejectedExecutionException) { /* The worker has already stopped. */ }
         worker.shutdown()
+    }
+
+    private companion object {
+        const val DEBOUNCE_MS = 180L
     }
 }

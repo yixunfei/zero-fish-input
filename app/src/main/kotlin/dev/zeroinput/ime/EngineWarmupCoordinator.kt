@@ -7,7 +7,6 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.ime.core.PreparedInputEngine
 import dev.zeroinput.ime.core.privacy.SessionPrivacy
 import dev.zeroinput.ime.concurrency.BoundedExecutors
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 import java.util.concurrent.RejectedExecutionException
@@ -21,7 +20,6 @@ internal data class EngineWarmupRequest(
     val privacy: SessionPrivacy,
     val chineseOptions: ChineseInputOptions = ChineseInputOptions(),
     val retryInitialization: Boolean = false,
-    val chineseEngine: ChineseEngineChoice = ChineseEngineChoice.RIME,
 )
 
 internal sealed interface EngineWarmupResult {

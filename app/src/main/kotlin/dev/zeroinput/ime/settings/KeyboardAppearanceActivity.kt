@@ -1,40 +1,72 @@
 package dev.zeroinput.ime.settings
 
+import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.radiobutton.MaterialRadioButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.switchmaterial.SwitchMaterial
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.ui.KeyboardAppearance
-import dev.zeroinput.ime.ui.KeyboardHeight
-import dev.zeroinput.ime.ui.KeyboardTheme
 import dev.zeroinput.ime.ui.ZeroInputView
+import dev.zeroinput.ime.ui.R as UiR
 
 class KeyboardAppearanceActivity : AppCompatActivity() {
-    private val settings by lazy { (application as ZeroInputApplication).graph.settings }
+    private val graph by lazy { (application as ZeroInputApplication).graph }
+    private val settings get() = graph.settings
+    private val binding by lazy { KeyboardAppearanceBinding(graph.keyboardBackgrounds) }
     private lateinit var preview: FrameLayout
+    private lateinit var options: ScrollView
+    private lateinit var status: TextView
     private var keyboard: ZeroInputView? = null
     private var selected = KeyboardAppearance()
+    private var operation: AutoCloseable? = null
+    private var visible = false
+    private var previewTheme: dev.zeroinput.ime.ui.KeyboardTheme? = null
+    private val picker = registerForActivityResult(object : ActivityResultContracts.OpenDocument() {
+        override fun createIntent(context: android.content.Context, input: Array<String>): Intent =
+            super.createIntent(context, input).putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+    }) { uri ->
+        if (uri != null) {
+            setBusy(true)
+            operation = graph.keyboardBackgrounds.import(uri) { success ->
+                setBusy(false)
+                if (!success) message(UiR.string.appearance_image_failed)
+                refreshOptions()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         selected = settings.keyboardAppearance
         setContentView(content())
-        updatePreview()
+        refreshOptions()
     }
 
     override fun onPause() { keyboard?.cancelPendingGestures(); super.onPause() }
-    override fun onDestroy() { keyboard?.release(); super.onDestroy() }
+    override fun onStart() { super.onStart(); visible = true; if (::preview.isInitialized) updatePreview() }
+    override fun onStop() { visible = false; preview.visibility = View.INVISIBLE; binding.close(); super.onStop() }
+    override fun onDestroy() {
+        operation?.close()
+        binding.close()
+        keyboard?.release()
+        super.onDestroy()
+    }
 
     private fun content() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -49,86 +81,99 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
             navigationContentDescription = getString(R.string.navigate_up)
             setNavigationOnClickListener { finish() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)))
-        addView(ScrollView(this@KeyboardAppearanceActivity).apply {
-            addView(options())
+        status = TextView(context).apply { visibility = View.GONE; setPadding(dp(16), dp(4), dp(16), dp(4)) }
+        addView(status)
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        addView(LinearLayout(context).apply {
+            orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            preview = FrameLayout(context).apply {
+                contentDescription = getString(R.string.keyboard_preview)
+                visibility = View.INVISIBLE
+            }
+            addView(preview, if (landscape) LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                else LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            options = ScrollView(context).apply { isFillViewport = true }
+            addView(options, if (landscape) LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                else LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
     }
 
-    private fun options() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        addView(com.google.android.material.switchmaterial.SwitchMaterial(context).apply {
-            setText(dev.zeroinput.ime.ui.R.string.glide_enabled)
-            isChecked = settings.glideTypingEnabled
-            minHeight = dp(48)
-            setPadding(dp(16), 0, dp(16), 0)
-            setOnCheckedChangeListener { _, enabled -> settings.glideTypingEnabled = enabled }
+    private fun refreshOptions() {
+        selected = settings.keyboardAppearance
+        val scroll = options.scrollY
+        options.removeAllViews()
+        options.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(SwitchMaterial(context).apply {
+                setText(UiR.string.glide_enabled); isChecked = settings.glideTypingEnabled
+                minHeight = dp(48); setPadding(dp(16), 0, dp(16), 0)
+                setOnCheckedChangeListener { _, enabled -> settings.glideTypingEnabled = enabled }
+            })
+            addView(AppearanceOptionsView(context, selected, ::select, ::chooseImage,
+                { confirmReset(false) }, { confirmReset(true) }))
         })
-        addView(TextView(context).apply {
-            setText(dev.zeroinput.ime.ui.R.string.glide_description)
-            setPadding(dp(16), 0, dp(16), dp(8))
-        })
-        addView(title(R.string.keyboard_style))
-        addView(RadioGroup(context).apply {
-            orientation = RadioGroup.VERTICAL
-            KeyboardTheme.entries.forEach { preset ->
-                addView(radio(preset.label, preset == selected.theme).apply {
-                    val themed = KeyboardThemeContext.create(context, preset)
-                    val color = com.google.android.material.color.MaterialColors.getColor(themed,
-                        com.google.android.material.R.attr.colorPrimaryContainer, android.graphics.Color.GRAY)
-                    setCompoundDrawablesRelativeWithIntrinsicBounds(null, null,
-                        android.graphics.drawable.GradientDrawable().apply { setColor(color); cornerRadius = dp(4).toFloat(); setSize(dp(48), dp(24)) }, null)
-                    setOnClickListener { select(selected.copy(theme = preset)) }
-                })
-            }
-        })
-        addView(title(R.string.keyboard_height))
-        addView(RadioGroup(context).apply {
-            orientation = RadioGroup.HORIZONTAL
-            KeyboardHeight.entries.forEach { height ->
-                addView(radio(height.label, height == selected.height).apply {
-                    textSize = 14f
-                    setPadding(0, 0, 0, 0)
-                    layoutParams = RadioGroup.LayoutParams(0, dp(48), 1f)
-                    setOnClickListener { select(selected.copy(height = height)) }
-                })
-            }
-        })
-        addView(title(R.string.keyboard_preview))
-        preview = FrameLayout(context)
-        addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-    }
-
-    private fun radio(label: Int, checked: Boolean) = MaterialRadioButton(this).apply {
-        id = View.generateViewId()
-        setText(label)
-        isChecked = checked
-        minHeight = dp(48)
-        setPadding(dp(12), 0, dp(16), 0)
-        layoutParams = RadioGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-    }
-
-    private fun title(label: Int) = TextView(this).apply {
-        setText(label)
-        textSize = 14f
-        setPadding(dp(16), dp(16), dp(16), dp(8))
-    }
-
-    private fun select(appearance: KeyboardAppearance) {
-        if (selected == appearance) return
-        selected = appearance
-        settings.keyboardAppearance = appearance
+        options.post { options.scrollTo(0, scroll) }
         updatePreview()
     }
 
-    private fun updatePreview() {
-        keyboard?.release()
-        preview.removeAllViews()
-        keyboard = ZeroInputView(KeyboardThemeContext.create(this, selected.theme)).apply {
-            setKeyboardHeight(selected.height)
-            // This preview has no editor, engine or personal-data callbacks.
-            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-        }.also { preview.addView(it) }
+    private fun select(appearance: KeyboardAppearance, commit: Boolean) {
+        val deferBlur = !commit && selected.backgroundBlur != appearance.backgroundBlur
+        selected = appearance
+        if (commit) settings.keyboardAppearance = appearance
+        if (!deferBlur) updatePreview()
     }
 
+    private fun updatePreview() {
+        if (!visible) return
+        if (keyboard == null || previewTheme != selected.theme) {
+            keyboard?.release()
+            preview.removeAllViews()
+            keyboard = ZeroInputView(KeyboardThemeContext.create(this, selected.theme)).apply {
+                // No editor, engine or personal-data callbacks exist in the preview.
+                importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+            }.also { preview.addView(it) }
+            previewTheme = selected.theme
+        }
+        keyboard?.let { view ->
+            binding.apply(view, selected) { success ->
+                if (visible) preview.visibility = View.VISIBLE
+                if (!success) message(UiR.string.appearance_image_missing)
+            }
+        }
+    }
+
+    private fun chooseImage() {
+        try { picker.launch(arrayOf("image/jpeg", "image/png", "image/webp")) }
+        catch (_: android.content.ActivityNotFoundException) { message(UiR.string.appearance_image_failed) }
+    }
+
+    private fun confirmReset(all: Boolean) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (all) UiR.string.appearance_reset_title else UiR.string.appearance_remove_title)
+            .setMessage(if (all) UiR.string.appearance_reset_message else UiR.string.appearance_remove_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                if (all) settings.keyboardAppearance = KeyboardAppearance()
+                binding.close()
+                setBusy(true)
+                operation = graph.keyboardBackgrounds.remove { success ->
+                    setBusy(false)
+                    if (!success) message(UiR.string.appearance_delete_failed)
+                    refreshOptions()
+                }
+            }.show()
+    }
+
+    private fun setBusy(busy: Boolean) {
+        status.visibility = if (busy) View.VISIBLE else View.GONE
+        status.setText(UiR.string.appearance_loading)
+        fun enable(view: View) {
+            view.isEnabled = !busy
+            if (view is ViewGroup) for (index in 0 until view.childCount) enable(view.getChildAt(index))
+        }
+        enable(options)
+    }
+
+    private fun message(label: Int) { Toast.makeText(this, label, Toast.LENGTH_LONG).show() }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

@@ -14,7 +14,6 @@ import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
 import dev.zeroinput.engine.api.DoublePinyinScheme
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.settings.SettingsRepository
 import dev.zeroinput.ime.settings.SettingsScreenState
 import dev.zeroinput.ime.settings.SettingsScreenView
@@ -26,6 +25,34 @@ import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 class SettingsPanelTest {
+    @Test fun fuzzyMasterUpdatesEveryVisibleRuleAndIndividualRulesRemainUsable() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var result: Result<Unit>? = null
+        instrumentation.runOnMainSync {
+            result = runCatching {
+                val context = ContextThemeWrapper(instrumentation.targetContext, R.style.Theme_ZeroInput)
+                val panel = dev.zeroinput.ime.settings.ChineseSettingsView(context)
+                var options = ChineseInputOptions()
+                panel.onOptionsChanged = { options = it }
+                panel.render(options, setOf(dev.zeroinput.engine.api.EngineCapability.FUZZY_PINYIN))
+                val switches = (0 until panel.childCount).map(panel::getChildAt).filterIsInstance<MaterialSwitch>()
+                val master = switches.single { it.text == context.getString(R.string.fuzzy_pinyin_enabled) }
+                val pairs = switches.takeLast(dev.zeroinput.engine.api.FuzzyPinyinPair.entries.size)
+                assertTrue(!master.isChecked)
+                master.isChecked = true
+                assertTrue(pairs.all { it.isChecked })
+                assertEquals(ChineseInputOptions.MAX_FUZZY_PINYIN_MASK, options.effectiveFuzzyPinyinMask)
+                master.isChecked = false
+                assertTrue(pairs.none { it.isChecked })
+                assertEquals(0, options.fuzzyPinyinMask)
+                pairs.first().isChecked = true
+                assertTrue(master.isChecked)
+                assertEquals(1, pairs.count { it.isChecked })
+            }
+        }
+        checkNotNull(result).getOrThrow()
+    }
+
     @Test
     fun chineseControlsFitSmallScreensAndExposeTheSelectedModes() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -44,7 +71,6 @@ class SettingsPanelTest {
     fun chineseOptionsPersistAsOneValueSnapshot() {
         val repository = SettingsRepository(InstrumentationRegistry.getInstrumentation().targetContext)
         val original = repository.chineseInputOptions
-        val originalEngine = repository.chineseEngine
         val originalModel = repository.experimentalModelRanking
         try {
             val changed = ChineseInputOptions(
@@ -56,30 +82,27 @@ class SettingsPanelTest {
                 ChineseKeyboardLayout.NINE_KEY,
             )
             repository.chineseInputOptions = changed
-            repository.chineseEngine = ChineseEngineChoice.DICTIONARY_TEST
             repository.experimentalModelRanking = true
             assertEquals(changed, SettingsRepository(InstrumentationRegistry.getInstrumentation().targetContext).chineseInputOptions)
-            assertEquals(ChineseEngineChoice.DICTIONARY_TEST, SettingsRepository(InstrumentationRegistry.getInstrumentation().targetContext).chineseEngine)
             assertTrue(SettingsRepository(InstrumentationRegistry.getInstrumentation().targetContext).experimentalModelRanking)
         } finally {
             repository.chineseInputOptions = original
-            repository.chineseEngine = originalEngine
             repository.experimentalModelRanking = originalModel
         }
     }
 
-    @Test fun fuzzyMasterSwitchPersistsWithoutLosingSelectedRules() {
+    @Test fun fuzzyMasterSwitchPersistsAllSelectionsOrNone() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = SettingsRepository(context)
         val original = repository.chineseInputOptions
         try {
             val selected = ChineseInputOptions().withFuzzy(dev.zeroinput.engine.api.FuzzyPinyinPair.N_L, true)
-            repository.chineseInputOptions = selected.copy(fuzzyPinyinEnabled = false)
+            repository.chineseInputOptions = selected.withAllFuzzy(false)
             val restored = SettingsRepository(context).chineseInputOptions
-            assertEquals(selected.fuzzyPinyinMask, restored.fuzzyPinyinMask)
+            assertEquals(0, restored.fuzzyPinyinMask)
             assertTrue(!restored.fuzzyPinyinEnabled)
-            repository.chineseInputOptions = restored.copy(fuzzyPinyinEnabled = true)
-            assertEquals(selected, SettingsRepository(context).chineseInputOptions)
+            repository.chineseInputOptions = restored.withAllFuzzy(true)
+            assertEquals(selected.withAllFuzzy(true), SettingsRepository(context).chineseInputOptions)
         } finally { repository.chineseInputOptions = original }
     }
 

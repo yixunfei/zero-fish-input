@@ -40,8 +40,14 @@ data class ChineseInputOptions(
 
     fun withFuzzy(pair: FuzzyPinyinPair, enabled: Boolean): ChineseInputOptions {
         val bit = 1 shl pair.ordinal
-        return copy(fuzzyPinyinMask = if (enabled) fuzzyPinyinMask or bit else fuzzyPinyinMask and bit.inv())
+        val mask = if (enabled) effectiveFuzzyPinyinMask or bit else effectiveFuzzyPinyinMask and bit.inv()
+        return copy(fuzzyPinyinMask = mask, fuzzyPinyinEnabled = mask != 0)
     }
+
+    fun withAllFuzzy(enabled: Boolean): ChineseInputOptions = copy(
+        fuzzyPinyinMask = if (enabled) MAX_FUZZY_PINYIN_MASK else 0,
+        fuzzyPinyinEnabled = enabled,
+    )
 
     companion object {
         val PAGE_SIZES: List<Int> = listOf(5, 8, 10)

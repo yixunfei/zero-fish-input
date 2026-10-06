@@ -2,6 +2,7 @@ package dev.zeroinput.ime
 
 import android.content.Intent
 import android.os.SystemClock
+import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -71,15 +72,76 @@ class AiImeInteractionTest {
         onMain { assertFalse(panel().isAiOpen); assertTrue(editor.editor.text.isEmpty()) }
     }
 
+    @Test fun selectedContentRequiresKeyboardClaimAndClearsOnEditorChange() = withEditor { editor ->
+        onMain {
+            graph.aiContentInbox.put(dev.zeroinput.ime.ai.AiImportedContent("public imported context".toCharArray(),
+                listOf(dev.zeroinput.ai.api.AiAttachment("text/plain", "fixture".toByteArray(), "fixture.txt"))))
+        }
+        dev.zeroinput.ime.testing.DeviceTouch.tapVisible { labelled(UiR.string.ai_open) }
+        await { panel().isAiOpen }
+        onMain { assertTrue(draft().text.isEmpty()); assertTrue(editor.editor.text.isEmpty()) }
+        dev.zeroinput.ime.testing.DeviceTouch.tapVisible { labelled(UiR.string.ai_more) }
+        dev.zeroinput.ime.testing.DeviceTouch.tapVisible {
+            WindowInspector.getGlobalWindowViews().flatMap(::views).filterIsInstance<TextView>().first {
+                it.isShown && it.text == it.context.getString(UiR.string.ai_import_content)
+            }
+        }
+        await { draft().text.toString() == "public imported context" }
+        onMain { assertFalse(graph.aiContentInbox.available()); assertTrue(editor.editor.text.isEmpty()) }
+        onMain {
+            editor.editor.imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            editor.getSystemService(InputMethodManager::class.java).restartInput(editor.editor)
+        }
+        await { !panel().isAiOpen }
+        onMain { assertTrue(editor.editor.text.isEmpty()) }
+    }
+
+    @Test fun noSuggestionsChatOpensIndependentChineseDraftButNoLearningStillBlocksAi() = withEditor { editor ->
+        onMain {
+            editor.editor.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE or
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            editor.editor.imeOptions = 0
+            editor.getSystemService(InputMethodManager::class.java).restartInput(editor.editor)
+        }
+        await { labelledOrNull(UiR.string.ai_open)?.isEnabled == true }
+        dev.zeroinput.ime.testing.DeviceTouch.tapVisible { labelled(UiR.string.ai_open) }
+        await { panel().isAiEditing }
+        onMain {
+            for (character in "nihao") panel().onAiDraftChanged(dev.zeroinput.ime.ui.KeyboardAction.Text(character.toString()))
+            panel().onAiDraftChanged(dev.zeroinput.ime.ui.KeyboardAction.Space)
+        }
+        await { draft().text.toString() == "你好" }
+        onMain {
+            for (character in "zhongguo") panel().onAiDraftChanged(dev.zeroinput.ime.ui.KeyboardAction.Text(character.toString()))
+            panel().onAiDraftChanged(dev.zeroinput.ime.ui.KeyboardAction.Space)
+        }
+        await { draft().text.toString() == "你好中国" }
+        onMain {
+            assertTrue(editor.editor.text.isEmpty())
+            editor.editor.imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            editor.getSystemService(InputMethodManager::class.java).restartInput(editor.editor)
+        }
+        await { !panel().isAiOpen && labelledOrNull(UiR.string.ai_entry_unavailable) != null }
+        dev.zeroinput.ime.testing.DeviceTouch.tapVisible { labelled(UiR.string.ai_entry_unavailable) }
+        onMain { assertFalse(panel().isAiOpen); assertTrue(editor.editor.text.isEmpty()) }
+    }
+
     private fun withEditor(test: (InputFixtureActivity) -> Unit) {
         val originalMethod = shell("settings get secure default_input_method").trim()
         val originalConfig = graph.aiConfiguration.read()
         val learning = graph.settings.learningEnabled
         val incognito = graph.settings.incognitoMode
+        val language = graph.settings.lastLanguage
+        val pack = graph.settings.lastLanguagePackKey
         var activity: InputFixtureActivity? = null
         try {
             configure(AiConfiguration())
-            onMain { graph.settings.learningEnabled = true; graph.settings.incognitoMode = false }
+            onMain {
+                graph.settings.learningEnabled = true
+                graph.settings.incognitoMode = false
+                graph.settings.lastLanguage = dev.zeroinput.engine.api.InputLanguage.CHINESE
+                graph.settings.lastLanguagePackKey = null
+            }
             shell("ime enable dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService")
             shell("ime set dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService")
             activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
@@ -93,10 +155,20 @@ class AiImeInteractionTest {
             await { panels().isNotEmpty() && views(panel()).any {
                 it.contentDescription == it.context.getString(UiR.string.ai_open) && it.visibility == View.VISIBLE
             } }
+            onMain {
+                if (views(panel()).filterIsInstance<TextView>().any {
+                    it.contentDescription == it.context.getString(UiR.string.language_switch) && it.text.toString() == "En"
+                }) panel().onKeyboardAction(dev.zeroinput.ime.ui.KeyboardAction.SwitchLanguage)
+            }
             test(fixture)
         } finally {
             activity?.let { onMain { it.finish() } }
-            onMain { graph.settings.learningEnabled = learning; graph.settings.incognitoMode = incognito }
+            onMain {
+                graph.settings.learningEnabled = learning
+                graph.settings.incognitoMode = incognito
+                graph.settings.lastLanguage = language
+                graph.settings.lastLanguagePackKey = pack
+            }
             configure(originalConfig)
             if (originalMethod.isNotBlank() && originalMethod != "null") shell("ime set $originalMethod")
         }

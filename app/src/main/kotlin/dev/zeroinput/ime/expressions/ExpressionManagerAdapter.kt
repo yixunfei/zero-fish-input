@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import dev.zeroinput.ime.R
 import dev.zeroinput.userdata.PersonalExpression
@@ -25,11 +26,19 @@ internal class ExpressionManagerAdapter(
             it.texts.setOnClickListener(null)
             it.delete.setOnClickListener(null)
         }
-        val oldCount = entries.size
-        entries = emptyList()
-        if (oldCount > 0) notifyItemRangeRemoved(0, oldCount)
-        entries = values.toList()
-        if (entries.isNotEmpty()) notifyItemRangeInserted(0, entries.size)
+        val previous = entries
+        val next = values.toList()
+        entries = next
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = previous.size
+            override fun getNewListSize() = next.size
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                previous[oldItemPosition].id == next[newItemPosition].id
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                previous[oldItemPosition] == next[newItemPosition]
+        }).dispatchUpdatesTo(this)
     }
     override fun getItemCount() = entries.size
 

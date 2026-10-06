@@ -48,7 +48,8 @@ internal class KeyboardWindowLayout(
     private fun configureFrame() {
         val view = host ?: return
         val floating = view.placement.mode == KeyboardPlacementMode.FLOATING
-        val height = if (floating) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT
+        val height = if (floating || view.keyboard.isPanelExpanded) ViewGroup.LayoutParams.MATCH_PARENT
+            else ViewGroup.LayoutParams.WRAP_CONTENT
         for (target in listOfNotNull(view, view.parent as? View)) {
             val params = target.layoutParams ?: continue
             if (params.height != height) { params.height = height; target.layoutParams = params }
@@ -67,7 +68,13 @@ internal class KeyboardWindowLayout(
         if (bounds != lastBounds || floating != lastFloating) {
             lastBounds = bounds
             lastFloating = floating
-            service.window?.window?.decorView?.requestLayout()
+            service.window?.window?.let { imeWindow ->
+                imeWindow.decorView.requestLayout()
+                // InputMethodService derives the editor's IME insets from the
+                // window after layout. Explicitly schedule an inset pass here
+                // so a floating host cannot leave a stale full-window inset.
+                androidx.core.view.ViewCompat.requestApplyInsets(imeWindow.decorView)
+            }
         }
     }
 
@@ -79,9 +86,12 @@ internal class KeyboardWindowLayout(
         view.getLocationInWindow(location)
         rect.offset(location[0], location[1])
         val floating = view.placement.mode == KeyboardPlacementMode.FLOATING
-        val bottom = service.window?.window?.decorView?.height ?: rect.bottom
-        outInsets.contentTopInsets = if (floating) bottom else rect.top
-        outInsets.visibleTopInsets = if (floating) bottom else rect.top
+        // The full-window host is only a placement surface. Reporting the
+        // window bottom as the floating content top leaves no resize inset,
+        // while the touchable region remains the actual keyboard rectangle.
+        val windowBottom = view.height
+        outInsets.contentTopInsets = if (floating) windowBottom else rect.top
+        outInsets.visibleTopInsets = if (floating) windowBottom else rect.top
         outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION
         outInsets.touchableRegion.set(rect)
     }

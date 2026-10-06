@@ -13,6 +13,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,21 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LanguagePackJsonPlatformTest {
+    @Test fun rapidSerialTogglesUseRequestedValueEvenWithTheOriginalPackSnapshot() = withInstaller { installer ->
+        val original = install(installer, manifest())
+        val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            val tasks = (0 until 21).map { index -> worker.submit {
+                val enabled = index % 2 != 0
+                assertTrue(installer.setEnabled(original, enabled))
+                assertEquals(enabled, installer.installedSnapshot().single().enabled)
+            } }
+            tasks.forEach { it.get(5, java.util.concurrent.TimeUnit.SECONDS) }
+            assertFalse(installer.listInstalled().single().enabled)
+            assertTrue(original.enabled)
+        } finally { worker.shutdownNow() }
+    }
+
     @Test fun androidParserRejectsDepthAndUnquotedTokenBypasses() = withInstaller { installer ->
         val nested = "[".repeat(32) + "0" + "]".repeat(32)
         val invalid = listOf(

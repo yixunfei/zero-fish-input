@@ -30,6 +30,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     var onFavoriteRequested: (EmojiEntry, Boolean) -> Unit = { _, _ -> }
     var onManageRequested: (String?) -> Unit = {}
     var onSearchModeChanged: (Boolean) -> Unit = {}
+    var onQueryClearRequested: () -> Unit = {}
     var onUserInteraction: () -> Unit = {}
 
     private val state = ExpressionBrowserState()
@@ -55,6 +56,13 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         ellipsize = android.text.TextUtils.TruncateAt.END
         isSaveEnabled = false
         layoutParams = LayoutParams(0, dp(48), 1f)
+        isClickable = true
+        isFocusable = true
+        contentDescription = context.getString(R.string.expression_search_input)
+        setOnClickListener {
+            onUserInteraction()
+            if (!state.searchActive) toggleSearch()
+        }
     }
     private val searchButton = icon(R.drawable.ic_expression_search, R.string.expression_search) { toggleSearch() }
     private val manageButton = icon(R.drawable.ic_expression_add, R.string.expression_manage) { onManageRequested(null) }
@@ -107,12 +115,17 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     }
 
     fun renderPersonal(allowed: Boolean, data: PersonalExpressionsUi, recent: List<String>) {
+        if (state.personalizationAllowed && (!allowed || state.personal != data)) {
+            // Revocation/deletion cannot leave private rows visible while a search runs.
+            adapter.submit(emptyList(), emptySet(), false)
+        }
         state.renderPersonal(allowed, data, recent)
         refresh()
     }
 
     fun clearSession() {
         browser.cancelSwipe()
+        adapter.submit(emptyList(), emptySet(), false)
         state.clearSession()
         refresh()
         onSearchModeChanged(false)
@@ -120,7 +133,12 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
 
     fun appendQuery(value: String) { state.append(value); refresh() }
     fun removeQueryCharacter() { state.backspace(); refresh() }
-    fun clearQuery() { onUserInteraction(); state.clearQuery(); refresh() }
+    fun renderQuery(value: String) {
+        if (state.query == value) return
+        state.replaceQuery(value)
+        refresh()
+    }
+    fun clearQuery() { onUserInteraction(); onQueryClearRequested(); state.clearQuery(); refresh() }
 
     fun closeSearch(): Boolean {
         if (!state.searchActive) return false
@@ -216,15 +234,16 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         filterTask?.cancel(false)
         (filterTask as? Runnable)?.let { filterWorker?.remove(it) }
         filterTask = null
-        // Revocation removes old personal rows synchronously before any new background result.
-        adapter.submit(emptyList(), emptySet(), false)
-        emptyLabel.visibility = VISIBLE
         val privateCategory = state.category in setOf(EmojiCategory.RECENT, EmojiCategory.FAVORITES, EmojiCategory.CUSTOM)
         if (!state.personalizationAllowed && privateCategory) {
+            adapter.submit(emptyList(), emptySet(), false)
+            emptyLabel.visibility = VISIBLE
             updateEmptyLabel()
             return
         }
         if (!EmojiCatalog.isReady && state.category !in setOf(EmojiCategory.KAOMOJI, EmojiCategory.CUSTOM)) {
+            adapter.submit(emptyList(), emptySet(), false)
+            emptyLabel.visibility = VISIBLE
             emptyLabel.setText(if (preparationFailed) R.string.expression_unavailable else R.string.expression_loading)
             return
         }
@@ -245,15 +264,29 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
                 reference.get()?.post {
                     val panel = reference.get()
                     if (panel != null && panel.isAttachedToWindow && panel.renderGeneration == generation) {
-                        panel.adapter.submit(entries, request.personal.favorites, allowed)
-                        panel.emptyLabel.visibility = if (entries.isEmpty()) VISIBLE else GONE
-                        panel.updateEmptyLabel()
+                        panel.publishSearch(generation, entries, request.personal.favorites, allowed)
                     }
                 }
             }
         } catch (_: RejectedExecutionException) {
+            emptyLabel.visibility = VISIBLE
             emptyLabel.setText(R.string.expression_unavailable)
+            return
         }
+        if (adapter.itemCount == 0) {
+            emptyLabel.visibility = VISIBLE
+            emptyLabel.setText(R.string.expression_loading)
+        }
+    }
+
+    private fun publishSearch(generation: Long, entries: List<EmojiEntry>, favorites: Set<String>, allowed: Boolean) {
+        if (!isAttachedToWindow || renderGeneration != generation) return
+        if (grid.isComputingLayout) {
+            post { publishSearch(generation, entries, favorites, allowed) }
+            return
+        }
+        adapter.submit(entries, favorites, allowed)
+        emptyLabel.visibility = if (entries.isEmpty()) VISIBLE else GONE
         updateEmptyLabel()
     }
 

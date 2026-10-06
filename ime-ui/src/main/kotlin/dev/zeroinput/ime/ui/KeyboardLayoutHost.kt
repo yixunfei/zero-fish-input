@@ -49,6 +49,7 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         addView(surface)
         keyboard.setExternalInsets(true)
         keyboard.onPlacementRequested = ::showPlacementMenu
+        keyboard.onPanelExpansionChanged = { requestLayout(); onBoundsChanged() }
         controls.onDock = { selectMode(KeyboardPlacementMode.DOCKED) }
         controls.onFlip = { selectMode(if (placement.mode == KeyboardPlacementMode.LEFT_HAND)
             KeyboardPlacementMode.RIGHT_HAND else KeyboardPlacementMode.LEFT_HAND) }
@@ -159,14 +160,16 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         val floating = placement.mode == KeyboardPlacementMode.FLOATING
         val offered = MeasureSpec.getSize(heightMeasureSpec).takeIf { it > 0 }
             ?: dp(resources.configuration.screenHeightDp)
-        val top = if (floating) safeInsets.top else 0
+        val top = if (floating || keyboard.isPanelExpanded) safeInsets.top else 0
         val availableWidth = (width - safeInsets.left - safeInsets.right).coerceAtLeast(0)
         val availableHeight = (offered - top - safeInsets.bottom).coerceAtLeast(0)
         val panelWidth = if (minimized) minOf(dp(56), availableWidth)
+            else if (keyboard.isPanelExpanded) availableWidth
             else KeyboardPlacementGeometry.width(placement, availableWidth, dp(240))
         surface.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(availableHeight, MeasureSpec.AT_MOST))
-        setMeasuredDimension(width, if (floating) offered else minOf(offered, surface.measuredHeight + safeInsets.bottom))
+        setMeasuredDimension(width, if (floating || keyboard.isPanelExpanded) offered
+            else minOf(offered, surface.measuredHeight + safeInsets.bottom))
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -184,6 +187,7 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         menu?.dismiss(); menu = null
         onPlacementChanged = {}; onInteraction = {}; onBoundsChanged = {}
         keyboard.onPlacementRequested = {}
+        keyboard.onPanelExpansionChanged = {}
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

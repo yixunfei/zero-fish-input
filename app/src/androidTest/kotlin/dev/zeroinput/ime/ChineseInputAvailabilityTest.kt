@@ -11,7 +11,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.ChineseInputOptions
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.InputEngineStatus
@@ -113,14 +112,12 @@ class ChineseInputAvailabilityTest {
         val originalMethod = shell("settings get secure default_input_method").trim()
         val settings = graph.settings
         val options = settings.chineseInputOptions
-        val engine = settings.chineseEngine
         val language = settings.lastLanguage
         val pack = settings.lastLanguagePackKey
         var activity: InputFixtureActivity? = null
         try {
             onMain {
                 settings.chineseInputOptions = ChineseInputOptions()
-                settings.chineseEngine = ChineseEngineChoice.RIME
                 settings.lastLanguagePackKey = null
             }
             val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
@@ -131,7 +128,7 @@ class ChineseInputAvailabilityTest {
             await { panelOrNull() != null }
             onMain {
                 if (views(panel()).filterIsInstance<TextView>().any {
-                    it.contentDescription == "切换中英文" && it.text.toString() == "En"
+                    it.contentDescription == it.context.getString(UiR.string.language_switch) && it.text.toString() == "En"
                 }) panel().onKeyboardAction(KeyboardAction.SwitchLanguage)
             }
             action(activity)
@@ -140,7 +137,6 @@ class ChineseInputAvailabilityTest {
             if (originalMethod.isNotBlank() && originalMethod != "null") shell("ime set $originalMethod")
             onMain {
                 settings.chineseInputOptions = options
-                settings.chineseEngine = engine
                 settings.lastLanguage = language
                 settings.lastLanguagePackKey = pack
             }

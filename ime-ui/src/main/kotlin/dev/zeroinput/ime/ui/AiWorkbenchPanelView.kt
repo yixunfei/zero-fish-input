@@ -2,6 +2,7 @@ package dev.zeroinput.ime.ui
 
 import android.content.Context
 import android.graphics.Color
+import android.content.res.ColorStateList
 import android.os.Build
 import android.view.Gravity
 import android.view.View
@@ -10,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
+import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.ai.api.*
 
 /** Display and explicit user intents only. All draft conversion is owned by the service. */
@@ -21,12 +23,20 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onConversationDeleted: (String) -> Unit = {}
     var onNewConversation: () -> Unit = {}
     var onEditingChanged: (Boolean) -> Unit = {}
+    var onSettings: () -> Unit = {}
+    var onAddContent: () -> Unit = {}
+    var onImportContent: () -> Unit = {}
+    var onRemoveAttachment: (Int) -> Unit = {}
     private var action = AiAction.ASK
     private var languageIndex = 0
     private var pendingDelete: String? = null
     private var streaming = false
+    private var inputLanguage = InputLanguage.CHINESE
     var editing = false
         private set
+    val editingHeightDp: Int get() = if (attachmentRow.childCount > 0) 224 else 176
+
+    private val inputStatus = textView().apply { textSize = 12f; gravity = Gravity.CENTER_VERTICAL }
 
     private val draft = textView().apply {
         maxLines = 2
@@ -36,6 +46,11 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         isFocusable = true
         contentDescription = context.getString(R.string.ai_edit)
         setOnClickListener { setEditing(true) }
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(4).toFloat()
+            setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceContainer, Color.TRANSPARENT))
+            setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutline, Color.GRAY))
+        }
     }
     private val transcript = textView()
     private val result = textView()
@@ -51,12 +66,16 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private val edit = button(R.string.ai_edit) { setEditing(!editing) }
     private val submit = button(R.string.ai_submit) { submit() }
     private val cancel = button(R.string.ai_cancel) { onCancel() }
-    private val insert = button(R.string.ai_insert) { onInsert("") }
+    private val insert = button(R.string.ai_insert) { onInsert(result.text.toString()) }
+    private val settings = button(R.string.ai_settings) { onSettings() }
+    private val addContent = button(R.string.ai_add_content) { onAddContent() }
+    private val importContent = button(R.string.ai_import_content) { onImportContent() }
+    private val more = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.ai_more) { showMore() }
+    private val attachmentRow = LinearLayout(context).apply { orientation = HORIZONTAL }
     private val actions = AiAction.entries.associateWith { value ->
         button(actionLabel(value)) {
             action = value
             updateActionStyles()
-            if (value == AiAction.TRANSLATE && draft.text.isNotBlank()) submit()
         }
     }
 
@@ -67,21 +86,47 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         isSaveEnabled = false
         setPadding(dp(8), 0, dp(8), 0)
         addView(scrollRow(actions.values + target), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        addView(inputStatus, LayoutParams(LayoutParams.MATCH_PARENT, dp(32)))
         addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        addView(HorizontalScrollView(context).apply { addView(attachmentRow) })
         addView(detail, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(scrollRow(listOf(edit, submit, cancel, insert)), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        addView(LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            listOf(submit, edit, insert).forEach { addView(it, LayoutParams(0, dp(48), 1f)) }
+            addView(more, LayoutParams(dp(48), dp(48)))
+        }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        cancel.visibility = GONE
+        detailContent.addView(cancel, 0)
+        importContent.visibility = GONE
         renderConversations(emptyList())
         updateActionStyles()
         render(AiStreamEvent.Cancelled)
     }
 
-    fun renderDraft(value: String) { draft.text = value }
+    fun renderDraft(value: String, language: InputLanguage = inputLanguage) {
+        draft.text = value
+        draft.error = null
+        inputLanguage = language
+        renderInputStatus()
+        submit.isEnabled = !streaming && value.isNotBlank()
+    }
+
+    fun renderImportedContent(available: Boolean, names: List<String>) {
+        importContent.visibility = if (available) VISIBLE else GONE
+        attachmentRow.removeAllViews()
+        names.forEachIndexed { index, name ->
+            attachmentRow.addView(buttonText(context.getString(R.string.ai_remove_attachment, name)) {
+                onRemoveAttachment(index)
+            })
+        }
+    }
 
     fun setEditing(value: Boolean) {
         if (editing == value) return
         editing = value
         detail.visibility = if (value) GONE else VISIBLE
         edit.setText(if (value) R.string.ai_read else R.string.ai_edit)
+        renderInputStatus()
         onEditingChanged(value)
     }
 
@@ -116,12 +161,14 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
 
     fun renderConversation(value: AiConversation?) {
-        result.text = ""
-        transcript.text = value?.messages.orEmpty().joinToString("\n\n") { message ->
+        val messages = value?.messages.orEmpty()
+        val latest = messages.lastOrNull()?.takeIf { it.role == AiRole.ASSISTANT }
+        result.text = latest?.content.orEmpty()
+        insert.isEnabled = false
+        transcript.text = (if (latest == null) messages else messages.dropLast(1)).joinToString("\n\n") { message ->
             context.getString(if (message.role == AiRole.USER) R.string.ai_user_message else R.string.ai_assistant_message,
                 message.content)
         }
-        if (value == null) result.text = ""
     }
 
     fun render(event: AiStreamEvent) {
@@ -132,40 +179,59 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
                 setEditing(false)
                 submit.isEnabled = false
                 cancel.isEnabled = true
+                cancel.visibility = VISIBLE
+                inputStatus.setText(R.string.ai_generating)
                 insert.isEnabled = false
             }
             is AiStreamEvent.Delta -> result.append(event.text)
             is AiStreamEvent.Completed -> {
                 streaming = false
                 result.text = event.text
-                submit.isEnabled = true
+                submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false
+                cancel.visibility = GONE
+                renderInputStatus()
                 insert.isEnabled = event.text.isNotBlank()
             }
             is AiStreamEvent.Failed -> {
                 streaming = false
                 setEditing(false)
-                result.setText(when (event.error) {
-                    is AiProviderError.Policy -> R.string.ai_policy_unavailable
-                    is AiProviderError.Configuration -> R.string.ai_configuration_invalid
-                    is AiProviderError.Network -> R.string.ai_connection_failed
-                    is AiProviderError.Response -> R.string.ai_response_invalid
-                })
-                submit.isEnabled = true
+                result.setText(aiErrorMessage(event.error))
+                submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false
+                cancel.visibility = GONE
+                renderInputStatus()
                 insert.isEnabled = false
             }
             AiStreamEvent.Cancelled -> {
                 streaming = false
                 result.text = ""
-                submit.isEnabled = true
+                submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false
+                cancel.visibility = GONE
+                renderInputStatus()
                 insert.isEnabled = false
             }
         }
     }
 
+    private fun renderInputStatus() {
+        if (streaming) inputStatus.setText(R.string.ai_generating)
+        else inputStatus.text = context.getString(if (editing) R.string.ai_draft_mode else R.string.ai_result_mode,
+            context.getString(if (inputLanguage == InputLanguage.CHINESE) R.string.ai_input_chinese else R.string.ai_input_english))
+        draft.isSelected = editing
+    }
+
+    private fun showMore() {
+        val menu = androidx.appcompat.widget.PopupMenu(context, more)
+        val commands = listOf(importContent, addContent, settings).filter { it !== importContent || importContent.visibility == VISIBLE }
+        commands.forEachIndexed { index, button -> menu.menu.add(0, index, index, button.text) }
+        menu.setOnMenuItemClickListener { commands[it.itemId].performClick(); true }
+        menu.show()
+    }
+
     fun reset() {
+        renderImportedContent(false, emptyList())
         draft.text = ""
         transcript.text = ""
         pendingDelete = null
@@ -195,7 +261,14 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private fun updateActionStyles() {
         actions.forEach { (value, view) ->
             view.isSelected = value == action
-            view.alpha = if (value == action) 1f else 0.62f
+            view.isCheckable = true
+            view.isChecked = value == action
+            val selected = value == action
+            view.backgroundTintList = ColorStateList.valueOf(resolveColor(
+                if (selected) com.google.android.material.R.attr.colorPrimaryContainer
+                else com.google.android.material.R.attr.colorSurface, Color.TRANSPARENT))
+            view.setTextColor(resolveColor(if (selected) com.google.android.material.R.attr.colorOnPrimaryContainer
+                else com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
         }
         target.visibility = if (action == AiAction.TRANSLATE) VISIBLE else GONE
         target.text = resources.getStringArray(R.array.ai_target_languages)[languageIndex]
@@ -220,8 +293,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         text = label
         isAllCaps = false
         letterSpacing = 0f
+        cornerRadius = dp(4)
         minWidth = 0
         minimumWidth = 0
+        setPadding(dp(8), paddingTop, dp(8), paddingBottom)
         maxLines = 1
         ellipsize = android.text.TextUtils.TruncateAt.END
         setOnClickListener { action() }

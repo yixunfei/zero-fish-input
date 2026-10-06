@@ -50,11 +50,6 @@ class EngineWarmupCoordinatorTest {
     }
 
     @Test
-    fun `changing engine selection retires the delayed engine from the old selection`() {
-        verifyReplacement(request().copy(chineseEngine = dev.zeroinput.ime.settings.ChineseEngineChoice.DICTIONARY_TEST))
-    }
-
-    @Test
     fun `changing keyboard layout retires a delayed engine with the old spelling rules`() {
         val original = request()
         verifyReplacement(original.copy(chineseOptions = original.chineseOptions.copy(

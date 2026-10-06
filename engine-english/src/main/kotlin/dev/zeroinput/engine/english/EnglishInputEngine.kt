@@ -167,7 +167,7 @@ class EnglishInputEngine(
     private fun unchanged(consumed: Boolean) = EngineUpdate(currentSnapshot, consumed = consumed)
 
     private fun preserveCase(typed: String, suggestion: String): String = when {
-        typed.all(Char::isUpperCase) -> suggestion.uppercase(Locale.ROOT)
+        typed.any(Char::isLetter) && typed.filter(Char::isLetter).all(Char::isUpperCase) -> suggestion.uppercase(Locale.ROOT)
         typed.firstOrNull()?.isUpperCase() == true -> suggestion.replaceFirstChar { it.uppercase(Locale.ROOT) }
         else -> suggestion
     }

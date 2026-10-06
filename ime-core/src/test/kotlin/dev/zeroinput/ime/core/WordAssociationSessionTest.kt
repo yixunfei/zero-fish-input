@@ -67,6 +67,23 @@ class WordAssociationSessionTest {
         assertEquals(1, session.candidates.size)
     }
 
+    @Test fun `refresh reruns the retained context when predictor becomes ready`() {
+        var ready = false
+        var queries = 0
+        val session = WordAssociationSession(NextWordPredictor { _, context, _ ->
+            queries++
+            if (ready) listOf(NextWordSuggestion("world")) else emptyList()
+        })
+        session.committed("hello", InputLanguage.ENGLISH)
+        assertTrue(session.candidates.isEmpty())
+        ready = true
+
+        session.refresh()
+
+        assertEquals(2, queries)
+        assertEquals(listOf("world"), session.candidates.map { it.text })
+    }
+
     @Test fun `normalization deduplicates script variants and rejects invalid output`() {
         val session = WordAssociationSession(NextWordPredictor { _, _, _ ->
             listOf(NextWordSuggestion("快乐"), NextWordSuggestion("快樂"),
@@ -75,6 +92,35 @@ class WordAssociationSessionTest {
         session.committed("生日", InputLanguage.CHINESE) { it.replace('乐', '樂') }
         assertEquals(listOf("快樂"), session.candidates.map { it.text })
         assertEquals("快樂", session.selection(session.candidates.single().id)?.commitText)
+    }
+
+    @Test fun `refresh retains the language of a fresh fragment following punctuation`() {
+        var ready = false
+        val contexts = mutableListOf<Pair<InputLanguage, String>>()
+        val session = WordAssociationSession(NextWordPredictor { language, context, _ ->
+            contexts += language to context.toString()
+            if (ready) listOf(NextWordSuggestion("world")) else emptyList()
+        })
+        session.committed("hello!new", InputLanguage.ENGLISH)
+        assertTrue(session.candidates.isEmpty())
+        ready = true
+
+        session.refresh()
+
+        assertEquals(listOf(InputLanguage.ENGLISH to "new", InputLanguage.ENGLISH to "new"), contexts)
+        assertEquals(listOf("world"), session.candidates.map { it.text })
+    }
+
+    @Test fun `trailing punctuation cannot restore the previous fragment on refresh`() {
+        var queries = 0
+        val session = WordAssociationSession(NextWordPredictor { _, _, _ ->
+            queries++
+            listOf(NextWordSuggestion("world"))
+        })
+        session.committed("hello!", InputLanguage.ENGLISH)
+        session.refresh()
+        assertEquals(0, queries)
+        assertTrue(session.candidates.isEmpty())
     }
 
     @Test fun `learned frequency reranks suggestions with a stable editorial fallback`() {

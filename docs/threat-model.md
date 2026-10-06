@@ -226,7 +226,8 @@
 - External cursor changes end the visible preedit without reading surrounding
   text, learning its contents or replacing the new selection. Engine/candidate
   state is reset so a later Backspace cannot use the old composing position.
-- The fuzzy master stores only a boolean preference, preserving the rule mask.
+- The fuzzy master updates the existing boolean and rule mask together: all pairs
+  on enable, no pairs on disable; individual selection remains supported.
   It uses existing configuration generations and never changes privacy eligibility.
 
 - Editor classes and variations have an explicit allowlist. Unknown classes,
@@ -293,6 +294,13 @@
   existing content and before committing an addition. A clear invalidates queued
   imports and deletes after any already committing write. Invalid/corrupt data,
   missing keys and rejected execution never become an empty vault to overwrite.
+
+- AI conversation history is optional and is cleared whenever the saved-history
+  setting is disabled, including on the storage worker's startup reconciliation.
+  The encrypted history key is deleted with the file; a failed purge keeps the
+  repository unavailable until an explicit retry succeeds. A transient in-memory
+  conversation may continue only for the current workbench session and is never
+  written while persistence is disabled.
 - Selection menu availability belongs to the source application. The system IPC,
   source application's own storage and text already submitted to a destination
   remain outside ZeroInput's private storage boundary. See ADR 0006.
@@ -416,15 +424,38 @@
 
 ## Keyboard appearance and editor layout
 
-Keyboard appearance settings contain only built-in theme/height identifiers. The
-nonexported preview Activity has no input connection, engine or personal-data
-callbacks. Replacing a keyboard releases old UI callbacks, candidates, queries
-and personal display bindings. Appearance changes use the existing settings
-invalidation for pending authentication and personalization writes. Numeric
-layout selection uses public EditorInfo flags and does not relax the conservative
-privacy policy for passwords, PIN or unknown editor variants. Rendering fixtures
-are nonexported Debug components; screenshots contain only constructed public
-content. No new permission, network dependency or personal-data format is added.
+Appearance preferences contain nonsensitive style values and an opaque image UUID.
+An explicit system-picker grant permits one content URI; no URI is retained and no
+storage permission or app network transport is added. The picker requests local
+sources; a document provider's own synchronization remains outside app control.
+Raster decoding accepts only PNG/JPEG/WebP signatures, at most 12 MiB, 40 million
+source pixels and a 16384-pixel edge. Sampling caps the decoded edge at 1280 pixels.
+AndroidX EXIF orientation parsing and re-encoding strip metadata before persistence.
+The byte count is enforced against the stream, independent of provider metadata.
+Malformed, truncated, oversized, denied, stalled and cancelled imports fail closed
+and preserve the previous selected image. Decode/blur/storage run on a bounded serial
+worker; a 15-second UI deadline and descriptor cancellation revoke stale publication.
+A provider or native decoder that ignores cancellation can occupy that single worker;
+queue limits prevent unbounded work, and ordinary keyboard input remains usable.
+
+Each image revision is atomically encrypted with AES-256-GCM and the isolated
+`zeroinput.keyboard-background.v1` Keystore alias under noBackupFilesDir. Ciphertext
+size is checked before loading; tampering, truncation or key loss falls back to the
+palette. No original file, EXIF, source URI, path or pixels enter logs, preferences,
+AI, exports or backups. Removing/resetting the background revokes old imports and
+serially deletes files and the dedicated key; failure is shown and can be retried.
+Unpublished encrypted revisions are removed on cancellation or subsequent startup.
+Temporary byte/pixel arrays are wiped; exclusively owned display bitmaps are released
+on view hide/replacement/destruction. Native decoder/renderer copies cannot be reliably
+zeroed; the chosen image is intentionally visible as keyboard decoration to anyone
+looking at the screen. The secure settings window prevents system previews/screenshots.
+
+The preview has no editor, engine or personal-data callbacks. Appearance changes use
+the existing invalidation for pending authentication/personalization. Opacity affects
+only the background within the opaque IME surface, never the labels or other apps.
+Frosted glass uses only the keyboard's own background and captures no screen content.
+Numeric layouts and conservative editor privacy classification remain unchanged.
+Tests render only synthetic public images and nonexported Debug fixtures.
 
 ## Experimental model context
 
@@ -554,10 +585,37 @@ exported component is added. See ADR 0017 and the scoped validation reports.
 
 ## AI workbench additions
 
+The user-approved import surface adds one exported, input-only Activity for plain
+text SEND/PROCESS_TEXT. Intent actions, MIME and text length are validated; arbitrary
+URIs/streams from senders are never opened. The Activity shows a protected review
+and uses only OpenDocument grants for attachments. It has no network or editor write
+port and always returns RESULT_CANCELED. A confirmed draft expires after two minutes
+and requires another explicit claim in an eligible IME session. Password, PIN, email,
+URI, unknown and privacy-tightened sessions cannot claim, submit or insert content.
+
+Malicious document providers can lie about length/type or stall reads. Actual byte
+count and strict text decoding are enforced, reads run on one bounded worker and
+cancellation closes the active descriptor. Unsupported types, too many/large files,
+invalid UTF-8 and stale callbacks fail closed. Attachments are transient, excluded
+from saved conversations and wiped on removal/session revocation. Provider processing
+of malformed media is outside this application's control; no local media decoder runs.
+The OS-selected document provider may itself synchronize remote files; this is not
+an additional app network transport. New tests cover import validation, explicit
+confirmation, expiring one-time ownership and editor privacy transitions.
+
+Multiple provider profiles use the dedicated encrypted configuration store. Missing
+selection cannot fall through to another profile's credentials. Image/audio capabilities
+belong to the selected model, and mismatches are rejected before opening a connection.
+Settings revoke queued network requests and imported content. Failed saves preserve
+the protected edit draft and leave networking revoked until a successful explicit save.
+
 See [ADR 0015](adr/0015-ai-workbench-boundary.md). The AI draft uses a separate
 local conversion session and an empty personalization port. It has no external
-editor or clipboard read port. Email, URI, no-personalization, no-suggestions,
+editor or clipboard read port. Email, URI, no-personalization,
 incognito and learning-disabled sessions are rejected alongside sensitive inputs.
+Only ordinary NO_SUGGESTIONS text editors may use independent AI drafts; every
+combined restriction is evaluated before granting this exception. Public conversion
+does not enable personal reads or learning. UI and request checks share the policy.
 The always-discoverable AI icon is only an explanation action in those contexts:
 it displays a fixed, localized restriction message without opening the workbench,
 loading AI history, reading editor/clipboard content or creating a request. The
@@ -571,6 +629,26 @@ cannot produce an insertable result; duplicate terminal callbacks are discarded.
 Settings changes revoke old requests before saving. Clear reports success only
 after both stores and dedicated keys are deleted; a failed deletion blocks access
 until an explicit retry. All store work stays off the input thread.
+
+Each provider request has one absolute deadline covering queue wait, connect, write
+and streaming read. A bounded deadline worker disconnects the active connection;
+terminal events are deduplicated. Attachment bytes are owned by the provider after
+submission and wiped once, after a running serializer exits or immediately when a
+queued or rejected request is removed. The workbench keeps only independent draft
+copies and never submits its draft array as provider-owned storage.
+
+The IME verifies the active `InputConnection` before processing selection callbacks
+and rejects callbacks whose previous selection cannot belong to the current anchor.
+A callback arriving after `onStartInput` is ignored without changing the new editor
+state.
+
+The settings model probe reuses the sole transport and sends only a fixed public
+prompt to the saved selected model after an explicit click and enabled network
+switches. It has no editor, draft, history, attachment or persistence ports. Output
+tokens and timeout are capped; dismissal/background/configuration/data-clear revoke
+callbacks and cancel transport. HTTP status categories expose no server bodies,
+credentials or content. Negative tests cover disabled networking, cancellation,
+stale/empty responses and combined editor restrictions.
 
 The bounded encrypted history file is temporarily decoded when listing; only
 summaries leave that operation. Selecting a chat loads messages, without a global
@@ -589,3 +667,23 @@ Explicitly submitted text and selected history leave the device for the configur
 provider. Provider retention, connection metadata, malicious model replies and JVM
 string zeroization limits are documented in the assessment. A prompt cannot bypass
 local insertion, session checks or clipboard authentication.
+
+## Internal search and panel expansion
+
+Expression search uses an isolated local draft (64 UTF-16 units), full-pinyin or
+English conversion, and no personalization or learning. Search keys and candidate
+commands never reach the external editor. Selecting an expression still uses the
+existing explicit insertion and privacy checks. Leaving search, ending/changing
+the editor, hiding/replacing the view, changing settings/subtype/privacy, and
+clearing personal data revoke draft work and remove queries. Delayed warm-up
+callbacks cannot restore a closed draft. Mutable committed buffers are overwritten;
+JVM composition/display strings remain subject to garbage collection. No draft is
+saved, logged, sent to AI, or read from an editor/clipboard.
+
+Panel expansion uses the existing IME window and bounded visible touch region.
+It adds no overlay, permission or persisted setting. System bars/cutouts and current
+parent constraints limit fullscreen handwriting; resizing retains the established
+stroke invalidation rule. Candidate prefetch keeps six engine and six personal
+pages at most, preserves ID checks, and clears retained personal pages on revision
+or privacy changes. Device tests use public fixtures to verify real window growth,
+internal search isolation, stale-session clearing, bounded drafts and scroll anchors.

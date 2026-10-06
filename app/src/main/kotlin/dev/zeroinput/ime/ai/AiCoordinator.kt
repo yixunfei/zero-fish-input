@@ -17,7 +17,11 @@ class AiCoordinator(private val provider: AiProvider) : AutoCloseable {
         policy: AiGenerationPolicy,
         listener: (AiStreamEvent) -> Unit,
     ): AiRequestHandle {
-        policy.check(request)
+        try { policy.check(request) } catch (error: Exception) {
+            // Ownership has not crossed the provider boundary yet.
+            request.attachments.forEach { it.bytes.fill(0) }
+            throw error
+        }
         val token = generation.incrementAndGet()
         current?.cancel()
         val handle = provider.stream(request) { event ->

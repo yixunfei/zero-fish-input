@@ -41,6 +41,7 @@ internal class ExpandingRimeEngine(
             closed = false
             lifecycleGeneration++
             startedContext = context
+            secondaryRequested = false
         }
         primary.start(context)
         return reset()
@@ -154,7 +155,10 @@ internal class ExpandingRimeEngine(
             active.restoreComposition(values[source])
             active.browsePage(page)
         }
-        snapshot = snapshot.copy(hasNextPage = false)
+        // The attempted page was not consumed. Do not retain the previous
+        // source's candidates, which would make Space select stale text.
+        snapshot = snapshot.copy(candidates = emptyList(), highlightedIndex = 0,
+            hasPreviousPage = source > 0, hasNextPage = false)
         return EngineUpdate(snapshot, consumed = false)
     }
 
@@ -198,6 +202,7 @@ internal class ExpandingRimeEngine(
             closed = true
             lifecycleGeneration++
             startedContext = null
+            secondaryRequested = false
             related.also { related = null }
         }
         try { primary.close() } finally {

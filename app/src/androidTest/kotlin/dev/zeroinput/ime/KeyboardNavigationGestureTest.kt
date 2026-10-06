@@ -67,7 +67,7 @@ class KeyboardNavigationGestureTest {
         assertEquals(0, commits)
     }
 
-    @Test fun candidateSwipesRequestPagesAndCancelledDragsDoNothing() = withPanel { panel ->
+    @Test fun candidatePageButtonsRemainAccessibleWithoutSelectingACell() = withPanel { panel ->
         val pages = mutableListOf<PageDirection>()
         var selections = 0
         panel.onCandidatePageChanged = { pages += it }
@@ -76,14 +76,14 @@ class KeyboardNavigationGestureTest {
             hasPreviousPage = true, hasNextPage = true)))
         tap(panel, UiR.string.expand_candidates)
         val grid = descendants(panel).filterIsInstance<RecyclerView>().first { it.isShown }
-        swipe(grid.parent as ViewGroup, -1)
-        swipe(grid.parent as ViewGroup, 1)
-        swipe(grid.parent as ViewGroup, -1, cancel = true)
+        tap(panel, UiR.string.next_candidates)
+        tap(panel, UiR.string.previous_candidates)
+        swipeVertical(grid, -1, cancel = true)
         assertEquals(listOf(PageDirection.NEXT, PageDirection.PREVIOUS), pages)
         assertEquals(0, selections)
     }
 
-    @Test fun firstExpandedCandidateSwipeRequestsNextPageWhenTheFirstGridFits() = withPanel { panel ->
+    @Test fun explicitNextPageRemainsAvailableWhenTheFirstGridFits() = withPanel { panel ->
         val pages = mutableListOf<PageDirection>()
         val firstPage = List(1) { Candidate("first", "首页") }
         panel.onCandidatePageChanged = { direction ->
@@ -98,7 +98,7 @@ class KeyboardNavigationGestureTest {
         )))
         tap(panel, UiR.string.expand_candidates)
         val grid = descendants(panel).filterIsInstance<RecyclerView>().first { it.isShown }
-        swipeVertical(grid.parent as ViewGroup, -1)
+        tap(panel, UiR.string.next_candidates)
         assertEquals(listOf(PageDirection.NEXT), pages)
         assertNotNull(descendants(panel).firstOrNull {
             it.isShown && it.contentDescription == panel.context.getString(UiR.string.candidate_description, "后续")
@@ -143,7 +143,7 @@ class KeyboardNavigationGestureTest {
         assertNull(find(panel, UiR.string.fuzzy_enable))
     }
 
-    @Test fun unconfiguredFuzzyShortcutOpensRuleSettingsWithoutEnablingEverything() = withPanel { panel ->
+    @Test fun unconfiguredFuzzyShortcutEnablesEveryRuleWithoutOpeningSettings() = withPanel { panel ->
         panel.renderSession(ready.copy(engineDescriptor = EngineDescriptor("fixture", "fixture", "1", setOf(InputLanguage.CHINESE),
             capabilities = setOf(EngineCapability.FUZZY_PINYIN))))
         panel.renderChineseOptions(ChineseInputOptions())
@@ -151,9 +151,9 @@ class KeyboardNavigationGestureTest {
         var toggles = 0
         panel.onFuzzySettingsRequested = { settings++ }
         panel.onFuzzySwitchRequested = { toggles++ }
-        tap(panel, UiR.string.fuzzy_choose_rules)
-        assertEquals(1, settings)
-        assertEquals(0, toggles)
+        tap(panel, UiR.string.fuzzy_enable)
+        assertEquals(0, settings)
+        assertEquals(1, toggles)
     }
 
     private fun withPanel(action: (ZeroInputView) -> Unit) {

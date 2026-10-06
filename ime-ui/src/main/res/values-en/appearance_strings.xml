@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="material_classic">Classic</string>
+    <string name="material_flat">Flat</string>
+    <string name="material_raised">Raised</string>
+    <string name="material_soft">Soft touch</string>
+    <string name="material_metal">Metal</string>
+    <string name="material_frosted">Frosted glass</string>
+    <string name="background_solid">Solid</string>
+    <string name="background_gradient">Gradient</string>
+    <string name="background_texture">Texture</string>
+    <string name="background_image">Custom image</string>
+    <string name="appearance_palette">Color palette</string>
+    <string name="appearance_material">Key style</string>
+    <string name="appearance_borders">Key borders</string>
+    <string name="appearance_radius">Corner radius: %1$d dp</string>
+    <string name="appearance_spacing">Key spacing: %1$d dp</string>
+    <string name="appearance_background">Keyboard background</string>
+    <string name="appearance_opacity">Background opacity: %1$d%%</string>
+    <string name="appearance_dim">Background veil: %1$d%%</string>
+    <string name="appearance_blur">Background blur: %1$d</string>
+    <string name="appearance_choose_image">Choose background image</string>
+    <string name="appearance_remove_image">Delete background image</string>
+    <string name="appearance_image_hint">JPG, PNG or WebP, up to 12 MB. Images stay on this device and are cropped to fill.</string>
+    <string name="appearance_image_failed">This image could not be used. Choose another image.</string>
+    <string name="appearance_loading">Processing image…</string>
+    <string name="appearance_delete_failed">Image deletion failed. Please retry.</string>
+    <string name="appearance_reset">Reset appearance</string>
+    <string name="appearance_reset_title">Reset appearance?</string>
+    <string name="appearance_reset_message">Restore the default palette and key style, and delete the imported background image.</string>
+    <string name="appearance_color">Background color</string>
+    <string name="appearance_color_auto">Match palette</string>
+    <string name="appearance_color_blue">Mist blue</string>
+    <string name="appearance_color_gray">Graphite</string>
+    <string name="appearance_color_sand">Warm sand</string>
+    <string name="appearance_color_rose">Blush</string>
+    <string name="appearance_glass_hint">Frosted glass softens the background image while keeping labels and keys clear.</string>
+    <string name="appearance_opacity_hint" formatted="false">0% hides the custom background; 100% shows it fully. Labels and keys stay opaque.</string>
+    <string name="appearance_image_missing">Background image unavailable. Please choose it again.</string>
+    <string name="appearance_remove_title">Delete background image?</string>
+    <string name="appearance_remove_message">Delete the copy saved by this app and switch to a solid background.</string>
+    <string name="appearance_classic_hint">Classic uses square keys without gaps. Borders can be switched independently.</string>
+</resources>

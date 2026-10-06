@@ -76,7 +76,7 @@ class LanguagePackInstaller(
      * the pending background refresh remains the source of truth.
      */
     private fun mergeInstalledCache(installed: InstalledLanguagePack) {
-        installedCache = installedCache?.let { current ->
+        installedCache = (installedCache ?: scanInstalled()).let { current ->
             (current.filterNot { it.key == installed.key } + installed)
                 .sortedWith(compareBy({ it.manifest.displayName }, { it.manifest.id }, { it.manifest.version }))
         }

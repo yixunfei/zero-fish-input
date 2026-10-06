@@ -83,5 +83,5 @@ object AuthenticationBroker {
         }
     }
 
-    private const val REQUEST_TIMEOUT_MILLIS = 60_000L
+    private const val REQUEST_TIMEOUT_MILLIS = 30_000L
 }

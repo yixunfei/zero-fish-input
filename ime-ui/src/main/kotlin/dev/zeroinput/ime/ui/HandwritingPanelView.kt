@@ -14,6 +14,7 @@ internal class HandwritingPanelView(context: Context) : LinearLayout(context) {
     var onStrokesChanged: (List<FloatArray>) -> Unit = {}
     var onCandidateSelected: (String) -> Boolean = { false }
     var onEditAction: (KeyboardAction) -> Unit = {}
+    var onFullScreenChanged: (Boolean) -> Unit = {}
     private val canvas = HandwritingCanvasView(context).apply { onChanged = { strokes ->
         renderCandidates(emptyList())
         onStrokesChanged(strokes)
@@ -24,6 +25,8 @@ internal class HandwritingPanelView(context: Context) : LinearLayout(context) {
         addView(candidateRow)
     }
     private var candidates: List<String> = emptyList()
+    private var fullScreen = false
+    private lateinit var fullScreenButton: MaterialButton
 
     init {
         orientation = VERTICAL
@@ -46,6 +49,15 @@ internal class HandwritingPanelView(context: Context) : LinearLayout(context) {
         }, weighted())
         addView(button(R.string.handwriting_space) { selectOrEdit(KeyboardAction.Space) }, weighted())
         addView(button(R.string.handwriting_enter) { selectOrEdit(KeyboardAction.Enter) }, weighted())
+        fullScreenButton = button(R.string.handwriting_fullscreen) {
+            onFullScreenChanged(!fullScreen)
+        }
+        fullScreenButton.text = ""
+        fullScreenButton.setIconResource(R.drawable.ic_handwriting_fullscreen)
+        fullScreenButton.iconSize = dp(24)
+        fullScreenButton.iconPadding = 0
+        fullScreenButton.iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+        addView(fullScreenButton, weighted())
     }
 
     private fun weighted() = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
@@ -110,6 +122,13 @@ internal class HandwritingPanelView(context: Context) : LinearLayout(context) {
     }
 
     fun clear() { canvas.clear() }
+    fun setFullScreen(value: Boolean) {
+        fullScreen = value
+        val label = if (value) R.string.handwriting_exit_fullscreen else R.string.handwriting_fullscreen
+        fullScreenButton.contentDescription = context.getString(label)
+        fullScreenButton.tooltipText = fullScreenButton.contentDescription
+    }
+    fun isFullScreen(): Boolean = fullScreen
     fun containsCandidate(value: String): Boolean = value in candidates && canvas.hasStrokes()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

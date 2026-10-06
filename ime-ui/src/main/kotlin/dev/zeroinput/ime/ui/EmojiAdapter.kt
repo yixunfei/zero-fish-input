@@ -37,14 +37,11 @@ internal class EmojiAdapter(
             holder.text.setOnLongClickListener(null)
             ViewCompat.removeAccessibilityAction(holder.text, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK.id)
         }
-        val oldCount = values.size
-        values = emptyList()
-        if (oldCount > 0) notifyItemRangeRemoved(0, oldCount)
         values = entries.toList()
         favorites = starred.toSet()
         allowPersonal = allowed
-        // Immediate replacement prevents a background diff from retaining private rows after revocation.
-        if (values.isNotEmpty()) notifyItemRangeInserted(0, values.size)
+        // Replace the backing snapshot before one atomic adapter notification.
+        notifyDataSetChanged()
     }
 
     fun entry(position: Int): EmojiEntry? = values.getOrNull(position)

@@ -15,6 +15,7 @@
         <item name="colorSecondaryContainer">@color/zero_secondary_container</item>
         <item name="colorOnSecondaryContainer">@color/zero_on_secondary_container</item>
         <item name="colorSurface">@color/zero_surface</item>
+        <item name="android:colorBackground">@color/zero_surface</item>
         <item name="colorOnSurface">@color/zero_on_surface</item>
         <item name="colorSurfaceVariant">@color/zero_surface_variant</item>
         <item name="colorOutline">@color/zero_outline</item>
@@ -48,6 +49,7 @@
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:backgroundDimEnabled">false</item>
         <item name="colorPrimaryContainer">@color/zero_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/zero_on_primary_container</item>
         <item name="colorSecondaryContainer">@color/zero_secondary_container</item>
         <item name="colorPrimary">@color/zero_primary</item>
         <item name="colorPrimaryVariant">@color/zero_primary</item>
@@ -56,6 +58,7 @@
         <item name="colorSecondaryVariant">@color/zero_secondary</item>
         <item name="colorOnSecondary">@color/zero_on_secondary</item>
         <item name="colorSurface">@color/zero_surface</item>
+        <item name="android:colorBackground">@color/zero_surface</item>
         <item name="colorOnSurface">@color/zero_on_surface</item>
         <item name="colorSurfaceVariant">@color/zero_surface_variant</item>
         <item name="colorOutline">@color/zero_outline</item>

@@ -16,6 +16,7 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 | yaml-cpp | `f7320141` | MIT | `yaml-cpp-MIT.txt` | 配置解析 |
 | marisa-trie | `0d4e8ab5` | BSD-2-Clause（本项目采用双许可证中的 BSD 选项） | `marisa-trie-COPYING.md` | 词典数据结构 |
 | AndroidX libraries | 见 `gradle/libs.versions.toml` | Apache-2.0 | `Apache-2.0.txt` | Android 运行时支持 |
+| AndroidX ExifInterface | 1.4.1 | Apache-2.0 | `Apache-2.0.txt` | Bounded local photo orientation parsing; replaces the legacy platform EXIF parser, no networking or components. Small AndroidX library, pinned Maven coordinate; metadata is stripped after import. |
 | AndroidX Test runner / JUnit extension | 1.6.2 / 1.2.1 | Apache-2.0 | `Apache-2.0.txt` | 仅模拟器/设备测试 APK；使用已有缓存，不进入应用运行时，无联网或采集路径 |
 | Material Components | 1.12.0 | Apache-2.0 | `Apache-2.0.txt` | Android UI |
 | Kotlin runtime | 2.1.21 | Apache-2.0 | `Apache-2.0.txt` | Kotlin 运行时 |

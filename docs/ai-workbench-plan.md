@@ -84,8 +84,9 @@ HTML, Markdown execution, URL fetching, tools or commands are executed.
    using the confirmation button, and clear all AI data from settings.
 5. Switch editors while generating or loading history. Tighten privacy, hide the
    keyboard, switch panels or change endpoint. No late response may reappear or
-   be inserted. Password/PIN/email/URI/incognito/no-learning/no-suggestions/unknown
-   fields must hide or reject the AI workspace.
+   be inserted. Password/PIN/email/URI/incognito/no-learning/unknown fields must
+   hide or reject the AI workspace. An ordinary text field with only
+   NO_SUGGESTIONS allows an independent draft; combined restrictions still block AI.
 6. Verify 320dp portrait, landscape, light and dark themes; API-key dialog and AI
    workspace must be protected from screenshots and saved view state. The private
    clipboard must still require its original authentication/confirmation flow.

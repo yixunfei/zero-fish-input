@@ -5,6 +5,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CandidateWindowTest {
+    @Test fun `first append preserves existing candidate identities and selection routes`() {
+        val engine = Pages()
+        val window = CandidateWindow()
+        val first = window.snapshot(engine.snapshot).candidates
+        val update = window.changePage(engine, engine.snapshot, PageDirection.NEXT)
+        val result = window.snapshot(update.snapshot)
+        assertEquals(first, result.candidates.take(first.size))
+        val route = checkNotNull(window.route(first.first().id))
+        assertEquals("entry0", window.select(engine, route, update.snapshot).committedText)
+    }
+
     @Test fun `space selects the displayed highlight after browsing instead of the last native page`() {
         val engine = Pages()
         var committed = ""

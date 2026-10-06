@@ -8,6 +8,9 @@ sealed interface InputCommand {
     /** Commits the current composition before inserting a literal symbol-page value. */
     data class LiteralText(val value: String) : InputCommand
 
+    /** Inserts an opening/closing pair and places the cursor between them when supported. */
+    data class PairedText(val opening: String, val closing: String) : InputCommand
+
     data object Backspace : InputCommand
 
     data object Space : InputCommand

@@ -31,6 +31,24 @@ class LanguagePackParserTest {
     }
 
     @Test
+    fun `accepts an integral floating point format version`() {
+        val manifest = LanguagePackParser.parse(
+            """
+            {
+              "formatVersion": 1.0,
+              "id": "float-pack",
+              "displayName": "Float pack",
+              "languageTag": "en-US",
+              "version": "1",
+              "engineId": "zeroinput.float",
+              "files": [{"path":"dictionary.txt","sha256":"${"0".repeat(64)}","size":0}]
+            }
+            """.trimIndent(),
+        )
+        assertEquals(1, manifest.formatVersion)
+    }
+
+    @Test
     fun `language tags are mapped only to implemented languages`() {
         assertEquals(InputLanguage.CHINESE, LanguagePackLanguage.fromTag("zh-Hant"))
         assertEquals(InputLanguage.ENGLISH, LanguagePackLanguage.fromTag("EN-us"))

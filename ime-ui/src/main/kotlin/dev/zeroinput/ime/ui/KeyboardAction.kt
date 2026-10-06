@@ -5,6 +5,8 @@ sealed interface KeyboardAction {
 
     data class LiteralText(val value: String) : KeyboardAction
 
+    data class PairedText(val opening: String, val closing: String) : KeyboardAction
+
     data object Backspace : KeyboardAction
 
     data object Shift : KeyboardAction

@@ -15,8 +15,9 @@ internal class AiSseReader {
             val line = readLine(reader, cancelled) ?: throw AiProviderError.Response("AI stream ended early")
             streamChars += line.length + 1
             if (streamChars > AiLimits.MAX_STREAM_CHARS) throw AiProviderError.Response("AI stream is too large")
-            if (!line.startsWith("data:")) continue
-            val data = line.substring(5).trim()
+            val field = line.removePrefix("\uFEFF").trimStart(' ', '\t')
+            if (!field.startsWith("data:")) continue
+            val data = field.substring(5).trim()
             if (data == "[DONE]") return output.toString()
             if (data.isEmpty()) continue
             val delta = parse(data)

@@ -19,11 +19,6 @@ import dev.zeroinput.engine.rime.RimeRuntimeState
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.languagepack.LanguagePackLanguage
 import dev.zeroinput.userdata.AiConfiguration
-import android.text.InputType
-import android.text.method.PasswordTransformationMethod
-import android.widget.EditText
-import android.widget.LinearLayout
-import com.google.android.material.materialswitch.MaterialSwitch
 
 class MainActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
@@ -39,7 +34,8 @@ class MainActivity : AppCompatActivity() {
     private var clipboardAuthRequest: AuthenticationBroker.RequestHandle? = null
     private var aiConfig = AiConfiguration()
     private var aiConfigReady = false
-    private var aiDialog: androidx.appcompat.app.AlertDialog? = null
+    private var aiDialog: AiProviderSettingsDialog? = null
+    private var languagePackOperationGeneration = 0L
     private val operations = SettingsTaskRunner(
         worker = worker,
         post = { callback -> runOnUiThread { callback() } },
@@ -141,6 +137,7 @@ class MainActivity : AppCompatActivity() {
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
         screen.onSoundEffectsChanged = { graph.settings.soundEffectsEnabled = it; render() }
         screen.onWordAssociationsChanged = { graph.settings.wordAssociationsEnabled = it; render() }
+        screen.onPairedSymbolsChanged = { graph.settings.pairedSymbolsEnabled = it; render() }
         screen.onAiEnabledChanged = { enabled ->
             updateAiConfig {
                 copy(
@@ -155,11 +152,6 @@ class MainActivity : AppCompatActivity() {
         screen.onAppearanceRequested = { startActivity(Intent(this, KeyboardAppearanceActivity::class.java)) }
         screen.onChineseOptionsChanged = { graph.settings.chineseInputOptions = it; render() }
         screen.onModelRankingChanged = { graph.settings.experimentalModelRanking = it; render() }
-        screen.onChineseEngineChanged = {
-            graph.settings.chineseEngine = it
-            graph.settings.lastLanguagePackKey = null
-            render()
-        }
         screen.onBuiltInEngineSelected = {
             graph.settings.lastLanguagePackKey = null
             graph.settings.lastLanguage = InputLanguage.CHINESE
@@ -177,12 +169,13 @@ class MainActivity : AppCompatActivity() {
             languagePackPicker.launch(arrayOf("application/zip", "application/octet-stream"))
         }
         screen.onLanguagePackEnabledChanged = { key, enabled ->
+            val ticket = ++languagePackOperationGeneration
             operations.execute({
                 val pack = checkNotNull(graph.languagePacks.listInstalled().firstOrNull { it.key == key })
                 val changed = graph.languagePacks.setEnabled(pack, enabled)
                 graph.refreshLanguagePacks()
                 check(changed)
-            }) { render() }
+            }) { if (ticket == languagePackOperationGeneration) render() }
         }
         screen.onLanguagePackSelected = { key ->
             if (graph.languagePackRegistry.contains(key)) {
@@ -204,13 +197,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
         screen.onLanguagePackDeleteRequested = { key ->
+            val ticket = ++languagePackOperationGeneration
             operations.execute({
                 val removed = graph.languagePacks.removeByKey(key)
                 graph.refreshLanguagePacks()
                 check(removed)
             }) {
-                Toast.makeText(this, R.string.language_pack_deleted, Toast.LENGTH_SHORT).show()
-                render()
+                if (ticket == languagePackOperationGeneration) {
+                    Toast.makeText(this, R.string.language_pack_deleted, Toast.LENGTH_SHORT).show()
+                    render()
+                }
             }
         }
     }
@@ -249,75 +245,49 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun updateAiConfig(change: AiConfiguration.() -> AiConfiguration) {
-        if (!aiConfigReady) return
+    private fun updateAiConfig(completed: (Boolean) -> Unit = {}, change: AiConfiguration.() -> AiConfiguration) {
+        if (!aiConfigReady) { completed(false); return }
         val next = aiConfig.change()
         aiConfigReady = false
         screen.setAiControlsEnabled(false)
         graph.updateAiConfiguration(next) { success -> runOnUiThread {
-            if (isFinishing || isDestroyed) return@runOnUiThread
+            if (isFinishing || isDestroyed) { completed(false); return@runOnUiThread }
             // A rejected endpoint or failed write leaves the saved settings
             // intact. Preserve them for the next edit while reflecting the
             // graph's immediate network revocation in both switches.
             aiConfig = if (success) next else aiConfig.copy(enabled = false, networkAllowed = false)
             aiConfigReady = true
             render()
+            completed(success)
             Toast.makeText(this, if (success) R.string.ai_settings_saved else R.string.operation_failed, Toast.LENGTH_SHORT).show()
         } }
     }
 
     private fun showAiSettings() {
-        if (!aiConfigReady || aiDialog != null) return
-        val current = aiConfig
-        val fields = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 0, 24, 0)
-        }
-        val endpoint = EditText(this).apply { hint = getString(R.string.ai_endpoint_hint); setText(current.endpoint); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
-        val model = EditText(this).apply { hint = getString(R.string.ai_model_hint); setText(current.model) }
-        val key = EditText(this).apply {
-            hint = getString(R.string.ai_key_hint)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            transformationMethod = PasswordTransformationMethod.getInstance()
-        }
-        val save = MaterialSwitch(this).apply { text = getString(R.string.ai_save_conversations); isChecked = current.saveConversations }
-        fields.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            fields.importantForContentCapture = android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
-        }
-        listOf(endpoint, model, key).forEach {
-            it.isSaveEnabled = false
-            it.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
-            it.filters = arrayOf(android.text.InputFilter.LengthFilter(if (it === model) 128 else 512))
-        }
-        fields.addView(endpoint); fields.addView(model); fields.addView(key); fields.addView(save)
-        aiDialog = MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.ai_settings_title)
-            .setView(fields)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.save) { _, _ ->
-                val enteredKey = key.text?.toString().orEmpty()
-                val next = current.copy(
-                    endpoint = endpoint.text?.toString()?.trim().orEmpty(),
-                    model = model.text?.toString()?.trim().orEmpty(),
-                    apiKey = enteredKey.ifBlank { current.apiKey },
-                    saveConversations = save.isChecked,
-                )
-                updateAiConfig { next }
-            }
-            .create().also { dialog ->
-                dialog.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-                dialog.setOnDismissListener {
-                    key.text?.clear()
-                    endpoint.text?.clear()
-                    model.text?.clear()
-                    if (aiDialog === dialog) aiDialog = null
-                }
-                dialog.show()
-            }
+        if (!aiConfigReady || aiDialog?.isShowing == true) return
+        aiDialog = AiProviderSettingsDialog(this, { aiConfig }, { next, done -> updateAiConfig(done) { next } }, ::startAiTest)
+            .also { it.show() }
+    }
+
+    private fun startAiTest(render: (dev.zeroinput.ime.ai.AiProbeState) -> Unit): AutoCloseable {
+        val active = java.util.concurrent.atomic.AtomicBoolean(true)
+        val data = graph.aiDataGeneration.current()
+        val config = graph.aiConfigurationSnapshot() ?: AiConfiguration()
+        val probe = dev.zeroinput.ime.ai.AiProviderProbe(
+            provider = { snapshot -> dev.zeroinput.ime.ai.OpenAiCompatibleProvider(
+                { if (graph.aiDataGeneration.isCurrent(data)) snapshot else AiConfiguration() },
+                graph.aiExecutor, graph.aiCancellationExecutor) },
+            current = { active.get() && !isFinishing && !isDestroyed && graph.aiDataGeneration.isCurrent(data) },
+            post = { callback -> screen.post { callback() } },
+            render = render,
+        )
+        val observer = graph.observeAiConfiguration { screen.post { if (active.get()) probe.cancel() } }
+        probe.start(config)
+        return AutoCloseable { active.set(false); observer.close(); probe.close() }
     }
 
     override fun onStop() {
+        aiDialog?.cancelTests()
         // Keep the bounded draft in this protected window while the user visits
         // another app. Explicit dismissal or destruction clears its fields.
         if (isFinishing) aiDialog?.dismiss()
@@ -350,8 +320,7 @@ class MainActivity : AppCompatActivity() {
             it.serviceInfo.packageName == packageName && it.serviceInfo.name == component.className
         }
         val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD).orEmpty()
-        val choice = graph.settings.chineseEngine
-        val engine = if (choice == ChineseEngineChoice.DICTIONARY_TEST) getString(R.string.engine_dictionary_name) else when (graph.rime.runtime.state) {
+        val engine = when (graph.rime.runtime.state) {
             RimeRuntimeState.READY -> getString(R.string.engine_status_ready)
             RimeRuntimeState.FAILED -> getString(R.string.engine_status_failed)
             RimeRuntimeState.INITIALIZING -> getString(R.string.engine_status_preparing)
@@ -368,11 +337,11 @@ class MainActivity : AppCompatActivity() {
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,
                 soundEffectsEnabled = graph.settings.soundEffectsEnabled,
                 wordAssociationsEnabled = graph.settings.wordAssociationsEnabled,
+                pairedSymbolsEnabled = graph.settings.pairedSymbolsEnabled,
                 engineStatus = engine,
                 chineseOptions = graph.settings.chineseInputOptions,
                 experimentalModelRanking = graph.settings.experimentalModelRanking,
-                chineseEngine = choice,
-                engineCapabilities = graph.chineseEngineDescriptor(choice).capabilities,
+                engineCapabilities = graph.rime.descriptor.capabilities,
                 languagePacks = graph.installedLanguagePacks().map { pack ->
                     LanguagePackScreenState(
                         key = pack.key,
@@ -386,9 +355,10 @@ class MainActivity : AppCompatActivity() {
                 },
                 aiEnabled = aiConfig.enabled,
                 aiNetworkAllowed = aiConfig.networkAllowed,
-                aiEndpoint = aiConfig.endpoint,
-                aiModel = aiConfig.model,
-                aiKeyConfigured = aiConfig.apiKey.isNotBlank(),
+                aiEndpoint = aiConfig.activeEndpoint(),
+                aiModel = aiConfig.activeModel(),
+                aiProviderName = aiConfig.activeProvider()?.name.orEmpty(),
+                aiKeyConfigured = aiConfig.activeKey().isNotBlank(),
                 aiSaveConversations = aiConfig.saveConversations,
             ),
         )

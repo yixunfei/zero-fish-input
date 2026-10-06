@@ -13,6 +13,7 @@ package dev.zeroinput.ime
  */
 internal class EngineWarmupResultDelivery(
     private val post: (Runnable) -> Boolean,
+    private val ready: () -> Boolean = { true },
     private val deliver: (EngineWarmupResult) -> Unit,
 ) : AutoCloseable {
     private val lock = Any()
@@ -64,12 +65,24 @@ internal class EngineWarmupResultDelivery(
         closePrepared(orphan)
     }
 
+    /** Owner thread resumes a deferred handoff after its composition ends. */
+    fun resume() {
+        val shouldPost = synchronized(lock) {
+            if (closed || pending == null || deliveryPosted) false
+            else { deliveryPosted = true; true }
+        }
+        if (shouldPost && !runCatching { post(Runnable { deliverPending() }) }.getOrDefault(false)) {
+            cancelPostedDelivery()
+        }
+    }
+
     private fun deliverPending() {
+        val canDeliver = runCatching(ready).getOrDefault(false)
         var wasClosed = false
         val result = synchronized(lock) {
             deliveryPosted = false
             wasClosed = closed
-            pending.also { pending = null }
+            if (!closed && !canDeliver) null else pending.also { pending = null }
         }
         if (wasClosed) {
             closePrepared(result)

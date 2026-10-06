@@ -59,6 +59,18 @@ class HandwritingCanvasTest {
         assertTrue(lastCopy.isEmpty())
     }
 
+    @Test fun fullScreenToggleExpandsTheWritingSurfaceAndCanBeReversed() = withCanvas { panel, _ ->
+        val toggle = descendants(panel).first { it.contentDescription == panel.context.getString(UiR.string.handwriting_fullscreen) }
+        val compactHeight = panel.height
+        toggle.performClick()
+        remeasure(panel)
+        assertEquals(panel.context.getString(UiR.string.handwriting_exit_fullscreen), toggle.contentDescription)
+        assertTrue("Fullscreen must actually enlarge the panel", panel.height > compactHeight)
+        toggle.performClick()
+        remeasure(panel)
+        assertEquals(panel.context.getString(UiR.string.handwriting_fullscreen), toggle.contentDescription)
+    }
+
     private fun withCanvas(block: (ZeroInputView, View) -> Unit) {
         val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardPreviewFixtureActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyboardPreviewFixtureActivity
@@ -78,6 +90,15 @@ class HandwritingCanvasTest {
         val time = SystemClock.uptimeMillis()
         val event = MotionEvent.obtain(time, time, action, x, y, 0)
         try { view.dispatchTouchEvent(event) } finally { event.recycle() }
+    }
+
+    private fun remeasure(view: View) {
+        val density = view.resources.displayMetrics.density
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(view.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec((view.resources.configuration.screenHeightDp * density).toInt(), View.MeasureSpec.AT_MOST),
+        )
+        view.layout(0, 0, view.measuredWidth, view.measuredHeight)
     }
 
     private fun descendants(view: View): List<View> = listOf(view) +

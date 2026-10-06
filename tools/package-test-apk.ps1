@@ -13,7 +13,7 @@ $ProgressPreference = "SilentlyContinue"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $gradleWrapper = Join-Path $repositoryRoot "gradlew.bat"
-$debugApkRoot = Join-Path $repositoryRoot "app\build\outputs\apk\debug"
+$debugApkRoot = Join-Path $repositoryRoot "app\build\intermediates\apk\debug"
 $artifactRoot = Join-Path $repositoryRoot "app\build\outputs\test-apk"
 $supportedAbis = @("arm64-v8a", "armeabi-v7a", "x86_64")
 

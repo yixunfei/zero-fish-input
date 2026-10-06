@@ -21,6 +21,7 @@ import dev.zeroinput.userdata.SecureClipboardVault
 
 internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     var onAction: () -> Unit = {}
+    var onAiAction: () -> Unit = {}
     var onCancel: () -> Unit = {}
 
     private val status = TextView(context).apply { textSize = 16f }
@@ -51,6 +52,14 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         filterTouchesWhenObscured = true
         setOnClickListener { onAction() }
     }
+    private val aiAction = MaterialButton(context).apply {
+        isAllCaps = false
+        letterSpacing = 0f
+        minHeight = dp(48)
+        filterTouchesWhenObscured = true
+        setOnClickListener { onAiAction() }
+        visibility = GONE
+    }
 
     init {
         orientation = VERTICAL
@@ -79,6 +88,9 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         addView(action, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
             setMargins(dp(20), dp(8), dp(20), dp(16))
         })
+        addView(aiAction, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            setMargins(dp(20), 0, dp(20), dp(16))
+        })
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
@@ -89,6 +101,9 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     fun showReview(length: Int, enabled: Boolean) {
         status.text = resources.getQuantityString(R.plurals.clipboard_import_received, length, length)
         action.setText(if (enabled) R.string.clipboard_import_authenticate else R.string.enable_secure_clipboard)
+        aiAction.setText(R.string.clipboard_import_ai)
+        aiAction.visibility = VISIBLE
+        aiAction.isEnabled = true
     }
 
     fun showAuthorized(value: String) {
@@ -98,6 +113,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         labelField.visibility = VISIBLE
         action.setText(R.string.save)
         action.isEnabled = true
+        aiAction.visibility = GONE
     }
 
     fun label(): String = labelInput.text?.toString().orEmpty()
@@ -105,6 +121,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     fun showBusy(authenticating: Boolean) {
         clearText()
         action.isEnabled = false
+        aiAction.visibility = GONE
         status.setText(if (authenticating) R.string.authenticating else R.string.clipboard_import_saving)
     }
 
@@ -113,6 +130,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         content.visibility = GONE
         labelInput.text?.clear()
         labelField.visibility = GONE
+        aiAction.visibility = GONE
     }
 
     private fun row() = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {

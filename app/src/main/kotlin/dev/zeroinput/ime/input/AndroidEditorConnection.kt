@@ -18,9 +18,11 @@ class AndroidEditorConnection(
     fun selectedLength(): Int? = selection.selectedLength()
 
     fun updateSelection(start: Int, end: Int, composingStart: Int = -1, composingEnd: Int = -1,
-        previousStart: Int = -1, previousEnd: Int = -1): Boolean =
-        selection.updated(start, end, composingStart, composingEnd, previousStart, previousEnd)
+        previousStart: Int = -1, previousEnd: Int = -1): Boolean {
+        if (current() == null) return false
+        return selection.updated(start, end, composingStart, composingEnd, previousStart, previousEnd)
             .also { if (it) onContextInvalidated() }
+    }
 
     override fun setComposingText(text: String) {
         committedConnection = null
@@ -52,6 +54,31 @@ class AndroidEditorConnection(
             onCommitted(text)
             return true
         } else { selection.unknown(); onCommitted(null); return false }
+    }
+
+    override fun commitPairedText(text: String, cursorOffset: Int): Boolean {
+        if (text.isEmpty()) return false
+        val connection = current()
+        committedConnection = null
+        val start = selection.insertionStart()
+        selection.replaced(text.length, composing = false)
+        if (connection?.commitText(text, 1) != true) {
+            selection.unknown()
+            onContextInvalidated()
+            onCommitted(null)
+            return false
+        }
+        committedConnection = connection
+        onCommitted(text)
+        val target = start?.plus(cursorOffset)?.coerceIn(start, start + text.length)
+        if (target != null) {
+            selection.expectSelection(target)
+            if (!connection.setSelection(target, target)) {
+                selection.unknown()
+                onContextInvalidated()
+            }
+        }
+        return true
     }
 
     override fun invalidateReconversion() { selection.invalidate(); committedConnection = null }

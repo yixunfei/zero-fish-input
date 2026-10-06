@@ -14,10 +14,8 @@ internal object HandwritingDecoder {
         try {
             val blank = score(probabilities, steps, inside, after) ?: return emptyList()
             val ranked = ArrayList<Int>(limit)
-            var bestClass = 0
             for (index in 1 until CLASS_COUNT) {
                 inside[index] += after[index]
-                if (inside[index] > inside[bestClass]) bestClass = index
                 if (inside[index] <= 0.0 || !isHan(characters[index])) continue
                 val position = ranked.indexOfFirst { inside[index] > inside[it] }
                     .let { if (it < 0) ranked.size else it }
@@ -26,7 +24,7 @@ internal object HandwritingDecoder {
             }
             // An empty/non-Han result must not be turned into arbitrary Han alternatives.
             val bestHan = ranked.firstOrNull() ?: return emptyList()
-            if (inside[bestHan] <= blank || !isHan(characters[bestClass])) return emptyList()
+            if (inside[bestHan] <= blank) return emptyList()
             return ranked.map { characters[it] }.distinct()
         } finally {
             inside.fill(0.0)

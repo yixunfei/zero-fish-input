@@ -22,10 +22,16 @@ internal class WordAssociationSession(
     private var length = 0
     private var generation = 0L
     private var suggestions = emptyList<NextWordSuggestion>()
+    private var lastLanguage: InputLanguage? = null
     var candidates: List<Candidate> = emptyList()
         private set
 
-    fun clear() { context.fill('\u0000'); length = 0; hide() }
+    fun clear() {
+        context.fill('\u0000')
+        length = 0
+        lastLanguage = null
+        hide()
+    }
 
     fun hide() { generation++; suggestions = emptyList(); candidates = emptyList() }
 
@@ -38,6 +44,19 @@ internal class WordAssociationSession(
             context[length++] = character
         }
         if (length == 0 || (0 until length).none { context[it].isLetter() }) return
+        lastLanguage = language
+        rebuild(language, normalize)
+    }
+
+    /** Re-runs the current context after an asynchronously loaded predictor becomes ready. */
+    fun refresh(normalize: (String) -> String = { it }) {
+        val language = lastLanguage ?: return
+        if (length == 0 || (0 until length).none { context[it].isLetter() }) return
+        hide()
+        rebuild(language, normalize)
+    }
+
+    private fun rebuild(language: InputLanguage, normalize: (String) -> String) {
         val view = CharBuffer.wrap(context, 0, length).asReadOnlyBuffer()
         suggestions = try {
             predictor.suggest(language, view, 8).take(8).filter {

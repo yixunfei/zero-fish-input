@@ -5,6 +5,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalCandidatePagingTest {
+    @Test fun `personal pages append without dropping native rows and remain bounded`() {
+        val paging = PersonalCandidatePaging()
+        val native = EngineSnapshot("ni", "ni", listOf(Candidate("native", "你")))
+        val store = Store()
+        fun visible() = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        val first = visible()
+        paging.changePage(PageDirection.NEXT, native)
+        assertEquals(first.candidates, visible().candidates.take(first.candidates.size))
+        repeat(10) {
+            paging.changePage(PageDirection.NEXT, native)
+            assertTrue(visible().candidates.size <= PersonalCandidatePaging.MAX_PAGES * PersonalCandidatePaging.PAGE_SIZE + 1)
+        }
+        while (paging.changePage(PageDirection.PREVIOUS, native)) visible()
+        assertEquals(first.candidates, visible().candidates.take(first.candidates.size))
+    }
+
     @Test fun `all personal entries are reachable after native exhaustion`() {
         val paging = PersonalCandidatePaging()
         val native = EngineSnapshot("ni", "ni", listOf(Candidate("native", "你")))
@@ -66,7 +82,7 @@ class PersonalCandidatePagingTest {
         val native = EngineSnapshot("ni", "ni")
         paging.publish(native, store, InputLanguage.CHINESE, true) { it }
         paging.changePage(PageDirection.NEXT, native)
-        assertEquals(8, paging.publish(native, store, InputLanguage.CHINESE, true) { it }.candidates.size)
+        assertEquals(16, paging.publish(native, store, InputLanguage.CHINESE, true) { it }.candidates.size)
         store.revision++
         store.ready = false
         val hidden = paging.publish(native, store, InputLanguage.CHINESE, true) { it }

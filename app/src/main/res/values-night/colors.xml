@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="zero_primary">#70DBB6</color>
-    <color name="zero_on_primary">#00382A</color>
-    <color name="zero_primary_container">#00513D</color>
-    <color name="zero_on_primary_container">#8CF8D1</color>
-    <color name="zero_secondary">#EAC33F</color>
-    <color name="zero_on_secondary">#3D2E00</color>
-    <color name="zero_secondary_container">#584400</color>
-    <color name="zero_on_secondary_container">#FFE17B</color>
-    <color name="zero_surface">#101412</color>
-    <color name="zero_on_surface">#E1E3E0</color>
-    <color name="zero_surface_variant">#3F4945</color>
-    <color name="zero_outline">#89938E</color>
+    <color name="zero_primary">#AEC7FF</color>
+    <color name="zero_on_primary">#092F65</color>
+    <color name="zero_primary_container">#23477E</color>
+    <color name="zero_on_primary_container">#D9E5FF</color>
+    <color name="zero_secondary">#BBC7DC</color>
+    <color name="zero_on_secondary">#263246</color>
+    <color name="zero_secondary_container">#3C485D</color>
+    <color name="zero_on_secondary_container">#DFE6F2</color>
+    <color name="zero_surface">#151A22</color>
+    <color name="zero_on_surface">#E4E9F2</color>
+    <color name="zero_surface_variant">#303946</color>
+    <color name="zero_outline">#8D98A9</color>
 </resources>

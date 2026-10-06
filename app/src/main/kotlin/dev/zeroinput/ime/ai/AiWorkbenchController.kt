@@ -26,6 +26,7 @@ internal class AiWorkbenchController(
     private var handle: AiRequestHandle? = null
     private var delivery: AiStreamDelivery? = null
     private var resultDataGeneration = -1L
+    private var persistenceEnabled = configuration()?.saveConversations == true
 
     fun invalidate() {
         stop()
@@ -51,7 +52,12 @@ internal class AiWorkbenchController(
     }
 
     fun refreshConversations() {
-        if (!allowed() || configuration()?.saveConversations != true) {
+        reconcilePersistence()
+        if (!allowed()) {
+            renderList(emptyList())
+            return
+        }
+        if (configuration()?.saveConversations != true) {
             renderList(emptyList())
             return
         }
@@ -59,7 +65,11 @@ internal class AiWorkbenchController(
     }
 
     fun selectConversation(id: String) {
-        if (!allowed() || configuration()?.saveConversations != true) return
+        reconcilePersistence()
+        if (!allowed()) return
+        if (configuration()?.saveConversations != true) {
+            return
+        }
         newConversation()
         storage({ current -> conversations.find(id, current) }, deliver = {
             selected = it
@@ -68,6 +78,7 @@ internal class AiWorkbenchController(
     }
 
     fun deleteConversation(id: String) {
+        reconcilePersistence()
         if (!allowed() || configuration()?.saveConversations != true) return
         stop()
         if (selected?.id == id) {
@@ -77,16 +88,26 @@ internal class AiWorkbenchController(
         storage({ current -> conversations.delete(id, current) }, deliver = { refreshConversations() })
     }
 
-    fun submit(action: AiAction, input: String, target: String?) {
+    fun submit(action: AiAction, input: String, target: String?, attachments: List<AiAttachment> = emptyList()) {
+        reconcilePersistence()
         stop()
         val config = configuration()
-        if (!allowed() || config == null || !config.enabled || !config.networkAllowed) {
-            fail()
+        if (!allowed()) {
+            fail(AiProviderError.Policy("AI unavailable in this editor"))
+            return
+        }
+        if (config == null || !config.enabled || !config.networkAllowed) {
+            fail(AiProviderError.Policy("AI network is disabled"))
+            return
+        }
+        if (config.activeKey().isBlank()) {
+            fail(AiProviderError.Configuration("AI provider is not configured"))
             return
         }
         val previous = selected
         val request = try {
-            AiRequest(previous?.id, action, input, target, boundedHistory(previous?.messages.orEmpty()))
+            copyRequest(AiRequest(previous?.id, action, input, target,
+                boundedHistory(previous?.messages.orEmpty()), attachments))
         } catch (_: IllegalArgumentException) {
             fail()
             return
@@ -94,6 +115,7 @@ internal class AiWorkbenchController(
         val token = generation.get()
         val data = dataGeneration.current()
         val sink = AiStreamDelivery(post) { event ->
+            reconcilePersistence()
             if (generation.get() != token || !dataGeneration.isCurrent(data) || !allowed()) return@AiStreamDelivery
             when (event) {
                 is AiStreamEvent.Completed -> {
@@ -105,8 +127,8 @@ internal class AiWorkbenchController(
                         result = null
                         render(AiStreamEvent.Failed(AiProviderError.Response("AI response is invalid")))
                     } else {
-                        render(event)
                         complete(request, previous, event.text, token, data, config.saveConversations)
+                        render(event)
                     }
                 }
                 is AiStreamEvent.Failed, AiStreamEvent.Cancelled -> {
@@ -127,6 +149,7 @@ internal class AiWorkbenchController(
 
     /** The UI cannot supply arbitrary text or revive a result from an older editor. */
     fun consumeResult(): String? {
+        reconcilePersistence()
         if (!allowed() || !dataGeneration.isCurrent(resultDataGeneration)) return null
         return result.also { result = null }
     }
@@ -152,21 +175,44 @@ internal class AiWorkbenchController(
         token: Long = generation.get(),
         data: Long = dataGeneration.current(),
     ) {
-        val current = { generation.get() == token && dataGeneration.isCurrent(data) }
+        val current = { generation.get() == token && dataGeneration.isCurrent(data) &&
+            configuration()?.saveConversations == true }
         try {
             executor.execute {
                 if (!current()) return@execute
                 val value = runCatching { work(current) }
                 post {
+                    reconcilePersistence()
                     if (current() && allowed()) value.fold(deliver) { fail() }
                 }
             }
         } catch (_: RejectedExecutionException) { fail() }
     }
 
-    private fun fail() {
+    /** Revoke saved context once at the transition, preserving new unsaved conversations. */
+    private fun reconcilePersistence() {
+        val enabled = configuration()?.saveConversations == true
+        val revoked = persistenceEnabled && !enabled
+        persistenceEnabled = enabled
+        if (revoked) invalidate()
+    }
+
+    private fun copyRequest(request: AiRequest): AiRequest {
+        val copies = mutableListOf<ByteArray>()
+        try {
+            return request.copy(attachments = request.attachments.map { attachment ->
+                val bytes = attachment.bytes.copyOf().also(copies::add)
+                AiAttachment(attachment.mimeType, bytes, attachment.displayName)
+            })
+        } catch (error: Exception) {
+            copies.forEach { it.fill(0) }
+            throw error
+        }
+    }
+
+    private fun fail(error: AiProviderError = AiProviderError.Policy("AI operation unavailable")) {
         result = null
-        render(AiStreamEvent.Failed(AiProviderError.Policy("AI operation unavailable")))
+        render(AiStreamEvent.Failed(error))
     }
 
     private fun conversationTitle(input: String): String {

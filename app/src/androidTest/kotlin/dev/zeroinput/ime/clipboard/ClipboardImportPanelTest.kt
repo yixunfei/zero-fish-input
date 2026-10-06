@@ -45,12 +45,16 @@ class ClipboardImportPanelTest {
                         if (authorized) view.showAuthorized("Public fixture text. ".repeat(390))
                         else view.showReview(8_192, enabled = false)
                         measure(view, width, height)
-                        val action = children(view).filterIsInstance<MaterialButton>().single()
-                        assertTrue(action.width > 0 && action.height >= dp(view, 48))
-                        assertTrue(action.bottom <= view.height && action.top >= dp(view, 56))
-                        for (line in 0 until action.layout.lineCount) {
-                            assertEquals(0, action.layout.getEllipsisCount(line))
-                            assertTrue(action.layout.getLineWidth(line) <= action.width - action.compoundPaddingLeft - action.compoundPaddingRight)
+                        val buttons = children(view).filterIsInstance<MaterialButton>()
+                            .filter { it.visibility == View.VISIBLE }
+                        assertEquals(if (authorized) 1 else 2, buttons.size)
+                        buttons.forEach { button ->
+                            assertTrue(button.width > 0 && button.height >= dp(view, 48))
+                            assertTrue(button.bottom <= view.height && button.top >= dp(view, 56))
+                            for (line in 0 until button.layout.lineCount) {
+                                assertEquals(0, button.layout.getEllipsisCount(line))
+                                assertTrue(button.layout.getLineWidth(line) <= button.width - button.compoundPaddingLeft - button.compoundPaddingRight)
+                            }
                         }
                         if (authorized) saveFixture(view, "import-${locale.language}-$night-$width.png")
                     }

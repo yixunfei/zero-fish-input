@@ -1,9 +1,7 @@
 package dev.zeroinput.ime.ui
 
 import android.content.Context
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
-import android.graphics.drawable.InsetDrawable
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.MotionEvent
@@ -39,13 +37,14 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
         isEnabled = spec.enabled
     }
 
-    fun setColors(base: Int, pressed: Int, outline: Int, radius: Float, inset: Int) {
-        val updated = KeyPalette(base, pressed, outline, radius, inset)
+    fun setColors(base: Int, pressed: Int, outline: Int, radius: Float, inset: Int,
+                  appearance: KeyboardAppearance = KeyboardAppearance()) {
+        val updated = KeyPalette(base, pressed, outline, radius, inset, appearance)
         if (palette == updated) return
         palette = updated
         background = StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_pressed), tile(pressed, outline, radius, inset))
-            addState(intArrayOf(), tile(base, outline, radius, inset))
+            addState(intArrayOf(android.R.attr.state_pressed), tile(pressed, outline, radius, inset, appearance, true))
+            addState(intArrayOf(), tile(base, outline, radius, inset, appearance, false))
         }
     }
 
@@ -85,11 +84,10 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
 
     private fun inside(event: MotionEvent): Boolean = event.x >= 0 && event.y >= 0 && event.x < width && event.y < height
 
-    private fun tile(color: Int, line: Int, radius: Float, inset: Int) = InsetDrawable(GradientDrawable().apply {
-        setColor(color)
-        setStroke(1, line)
-        cornerRadius = radius
-    }, inset)
+    private fun tile(color: Int, line: Int, radius: Float, inset: Int, appearance: KeyboardAppearance, pressed: Boolean) =
+        KeyboardKeyDrawable(color, line, radius, inset, appearance.material, appearance.borders, pressed,
+            resources.displayMetrics.density, appearance.background != KeyboardBackground.SOLID)
 
-    private data class KeyPalette(val base: Int, val pressed: Int, val outline: Int, val radius: Float, val inset: Int)
+    private data class KeyPalette(val base: Int, val pressed: Int, val outline: Int, val radius: Float, val inset: Int,
+                                  val appearance: KeyboardAppearance)
 }

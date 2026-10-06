@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.core
 
 import dev.zeroinput.engine.api.*
+import java.util.TreeMap
 
 /** A bounded personal page; unresolved worker queries preserve the last visible page. */
 internal class PersonalCandidatePaging {
@@ -10,6 +11,7 @@ internal class PersonalCandidatePaging {
     private var requested = 0
     private var page = PersonalSuggestionPage()
     private var first = PersonalSuggestionPage()
+    private val pages = TreeMap<Int, PersonalSuggestionPage>()
     private var revision: Long? = null
     val isBrowsing: Boolean get() = offset > 0
 
@@ -20,16 +22,19 @@ internal class PersonalCandidatePaging {
         requested = 0
         page = PersonalSuggestionPage()
         first = page
+        pages.clear()
         revision = null
     }
 
     fun changePage(direction: PageDirection, native: EngineSnapshot): Boolean {
-        if (direction == PageDirection.PREVIOUS && offset > 0) {
-            requested = (offset - PAGE_SIZE).coerceAtLeast(0)
+        val start = pages.firstKeyOrNull()
+        if (direction == PageDirection.PREVIOUS && start != null && start > 0) {
+            requested = (start - PAGE_SIZE).coerceAtLeast(0)
             return true
         }
-        if (direction == PageDirection.NEXT && (offset > 0 || !native.hasNextPage) && page.hasMore) {
-            requested = offset + PAGE_SIZE
+        val last = pages.lastEntry()
+        if (direction == PageDirection.NEXT && (offset > 0 || !native.hasNextPage) && last?.value?.hasMore == true) {
+            requested = last.key + PAGE_SIZE
             return true
         }
         return false
@@ -53,33 +58,37 @@ internal class PersonalCandidatePaging {
             requested = 0
             page = PersonalSuggestionPage()
             first = page
+            pages.clear()
             revision = loaded.revision
             if (!wasFirstPage) return native
         }
         revision = loaded.revision
         if (loaded.ready) {
+            val goingBack = requested < offset
             offset = requested
             page = loaded
             if (offset == 0) first = loaded
+            pages[offset] = loaded
+            while (pages.size > MAX_PAGES) {
+                if (goingBack) pages.pollLastEntry() else pages.pollFirstEntry()
+            }
         }
-        val personal = page.items.mapNotNull { term ->
+        fun rows(page: PersonalSuggestionPage) = page.items.mapNotNull { term ->
             normalize(term.text)?.let { Candidate("personal:${term.id}", it, "个人词组", term.frequency, term.input) }
         }
-        val items = when {
-            offset > 0 -> personal
-            // The personal page is empty on most keystrokes: skip the
-            // concatenation and the deduplication set.  Native candidate
-            // lists are text-unique by construction, so passing them through
-            // unchanged matches the merged result.
-            personal.isEmpty() -> native.candidates
-            else -> (personal + native.candidates).distinctBy(Candidate::text)
+        val includesNative = pages.isEmpty() || pages.firstKey() == 0
+        val personal = pages.entries.flatMap { (start, value) ->
+            if (start == 0) rows(value) + native.candidates else rows(value)
         }
+        val items = if (personal.isEmpty() && includesNative) native.candidates else personal.distinctBy(Candidate::text)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         return native.copy(candidates = items, highlightedIndex = if (offset > 0) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
-            hasPreviousPage = offset > 0 || native.hasPreviousPage,
-            hasNextPage = if (offset > 0) page.hasMore else native.hasNextPage || first.hasMore)
+            hasPreviousPage = !includesNative || native.hasPreviousPage,
+            hasNextPage = if (isBrowsing) pages.lastEntry()?.value?.hasMore == true else native.hasNextPage || first.hasMore)
     }
 
-    companion object { const val PAGE_SIZE = 8 }
+    private fun TreeMap<Int, PersonalSuggestionPage>.firstKeyOrNull(): Int? = firstEntry()?.key
+
+    companion object { const val PAGE_SIZE = 8; const val MAX_PAGES = 6 }
 }

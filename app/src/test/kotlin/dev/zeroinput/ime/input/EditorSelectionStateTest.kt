@@ -6,6 +6,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class EditorSelectionStateTest {
+    @Test fun `revoked connection ignores late selection without mutating its anchor`() {
+        val adapter = AndroidEditorConnection(4, 4, current = { null })
+        assertFalse(adapter.updateSelection(1, 3, previousStart = 0, previousEnd = 0))
+        assertNull(adapter.selectedLength())
+    }
+
+    @Test fun `selection from an unrelated previous anchor cannot corrupt a new session`() {
+        val state = EditorSelectionState(10, 10)
+        state.replaced(2, composing = true)
+        assertFalse(state.updated(2, 2, 0, 2, previousStart = 1, previousEnd = 1))
+        assertEquals(10, state.insertionStart())
+        assertFalse(state.updated(12, 12, 10, 12, previousStart = 10, previousEnd = 10))
+        assertTrue(state.updated(8, 8, previousStart = 12, previousEnd = 12))
+    }
+
     @Test fun `synchronous editor acknowledgements do not invalidate successive preedits or commit`() {
         var invalidations = 0
         lateinit var adapter: AndroidEditorConnection
@@ -81,6 +96,14 @@ class EditorSelectionStateTest {
 
         assertFalse(state.updated(1, 1, 0, 1, previousStart = 0, previousEnd = 0))
         assertFalse(state.updated(41, 41, 40, 41, previousStart = 40, previousEnd = 40))
+    }
+
+    @Test fun `delayed cursor move from before a new composition does not cancel it`() {
+        val state = EditorSelectionState(2, 2)
+        state.replaced(1, composing = true)
+
+        assertFalse(state.updated(0, 0, previousStart = 2, previousEnd = 2))
+        assertTrue(state.updated(0, 0, previousStart = 3, previousEnd = 3))
     }
 
     @Test fun `unknown initial cursor anchors on the first composing span without dropping rapid input`() {

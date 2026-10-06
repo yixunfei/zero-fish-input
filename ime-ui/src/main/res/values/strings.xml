@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="panel_expand">展开面板</string>
+    <string name="panel_collapse">收起面板</string>
+    <string name="expression_search_input">输入表情搜索词</string>
     <string name="key_semicolon">分号，微软双拼 ing</string>
     <!-- Hexadecimal editor flags are identifiers, not plural quantities. -->
     <string name="input_diagnostics_format" tools:ignore="PluralsCandidate">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
@@ -11,14 +14,29 @@
     <string name="clipboard_guard_changed">系统剪贴板已变化</string>
     <string name="keyboard_settings">zero fish input 设置</string>
     <string name="ai_toolbar_label">AI</string>
+    <string name="ai_more">更多操作</string>
+    <string name="ai_draft_mode">AI 草稿 · %1$s</string>
+    <string name="ai_result_mode">AI 结果 · %1$s</string>
+    <string name="ai_input_chinese">中文拼音</string>
+    <string name="ai_input_english">英文</string>
+    <string name="ai_generating">正在生成…</string>
+    <string name="ai_timeout">请求超时，请检查网络后重试。</string>
+    <string name="ai_authentication_failed">鉴权失败，请检查 API key 和模型访问权限。</string>
+    <string name="ai_model_unavailable">模型或接口不存在，请检查模型名称和服务地址。</string>
+    <string name="ai_rate_limited">请求受限，请检查额度或稍后重试。</string>
+    <string name="ai_service_unavailable">服务暂不可用，请稍后重试。</string>
     <string name="ai_open">打开 AI 工作台</string>
     <string name="ai_entry_unavailable">AI 暂不可用，点按查看原因</string>
     <string name="ai_entry_privacy_blocked">当前输入框或隐私设置禁止 AI，请检查隐身、学习和个性化设置。</string>
     <string name="ai_input_hint">输入问题或文字</string>
     <string name="ai_target_language_hint">目标语言（翻译时可选）</string>
-    <string name="ai_submit">提交请求</string>
+    <string name="ai_submit">发送</string>
     <string name="ai_cancel">停止</string>
-    <string name="ai_insert">插入结果</string>
+    <string name="ai_insert">插入</string>
+    <string name="ai_settings">设置</string>
+    <string name="ai_add_content">添加内容</string>
+    <string name="ai_import_content">引入已选内容</string>
+    <string name="ai_remove_attachment">移除 %1$s</string>
     <string name="ai_input_required">请输入内容</string>
     <string name="ai_request_failed">请求未完成</string>
     <string name="ai_policy_unavailable">AI 暂不可用，请检查设置中的 AI、联网开关及当前输入框的隐私限制。</string>
@@ -96,7 +114,7 @@
     <string name="expression_no_favorites">暂无收藏</string>
     <string name="expression_no_custom">暂无自定义颜文字</string>
     <string name="expression_no_recent">暂无最近记录</string>
-    <string name="keyboard_theme_classic">经典</string>
+    <string name="keyboard_theme_classic">雾蓝（默认）</string>
     <string name="keyboard_theme_gray">极简灰</string>
     <string name="keyboard_theme_mint">薄荷绿</string>
     <string name="keyboard_theme_rose">樱花粉</string>
@@ -133,7 +151,7 @@
     <string name="ai_user_message">你：%1$s</string>
     <string name="ai_assistant_message">AI：%1$s</string>
     <string name="ai_edit">编辑</string>
-    <string name="ai_read">收起键盘</string>
+    <string name="ai_read">预览</string>
     <string-array name="ai_target_languages" translatable="false">
         <item>English</item><item>中文</item><item>日本語</item><item>한국어</item>
         <item>Français</item><item>Deutsch</item><item>Español</item><item>العربية</item>
@@ -156,6 +174,8 @@
     <string name="handwriting_delete">删除</string>
     <string name="handwriting_space">空格</string>
     <string name="handwriting_enter">回车</string>
+    <string name="handwriting_fullscreen">全屏</string>
+    <string name="handwriting_exit_fullscreen">退出全屏</string>
     <string name="handwriting_candidate">候选字</string>
     <string name="handwriting_candidate_value">输入 %1$s</string>
     <string name="language_sensitive_protection">敏感输入保护中</string>

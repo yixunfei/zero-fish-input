@@ -16,8 +16,6 @@ import dev.zeroinput.ime.BuildConfig
 import dev.zeroinput.ime.R
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.EngineCapability
-import com.google.android.material.radiobutton.MaterialRadioButton
-import android.widget.RadioGroup
 
 data class SettingsScreenState(
     val isEnabled: Boolean,
@@ -31,13 +29,14 @@ data class SettingsScreenState(
     val chineseOptions: ChineseInputOptions = ChineseInputOptions(),
     val experimentalModelRanking: Boolean = false,
     val wordAssociationsEnabled: Boolean = true,
+    val pairedSymbolsEnabled: Boolean = true,
     val languagePacks: List<LanguagePackScreenState> = emptyList(),
-    val chineseEngine: ChineseEngineChoice = ChineseEngineChoice.RIME,
     val engineCapabilities: Set<EngineCapability> = EngineCapability.entries.toSet(),
     val aiEnabled: Boolean = false,
     val aiNetworkAllowed: Boolean = false,
     val aiEndpoint: String = "",
     val aiModel: String = "",
+    val aiProviderName: String = "",
     val aiKeyConfigured: Boolean = false,
     val aiSaveConversations: Boolean = false,
 )
@@ -61,6 +60,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onHapticsChanged: (Boolean) -> Unit = {}
     var onSoundEffectsChanged: (Boolean) -> Unit = {}
     var onWordAssociationsChanged: (Boolean) -> Unit = {}
+    var onPairedSymbolsChanged: (Boolean) -> Unit = {}
     var onDictionaryRequested: () -> Unit = {}
     var onExpressionsRequested: () -> Unit = {}
     var onAppearanceRequested: () -> Unit = {}
@@ -74,7 +74,6 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onChineseOptionsChanged: (ChineseInputOptions) -> Unit = {}
     var onModelRankingChanged: (Boolean) -> Unit = {}
     var onBuiltInEngineSelected: () -> Unit = {}
-    var onChineseEngineChanged: (ChineseEngineChoice) -> Unit = {}
     var onAiEnabledChanged: (Boolean) -> Unit = {}
     var onAiNetworkChanged: (Boolean) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
@@ -112,28 +111,10 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val hapticsSwitch = settingSwitch(context.getString(R.string.setting_haptics)) { onHapticsChanged(it) }
     private val soundEffectsSwitch = settingSwitch(context.getString(R.string.setting_sound_effects)) { onSoundEffectsChanged(it) }
     private val associationSwitch = settingSwitch(context.getString(R.string.setting_word_associations)) { onWordAssociationsChanged(it) }
+    private val pairedSymbolsSwitch = settingSwitch(context.getString(R.string.setting_paired_symbols)) { onPairedSymbolsChanged(it) }
     private val aiEnabledSwitch = settingSwitch(context.getString(R.string.ai_enabled)) { onAiEnabledChanged(it) }
     private val aiNetworkSwitch = settingSwitch(context.getString(R.string.ai_network)) { onAiNetworkChanged(it) }
     private val aiStatus = valueText()
-    private val engineButtons = ChineseEngineChoice.entries.associateWith { choice ->
-        MaterialRadioButton(context).apply {
-            id = View.generateViewId()
-            setText(if (choice == ChineseEngineChoice.RIME) R.string.engine_rime_name else R.string.engine_dictionary_name)
-            minHeight = dp(48)
-        }
-    }
-    private val engineChoices = RadioGroup(context).apply {
-        orientation = LinearLayout.VERTICAL
-        engineButtons.values.forEach(::addView)
-        setOnCheckedChangeListener { _, id ->
-            if (!suppressSwitchCallbacks) engineButtons.entries.firstOrNull { it.value.id == id }?.let { onChineseEngineChanged(it.key) }
-        }
-    }
-    private val dictionaryNotice = TextView(context).apply {
-        setText(R.string.engine_dictionary_notice)
-        textSize = 13f
-        setPadding(0, dp(6), 0, dp(8))
-    }
 
     init {
         isFillViewport = true
@@ -155,14 +136,12 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             !state.aiEnabled -> context.getString(R.string.ai_disabled)
             !state.aiNetworkAllowed -> context.getString(R.string.ai_network_disabled)
             !state.aiKeyConfigured -> context.getString(R.string.ai_key_missing)
-            else -> "${state.aiModel} · ${state.aiEndpoint}"
+            else -> listOf(state.aiProviderName, state.aiModel).filter(String::isNotBlank).joinToString(" · ")
         }
         chineseSettings.render(state.chineseOptions, state.engineCapabilities)
-        dictionaryNotice.visibility = if (state.chineseEngine == ChineseEngineChoice.DICTIONARY_TEST) View.VISIBLE else View.GONE
         renderLanguagePacks(state.languagePacks)
         suppressSwitchCallbacks = true
         try {
-            engineChoices.check(engineButtons.getValue(state.chineseEngine).id)
             updateSwitch(learningSwitch, state.learningEnabled)
             updateSwitch(modelSwitch, state.experimentalModelRanking)
             updateSwitch(incognitoSwitch, state.incognitoMode)
@@ -170,6 +149,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(hapticsSwitch, state.hapticsEnabled)
             updateSwitch(soundEffectsSwitch, state.soundEffectsEnabled)
             updateSwitch(associationSwitch, state.wordAssociationsEnabled)
+            updateSwitch(pairedSymbolsSwitch, state.pairedSymbolsEnabled)
             updateSwitch(aiEnabledSwitch, state.aiEnabled)
             updateSwitch(aiNetworkSwitch, state.aiEnabled && state.aiNetworkAllowed)
             aiNetworkSwitch.isEnabled = aiControlsEnabled && aiEnabledSwitch.isChecked
@@ -229,11 +209,10 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(hapticsSwitch)
         content.addView(soundEffectsSwitch)
         content.addView(associationSwitch)
+        content.addView(pairedSymbolsSwitch)
         command(context.getString(R.string.keyboard_appearance)) { onAppearanceRequested() }
 
         section(context.getString(R.string.chinese_input_settings))
-        content.addView(engineChoices)
-        content.addView(dictionaryNotice)
         command(context.getString(R.string.select_builtin_chinese)) { onBuiltInEngineSelected() }
         content.addView(chineseSettings)
         content.addView(modelSwitch)
@@ -280,7 +259,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary, Color.BLACK))
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(50))
+            minHeight = dp(52)
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             setOnClickListener { callback() }
         })
     }
@@ -299,7 +279,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         isAllCaps = false
         letterSpacing = 0f
         cornerRadius = dp(6)
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(44)).apply {
+        layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)).apply {
             marginStart = dp(8)
         }
         setOnClickListener { callback() }
@@ -357,7 +337,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         text = label
         textSize = 16f
         gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(52))
+        minHeight = dp(56)
+        setPadding(0, dp(8), 0, dp(8))
+        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         setOnCheckedChangeListener { _, checked ->
             if (!suppressSwitchCallbacks) callback(checked)
         }

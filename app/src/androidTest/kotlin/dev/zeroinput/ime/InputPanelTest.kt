@@ -80,8 +80,7 @@ class InputPanelTest {
     }
 
     @Test
-    fun expandedCandidatesKeepHeightAndRoutePagingAndSelection() = onMain {
-        val panel = panel(false)
+    fun expandedCandidatesKeepHeightAndRoutePagingAndSelection() = withAttachedPanel { panel ->
         panel.renderSession(candidateState())
         var pageRequests = 0
         var selection = -1
@@ -253,11 +252,13 @@ class InputPanelTest {
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expression_search)).performClick()
         measure(panel, 320)
         val searchHeight = panel.measuredHeight
-        // Switching panels preserves search; Back intentionally closes it one level at a time.
+        // Leaving a search clears its local input session; a new search restores the same geometry.
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expression_smileys)).performClick()
+        assertFalse(panel.isSearchEditing)
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expression_search)).performClick()
         measure(panel, 320)
-        assertTrue("Returning to active emoji search must preserve its height", panel.measuredHeight == searchHeight)
+        assertTrue("A new search restores its height", panel.measuredHeight == searchHeight)
         assertTrue("Panel changes must invalidate pending authenticated actions", interactions >= 5)
     }
 
@@ -321,6 +322,17 @@ class InputPanelTest {
         }
     }
 
+    private fun withAttachedPanel(action: (ZeroInputView) -> Unit) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val activity = instrumentation.startActivitySync(android.content.Intent(instrumentation.targetContext,
+            dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) as dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity
+        try {
+            instrumentation.waitForIdleSync()
+            onMain { action(activity.keyboard) }
+        } finally { onMain { activity.keyboard.release(); activity.finish() } }
+    }
+
     private fun panel(night: Boolean, landscape: Boolean = false): ZeroInputView {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val configuration = Configuration(target.resources.configuration).apply {
@@ -344,7 +356,8 @@ class InputPanelTest {
     }
 
     private fun assertLabelsFit(root: View) {
-        visible(root).filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach { button ->
+        visible(root).filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() &&
+            it.contentDescription != root.context.getString(dev.zeroinput.ime.ui.R.string.expression_search_input) }.forEach { button ->
             val available = button.width - button.compoundPaddingLeft - button.compoundPaddingRight
             assertTrue("Button '${button.text}': width=${button.width}, padding=${button.compoundPaddingLeft + button.compoundPaddingRight}, text=${button.paint.measureText(button.text.toString())}",
                 available >= button.paint.measureText(button.text.toString()))

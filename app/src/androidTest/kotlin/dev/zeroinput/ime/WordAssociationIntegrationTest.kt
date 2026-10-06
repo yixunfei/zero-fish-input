@@ -15,7 +15,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.InputLanguage
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.ZeroInputView
@@ -135,14 +134,13 @@ class WordAssociationIntegrationTest {
         val previousLanguage = settings.lastLanguage
         val pack = settings.lastLanguagePackKey
         val options = settings.chineseInputOptions
-        val engine = settings.chineseEngine
         var activity: InputFixtureActivity? = null
         try {
             graph.engineExecutor.submit {}.get(60, TimeUnit.SECONDS)
             onMain {
                 settings.learningEnabled = true; settings.incognitoMode = false
                 settings.wordAssociationsEnabled = true; settings.experimentalModelRanking = false
-                settings.chineseInputOptions = ChineseInputOptions(script = script); settings.chineseEngine = ChineseEngineChoice.RIME
+                settings.chineseInputOptions = ChineseInputOptions(script = script)
                 settings.lastLanguagePackKey = null
             }
             val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
@@ -178,7 +176,7 @@ class WordAssociationIntegrationTest {
                 settings.learningEnabled = privacy.learningEnabled; settings.incognitoMode = privacy.incognitoMode
                 settings.wordAssociationsEnabled = enabled; settings.experimentalModelRanking = model
                 settings.lastLanguage = previousLanguage; settings.lastLanguagePackKey = pack
-                settings.chineseInputOptions = options; settings.chineseEngine = engine
+                settings.chineseInputOptions = options
             }
             if (original.isNotBlank() && original != "null") shell("ime set $original")
         }
@@ -188,7 +186,11 @@ class WordAssociationIntegrationTest {
         value.forEach { panel().onKeyboardAction(KeyboardAction.Text(it.toString())) }
     }
     private fun choose(value: String) {
-        await { value in words() }
+        try {
+            await { value in words() }
+        } catch (failure: AssertionError) {
+            throw AssertionError("Missing candidate '$value'", failure)
+        }
         onMain { candidates().first { it.text.toString() == value }.performClick() }
     }
     private fun candidates() = views(panel()).filterIsInstance<TextView>()
@@ -207,7 +209,15 @@ class WordAssociationIntegrationTest {
             if (ready) return
             SystemClock.sleep(50)
         }
-        fail("Association fixture did not reach expected state")
+        var diagnostics = "panel=missing"
+        onMain {
+            val view = panelOrNull()
+            if (view != null) {
+                diagnostics = "words=${words()} engine=${view.renderedEngineStatus} " +
+                    "text=${runCatching { view.rootView?.findFocus()?.toString() }.getOrNull()}"
+            }
+        }
+        fail("Association fixture did not reach expected state: $diagnostics")
     }
     private fun onMain(action: () -> Unit) {
         var result: Result<Unit>? = null

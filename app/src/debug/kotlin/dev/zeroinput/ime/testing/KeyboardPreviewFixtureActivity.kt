@@ -23,6 +23,7 @@ class KeyboardPreviewFixtureActivity : Activity() {
         val preset = KeyboardTheme.entries.firstOrNull { it.name == intent.getStringExtra("theme") } ?: KeyboardTheme.CLASSIC
         val context = KeyboardThemeContext.create(createConfigurationContext(config), preset)
         keyboard = ZeroInputView(context)
+        keyboard.applyAppearance(dev.zeroinput.ime.ui.KeyboardAppearance(theme = preset))
         setContentView(FrameLayout(context).apply {
             setBackgroundColor(com.google.android.material.color.MaterialColors.getColor(context,
                 com.google.android.material.R.attr.colorSurfaceVariant, android.graphics.Color.GRAY))

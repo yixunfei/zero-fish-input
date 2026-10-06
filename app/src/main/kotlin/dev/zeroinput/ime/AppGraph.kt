@@ -1,5 +1,7 @@
 package dev.zeroinput.ime
 
+import dev.zeroinput.engine.api.ChineseInputOptions
+
 import android.content.Context
 import dev.zeroinput.ime.clipboardguard.ClipboardGuardPreferences
 import dev.zeroinput.ime.clipboardguard.ClipboardGuardRuntime
@@ -10,8 +12,6 @@ import dev.zeroinput.engine.api.LearnedSuggestionSource
 import dev.zeroinput.engine.api.WeightedTerm
 import dev.zeroinput.engine.english.EnglishEngineFactory
 import dev.zeroinput.engine.rime.RimeEngineFactory
-import dev.zeroinput.engine.dictionary.DictionaryEngineFactory
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.personalization.QueuedPersonalizationStore
 import dev.zeroinput.ime.settings.SettingsRepository
 import dev.zeroinput.ime.concurrency.BoundedExecutors
@@ -50,12 +50,14 @@ class AppGraph(context: Context) : AutoCloseable {
         name = "zeroinput-ai-cancel",
         queueCapacity = 2,
     )
+    internal val aiDocumentExecutor: ExecutorService = BoundedExecutors.singleThread("zeroinput-ai-document", 1)
     internal val aiPersistenceExecutor: ExecutorService = BoundedExecutors.singleThread(
         name = "zeroinput-ai-storage",
         queueCapacity = 2,
     )
 
     val settings = SettingsRepository(applicationContext)
+    internal val keyboardBackgrounds = dev.zeroinput.ime.settings.KeyboardBackgroundStore(applicationContext, settings)
     internal val clipboardGuardPreferences = ClipboardGuardPreferences(applicationContext)
     internal val clipboardGuard = ClipboardGuardRuntime(applicationContext, clipboardGuardPreferences)
     val userLexicon = UserLexiconRepository(applicationContext)
@@ -77,9 +79,12 @@ class AppGraph(context: Context) : AutoCloseable {
     val secureClipboard = SecureClipboardVault(applicationContext)
     val aiConfiguration = dev.zeroinput.userdata.AiConfigurationRepository(applicationContext)
     val aiConversations = dev.zeroinput.userdata.AiConversationRepository(applicationContext)
+    private val aiConfigurationStorage = dev.zeroinput.ime.ai.AiConfigurationStorage(aiConfiguration, aiConversations)
     private val aiConfigurationState = dev.zeroinput.ime.ai.AiConfigurationState()
     val aiCoordinator = AiCoordinator(OpenAiCompatibleProvider({ aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor))
     val aiDataGeneration = AiDataGeneration()
+    internal val aiContentInbox = dev.zeroinput.ime.ai.AiContentInbox()
+    private val aiImportSettingsObserver = settings.addChangeListener { aiContentInbox.clear() }
 
     fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
 
@@ -94,7 +99,7 @@ class AppGraph(context: Context) : AutoCloseable {
         val token = aiConfigurationState.current()
         try {
             aiPersistenceExecutor.execute {
-                val result = runCatching { aiConfiguration.read() }
+                val result = runCatching { aiConfigurationStorage.read() }
                 if (aiConfigurationState.publish(token, result.getOrNull())) completed(result)
                 else completed(Result.failure(IllegalStateException("AI configuration revoked")))
             }
@@ -108,7 +113,7 @@ class AppGraph(context: Context) : AutoCloseable {
         val token = revokeAiConfiguration()
         enqueueAiControl(completed) {
             check(aiConfigurationState.isCurrent(token))
-            aiConfiguration.write(value)
+            aiConfigurationStorage.write(value)
             check(aiConfigurationState.publish(token, value, explicitControl = true))
         }
     }
@@ -116,15 +121,13 @@ class AppGraph(context: Context) : AutoCloseable {
     fun clearAiData(completed: (Boolean) -> Unit) {
         val token = revokeAiConfiguration()
         enqueueAiControl(completed) {
-            val config = runCatching { aiConfiguration.clear() }
-            val history = runCatching { aiConversations.clear() }
-            config.getOrThrow()
-            history.getOrThrow()
+            aiConfigurationStorage.clear()
             check(aiConfigurationState.publish(token, AiConfiguration(), explicitControl = true))
         }
     }
 
     private fun revokeAiConfiguration(): Long {
+        aiContentInbox.clear()
         val token = aiConfigurationState.revoke()
         aiDataGeneration.invalidate()
         aiCoordinator.invalidate()
@@ -142,17 +145,13 @@ class AppGraph(context: Context) : AutoCloseable {
     val languagePacks = LanguagePackInstaller(applicationContext)
     val languagePackRegistry = LanguagePackRegistry(languagePacks)
     val rime = RimeEngineFactory(applicationContext, engineExecutor)
-    private val dictionaryEngine = DictionaryEngineFactory()
     @Volatile private var associationPredictor: dev.zeroinput.engine.api.NextWordPredictor =
         dev.zeroinput.engine.api.NextWordPredictor.Empty
+    @Volatile private var associationPredictorReady = false
     val nextWordPredictor = dev.zeroinput.engine.api.NextWordPredictor { language, context, limit ->
         associationPredictor.suggest(language, context, limit)
     }
 
-    fun chineseEngineDescriptor(choice: ChineseEngineChoice): EngineDescriptor = when (choice) {
-        ChineseEngineChoice.RIME -> rime.descriptor
-        ChineseEngineChoice.DICTIONARY_TEST -> dictionaryEngine.descriptor
-    }
     private val english = EnglishEngineFactory(
         learnedSuggestions = LearnedSuggestionSource { prefix, limit ->
             // Keep English personalization behind the same queued, encrypted
@@ -169,6 +168,7 @@ class AppGraph(context: Context) : AutoCloseable {
     private var languagePackDiscoveryComplete = false
     private val languagePackRefreshLock = Any()
     private val languagePackListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val associationPredictorListeners = CopyOnWriteArrayList<() -> Unit>()
     private val personalizationListeners = CopyOnWriteArrayList<() -> Unit>()
 
     init {
@@ -180,6 +180,8 @@ class AppGraph(context: Context) : AutoCloseable {
             engineExecutor.execute {
                 associationPredictor = runCatching { dev.zeroinput.engine.dictionary.WordAssociationIndex.loadBundled() }
                     .getOrDefault(dev.zeroinput.engine.api.NextWordPredictor.Empty)
+                associationPredictorReady = true
+                associationPredictorListeners.forEach { listener -> runCatching(listener) }
                 // A broken optional language pack must not prevent the core Rime
                 // runtime from publishing its terminal READY/FAILED state.
                 runCatching { rime.warmUp() }
@@ -203,6 +205,12 @@ class AppGraph(context: Context) : AutoCloseable {
         InputLanguage.ENGLISH -> english.create()
     }
 
+    /** Internal drafts always use full pinyin and never inherit an editor's layout. */
+    fun createDraftEngine(language: InputLanguage): InputEngine = when (language) {
+        InputLanguage.CHINESE -> rime.createFallback(ChineseInputOptions())
+        InputLanguage.ENGLISH -> english.create()
+    }
+
     /**
      * Creates the engine requested by a warm-up ticket.  A null result means
      * that the runtime or language-pack registry is not ready yet; the caller
@@ -212,15 +220,12 @@ class AppGraph(context: Context) : AutoCloseable {
     internal fun prepareEngine(request: EngineWarmupRequest): InputEngine? {
         if (!request.privacy.suggestionsAllowed) return null
         if (request.retryInitialization && request.language == InputLanguage.CHINESE &&
-            request.languagePackKey == null && request.chineseEngine == ChineseEngineChoice.RIME && !rime.runtime.isReady) rime.warmUp()
+            request.languagePackKey == null && !rime.runtime.isReady) rime.warmUp()
         val candidate = if (request.languagePackKey != null) {
             createLanguagePackEngine(request.languagePackKey)
         } else {
             when (request.language) {
-                InputLanguage.CHINESE -> when (request.chineseEngine) {
-                    ChineseEngineChoice.RIME -> rime.createNativeOrNull(request.chineseOptions, engineExecutor)
-                    ChineseEngineChoice.DICTIONARY_TEST -> dictionaryEngine.create(request.chineseOptions)
-                }
+                InputLanguage.CHINESE -> rime.createNativeOrNull(request.chineseOptions, engineExecutor)
                 InputLanguage.ENGLISH -> english.create()
             }
         }
@@ -273,6 +278,16 @@ class AppGraph(context: Context) : AutoCloseable {
         }
     }
 
+    fun addAssociationPredictorListener(listener: () -> Unit): AutoCloseable {
+        associationPredictorListeners += listener
+        if (associationPredictorReady) runCatching(listener)
+        return object : AutoCloseable {
+            override fun close() {
+                associationPredictorListeners -= listener
+            }
+        }
+    }
+
     /** Clears user phrases, frequencies, and emoji recency through their queued stores. */
     fun clearPersonalizationData() {
         // Settings invokes this on its worker.  Wait for the encrypted phrase
@@ -312,21 +327,26 @@ class AppGraph(context: Context) : AutoCloseable {
         queuedPersonalization.addSuggestionListener(listener)
 
     fun registeredEngineDescriptors(): List<EngineDescriptor> =
-        listOf(rime.descriptor, dictionaryEngine.descriptor, english.descriptor) + languagePackRegistry.descriptors()
+        listOf(rime.descriptor, english.descriptor) + languagePackRegistry.descriptors()
 
     override fun close() {
+        keyboardBackgrounds.close()
         securePaste.close()
         clipboardSelectionTransfer.close()
         clipboardGuard.close()
         engineExecutor.shutdownNow()
         aiConfigurationListeners.clear()
         aiCoordinator.close()
+        aiContentInbox.clear()
         aiExecutor.shutdownNow()
+        aiDocumentExecutor.shutdownNow()
+        aiImportSettingsObserver.close()
         aiCancellationExecutor.shutdown()
         aiPersistenceExecutor.shutdownNow()
         queuedPersonalization.close()
         languagePackSnapshot = emptyList()
         languagePackListeners.clear()
+        associationPredictorListeners.clear()
         personalizationListeners.clear()
         expressionListeners.clear()
         languagePackRegistry.close()

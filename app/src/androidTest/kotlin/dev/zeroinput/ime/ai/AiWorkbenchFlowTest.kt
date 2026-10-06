@@ -18,6 +18,7 @@ import dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity
 import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.userdata.AiConfiguration
 import dev.zeroinput.userdata.AiConversationRepository
+import dev.zeroinput.userdata.AiProviderProfile
 import java.util.concurrent.Executors
 import org.junit.Assert.*
 import org.junit.Test
@@ -36,7 +37,7 @@ class AiWorkbenchFlowTest {
             DeviceTouch.tap { f.labelled(UiR.string.ai_open) }
             onMain { f.panel.renderAiDraft("public question", ready) }
             DeviceTouch.tap { f.button(label) }
-            if (action != AiAction.TRANSLATE) DeviceTouch.tap { f.button(UiR.string.ai_submit) }
+            DeviceTouch.tap { f.button(UiR.string.ai_submit) }
             onMain {
                 assertEquals(action, f.provider.request?.action)
                 assertTrue(f.inserted.isEmpty())
@@ -88,10 +89,25 @@ class AiWorkbenchFlowTest {
         val provider = PublicProvider()
         val inserted = mutableListOf<String>()
         var allowed = true
+        private val profile = AiProviderProfile(
+            id = "fixture",
+            name = "Fixture",
+            endpoint = "https://provider.example/v1/chat/completions",
+            apiKey = "public-fixture",
+            models = listOf("fixture-model"),
+            selectedModel = "fixture-model",
+        )
         private val worker = Executors.newSingleThreadExecutor()
         private val handler = Handler(Looper.getMainLooper())
         val controller = AiWorkbenchController(AiCoordinator(provider), AiConversationRepository(PublicMemoryStore()), worker,
-            { AiConfiguration(enabled = true, networkAllowed = true) }, AiDataGeneration(),
+            {
+                AiConfiguration(
+                    enabled = true,
+                    networkAllowed = true,
+                    providers = listOf(profile),
+                    selectedProviderId = profile.id,
+                )
+            }, AiDataGeneration(),
             { handler.post(it) }, { allowed && panel.isAiOpen }, panel::renderAi,
             panel::renderAiConversations, panel::renderAiConversation)
 

@@ -110,11 +110,22 @@ internal class GlideTouchTracker(
     private fun append(x: Float, y: Float, time: Long) {
         val elapsed = (time - startedAt).coerceIn(0L, GlidePoint.MAX_DURATION_MILLIS)
         if (points.lastOrNull()?.elapsedMillis?.let { it > elapsed } == true) return
-        if (points.size >= GlideRequest.MAX_POINTS) {
-            val reduced = points.filterIndexed { index, _ -> index % 2 == 0 }
-            points.clear(); points.addAll(reduced)
+        val next = GlidePoint((x / host.width).coerceIn(0f, 1f), (y / host.height).coerceIn(0f, 1f), elapsed)
+        if (points.size < GlideRequest.MAX_POINTS) {
+            points += next
+        } else {
+            // Resample the complete bounded stroke so the newest tail keeps
+            // the same temporal density as the rest of the gesture.
+            val combined = ArrayList<GlidePoint>(points.size + 1).apply {
+                addAll(points)
+                add(next)
+            }
+            val last = combined.lastIndex
+            points.clear()
+            repeat(GlideRequest.MAX_POINTS) { index ->
+                points += combined[index * last / (GlideRequest.MAX_POINTS - 1)]
+            }
         }
-        points += GlidePoint((x / host.width).coerceIn(0f, 1f), (y / host.height).coerceIn(0f, 1f), elapsed)
     }
 
     fun draw(canvas: Canvas) {

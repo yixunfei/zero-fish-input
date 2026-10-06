@@ -5,6 +5,8 @@ import dev.zeroinput.engine.api.ChineseKeyboardLayout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /** Owns only regenerable, non-personal configuration and compiled syllable indexes. */
 internal class RimeConfigurationInstaller(
@@ -33,9 +35,14 @@ internal class RimeConfigurationInstaller(
             if (options.effectiveDoublePinyinScheme == dev.zeroinput.engine.api.DoublePinyinScheme.MICROSOFT) {
                 schema.getJSONObject("speller").put("alphabet", "abcdefghijklmnopqrstuvwxyz;")
             }
-            val temporary = File(directories.user, "$id.tmp")
+            val temporary = Files.createTempFile(directories.user.toPath(), "$id-", ".tmp").toFile()
             temporary.writeText(schema.toString())
-            check(temporary.renameTo(file)) { "Unable to install input configuration" }
+            try {
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally { temporary.delete() }
         }
         return id to file
     }

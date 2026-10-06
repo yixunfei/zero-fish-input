@@ -7,11 +7,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AiSseReaderTest {
+    @Test fun exactLineLimitIsAcceptedAndOneAdditionalCharacterIsRejected() {
+        val line = ":" + "x".repeat(AiLimits.MAX_STREAM_LINE_CHARS - 1)
+        assertEquals("", read(line + "\ndata: [DONE]\n"))
+        val error = assertThrows(AiProviderError.Response::class.java) {
+            read(line + "x\ndata: [DONE]\n")
+        }
+        assertEquals("AI stream line is too large", error.message)
+    }
+
     private fun chunk(text: String) = "data: {\"choices\":[{\"delta\":{\"content\":\"$text\"}}]}\n\n"
     private fun read(value: String): String = AiSseReader().read(StringReader(value).buffered(), { false }, {})
 
     @Test fun multilingualDeltasStopAtDone() {
         assertEquals("你好 world", read(": keepalive\n" + chunk("你好") + chunk(" world") + "data: [DONE]\n" + chunk("ignored")))
+    }
+    @Test fun acceptsBomAndOptionalFieldIndentation() {
+        assertEquals("fixture", read("\uFEFF  data: {\"choices\":[{\"delta\":{\"content\":\"fixture\"}}]}\n" +
+            "data: [DONE]\n"))
     }
     @Test fun truncatedMalformedAndProviderErrorStreamsFailWithoutLeakingContent() {
         for (value in listOf(chunk("fixture"), "data: malformed secret\n", "data: {\"error\":\"secret\"}\n")) {

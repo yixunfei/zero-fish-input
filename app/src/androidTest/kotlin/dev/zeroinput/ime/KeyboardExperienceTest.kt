@@ -129,6 +129,22 @@ class KeyboardExperienceTest {
         assertTrue(deleted)
     }
 
+    @Test fun pairedSymbolsCanBeDisabledWithoutRebuildingTheKeyboard() = onMain {
+        val panel = panel()
+        val actions = mutableListOf<KeyboardAction>()
+        panel.onKeyboardAction = { actions += it }
+        click(panel, UiR.string.key_symbols)
+        measure(panel)
+
+        key(panel, "(").performClick()
+        assertEquals(listOf(KeyboardAction.PairedText("(", ")")), actions)
+
+        actions.clear()
+        panel.configurePairedSymbols(false)
+        key(panel, "(").performClick()
+        assertEquals(listOf(KeyboardAction.LiteralText("(")), actions)
+    }
+
     @Test fun retiredThemeViewCannotSendOldKeyCandidateOrToolbarActions() = onMain {
         val panel = panel()
         var actions = 0

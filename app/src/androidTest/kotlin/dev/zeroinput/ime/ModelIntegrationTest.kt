@@ -15,7 +15,6 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.ime.input.AndroidEditorConnection
-import dev.zeroinput.ime.settings.ChineseEngineChoice
 import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.ZeroInputView
@@ -95,14 +94,13 @@ class ModelIntegrationTest {
         val settings = graph.settings
         val previous = Triple(settings.experimentalModelRanking, settings.learningEnabled, settings.incognitoMode)
         val options = settings.chineseInputOptions
-        val engine = settings.chineseEngine
         val language = settings.lastLanguage
         val pack = settings.lastLanguagePackKey
         var activity: InputFixtureActivity? = null
         try {
             onMain {
                 settings.experimentalModelRanking = true; settings.learningEnabled = true; settings.incognitoMode = false
-                settings.chineseInputOptions = ChineseInputOptions(); settings.chineseEngine = ChineseEngineChoice.RIME
+                settings.chineseInputOptions = ChineseInputOptions()
             }
             val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
             shell("ime enable $method"); shell("ime set $method")
@@ -148,7 +146,7 @@ class ModelIntegrationTest {
             activity?.let { onMain { it.finish() } }
             onMain {
                 settings.experimentalModelRanking = previous.first; settings.learningEnabled = previous.second
-                settings.incognitoMode = previous.third; settings.chineseInputOptions = options; settings.chineseEngine = engine
+                settings.incognitoMode = previous.third; settings.chineseInputOptions = options
                 settings.lastLanguage = language; settings.lastLanguagePackKey = pack
             }
             if (original.isNotBlank() && original != "null") shell("ime set $original")
