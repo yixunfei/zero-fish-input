@@ -93,10 +93,8 @@ class AiConfigurationRepository(
         val bytes = store.read() ?: return AiConfiguration()
         return try {
             require(bytes.size <= MAX_CONFIG_BYTES)
-            var encoded = String(bytes, StandardCharsets.UTF_8)
-            val root = JSONObject(encoded)
-            encoded = ""
-            when (root.getInt("format")) {
+            val parsed = withJsonReader(bytes, ::readConfiguration)
+            when (parsed.legacyFormat) {
                 in 1..3 -> {
                     // The pre-provider format contained a single endpoint/key. The
                     // user explicitly chose to discard it instead of migrating it.
@@ -110,37 +108,138 @@ class AiConfigurationRepository(
                     }
                     return AiConfiguration()
                 }
-                FORMAT -> Unit
-                else -> throw IllegalStateException("AI configuration is invalid")
             }
-            val entries = root.optJSONArray("providers") ?: JSONArray()
-            val providers = (0 until entries.length()).map { index ->
-                val entry = entries.getJSONObject(index)
-                val models = entry.getJSONArray("models")
-                AiProviderProfile(
-                    id = entry.getString("id"), name = entry.getString("name"),
-                    endpoint = entry.getString("endpoint"), apiKey = entry.getString("apiKey"),
-                    models = (0 until models.length()).map(models::getString),
-                    selectedModel = entry.getString("selectedModel"),
-                    imageModels = entry.getJSONArray("imageModels").let { values ->
-                        (0 until values.length()).map(values::getString).toSet()
-                    },
-                    audioModels = entry.getJSONArray("audioModels").let { values ->
-                        (0 until values.length()).map(values::getString).toSet()
-                    },
-                )
-            }
-            AiConfiguration(
-                enabled = root.optBoolean("enabled", false),
-                networkAllowed = root.optBoolean("networkAllowed", false),
-                timeoutMs = root.optLong("timeoutMs", 60_000L),
-                saveConversations = root.optBoolean("saveConversations", false),
-                providers = providers,
-                selectedProviderId = root.optString("selectedProviderId").takeIf { it.isNotBlank() },
-            ).also(::validate)
+            parsed.configuration.also(::validate)
         } catch (_: Exception) {
             throw IllegalStateException("AI configuration is invalid")
         } finally { bytes.fill(0) }
+    }
+
+    private class ParsedConfiguration(
+        val legacyFormat: Long,
+        val configuration: AiConfiguration,
+    )
+
+    private fun invalid(): Nothing = throw IllegalArgumentException("invalid")
+
+    private fun nextString(reader: android.util.JsonReader): String {
+        require(reader.peek() == android.util.JsonToken.STRING)
+        return reader.nextString()
+    }
+
+    private fun nextLong(reader: android.util.JsonReader): Long {
+        require(reader.peek() == android.util.JsonToken.NUMBER)
+        return reader.nextString().toLongOrNull() ?: invalid()
+    }
+
+    private fun nextBoolean(reader: android.util.JsonReader): Boolean {
+        require(reader.peek() == android.util.JsonToken.BOOLEAN)
+        return reader.nextBoolean()
+    }
+
+    private fun nextNullableString(reader: android.util.JsonReader): String? = when (reader.peek()) {
+        android.util.JsonToken.NULL -> { reader.nextNull(); null }
+        android.util.JsonToken.STRING -> reader.nextString()
+        else -> invalid()
+    }
+
+    private fun readStringSet(reader: android.util.JsonReader): Set<String> {
+        val values = LinkedHashSet<String>()
+        reader.beginArray()
+        while (reader.hasNext()) values += nextString(reader)
+        reader.endArray()
+        return values
+    }
+
+    private fun readStringList(reader: android.util.JsonReader): List<String> {
+        val values = ArrayList<String>()
+        reader.beginArray()
+        while (reader.hasNext()) values += nextString(reader)
+        reader.endArray()
+        return values
+    }
+
+    private fun readProviders(reader: android.util.JsonReader): List<AiProviderProfile> {
+        val providers = ArrayList<AiProviderProfile>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            var id: String? = null
+            var name: String? = null
+            var endpoint: String? = null
+            var apiKey: String? = null
+            var models: List<String>? = null
+            var selectedModel: String? = null
+            var imageModels = emptySet<String>()
+            var audioModels = emptySet<String>()
+            val fields = HashSet<String>()
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val field = reader.nextName()
+                require(fields.add(field))
+                when (field) {
+                    "id" -> id = nextString(reader)
+                    "name" -> name = nextString(reader)
+                    "endpoint" -> endpoint = nextString(reader)
+                    "apiKey" -> apiKey = nextString(reader)
+                    "models" -> models = readStringList(reader)
+                    "selectedModel" -> selectedModel = nextString(reader)
+                    "imageModels" -> imageModels = readStringSet(reader)
+                    "audioModels" -> audioModels = readStringSet(reader)
+                    else -> invalid()
+                }
+            }
+            reader.endObject()
+            providers += AiProviderProfile(
+                id = id ?: invalid(), name = name ?: invalid(),
+                endpoint = endpoint ?: invalid(), apiKey = apiKey ?: invalid(),
+                models = models ?: invalid(), selectedModel = selectedModel ?: invalid(),
+                imageModels = imageModels, audioModels = audioModels,
+            )
+        }
+        reader.endArray()
+        return providers
+    }
+
+    private fun readConfiguration(reader: android.util.JsonReader): ParsedConfiguration {
+        var format: Long? = null
+        var enabled = false
+        var networkAllowed = false
+        var timeoutMs = 60_000L
+        var saveConversations = false
+        var selectedProviderId: String? = null
+        var providers: List<AiProviderProfile> = emptyList()
+        val fields = HashSet<String>()
+        reader.beginObject()
+        while (reader.hasNext()) {
+            val field = reader.nextName()
+            require(fields.add(field))
+            when (field) {
+                "format" -> format = nextLong(reader)
+                "enabled" -> enabled = nextBoolean(reader)
+                "networkAllowed" -> networkAllowed = nextBoolean(reader)
+                "timeoutMs" -> timeoutMs = nextLong(reader)
+                "saveConversations" -> saveConversations = nextBoolean(reader)
+                "selectedProviderId" -> selectedProviderId = nextNullableString(reader)
+                "providers" -> providers = readProviders(reader)
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+        require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
+        val version = format ?: invalid()
+        require(version == FORMAT.toLong() || version in 1..3)
+        if (version == FORMAT.toLong()) {
+            require(fields.containsAll(listOf("enabled", "networkAllowed", "timeoutMs", "saveConversations", "providers")))
+        }
+        val configuration = if (version == FORMAT.toLong()) AiConfiguration(
+            enabled = enabled,
+            networkAllowed = networkAllowed,
+            timeoutMs = timeoutMs,
+            saveConversations = saveConversations,
+            providers = providers,
+            selectedProviderId = selectedProviderId?.takeIf { it.isNotBlank() },
+        ) else AiConfiguration()
+        return ParsedConfiguration(version, configuration)
     }
 
     private fun validate(value: AiConfiguration) {

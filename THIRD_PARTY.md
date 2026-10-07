@@ -18,6 +18,7 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 | AndroidX libraries | 见 `gradle/libs.versions.toml` | Apache-2.0 | `Apache-2.0.txt` | Android 运行时支持 |
 | AndroidX ExifInterface | 1.4.1 | Apache-2.0 | `Apache-2.0.txt` | Bounded local photo orientation parsing; replaces the legacy platform EXIF parser, no networking or components. Small AndroidX library, pinned Maven coordinate; metadata is stripped after import. |
 | AndroidX Test runner / JUnit extension | 1.6.2 / 1.2.1 | Apache-2.0 | `Apache-2.0.txt` | 仅模拟器/设备测试 APK；使用已有缓存，不进入应用运行时，无联网或采集路径 |
+| Robolectric | 4.16.1 | MIT | `robolectric-MIT.txt` | Host JVM tests using Android JSON parsing; not included in application or device-test APKs. |
 | Material Components | 1.12.0 | Apache-2.0 | `Apache-2.0.txt` | Android UI |
 | Kotlin runtime | 2.1.21 | Apache-2.0 | `Apache-2.0.txt` | Kotlin 运行时 |
 | PaddlePaddle PP-OCRv5 mobile recognition model | `ed152b8b495f84de93cda5709d768548a9127622` | Apache-2.0 (model card) | `Apache-2.0.txt` | 离线中文单字手写识别模型与派生字符表 |
@@ -32,6 +33,15 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 Rime 与颜文字的 LGPL 源数据随 APK 提供；Tegaki 笔画表的原始训练 XML、模型、构建文件和
 适配脚本另随对应源码归档提供。ZeroInput 的独立源码仍采用 Apache-2.0。分发二进制时必须同时
 提供本目录、`NOTICE`、`SOURCES.md` 及对应源码归档。
+
+Robolectric is a maintained Android testing framework, pinned to Maven coordinate
+`org.robolectric:robolectric:4.16.1`. It supplies Android API 28 behavior for AI
+repository/controller JVM tests instead of mocking away parsing. Its MIT license
+is compatible with this project. It adds host test dependencies and a large Android
+framework cache, but no APK size, permissions, telemetry or runtime network path.
+First setup resolves Maven dependencies/framework artifacts; cached tests run offline.
+Updates require explicit version review; upstream license is retained from tag
+`robolectric-4.16.1`.
 
 OpenCC 的 `TSCharacters.txt`、`TSPhrases.txt`、`STCharacters.txt` 与 `STPhrases.txt`
 从已固定且校验的 OpenCC 源码生成 APK 资产；每个文件的 SHA-256 同时固定在

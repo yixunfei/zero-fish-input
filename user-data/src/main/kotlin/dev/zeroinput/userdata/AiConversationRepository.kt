@@ -68,31 +68,100 @@ class AiConversationRepository(private val store: EncryptedStore) {
         val bytes = store.read() ?: return emptyList()
         return try {
             require(bytes.size <= MAX_STORE_BYTES)
-            var encoded = String(bytes, StandardCharsets.UTF_8)
-            val root = JSONObject(encoded)
-            encoded = ""
-            require(root.getInt("format") == 1)
-            val array = root.getJSONArray("conversations")
-            require(array.length() <= AiLimits.MAX_CONVERSATIONS)
-            val conversations = List(array.length()) { index ->
-                val item = array.getJSONObject(index)
-                val messages = item.optJSONArray("messages") ?: JSONArray()
-                require(messages.length() <= AiLimits.MAX_HISTORY_MESSAGES)
-                AiConversation(
-                    id = item.getString("id"),
-                    title = item.getString("title"),
-                    messages = List(messages.length()) { messageIndex ->
-                        val message = messages.getJSONObject(messageIndex)
-                        AiMessage(AiRole.valueOf(message.getString("role")), message.getString("content"))
-                    },
-                    updatedAtEpochMillis = item.optLong("updatedAt", 0L),
-                )
+            withJsonReader(bytes) { reader ->
+                var format: Long? = null
+                var conversations: List<AiConversation>? = null
+                val fields = HashSet<String>()
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    val field = reader.nextName()
+                    require(fields.add(field))
+                    when (field) {
+                        "format" -> format = nextLong(reader)
+                        "conversations" -> conversations = readConversations(reader)
+                        else -> invalid()
+                    }
+                }
+                reader.endObject()
+                require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
+                require(format == 1L && conversations != null)
+                require(conversations.map { it.id }.toSet().size == conversations.size)
+                conversations
             }
-            require(conversations.map { it.id }.toSet().size == conversations.size)
-            conversations
         } catch (_: Exception) {
             throw IllegalStateException("AI conversations are invalid")
         } finally { bytes.fill(0) }
+    }
+
+    private fun invalid(): Nothing = throw IllegalArgumentException("invalid")
+
+    private fun nextString(reader: android.util.JsonReader): String {
+        require(reader.peek() == android.util.JsonToken.STRING)
+        return reader.nextString()
+    }
+
+    private fun nextLong(reader: android.util.JsonReader): Long {
+        require(reader.peek() == android.util.JsonToken.NUMBER)
+        return reader.nextString().toLongOrNull() ?: invalid()
+    }
+
+    private fun readConversations(reader: android.util.JsonReader): List<AiConversation> {
+        val conversations = ArrayList<AiConversation>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            require(conversations.size < AiLimits.MAX_CONVERSATIONS)
+            var id: String? = null
+            var title: String? = null
+            var messages: List<AiMessage>? = null
+            var updatedAt = 0L
+            val fields = HashSet<String>()
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val field = reader.nextName()
+                require(fields.add(field))
+                when (field) {
+                    "id" -> id = nextString(reader)
+                    "title" -> title = nextString(reader)
+                    "messages" -> messages = readMessages(reader)
+                    "updatedAt" -> updatedAt = nextLong(reader)
+                    else -> invalid()
+                }
+            }
+            reader.endObject()
+            conversations += AiConversation(
+                id = id ?: invalid(),
+                title = title ?: invalid(),
+                messages = messages ?: invalid(),
+                updatedAtEpochMillis = updatedAt,
+            )
+        }
+        reader.endArray()
+        return conversations
+    }
+
+    private fun readMessages(reader: android.util.JsonReader): List<AiMessage> {
+        val messages = ArrayList<AiMessage>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            require(messages.size < AiLimits.MAX_HISTORY_MESSAGES)
+            var role: String? = null
+            var content: String? = null
+            val fields = HashSet<String>()
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val field = reader.nextName()
+                require(fields.add(field))
+                when (field) {
+                    "role" -> role = nextString(reader)
+                    "content" -> content = nextString(reader)
+                    else -> invalid()
+                }
+            }
+            reader.endObject()
+            messages += AiMessage(AiRole.valueOf(role ?: invalid()), content ?: invalid())
+        }
+        reader.endArray()
+        return messages
     }
 
     private fun persist(values: List<AiConversation>) {

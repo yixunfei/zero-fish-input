@@ -5,6 +5,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalCandidatePagingTest {
+    @Test fun `native previous pages stay reachable when personal first page is cached`() {
+        val paging = PersonalCandidatePaging()
+        val native = EngineSnapshot("ni", "ni", listOf(Candidate("native", "你")), hasPreviousPage = true)
+        for (empty in listOf(false, true)) {
+            paging.clear()
+            val result = paging.publish(native, Store().apply { this.empty = empty }, InputLanguage.CHINESE, true) { it }
+            assertTrue(result.hasPreviousPage)
+            assertFalse(paging.changePage(PageDirection.PREVIOUS, native))
+        }
+    }
+
     @Test fun `personal pages append without dropping native rows and remain bounded`() {
         val paging = PersonalCandidatePaging()
         val native = EngineSnapshot("ni", "ni", listOf(Candidate("native", "你")))

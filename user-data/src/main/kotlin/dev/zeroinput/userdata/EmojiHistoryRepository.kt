@@ -26,7 +26,6 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
             val current = load().associateByTo(linkedMapOf(), EmojiUsage::value)
             val old = current[emoji]
             val nextLastUsed = maxOf(System.currentTimeMillis(), lastUsedHighWater + 1)
-            lastUsedHighWater = nextLastUsed
             current[emoji] = EmojiUsage(emoji, ((old?.count ?: 0) + 1).coerceAtMost(EmojiHistoryFormat.MAX_COUNT), nextLastUsed)
             val updated = current.values.sortedByDescending { it.lastUsed }.take(EmojiHistoryFormat.MAX_ENTRIES)
             val bytes = EmojiHistoryFormat.encode(updated)
@@ -34,6 +33,9 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
                 if (expectedRevision != currentRevision() || !isCurrent()) return@synchronized false
                 store.write(bytes)
             } finally { bytes.fill(0) }
+            // Raise the high-water only after the write succeeded; a failed or
+            // stale write must not skip timestamps for later records.
+            lastUsedHighWater = nextLastUsed
             true
         }
 
@@ -54,11 +56,14 @@ class EmojiHistoryRepository(private val store: EncryptedStore) {
             try {
                 store.delete(deleteKey = true)
                 lastUsedHighWater = 0L
+                // Only a successful delete clears the fail-closed marker.  On
+                // failure the store may be half-deleted, so load()/record()
+                // keep rejecting access until a retried clear() succeeds.
                 deletionPending = false
             } catch (error: Throwable) {
                 deletionPending = true
                 throw error
-            } finally { deletionPending = false }
+            }
         }
     }
 

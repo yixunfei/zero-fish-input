@@ -31,6 +31,9 @@ RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI
 v0.4.0 包含可选联网 AI 工作台、中文输入与编辑器生命周期修复、语言包边界强化、私有剪贴板安全修复、
 AI 流式响应校验和设置失败处理。完整变化见 [发布说明](docs/releases/v0.4.0.md)。
 也可按下方构建说明运行 `./tools/package-test-apk.ps1` 自行生成测试包。
+当前代码审查与测试记录见 [2026-10-07 审查](docs/code-audit-2026-10-07.md)。
+AI 仓库及控制器的 JVM 测试使用 Robolectric 4.16.1 的 Android API 28 环境；
+首次运行需下载主机测试依赖，缓存后可离线运行，不进入测试 APK 或应用运行时。
 
 1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.4.0)
    下载 `zero-fish-input-0.4.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和

@@ -7,7 +7,12 @@ import dev.zeroinput.userdata.AiConfigurationRepository
 import dev.zeroinput.userdata.AiConversationRepository
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], manifest = Config.NONE)
 class AiConfigurationStorageTest {
     @Test fun disablingPersistenceDeletesHistoryAndItsKeyWithoutOpeningTheWorkbench() {
         val f = Fixture()

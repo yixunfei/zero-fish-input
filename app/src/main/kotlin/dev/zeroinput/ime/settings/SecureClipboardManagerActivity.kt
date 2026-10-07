@@ -17,8 +17,10 @@ import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.auth.AuthenticationBroker
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.clipboard.PendingClipboardAddition
 import dev.zeroinput.security.AuthenticationGrant
 import dev.zeroinput.userdata.SecureClipboardMetadata
+import java.util.concurrent.RejectedExecutionException
 
 class SecureClipboardManagerActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
@@ -33,6 +35,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     private var authenticationGeneration = 0L
     private var authenticationRequest: AuthenticationBroker.RequestHandle? = null
     private var privateDialog: androidx.appcompat.app.AlertDialog? = null
+    private var pendingAddition: PendingClipboardAddition? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +61,8 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         authenticationGeneration++
         authenticationRequest?.close()
         authenticationRequest = null
+        pendingAddition?.close()
+        pendingAddition = null
         worker.shutdownNow()
         super.onDestroy()
     }
@@ -132,18 +137,22 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).apply {
                 filterTouchesWhenObscured = true
                 setOnClickListener {
-                    val secret = value.editText?.text?.toString().orEmpty().toCharArray()
-                    if (secret.isEmpty() || secret.concatToString().isBlank()) {
+                    val editable = value.editText?.text
+                    val secret = CharArray(editable?.length ?: 0)
+                    editable?.getChars(0, editable.length, secret, 0)
+                    if (secret.isEmpty() || secret.all(Char::isWhitespace)) {
                         secret.fill('\u0000')
                         value.error = context.getString(R.string.secure_item_required)
                         return@setOnClickListener
                     }
                     val itemLabel = label.editText?.text?.toString().orEmpty()
                     val generation = graph.secureClipboard.captureGeneration()
+                    val draft = PendingClipboardAddition(secret)
+                    pendingAddition?.close()
+                    pendingAddition = draft
                     dialog.dismiss()
-                    authenticate(false) { grant ->
-                        try { addItem(itemLabel, secret.concatToString(), grant, generation) }
-                        finally { secret.fill('\u0000') }
+                    authenticate(false, onCancelled = draft::close) { grant ->
+                        addItem(itemLabel, draft, grant, generation)
                     }
                 }
             }
@@ -179,9 +188,11 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun addItem(label: String, value: String, grant: AuthenticationGrant, generation: Long) {
+    private fun addItem(label: String, draft: PendingClipboardAddition, grant: AuthenticationGrant, generation: Long) {
+        val vault = graph.secureClipboard
         runVaultOperation(
-            operation = { graph.secureClipboard.add(label, value, grant, generation) },
+            operation = { draft.consume { vault.add(label, it, grant, generation, draft::isActive) } },
+            onRejected = draft::close,
             onSuccess = { added ->
                 metadata = listOf(added) + metadata
                 screen.renderEntries(metadata)
@@ -227,20 +238,25 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         )
     }
 
-    private fun authenticate(cancelClosesScreen: Boolean, onGranted: (AuthenticationGrant) -> Unit) {
-        if (busy) return
+    private fun authenticate(
+        cancelClosesScreen: Boolean,
+        onCancelled: () -> Unit = {},
+        onGranted: (AuthenticationGrant) -> Unit,
+    ) {
+        if (busy) { onCancelled(); return }
         setBusy(true)
         authenticationInProgress = true
         val generation = ++authenticationGeneration
         authenticationRequest?.close()
         authenticationRequest = AuthenticationBroker.requestCancellable(this) authCallback@{ grant ->
-            if (generation != authenticationGeneration) return@authCallback
+            if (generation != authenticationGeneration) { onCancelled(); return@authCallback }
             authenticationRequest = null
             authenticationInProgress = false
-            if (isFinishing || isDestroyed) return@authCallback
+            if (isFinishing || isDestroyed) { onCancelled(); return@authCallback }
             if (grant != null) {
                 onGranted(grant)
             } else {
+                onCancelled()
                 setBusy(false)
                 if (cancelClosesScreen) {
                     finish()
@@ -256,14 +272,20 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun <T> runVaultOperation(operation: () -> T, onSuccess: (T) -> Unit) {
-        worker.execute {
-            val result = runCatching(operation)
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                setBusy(false)
-                result.onSuccess(onSuccess).onFailure { showError(it.message ?: getString(R.string.operation_failed)) }
+    private fun <T> runVaultOperation(operation: () -> T, onRejected: () -> Unit = {}, onSuccess: (T) -> Unit) {
+        try {
+            worker.execute {
+                val result = runCatching(operation)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    setBusy(false)
+                    result.onSuccess(onSuccess).onFailure { showError(getString(R.string.operation_failed)) }
+                }
             }
+        } catch (_: RejectedExecutionException) {
+            onRejected()
+            setBusy(false)
+            showError(getString(R.string.operation_failed))
         }
     }
 

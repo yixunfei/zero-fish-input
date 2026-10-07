@@ -1,6 +1,10 @@
 zero fish input (formerly ZeroInput)
 Copyright 2026 ZeroInput contributors
 
+Host-only Android unit tests use Robolectric 4.16.1 under MIT,
+Copyright (c) 2010 Xtreme Labs, Pivotal Labs and Google Inc.
+See LICENSES/robolectric-MIT.txt. Robolectric is not shipped in the application.
+
 This product includes software developed by the RIME Developers and data
 from the Rime Luna Pinyin and Rime Essay projects. It also includes software
 from Boost, OpenCC, LevelDB, yaml-cpp, marisa-trie, AndroidX, Material

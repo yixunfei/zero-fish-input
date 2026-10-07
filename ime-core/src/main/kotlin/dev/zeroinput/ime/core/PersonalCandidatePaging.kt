@@ -27,10 +27,19 @@ internal class PersonalCandidatePaging {
     }
 
     fun changePage(direction: PageDirection, native: EngineSnapshot): Boolean {
-        val start = pages.firstKeyOrNull()
-        if (direction == PageDirection.PREVIOUS && start != null && start > 0) {
-            requested = (start - PAGE_SIZE).coerceAtLeast(0)
-            return true
+        if (direction == PageDirection.PREVIOUS) {
+            val start = pages.firstKeyOrNull()
+            // Take over paging back only while the merged first page has been
+            // evicted by deeper browsing (start > 0); then the native first
+            // page is not stored and the engine cannot provide it.  Walking
+            // back reaches offset 0, which re-stores and re-merges the native
+            // first page.  While the merged first page is still cached the
+            // previous edge belongs to the engine, so decline here.
+            if (start != null && start > 0) {
+                requested = (start - PAGE_SIZE).coerceAtLeast(0)
+                return true
+            }
+            return false
         }
         val last = pages.lastEntry()
         if (direction == PageDirection.NEXT && (offset > 0 || !native.hasNextPage) && last?.value?.hasMore == true) {
@@ -59,6 +68,10 @@ internal class PersonalCandidatePaging {
             page = PersonalSuggestionPage()
             first = page
             pages.clear()
+            // A changed revision invalidates every stored page.  Adopt the new
+            // revision even while its replacement query is still pending, so a
+            // later resolution of the same revision is not mistaken for yet
+            // another change and hidden again.
             revision = loaded.revision
             if (!wasFirstPage) return native
         }
@@ -82,9 +95,14 @@ internal class PersonalCandidatePaging {
         }
         val items = if (personal.isEmpty() && includesNative) native.candidates else personal.distinctBy(Candidate::text)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
+        // "Previous" is a personal affordance only while the merged first
+        // page has been evicted by deeper browsing (changePage then owns it);
+        // while the native first page is still cached the previous edge
+        // belongs to the engine.
+        val hasPrevious = pages.isNotEmpty() && pages.firstKey() > 0
         return native.copy(candidates = items, highlightedIndex = if (offset > 0) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
-            hasPreviousPage = !includesNative,
+            hasPreviousPage = hasPrevious || includesNative && native.hasPreviousPage,
             hasNextPage = if (isBrowsing) pages.lastEntry()?.value?.hasMore == true else native.hasNextPage || first.hasMore)
     }
 

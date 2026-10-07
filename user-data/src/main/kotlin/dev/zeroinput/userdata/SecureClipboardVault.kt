@@ -7,7 +7,6 @@ import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.security.SecurityAliases
 import org.json.JSONArray
 import org.json.JSONObject
-import org.json.JSONException
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -79,10 +78,30 @@ class SecureClipboardVault(
         grant: AuthenticationGrant,
         expectedGeneration: Long = captureGeneration(),
         isActive: () -> Boolean = { true },
+    ): SecureClipboardMetadata {
+        val characters = value.toCharArray()
+        return try {
+            add(label, characters, grant, expectedGeneration, isActive)
+        } finally {
+            characters.fill('\u0000')
+        }
+    }
+
+    /**
+     * Preferred addition path: the value travels as a CharArray so callers can
+     * wipe their copy afterwards.  The String required by the persisted entry
+     * is created inside the vault lock and is a documented JSON-model boundary.
+     */
+    fun add(
+        label: String,
+        value: CharArray,
+        grant: AuthenticationGrant,
+        expectedGeneration: Long = captureGeneration(),
+        isActive: () -> Boolean = { true },
     ): SecureClipboardMetadata = synchronized(lock) {
         checkOperationActive(expectedGeneration, isActive)
         require(grant.consume()) { "Authentication expired or was already used" }
-        val cleanValue = validateValue(value)
+        val cleanValue = validateValue(String(value))
         val entries = load().toMutableList()
         require(entries.size < MAX_ENTRIES) { "Secure clipboard is full" }
         val entry = SecureClipboardEntry(
@@ -161,26 +180,74 @@ class SecureClipboardVault(
         checkStorageAvailable()
         val bytes = store.read() ?: return emptyList()
         return try {
-            var encoded = String(bytes, StandardCharsets.UTF_8)
-            val root = JSONObject(encoded)
-            encoded = ""
-            require(root.getInt("format") == FORMAT_VERSION) { "Unsupported secure clipboard format" }
-            val array = root.getJSONArray("entries")
-            require(array.length() <= MAX_ENTRIES) { "Secure clipboard has too many entries" }
-            List(array.length()) { index ->
-                val item = array.getJSONObject(index)
-                SecureClipboardEntry(
-                    id = validateId(item.getString("id")),
-                    label = validateLabel(item.getString("label")),
-                    value = validateValue(item.getString("value")),
-                    updatedAtEpochMillis = item.getLong("updatedAt").coerceAtLeast(0L),
-                )
+            withJsonReader(bytes) { reader ->
+                var version: Long? = null
+                var entries: List<SecureClipboardEntry>? = null
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    when (reader.nextName()) {
+                        "format" -> version = nextCheckedLong(reader)
+                        "entries" -> entries = readEntries(reader)
+                        else -> invalid()
+                    }
+                }
+                reader.endObject()
+                require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
+                require(version == FORMAT_VERSION.toLong() && entries != null) { "Unsupported secure clipboard format" }
+                entries
             }
-        } catch (_: JSONException) {
+        } catch (_: java.io.IOException) {
+            throw IOException("Invalid secure clipboard data")
+        } catch (_: IllegalArgumentException) {
+            throw IOException("Invalid secure clipboard data")
+        } catch (_: IllegalStateException) {
             throw IOException("Invalid secure clipboard data")
         } finally {
             bytes.fill(0)
         }
+    }
+
+    private fun invalid(): Nothing = throw java.io.IOException("Invalid secure clipboard data")
+
+    private fun nextCheckedLong(reader: android.util.JsonReader): Long {
+        require(reader.peek() == android.util.JsonToken.NUMBER)
+        return reader.nextString().toLongOrNull() ?: invalid()
+    }
+
+    private fun nextCheckedString(reader: android.util.JsonReader): String {
+        require(reader.peek() == android.util.JsonToken.STRING)
+        return reader.nextString()
+    }
+
+    private fun readEntries(reader: android.util.JsonReader): List<SecureClipboardEntry> {
+        val entries = ArrayList<SecureClipboardEntry>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            require(entries.size < MAX_ENTRIES) { "Secure clipboard has too many entries" }
+            var id: String? = null
+            var label: String? = null
+            var value: String? = null
+            var updatedAt = 0L
+            reader.beginObject()
+            while (reader.hasNext()) {
+                when (reader.nextName()) {
+                    "id" -> id = nextCheckedString(reader)
+                    "label" -> label = nextCheckedString(reader)
+                    "value" -> value = nextCheckedString(reader)
+                    "updatedAt" -> updatedAt = nextCheckedLong(reader)
+                    else -> invalid()
+                }
+            }
+            reader.endObject()
+            entries += SecureClipboardEntry(
+                id = validateId(id ?: invalid()),
+                label = validateLabel(label ?: invalid()),
+                value = validateValue(value ?: invalid()),
+                updatedAtEpochMillis = updatedAt.coerceAtLeast(0L),
+            )
+        }
+        reader.endArray()
+        return entries
     }
 
     private fun loadIndexSafely(): List<StoredSummary> {
@@ -199,22 +266,56 @@ class SecureClipboardVault(
     private fun loadIndex(): List<StoredSummary> {
         val bytes = indexStore.read() ?: return emptyList()
         return try {
-            var encoded = String(bytes, StandardCharsets.UTF_8)
-            val root = JSONObject(encoded)
-            encoded = ""
-            require(root.getInt("format") == INDEX_FORMAT_VERSION) { "Unsupported secure clipboard index" }
-            val array = root.getJSONArray("entries")
-            require(array.length() <= MAX_ENTRIES) { "Secure clipboard index has too many entries" }
-            List(array.length()) { index ->
-                val item = array.getJSONObject(index)
-                StoredSummary(
-                    id = validateId(item.getString("id")),
-                    updatedAtEpochMillis = item.getLong("updatedAt").coerceAtLeast(0L),
-                )
+            withJsonReader(bytes) { reader ->
+                var version: Long? = null
+                var summaries: List<StoredSummary>? = null
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    when (reader.nextName()) {
+                        "format" -> version = nextCheckedLong(reader)
+                        "entries" -> summaries = readIndexEntries(reader)
+                        else -> invalid()
+                    }
+                }
+                reader.endObject()
+                require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
+                require(version == INDEX_FORMAT_VERSION.toLong() && summaries != null) { "Unsupported secure clipboard index" }
+                summaries
             }
+        } catch (_: java.io.IOException) {
+            throw IOException("Invalid secure clipboard index")
+        } catch (_: IllegalArgumentException) {
+            throw IOException("Invalid secure clipboard index")
+        } catch (_: IllegalStateException) {
+            throw IOException("Invalid secure clipboard index")
         } finally {
             bytes.fill(0)
         }
+    }
+
+    private fun readIndexEntries(reader: android.util.JsonReader): List<StoredSummary> {
+        val summaries = ArrayList<StoredSummary>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            require(summaries.size < MAX_ENTRIES) { "Secure clipboard index has too many entries" }
+            var id: String? = null
+            var updatedAt = 0L
+            reader.beginObject()
+            while (reader.hasNext()) {
+                when (reader.nextName()) {
+                    "id" -> id = nextCheckedString(reader)
+                    "updatedAt" -> updatedAt = nextCheckedLong(reader)
+                    else -> invalid()
+                }
+            }
+            reader.endObject()
+            summaries += StoredSummary(
+                id = validateId(id ?: invalid()),
+                updatedAtEpochMillis = updatedAt.coerceAtLeast(0L),
+            )
+        }
+        reader.endArray()
+        return summaries
     }
 
     private fun persist(entries: List<SecureClipboardEntry>, beforeWrite: () -> Unit = {}) {

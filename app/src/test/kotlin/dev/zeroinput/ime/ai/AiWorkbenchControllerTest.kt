@@ -8,7 +8,12 @@ import dev.zeroinput.userdata.AiProviderProfile
 import java.util.concurrent.Executor
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
     @Test fun disablingPersistenceWithoutAnObserverCannotSendPreviouslySelectedHistory() {
         for (refresh in listOf(false, true)) {

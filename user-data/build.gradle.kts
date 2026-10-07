@@ -33,4 +33,5 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
     testImplementation(libs.json)
+    testImplementation(libs.robolectric)
 }

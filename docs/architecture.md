@@ -116,6 +116,12 @@ units only for the user's explicit Backspace action and retains no context histo
 
 ## Panel navigation and composition handoff
 
+Private clipboard management hands an owned `PendingClipboardAddition` buffer
+from authentication to one background write. Cancellation revokes its operation
+without waiting on storage; the owner clears pending or consumed buffers.
+Repeated internal selection intents revoke the old request before installing a new review and
+never transfer an authentication grant to replacement text.
+
 The view owns one-level Back handling for tools, expanded candidates, expression
 search, secondary panels and symbol pages. A lifecycle-bound predictive Back
 registration exists only while a secondary UI level is active; legacy Back keys

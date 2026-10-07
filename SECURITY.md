@@ -151,3 +151,10 @@ personalization, learning, external-editor read or network port. Search/session
 invalidation closes the draft and rejects delayed preparation results. Expanded
 panels remain inside the existing IME window and its visible touch region; no
 application-overlay permission is used for handwriting or panel expansion.
+
+Repeated internal selection imports revoke the old draft and authentication before
+starting a fresh review. Management additions keep mutable text only through
+authentication and the bounded background write, clearing it on cancellation,
+rejection or completion. AI storage rejects duplicate fields and missing required
+current-format fields without replacing the encrypted data. These controls do not
+change stored formats or grant access to other applications' clipboard contents.

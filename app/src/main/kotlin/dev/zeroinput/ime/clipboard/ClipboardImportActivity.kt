@@ -36,7 +36,11 @@ open class ClipboardImportActivity : AppCompatActivity() {
         setResult(RESULT_CANCELED)
         val incoming = intent
         intent = Intent()
-        val draft = if (savedInstanceState == null) receiveDraft(incoming) else null
+        receiveIncoming(incoming, savedInstanceState == null)
+    }
+
+    private fun receiveIncoming(incoming: Intent, accept: Boolean = true) {
+        val draft = if (accept) receiveDraft(incoming) else null
         request = draft?.request
         incoming.replaceExtras(null as Bundle?)
         incoming.clipData = null
@@ -62,6 +66,8 @@ open class ClipboardImportActivity : AppCompatActivity() {
     internal open fun receiveDraft(intent: Intent): ClipboardImportDraft? =
         ClipboardImportIntent.parse(intent)?.let { ClipboardImportDraft(it, graph.secureClipboard.captureGeneration()) }
 
+    internal open val acceptsReplacementDraft: Boolean = false
+
     override fun onResume() {
         super.onResume()
         resumed = true
@@ -83,8 +89,14 @@ open class ClipboardImportActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // A second external request cannot replace text bound to authentication.
-        discardAndFinish()
+        if (!acceptsReplacementDraft) {
+            discardAndFinish()
+            return
+        }
+        // Revoke the old request before accepting another draft. Its grant and
+        // callbacks must never authorize the replacement, even during authentication.
+        discard(shutdownWorker = false)
+        receiveIncoming(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -188,7 +200,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun discard() {
+    private fun discard(shutdownWorker: Boolean = true) {
         request?.close()
         request = null
         grant = null
@@ -201,7 +213,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
         settingsListener?.close()
         settingsListener = null
         mainHandler.removeCallbacks(expire)
-        worker.shutdownNow()
+        if (shutdownWorker) worker.shutdownNow()
     }
 
     private fun showMessage(message: Int) {

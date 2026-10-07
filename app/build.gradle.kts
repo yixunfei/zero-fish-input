@@ -112,6 +112,7 @@ dependencies {
     implementation(libs.material)
     testImplementation(libs.junit)
     testImplementation(libs.json)
+    testImplementation(libs.robolectric)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
 }

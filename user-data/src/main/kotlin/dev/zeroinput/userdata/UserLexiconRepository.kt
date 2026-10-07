@@ -197,6 +197,10 @@ class UserLexiconRepository(
         }
     }
 
+    /**
+     * Test-only plaintext export; callers own and must wipe the returned bytes.
+     * The JSON library's intermediate String remains subject to garbage collection.
+     */
     fun exportJson(): ByteArray = synchronized(lock) {
         UserLexiconFormat.serialize(loadTerms()).toString().toByteArray(StandardCharsets.UTF_8)
     }

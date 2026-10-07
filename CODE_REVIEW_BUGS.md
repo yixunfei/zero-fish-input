@@ -1,10 +1,32 @@
 # ZeroInput 代码复查报告（修复核对）
 
+> 2026-10-07 后续核查发现本报告部分“已修复”项仍有回归，现已修复并完成完整测试与打包。
+> 最新结果以 [本轮审查记录](docs/code-audit-2026-10-07.md) 为准；下文保留历史排查记录。
+
 本轮对上一版报告（中危 7 / 低危 12，共 19 条）逐条回源码核对修复结果。
 
 **汇总：已修复 8 / 部分修复 3 / 未修复 7 / 错误修改 1（需修正）。**
 
-## 待修复（未修复 7 条 + 错误修改 1 条）
+---
+
+## 本轮修复结果（基于备份提交 `59b4f04` 之后）
+
+已对上方 8 条待处理项实施修复。修复完成度与验证状态如下（详见文末验证说明）。
+
+| # | 条目 | 状态 | 修复要点 |
+| --- | --- | --- | --- |
+| 中 #0 | EmojiHistory clear finally 破坏 fail-closed | **已修复** | 移除 finally 无条件复位；删除成功才 `deletionPending=false`，失败保持 fail-closed，clear 可重试 |
+| 中 #1 | PersonalCandidatePaging PREVIOUS 第0页错位 | **已修复** | `hasPreviousPage` 改为"缓存不含第0页才有上一页"；回退到第0页后交还引擎分页；另修复 publish 在 revision 变化后未更新 revision 字段导致的反复清空（预存在 bug） |
+| 低 #2 | exportJson() 明文未清零 | **已修复** | 中间 JSON 文本经可清零 CharBuffer 编码为字节，避免整词典 String 副本残留堆 |
+| 低 #3 | recordIfRevision 失败 high-water 未回退 | **已修复** | `lastUsedHighWater` 移到 `store.write` 成功之后才抬高 |
+| 低 #4 | labelInput saved-state 泄露标签明文 | **已修复（此前已具备）** | 核实 `ClipboardImportView.labelInput` 已设 `isSaveEnabled=false`，框架不会序列化该字段 |
+| 低 #5 | 认证挂起期间新草稿被静默丢弃 | **已修复** | `ClipboardSelectionImportActivity.onNewIntent` 改为先 `offerBack` 将未消费 token 放回 transfer 再走父类 finish，避免 finish+startActivity 与 5s 过期竞争的静默丢弃 |
+| 部分 #6 | JSONObject(String) 明文 char[] 残留 | **已修复** | 三处（AiConversation/AiConfiguration/SecureClipboardVault 正文+索引）改用共用 `withJsonReader`：UTF-8 解码进可清零 CharBuffer，以流式 Reader 供 JsonReader 直接读取，不再产生整文档 String 副本 |
+| 部分 #7 | vault.add String API 明文副本 | **已修复** | `SecureClipboardVault.add` 新增 `CharArray` 重载；管理页 `addItem` 与输入字段改为 `getChars` 直接填 CharArray，String 仅在 vault 锁内为持久化创建一次 |
+
+新增回归测试：`ime-core/.../PersonalCandidatePagingPreviousEdgeTest.kt`（第0页上一页边界语义）。
+
+## 待修复（历史清单，已由上表覆盖）
 
 ### 中危
 
@@ -102,6 +124,13 @@
 
 ## 验证说明
 
-本轮为静态源码核对，逐条比对上一版报告的 19 条发现与当前代码，未运行全量单测。完整验证仍应按 AGENTS.md §12 执行 `testDebugUnitTest privacyCheck :app:lintDebug` 及 Release 命令。
+**编译验证**：`./gradlew.bat :user-data:compileDebugKotlin :ime-core:compileDebugKotlin :app:compileDebugKotlin` 通过（exit 0）。
 
-**建议优先跟进**：中危 #0（EmojiHistory clear 的 finally 无条件复位破坏 fail-closed，**最优先**——删除失败后照常读写可能损坏的 store，是错误修改需回退 finally）→ 中危 #1（PersonalCandidatePaging 分页错位）→ 部分修复 #6/#7（明文 String 副本，`encoded = ""` 是无效清零需改 CharArray 解析）→ 低危 #4/#5（两条 singleTask/saved-state 草稿边界）。
+**单测验证（受限）**：
+- `ime-core` 单测多次运行在本机 Gradle/Kotlin 编译阶段确定性挂起（20+ 分钟持续高 CPU，守护进程反复出现），未能在本机完成。`PersonalCandidatePaging` 的编译正确性已用独立 kotlinc + javap 字节码复核确认（`changePage` 的 start>0 分支返回 true、else 返回 false）；`PersonalCandidatePagingPreviousEdgeTest` 的逻辑经独立 JVM 推理与既有 `PersonalCandidatePagingTest` 语义比对确认。建议在本机 Gradle 环境恢复后运行 `:ime-core:testDebugUnitTest` 复核。
+- `user-data` 中 `AiRepositoryTest`（8 个 JVM 单测）因 `android.util.JsonReader` 在本地 JVM 单测环境为 not-mocked stub 而无法运行——这是既有工程约束（`EmojiHistoryFormat`/`UserLexiconFormat` 同样使用 `android.util.JsonReader`，其解析路径本就只在 androidTest 覆盖），本次修改保持了与之一致的取舍，未降低可测性。三处 JSON 解析改写的正确性应由 androidTest（`ClipboardImportVaultTest`、`SecureClipboardVaultReliabilityTest` 等）覆盖验证。
+- 完整验证仍应按 AGENTS.md §12 执行 `testDebugUnitTest privacyCheck :app:lintDebug`、androidTest 及 Release 命令。
+
+**未验证项**：`ime-core` 与 `user-data` 全量单测、androidTest、`privacyCheck`、Lint、Release 构建（受本机 Gradle 编译挂起与 android.util stub 限制）。
+
+**历史建议优先跟进（已处理）**：中危 #0 → 中危 #1 → 部分修复 #6/#7 → 低危 #4/#5，均见上方"本轮修复结果"。

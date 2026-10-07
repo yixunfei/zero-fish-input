@@ -123,6 +123,22 @@
 
 ## Encrypted storage failure boundaries
 
+- AI configuration and conversation readers reject duplicate object fields and
+  missing required current-format fields. Invalid data cannot silently become
+  default configuration or empty message history and is never rewritten on read.
+  Strict UTF-8 decoding owns its mutable buffer before decoding, including partial
+  failure; that buffer and caller-owned decrypted bytes are cleared on exit.
+- A repeated internal selection import first revokes the previous draft, grant, callbacks
+  and timeout, then starts a fresh review. The replacement requires its own
+  authentication and explicit save; invalid or replayed selection tokens fail closed.
+  Repeated external exported imports retain their reject-and-close behavior.
+- Management additions retain one owned mutable draft until a background write
+  consumes it. Authentication denial, executor rejection and Activity destruction
+  cancel and clear pending drafts. In-flight writes recheck cancellation through
+  the vault port and clear their buffer on completion without blocking the UI.
+  Regression tests cover delayed writes, cancellation, write failure and repeated
+  selection import. JVM/JSON strings still cannot be reliably erased.
+
 - Ciphertext reads require the existing dedicated Keystore key. Missing keys,
   invalid envelopes, wrong AAD and failed GCM authentication cannot produce
   plaintext or silently create a replacement key. Envelope format 1 is unchanged.
