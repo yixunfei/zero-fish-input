@@ -15,6 +15,66 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun quickModelSwitchClearsOldContextAndPendingCompletionWithoutChangingDefault() {
+        val f = Fixture(save = false)
+        f.profile = f.profile.copy(models = listOf("fixture-model", "other-model"))
+        f.controller.submit(AiAction.ASK, "old prompt", null)
+        f.provider.emit(AiStreamEvent.Completed("old answer"))
+        assertTrue(f.controller.selectModel("other-model"))
+        f.flush()
+        assertNull(f.controller.consumeResult())
+        f.controller.submit(AiAction.ASK, "fresh prompt", null)
+        val request = f.provider.requests.last()
+        assertEquals("other-model", request.model)
+        assertTrue(request.history.isEmpty())
+        assertNull(request.conversationId)
+        assertEquals("fixture-model", f.profile.selectedModel)
+        f.controller.newConversation()
+        f.controller.submit(AiAction.ASK, "another chat", null)
+        assertEquals("other-model", f.provider.requests.last().model)
+        f.controller.invalidate()
+        f.controller.submit(AiAction.ASK, "reopened", null)
+        assertEquals("fixture-model", f.provider.requests.last().model)
+    }
+
+    @Test fun newChatDropsPendingOutputAndHistoryWhileUnknownOrRestrictedModelSelectionFails() {
+        val f = Fixture(save = false)
+        f.profile = f.profile.copy(models = listOf("fixture-model", "other-model"))
+        f.controller.submit(AiAction.ASK, "first", null)
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.flush()
+        f.controller.submit(AiAction.ASK, "continue", null)
+        f.provider.emit(AiStreamEvent.Completed("late"))
+        f.controller.newConversation()
+        f.flush()
+        assertNull(f.controller.consumeResult())
+        assertFalse(f.controller.selectModel("unknown"))
+        f.allowed = false
+        assertFalse(f.controller.selectModel("other-model"))
+        f.allowed = true
+        f.controller.submit(AiAction.ASK, "new", null)
+        assertTrue(f.provider.requests.last().history.isEmpty())
+        assertNull(f.provider.requests.last().conversationId)
+    }
+
+    @Test fun changingProviderOrModelRevokesOldResultHistoryAndQueuedPersistence() {
+        val f = Fixture()
+        f.controller.submit(AiAction.ASK, "first", null)
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.ui.drain()
+        f.profile = f.profile.copy(id = "second", models = listOf("second-model"), selectedModel = "second-model")
+        f.worker.drain()
+        assertNull(f.controller.consumeResult())
+        assertTrue(f.repository.list().isEmpty())
+        f.controller.submit(AiAction.ASK, "new", null)
+        assertTrue(f.provider.requests.last().history.isEmpty())
+        assertNull(f.provider.requests.last().conversationId)
+        f.provider.emit(AiStreamEvent.Completed("late"))
+        f.profile = f.profile.copy(apiKey = "replacement-key")
+        f.flush()
+        assertNull(f.controller.consumeResult())
+    }
+
     @Test fun disablingPersistenceWithoutAnObserverCannotSendPreviouslySelectedHistory() {
         for (refresh in listOf(false, true)) {
             val f = Fixture()
@@ -216,7 +276,7 @@ class AiWorkbenchControllerTest {
         var allowed = true
         var persistenceEnabled = save
         val events = mutableListOf<AiStreamEvent>()
-        private val profile = AiProviderProfile(
+        var profile = AiProviderProfile(
             id = "fixture",
             name = "Fixture",
             endpoint = "https://provider.example/v1/chat/completions",

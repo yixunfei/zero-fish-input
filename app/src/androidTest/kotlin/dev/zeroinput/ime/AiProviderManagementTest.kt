@@ -111,13 +111,113 @@ class AiProviderManagementTest {
         } finally { onMain { editor.dismiss(); activity.finish() } }
     }
 
+    @Test fun discoveredModelsRequireExplicitSelectionAndSaveAndRetainManualModels() {
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+        val profile = AiProviderProfile("fixture", "Fixture", "https://provider.example/v1", "public-key",
+            listOf("manual"), "manual")
+        var value = AiConfiguration(enabled = true, networkAllowed = true, providers = listOf(profile), selectedProviderId = profile.id)
+        var callback: (dev.zeroinput.ai.api.AiModelCatalogEvent) -> Unit = {}
+        var requested: AiConfiguration? = null
+        val editor = onMain { AiProviderSettingsDialog(activity, { value }, { next, done -> value = next; done(true) },
+            startDiscovery = { draft, listener ->
+                requested = draft; callback = listener
+                listener(dev.zeroinput.ai.api.AiModelCatalogEvent.Started)
+                AutoCloseable {}
+            }) }
+        try {
+            onMain { editor.show() }
+            tap { it.text.toString().contains("Fixture · manual") }
+            tap { it.text.toString() == context.getString(R.string.ai_edit_provider) }
+            tap { it.text.toString() == context.getString(R.string.ai_fetch_models) }
+            onMain {
+                assertEquals(profile.endpoint, requested?.activeEndpoint())
+                assertEquals(profile.apiKey, requested?.activeKey())
+                callback(dev.zeroinput.ai.api.AiModelCatalogEvent.Completed(listOf("remote-one", "remote-two")))
+                assertEquals(listOf("manual"), value.activeProvider()?.models)
+            }
+            tap { it.text.toString() == "remote-one" }
+            tap { it.text.toString() == "remote-two" }
+            tap { it.text.toString() == context.getString(R.string.ai_models_apply) }
+            onMain {
+                assertEquals(listOf("manual"), value.activeProvider()?.models)
+                val field = topTexts().filterIsInstance<android.widget.EditText>().single {
+                    it.hint == context.getString(R.string.ai_models_hint) }
+                assertEquals("manual, remote-one, remote-two", field.text.toString())
+                val params = field.rootView.layoutParams as android.view.WindowManager.LayoutParams
+                assertTrue(params.flags and android.view.WindowManager.LayoutParams.FLAG_SECURE != 0)
+                capturePublicFixture(field.rootView)
+            }
+            tap { it.id == android.R.id.button1 }
+            assertEquals(listOf("manual", "remote-one", "remote-two"), value.activeProvider()?.models)
+            assertEquals("manual", value.activeModel())
+            assertTrue(value.activeProvider()?.imageModels.isNullOrEmpty())
+        } finally { onMain { editor.dismiss(); activity.finish() } }
+    }
+
+    @Test fun editingEndpointOrBackgroundingRevokesPendingModelList() {
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+        val profile = AiProviderProfile("fixture", "Fixture", "https://provider.example/v1", "public-key", listOf("manual"), "manual")
+        val value = AiConfiguration(enabled = true, networkAllowed = true, providers = listOf(profile), selectedProviderId = profile.id)
+        val callbacks = mutableListOf<(dev.zeroinput.ai.api.AiModelCatalogEvent) -> Unit>()
+        var cancelled = 0
+        val editor = onMain { AiProviderSettingsDialog(activity, { value }, { _, done -> done(true) },
+            startDiscovery = { _, listener -> callbacks += listener; AutoCloseable { cancelled++ } }) }
+        try {
+            onMain { editor.show() }
+            tap { it.text.toString().contains("Fixture · manual") }
+            tap { it.text.toString() == context.getString(R.string.ai_edit_provider) }
+            tap { it.text.toString() == context.getString(R.string.ai_fetch_models) }
+            onMain {
+                topTexts().filterIsInstance<android.widget.EditText>().single {
+                    it.hint == context.getString(R.string.ai_endpoint_hint) }.setText("https://replacement.example/v1")
+                callbacks.first()(dev.zeroinput.ai.api.AiModelCatalogEvent.Completed(listOf("stale")))
+                assertFalse(topTexts().any { it.text.toString() == "stale" })
+                assertEquals(1, cancelled)
+            }
+            tap { it.text.toString() == context.getString(R.string.ai_fetch_models) }
+            onMain {
+                editor.cancelTests()
+                callbacks.last()(dev.zeroinput.ai.api.AiModelCatalogEvent.Completed(listOf("late")))
+                assertFalse(topTexts().any { it.text.toString() == "late" })
+                assertEquals(2, cancelled)
+            }
+        } finally { onMain { editor.dismiss(); activity.finish() } }
+    }
+
+    private fun capturePublicFixture(root: View) {
+        // Only this test's fixed public profile is drawn; no real configuration is captured.
+        val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
+        try {
+            root.draw(android.graphics.Canvas(bitmap))
+            val config = root.resources.configuration
+            val name = "provider-${config.orientation}-${config.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK}.png"
+            val file = java.io.File(instrumentation.targetContext.getExternalFilesDir(null), name)
+            file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        } finally { bitmap.recycle() }
+    }
+
     private fun tap(predicate: (TextView) -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 5_000
         while (SystemClock.uptimeMillis() < deadline) {
             val clicked = onMain {
                 val target = WindowInspector.getGlobalWindowViews().lastOrNull()?.let(::views)
                     ?.filterIsInstance<TextView>()?.firstOrNull { it.isShown && predicate(it) }
-                if (target == null) false else {
+                if (target == null) {
+                    // Short landscape lists recycle off-screen rows; scroll as a user would.
+                    WindowInspector.getGlobalWindowViews().lastOrNull()?.let(::views)
+                        ?.filterIsInstance<android.widget.ListView>()?.forEach { list ->
+                            val adapter = list.adapter
+                            val position = (0 until adapter.count).firstOrNull { index ->
+                                predicate(TextView(list.context).apply { text = adapter.getItem(index)?.toString() })
+                            }
+                            if (position != null) list.setSelection(position)
+                        }
+                    false
+                } else {
                     val parent = target.parent as? AdapterView<*>
                     if (parent == null) target.performClick() else {
                         val position = parent.getPositionForView(target)

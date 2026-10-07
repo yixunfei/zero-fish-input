@@ -265,7 +265,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAiSettings() {
         if (!aiConfigReady || aiDialog?.isShowing == true) return
-        aiDialog = AiProviderSettingsDialog(this, { aiConfig }, { next, done -> updateAiConfig(done) { next } }, ::startAiTest)
+        aiDialog = AiProviderSettingsDialog(this, { aiConfig }, { next, done -> updateAiConfig(done) { next } }, ::startAiTest, ::startAiDiscovery)
             .also { it.show() }
     }
 
@@ -273,17 +273,40 @@ class MainActivity : AppCompatActivity() {
         val active = java.util.concurrent.atomic.AtomicBoolean(true)
         val data = graph.aiDataGeneration.current()
         val config = graph.aiConfigurationSnapshot() ?: AiConfiguration()
+        val current = { active.get() && !isFinishing && !isDestroyed &&
+            graph.aiDataGeneration.isCurrent(data) && graph.aiConfigurationSnapshot() == config }
         val probe = dev.zeroinput.ime.ai.AiProviderProbe(
             provider = { snapshot -> dev.zeroinput.ime.ai.OpenAiCompatibleProvider(
-                { if (graph.aiDataGeneration.isCurrent(data)) snapshot else AiConfiguration() },
+                { if (current()) snapshot else AiConfiguration() },
                 graph.aiProbeExecutor, graph.aiCancellationExecutor) },
-            current = { active.get() && !isFinishing && !isDestroyed && graph.aiDataGeneration.isCurrent(data) },
+            current = current,
             post = { callback -> screen.post { callback() } },
             render = render,
         )
         val observer = graph.observeAiConfiguration { screen.post { if (active.get()) probe.cancel() } }
         probe.start(config)
         return AutoCloseable { active.set(false); observer.close(); probe.close() }
+    }
+
+    private fun startAiDiscovery(
+        draft: AiConfiguration,
+        render: (dev.zeroinput.ai.api.AiModelCatalogEvent) -> Unit,
+    ): AutoCloseable {
+        val active = java.util.concurrent.atomic.AtomicBoolean(true)
+        val data = graph.aiDataGeneration.current()
+        val saved = graph.aiConfigurationSnapshot()
+        val current = { active.get() && !isFinishing && !isDestroyed &&
+            graph.aiDataGeneration.isCurrent(data) && graph.aiConfigurationSnapshot() == saved }
+        val discovery = dev.zeroinput.ime.ai.AiModelDiscovery(
+            provider = { snapshot -> dev.zeroinput.ime.ai.OpenAiCompatibleProvider(
+                { if (current()) snapshot else AiConfiguration() }, graph.aiProbeExecutor, graph.aiCancellationExecutor) },
+            current = current,
+            post = { callback -> screen.post { callback() } },
+            render = render,
+        )
+        val observer = graph.observeAiConfiguration { screen.post { if (active.get()) discovery.cancel() } }
+        discovery.start(draft.copy(enabled = saved?.enabled == true, networkAllowed = saved?.networkAllowed == true))
+        return AutoCloseable { active.set(false); observer.close(); discovery.close() }
     }
 
     override fun onStop() {

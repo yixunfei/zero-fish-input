@@ -41,8 +41,9 @@ internal class AiProviderProbe(
         delivery = sink
         render(AiProbeState.Running)
         try {
-            handle = provider(configuration.copy(timeoutMs = minOf(configuration.timeoutMs, 15_000L))).stream(
+            val request = provider(configuration.copy(timeoutMs = minOf(configuration.timeoutMs, 30_000L))).stream(
                 AiRequest(null, AiAction.ASK, "Reply with OK.", outputTokenLimit = 16), sink::offer)
+            if (token == generation && current()) handle = request else request.cancel()
         } catch (_: Exception) {
             sink.close()
             render(AiProbeState.Failed(AiProviderError.Network("AI probe could not start")))

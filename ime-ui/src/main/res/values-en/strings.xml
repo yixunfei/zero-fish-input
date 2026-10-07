@@ -145,6 +145,9 @@
     <string name="ai_action_rewrite">Rewrite</string>
     <string name="ai_action_translate">Translate</string>
     <string name="ai_new_conversation">New chat</string>
+    <string name="ai_switch_model">Choose model</string>
+    <string name="ai_current_model">%1$s ▾</string>
+    <string name="ai_switch_named_model">Current model %1$s; switch and start a new chat</string>
     <string name="ai_delete_conversation">Delete</string>
     <string name="ai_confirm_delete">Confirm delete</string>
     <string name="ai_delete_named">Delete chat %1$s</string>

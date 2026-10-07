@@ -151,10 +151,13 @@ Emoji 面板内使用随包图形，首次后台准备完成后可离线显示�
 
 ## AI 工作台（可选联网）
 
-设置 → AI 工作台中可添加、编辑、删除多组 OpenAI 兼容 Provider，每组保存 HTTPS Chat Completions
-地址、API key 和手动填写的模型列表。选择要使用的 Provider 和模型，再开启 AI 和联网开关。
-图片和音频能力按模型分别开启，切换模型不会继承其他模型的能力。
+设置 → AI 工作台中可添加、编辑、删除多组 OpenAI 兼容 Provider，每组保存 HTTPS API
+基地址（例如 `https://example.com/v1`，也支持完整 `/chat/completions` 地址）、API key 和多个模型。选择要使用的 Provider 和模型，再开启 AI 和联网开关。
+开启 AI 与联网开关后，在 Provider 编辑页点击 **获取可用模型**，勾选模型并 **应用到草稿**，
+最后点击 **保存**。每组最多保留 32 个模型，可用逗号或换行手动补充；不支持模型列表的服务仍可手动配置并检测。
+在 Provider 菜单点击 **选择模型** 切换当前模型。图片和音频能力按模型分别开启，远端列表不会自动授权多模态能力。
 配置页的 **检测当前模型** 会通过当前已保存的 Provider 和模型发送固定短测试文本，显示可用、鉴权失败、接口/模型不存在、限流或连接异常。
+检测通过真实生成请求确认可用，最多等待 30 秒；列表可获取并不代表模型一定可用。
 检测要求 AI 和联网开关已开启，可能产生少量费用；不携带草稿、历史或附件。关闭检测窗口或进入后台会取消。
 配置期间临时切换到其他应用再返回，当前页面会保留未保存的内容；点击“保存”后才生效。
 取消或退出页面会丢弃草稿，页面被系统重建或进程被回收后不会恢复未保存内容。
@@ -414,7 +417,7 @@ Android 9 及以上使用系统清空接口；Android 8.x 写入空文本，不�
 Build Tools 36.0.0、NDK `28.2.13676358` 和 CMake（Android SDK 3.22.1 或本机可用版本）。
 Gradle 8.14 由仓库 Wrapper 提供，无需单独安装 Gradle。首次获取构建工具、依赖和源码需要网络，
 应用安装后的核心输入、词库、个性化和安全剪贴板完全离线；AI 工作台只有在用户主动打开
-联网开关并提交文本时才访问所配置的 HTTPS provider。
+联网开关并提交文本、检测模型或获取模型列表时才访问所配置的 HTTPS provider。
 
 ```powershell
 git clone https://github.com/yixunfei/zero-fish-input.git
@@ -459,6 +462,19 @@ Lint：
 ```
 
 APK、第三方许可证、手写模型对应源码压缩包及 SHA-256 清单位于 `app/build/outputs/test-apk/<时间戳>/`。
+打包脚本依据本次 Gradle 生成的 APK locator 定位产物，避免单 ABI 与通用构建切换时取到旧包，
+并输出 `BUILD-PROVENANCE.json`。设备验收可指定待交付的同一文件，安装前后校验实际安装包的 SHA-256：
+
+```powershell
+./tools/test-test-apk-artifact.ps1
+./tools/test-input-experience.ps1 -Serial emulator-5554 `
+  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.4.0-debug-universal.apk' `
+  -TestClass 'dev.zeroinput.ime.AiProviderManagementTest,dev.zeroinput.ime.AiSettingsFailureTest,dev.zeroinput.ime.AiImeInteractionTest'
+```
+
+`-ApkPath` 不会替换成另一次构建的主 APK；仅重新准备测试 APK。通过记录保存在
+`build/device-apk-verification.json`。命令中的时间戳须替换为实际产物目录。
+
 分发测试包时请同时提供许可证与对应源码归档；源码归档包含固定上游训练 XML、原始模型和格式适配脚本。
 许可证和源码获取说明同时内置于 APK 的 `assets/licenses/`。需要更小的单 ABI 包时可传入
 `-Abi arm64-v8a`、`-Abi armeabi-v7a` 或 `-Abi x86_64`；连接且授权一台 ADB 设备后，使用
@@ -604,3 +620,18 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
 修改设置后清空。点选表情才按原有规则插入。AI 草稿继续使用独立输入，不与搜索共享内容。
 
 这组交互的回归步骤和验证结果见 [面板与搜索验证](docs/panel-interaction-validation.md)。
+
+AI Provider 基地址、多模型发现、会话隔离和真实远端验证见 [修复验证](docs/ai-provider-repair-validation.md)。
+快捷切换、新会话和本次安装包验收见 [模型管理验证](docs/ai-model-workbench-validation.md)。
+
+添加 Provider 时填写名称、HTTPS 基地址和 API key，点击“获取可用模型”后勾选并应用，
+最后保存。已选模型框也支持手动输入，以逗号或换行分隔；无需预先填写模型才能获取列表。
+AI 面板顶部可直接切换当前 Provider 已保存的模型，或点击“新会话”。快捷切换会清空当前
+草稿、附件和上下文，但不改写设置里的默认模型；退出面板后恢复默认。新会话保留当前
+快捷选择，并取消旧生成。只有点击发送才联网，结果仍需点击插入才进入外部输入框。
+
+测试包默认输出到 `app/build/outputs/test-apk`。工作盘空间不足时可指定其他磁盘：
+
+```powershell
+./tools/package-test-apk.ps1 -Abi universal -OutputDirectory C:/Users/yixun/Downloads/ZeroInput-test-apk
+```

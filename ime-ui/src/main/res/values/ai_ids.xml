@@ -1,0 +1,5 @@
+<resources>
+    <item name="ai_draft_text" type="id" />
+    <item name="ai_result_text" type="id" />
+    <item name="ai_model_button" type="id" />
+</resources>

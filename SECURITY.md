@@ -158,3 +158,14 @@ authentication and the bounded background write, clearing it on cancellation,
 rejection or completion. AI storage rejects duplicate fields and missing required
 current-format fields without replacing the encrypted data. These controls do not
 change stored formats or grant access to other applications' clipboard contents.
+
+
+AI 模型列表仅在设置页点击“获取可用模型”后请求，必须已开启 AI 与联网开关。
+请求只携带当前填写的 API key，不发送输入、草稿、历史或附件；仍由唯一 HTTPS Provider 执行，禁止重定向。
+远端列表有大小与数量限制，只使用模型 ID，不据此开启图片或音频权限；勾选并保存后才更新加密配置。
+模型检测必须收到真实完整回答才显示可用；HTTP 200、HTML 页面或模型列表成功不代表生成可用。
+修改配置、退出页面、退到后台和清除数据使旧检测或列表结果失效。排队请求绑定原配置，不能使用后来切换的密钥。
+
+AI 面板快捷切换仅能选择当前 Provider 已保存的模型，并清空草稿、附件和旧会话上下文。
+图片与音频能力以实际请求的模型校验；新会话与切换模型均撤销旧请求及延迟结果，不自动发送。
+流式成功必须同时收到正常文本结束与 DONE；工具调用、结束后续写、多候选和缺少结束标记均拒绝。

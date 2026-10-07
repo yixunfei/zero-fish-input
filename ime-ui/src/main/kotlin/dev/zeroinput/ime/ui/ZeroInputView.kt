@@ -82,6 +82,7 @@ class ZeroInputView @JvmOverloads constructor(
     var onAiConversationSelected: (String) -> Unit = {}
     var onAiConversationDeleted: (String) -> Unit = {}
     var onAiNewConversation: () -> Unit = {}
+    var onAiModelSelected: (String) -> Unit = {}
     var onAiVisibilityChanged: (Boolean) -> Unit = {}
     var onAiDraftChanged: (KeyboardAction) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
@@ -518,6 +519,7 @@ class ZeroInputView @JvmOverloads constructor(
         onAiConversationSelected = {}
         onAiConversationDeleted = {}
         onAiNewConversation = {}
+        onAiModelSelected = {}
         onAiVisibilityChanged = {}
         onAiDraftChanged = {}
         onAiSettingsRequested = {}
@@ -583,6 +585,8 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun renderAi(event: AiStreamEvent) { ai.render(event) }
+
+    fun renderAiModels(models: List<String>, selected: String?) { ai.renderModels(models, selected) }
 
     fun renderAiImportedContent(available: Boolean, names: List<String>) {
         ai.renderImportedContent(available, names)
@@ -736,6 +740,7 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onConversationSelected = { onAiConversationSelected(it) }
         ai.onConversationDeleted = { onAiConversationDeleted(it) }
         ai.onNewConversation = { onAiNewConversation() }
+        ai.onModelSelected = { onAiModelSelected(it) }
         ai.onSettings = { onAiSettingsRequested() }
         ai.onAddContent = { onAiAddContentRequested() }
         ai.onImportContent = { onAiImportContentRequested() }
@@ -962,6 +967,9 @@ class ZeroInputView @JvmOverloads constructor(
         val searchActive = isSearchEditing && !searchCandidatesExpanded
         val editing = searchActive || aiEditing
         val splitSearch = editing && landscape
+        // AI keeps three primary commands visible; reserve their width in a short landscape window.
+        val detailWeight = if (aiEditing) 5f else 1f
+        val keyboardWeight = if (aiEditing) 7f else 2f
         val compactPanel = dp(if (landscape) EMOJI_SEARCH_HEIGHT_DP else PANEL_HEIGHT_DP)
         val defaultHeight = when {
             editing && !splitSearch -> keyboard.preferredHeight + dp(if (searchActive) 224 else ai.editingHeightDp)
@@ -975,11 +983,11 @@ class ZeroInputView @JvmOverloads constructor(
         content.orientation = if (splitSearch) HORIZONTAL else VERTICAL
         emoji.layoutParams = if (splitSearch) LayoutParams(0, body, 1f)
             else LayoutParams(LayoutParams.MATCH_PARENT, if (searchActive) detailHeight else body)
-        keyboardContainer.layoutParams = if (splitSearch) LayoutParams(0, LayoutParams.WRAP_CONTENT, 2f)
+        keyboardContainer.layoutParams = if (splitSearch) LayoutParams(0, LayoutParams.WRAP_CONTENT, keyboardWeight)
             else LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         secureClipboard.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
         handwriting.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
-        ai.layoutParams = if (splitSearch) LayoutParams(0, body, 1f)
+        ai.layoutParams = if (splitSearch) LayoutParams(0, body, detailWeight)
             else LayoutParams(LayoutParams.MATCH_PARENT, if (aiEditing) detailHeight else body)
         expandedCandidates.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
     }

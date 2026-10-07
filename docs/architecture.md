@@ -177,12 +177,12 @@ contracts. `app` owns the Android composition root, `AiCoordinator` and the only
 adapter, `OpenAiCompatibleProvider`; `user-data` owns separately encrypted AI configuration
 and optional conversation history. The provider accepts only HTTPS endpoints, disables redirects,
 uses bounded timeouts and response sizes, and sends data only after the user submits text from
-the keyboard AI panel or explicitly tests the selected model in settings. The latter
+the keyboard AI panel or explicitly tests the selected model or fetches the model catalog in settings. The latter
 uses `AiProviderProbe`, a fixed public prompt, no history/attachments, a 16-token
-output cap and a 15-second timeout. It never reads editor context, selections, the system clipboard or the
+output cap and a 30-second timeout. It never reads editor context, selections, the system clipboard or the
 private clipboard vault.
 
-Provider configuration supports up to 16 profiles and 32 manually named models
+Provider configuration supports up to 16 profiles and 32 explicitly selected or manually named models
 per profile, with image/audio support declared per model. `AiComposeActivity` owns
 explicit text review and the system document picker; `AiAttachmentReader` bounds
 reads on an application-owned document worker. `AiContentInbox` is a single expiring,
@@ -591,3 +591,38 @@ key. Insets affect decoration only, keeping continuous rectangular touch regions
 变化不会传播到 Kotlin 业务层。Rime 运行时显式发布未初始化、初始化中、就绪和失败状态；native
 库缺失、初始化失败或无法创建探针会话都会进入失败状态并使用降级引擎。发行构建通过
 `requireRime` 属性阻止误用降级引擎。
+
+## AI provider routing and discovery (2026-10-07)
+
+`ai-api/AiEndpoint` validates and resolves API bases and full Chat Completions
+addresses. `AiModelCatalog` is separate from the generation port. Its sole runtime
+implementation is still `app/ai/OpenAiCompatibleProvider`; `AiTransportExchange`
+is an injectable I/O contract whose only production implementation lives inside
+that provider. `AiResponseReader` bounds catalog and non-streaming JSON responses.
+No network dependency or permission is added.
+
+`AiModelDiscovery` owns a cancellable settings operation; `AiModelPicker` owns its
+protected, unsaved multi-selection. An explicit fetch uses the current edit's key
+and endpoint with the saved network policy. Saving continues to use the same
+configuration repository and format. Manual models and per-model capabilities
+are preserved without treating catalog metadata as capability grants.
+
+Request configuration binds at enqueue time; execution rejects a changed snapshot.
+The absolute timer includes queue wait. Cancellation purges only cancelled tasks,
+not other operations. Workbench configuration reconciliation revokes old context,
+results and pending writes even before the settings observer is delivered.
+
+The workbench header exposes the current model and New chat while editing or
+viewing results. Quick selection uses only the active provider's saved model IDs;
+`AiWorkbenchController` owns this transient choice. `AiRequest.model` binds it to
+the request, and the transport validates membership and media capabilities against
+that model in the captured configuration. Switching starts empty context, revokes
+pending output/persistence, and clears draft attachments. Closing the workbench or
+changing configuration restores the saved default. New chat retains the transient
+model but discards the draft/context. Neither action sends a request or changes
+the stored configuration/conversation formats.
+
+SSE data lines are assembled per event within fixed limits. Completion requires a
+single text choice ending with `stop`, followed by `[DONE]`. Missing stops,
+post-stop content, tool payloads, multiple choices and trailing JSON are rejected;
+usage-only events remain supported.

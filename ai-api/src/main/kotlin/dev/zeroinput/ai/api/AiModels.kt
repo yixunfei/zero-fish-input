@@ -53,11 +53,16 @@ data class AiRequest(
     val history: List<AiMessage> = emptyList(),
     val attachments: List<AiAttachment> = emptyList(),
     val outputTokenLimit: Int? = null,
+    /** Optional workbench choice, restricted to the bound provider's saved model list. */
+    val model: String? = null,
 ) {
     init {
         require(input.isNotBlank()) { "AI input must not be blank" }
         require(input.length <= AiLimits.MAX_INPUT_CHARS) { "AI input is too large" }
         require(outputTokenLimit == null || outputTokenLimit in 1..4096) { "Invalid output limit" }
+        require(model == null || model.isNotBlank() && model.length <= 128 && model.none(Char::isISOControl)) {
+            "Invalid AI model"
+        }
         require(history.size <= AiLimits.MAX_HISTORY_MESSAGES) { "AI history is too large" }
         require(targetLanguage == null || targetLanguage.length in 2..32) { "Invalid target language" }
         require(attachments.size <= AiLimits.MAX_ATTACHMENTS) { "Too many AI attachments" }

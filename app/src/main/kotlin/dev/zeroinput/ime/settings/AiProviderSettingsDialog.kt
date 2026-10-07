@@ -30,7 +30,12 @@ internal class AiProviderSettingsDialog(
         callback(AiProbeState.Failed(dev.zeroinput.ai.api.AiProviderError.Configuration("Probe unavailable")))
         AutoCloseable {}
     },
+    private val startDiscovery: (AiConfiguration, (dev.zeroinput.ai.api.AiModelCatalogEvent) -> Unit) -> AutoCloseable = { _, callback ->
+        callback(dev.zeroinput.ai.api.AiModelCatalogEvent.Failed(dev.zeroinput.ai.api.AiProviderError.Configuration("Discovery unavailable")))
+        AutoCloseable {}
+    },
 ) {
+    private val modelPickers = mutableSetOf<AiModelPicker>()
     private val dialogs = mutableSetOf<AlertDialog>()
     private var saving = false
     private var test: AutoCloseable? = null
@@ -40,6 +45,7 @@ internal class AiProviderSettingsDialog(
     val isShowing: Boolean get() = dialogs.any { it.isShowing }
     fun dismiss() { cancelTests(); dialogs.toList().forEach { it.dismiss() } }
     fun cancelTests() {
+        modelPickers.toList().forEach { it.cancel() }
         testGeneration++
         test?.close(); test = null
         testStatus?.setText(R.string.ai_test_cancelled)
@@ -49,6 +55,7 @@ internal class AiProviderSettingsDialog(
 
     private fun save(value: AiConfiguration, completed: (Boolean) -> Unit = {}) {
         if (saving) { completed(false); return }
+        cancelTests()
         saving = true
         persist(value) { success -> saving = false; completed(success) }
     }
@@ -176,14 +183,16 @@ internal class AiProviderSettingsDialog(
             selectedProviderId = id))
     }
 
+    private fun editorFields() = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(24), dp(8), dp(24), dp(8))
+        importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+        if (android.os.Build.VERSION.SDK_INT >= 30)
+            importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+    }
+
     private fun edit(existing: AiProviderProfile?) {
-        val fields = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(8), dp(24), dp(8))
-            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-            if (android.os.Build.VERSION.SDK_INT >= 30)
-                importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
-        }
+        val fields = editorFields()
         fun field(hint: Int, text: String, max: Int, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(context).also {
             it.hint = context.getString(hint); it.setText(text); it.inputType = type
             it.filters = arrayOf(InputFilter.LengthFilter(max)); it.isSaveEnabled = false
@@ -193,11 +202,28 @@ internal class AiProviderSettingsDialog(
         val name = field(R.string.ai_provider_name, existing?.name.orEmpty(), 64)
         val endpoint = field(R.string.ai_endpoint_hint, existing?.endpoint ?: DEFAULT_ENDPOINT, 512,
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
-        val models = field(R.string.ai_models_hint, existing?.models?.joinToString(", ") ?: DEFAULT_MODEL, 4096)
         val key = field(R.string.ai_key_hint, "", 512,
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD).apply {
             transformationMethod = PasswordTransformationMethod.getInstance()
         }
+        val models = field(R.string.ai_models_hint, existing?.models?.joinToString(", ").orEmpty(), 8192,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE).apply {
+            minLines = 2; maxLines = 4
+        }
+        fields.removeView(models)
+        val picker = AiModelPicker(context, models, {
+            val draft = AiProviderProfile(existing?.id ?: "draft", name.text.toString(), endpoint.text.toString().trim(),
+                key.text.toString().ifBlank { existing?.apiKey.orEmpty() }, emptyList(), "")
+            configuration().copy(providers = listOf(draft), selectedProviderId = draft.id)
+        }, startDiscovery, { secure(it) }).also {
+            modelPickers += it
+            it.attach(fields, endpoint, key)
+        }
+        fields.addView(android.widget.TextView(context).apply {
+            setText(R.string.ai_selected_models)
+            setPadding(0, dp(8), 0, 0)
+        })
+        fields.addView(models)
         val images = MaterialSwitch(context).apply {
             setText(R.string.ai_support_images); isChecked = existing?.supportsImages == true
         }
@@ -216,7 +242,7 @@ internal class AiProviderSettingsDialog(
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 if (saving) return@setOnClickListener
-                val modelList = models.text.toString().split(',', '\n').map(String::trim).filter(String::isNotEmpty).distinct()
+                val modelList = AiModelPicker.modelNames(models)
                 val providerName = name.text.toString().trim()
                 if (providerName.isBlank() || modelList.isEmpty() || modelList.size > 32) {
                     models.error = context.getString(R.string.ai_provider_invalid); return@setOnClickListener
@@ -225,12 +251,10 @@ internal class AiProviderSettingsDialog(
                     endpoint.text.toString().trim(), key.text.toString().ifBlank { existing?.apiKey.orEmpty() },
                     modelList, existing?.selectedModel?.takeIf { it in modelList } ?: modelList.first(),
                     (existing?.imageModels.orEmpty() intersect modelList.toSet()).let {
-                        if (images.isChecked) it + (existing?.selectedModel?.takeIf { model -> model in modelList }
-                            ?: modelList.first()) else it - (existing?.selectedModel ?: modelList.first())
+                        updateCapability(it, modelList, existing?.selectedModel, images.isChecked)
                     },
                     (existing?.audioModels.orEmpty() intersect modelList.toSet()).let {
-                        if (audio.isChecked) it + (existing?.selectedModel?.takeIf { model -> model in modelList }
-                            ?: modelList.first()) else it - (existing?.selectedModel ?: modelList.first())
+                        updateCapability(it, modelList, existing?.selectedModel, audio.isChecked)
                     })
                 val current = configuration()
                 val updated = profiles(current).filterNot { it.id == profile.id } + profile
@@ -244,7 +268,10 @@ internal class AiProviderSettingsDialog(
                 }
             }
         }
-        secure(dialog) { listOf(name, endpoint, models, key).forEach { it.text?.clear() } }
+        secure(dialog) {
+            picker.close(); modelPickers -= picker
+            listOf(name, endpoint, models, key).forEach { it.text?.clear() }
+        }
     }
 
     private fun secure(dialog: AlertDialog, clear: () -> Unit = {}): AlertDialog = dialog.also {
@@ -254,10 +281,15 @@ internal class AiProviderSettingsDialog(
         it.show()
     }
 
+    private fun updateCapability(saved: Set<String>, models: List<String>, previous: String?, enabled: Boolean): Set<String> {
+        val target = previous ?: models.first()
+        if (target !in models) return saved
+        return if (enabled) saved + target else saved - target
+    }
+
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
 
     private companion object {
-        const val DEFAULT_ENDPOINT = "https://api.openai.com/v1/chat/completions"
-        const val DEFAULT_MODEL = "gpt-4o-mini"
+        const val DEFAULT_ENDPOINT = "https://api.openai.com/v1"
     }
 }

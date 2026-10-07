@@ -33,7 +33,7 @@ class AiProviderProbeTest {
         assertTrue(request?.attachments?.isEmpty() == true)
         assertNull(request?.conversationId)
         assertEquals(16, request?.outputTokenLimit)
-        assertTrue(checkNotNull(snapshot).timeoutMs <= 15_000L)
+        assertTrue(checkNotNull(snapshot).timeoutMs <= 30_000L)
         assertEquals(listOf(AiProbeState.Running, AiProbeState.Available), states)
         probe.close()
     }

@@ -24,6 +24,27 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AiWorkbenchPanelTest {
+    @Test fun newChatIsAvailableDuringEditingAndGenerationAndDoesNotSend() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        var chats = 0
+        var sends = 0
+        panel.onNewConversation = { chats++; panel.render(AiStreamEvent.Cancelled); panel.renderDraft("") }
+        panel.onSubmit = { _, _, _ -> sends++ }
+        for (generating in listOf(false, true)) {
+            panel.setEditing(true)
+            panel.renderDraft("public draft")
+            if (generating) panel.render(AiStreamEvent.Started)
+            val newChat = visible(panel).filterIsInstance<TextView>().single {
+                it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_new_conversation) }
+            assertTrue(newChat.isEnabled)
+            newChat.performClick()
+            assertTrue(panel.editing)
+        }
+        assertEquals(2, chats)
+        assertEquals(0, sends)
+    }
+
     @Test fun selectingTranslateRequiresExplicitSendAndConversationDoesNotEraseResult() = onMain {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val context = ContextThemeWrapper(target, R.style.Theme_ZeroInput_InputMethod)
@@ -51,8 +72,8 @@ class AiWorkbenchPanelTest {
             val target = InstrumentationRegistry.getInstrumentation().targetContext
             val configuration = Configuration(target.resources.configuration).apply {
                 orientation = if (landscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
-                screenWidthDp = if (landscape) 800 else 320
-                screenHeightDp = if (landscape) 411 else 640
+                screenWidthDp = if (landscape) 640 else 320
+                screenHeightDp = if (landscape) 320 else 640
                 uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
                     if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
             }
@@ -66,6 +87,7 @@ class AiWorkbenchPanelTest {
             var inserts = 0
             panel.onAiInsert = { inserts++ }
             panel.renderAiDraft("public fixture", InputSessionState())
+            panel.renderAiModels(listOf("public-long-model-name", "public-other"), "public-long-model-name")
             captureAndCheck(panel, configuration, night, "draft")
             panel.renderAi(AiStreamEvent.Started)
             panel.renderAi(AiStreamEvent.Completed("public response"))
@@ -94,6 +116,7 @@ class AiWorkbenchPanelTest {
         assertTrue("Selected action text must remain readable", ColorUtils.calculateContrast(
             selectedAction.currentTextColor, container) >= 4.5)
         val labels = listOf(dev.zeroinput.ime.ui.R.string.ai_submit, dev.zeroinput.ime.ui.R.string.ai_insert,
+            dev.zeroinput.ime.ui.R.string.ai_new_conversation,
             if (panel.isAiEditing) dev.zeroinput.ime.ui.R.string.ai_read else dev.zeroinput.ime.ui.R.string.ai_edit)
         for (label in labels) {
             val button = visible(workbench).filterIsInstance<TextView>().first { it.text == it.context.getString(label) }

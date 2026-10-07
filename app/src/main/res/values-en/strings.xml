@@ -239,15 +239,16 @@
     <string name="ai_use_provider">Use this provider</string>
     <string name="ai_choose_model">Choose model</string>
     <string name="ai_provider_name">Provider name</string>
-    <string name="ai_models_hint">Model names, separated by commas</string>
+    <string name="ai_models_hint">Selected models (or enter IDs separated by commas or new lines)</string>
+    <string name="ai_selected_models">Selected models · editable</string>
     <string name="ai_first_model">First model in the list</string>
     <string name="ai_model_images">%1$s supports images</string>
     <string name="ai_model_audio">%1$s supports audio</string>
-    <string name="ai_provider_save_failed">Could not save. Check the HTTPS endpoint, models and key, then retry.</string>
+    <string name="ai_provider_save_failed">Could not save. Check the HTTPS API URL (e.g. https://example.com/v1), models and key, then retry.</string>
     <string name="ai_provider_invalid">Enter a name and 1 to 32 models</string>
     <string name="ai_support_images">Selected model supports images</string>
     <string name="ai_support_audio">Selected model supports audio</string>
-    <string name="ai_endpoint_hint">HTTPS endpoint</string>
+    <string name="ai_endpoint_hint">HTTPS API URL (e.g. https://example.com/v1)</string>
     <string name="ai_key_hint">API key (leave blank to keep the current key)</string>
     <string name="ai_save_conversations">Save AI conversations</string>
     <string name="ai_settings_saved">AI configuration saved</string>
@@ -262,4 +263,13 @@
     <string name="language_pack_in_use">In use</string>
     <string name="language_pack_use">Use</string>
     <string name="language_pack_delete">Delete</string>
+    <string name="ai_fetch_models">Fetch available models</string>
+    <string name="ai_models_loading">Fetching model list…</string>
+    <plurals name="ai_models_found">
+        <item quantity="one">Found %1$d model. Select models to add.</item>
+        <item quantity="other">Found %1$d models. Select models to add.</item>
+    </plurals>
+    <string name="ai_models_failed">%1$s\nYou can still enter and test models manually.</string>
+    <string name="ai_models_select">Select models to keep (up to 32)</string>
+    <string name="ai_models_apply">Apply to draft</string>
 </resources>

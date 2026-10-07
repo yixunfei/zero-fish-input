@@ -152,6 +152,7 @@ class ZeroInputService : InputMethodService() {
             render = { inputView?.renderAi(it) },
             renderList = { inputView?.renderAiConversations(it) },
             renderConversation = { inputView?.renderAiConversation(it) },
+            renderModels = { models, selected -> inputView?.renderAiModels(models, selected) },
         )
     }
 
@@ -810,7 +811,14 @@ class ZeroInputService : InputMethodService() {
         view.onAiConversationsRequested = { aiWorkbench.refreshConversations() }
         view.onAiConversationSelected = { clearAiAttachments(); aiDraft.clear(); aiWorkbench.selectConversation(it) }
         view.onAiConversationDeleted = aiWorkbench::deleteConversation
-        view.onAiNewConversation = { clearAiAttachments(); aiWorkbench.newConversation(); aiDraft.clear() }
+        view.onAiNewConversation = {
+            syncSessionPrivacy()
+            if (aiAllowed()) { clearAiAttachments(); aiWorkbench.newConversation(); aiDraft.clear() }
+        }
+        view.onAiModelSelected = { model ->
+            syncSessionPrivacy()
+            if (aiWorkbench.selectModel(model)) { clearAiAttachments(); aiDraft.clear() }
+        }
         view.onAiSettingsRequested = { launchActivity(MainActivity::class.java) }
         view.onAiAddContentRequested = {
             syncSessionPrivacy()
@@ -833,6 +841,7 @@ class ZeroInputService : InputMethodService() {
         view.onAiVisibilityChanged = { open ->
             if (open) {
                 aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE)
+                aiWorkbench.refreshModels()
                 renderAiContent()
             }
             else { aiDraft.close(); invalidateAiRequest() }

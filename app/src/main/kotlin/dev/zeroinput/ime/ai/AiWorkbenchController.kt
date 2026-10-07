@@ -19,6 +19,7 @@ internal class AiWorkbenchController(
     private val render: (AiStreamEvent) -> Unit,
     private val renderList: (List<AiConversationSummary>) -> Unit,
     private val renderConversation: (AiConversation?) -> Unit,
+    private val renderModels: (List<String>, String?) -> Unit = { _, _ -> },
 ) {
     private val generation = AtomicLong()
     private var selected: AiConversation? = null
@@ -26,10 +27,13 @@ internal class AiWorkbenchController(
     private var handle: AiRequestHandle? = null
     private var delivery: AiStreamDelivery? = null
     private var resultDataGeneration = -1L
-    private var persistenceEnabled = configuration()?.saveConversations == true
+    private var boundConfiguration = configuration()
+    private var selectedModel: String? = null
 
     fun invalidate() {
         stop()
+        selectedModel = null
+        renderModels(emptyList(), null)
         selected = null
         renderConversation(null)
         renderList(emptyList())
@@ -49,6 +53,25 @@ internal class AiWorkbenchController(
         stop()
         selected = null
         renderConversation(null)
+    }
+
+    fun refreshModels() {
+        reconcilePersistence()
+        val profile = configuration()?.activeProvider()?.takeIf { allowed() }
+        renderModels(profile?.models.orEmpty(), selectedModel ?: profile?.selectedModel)
+    }
+
+    /** A quick choice is local to this workbench and starts with no prior model context. */
+    fun selectModel(model: String): Boolean {
+        reconcilePersistence()
+        val config = configuration() ?: return false
+        val profile = config.activeProvider() ?: return false
+        if (!allowed() || !config.enabled || !config.networkAllowed || model !in profile.models ||
+            model == (selectedModel ?: profile.selectedModel)) return false
+        newConversation()
+        selectedModel = model
+        refreshModels()
+        return true
     }
 
     fun refreshConversations() {
@@ -107,7 +130,7 @@ internal class AiWorkbenchController(
         val previous = selected
         val request = try {
             copyRequest(AiRequest(previous?.id, action, input, target,
-                boundedHistory(previous?.messages.orEmpty()), attachments))
+                boundedHistory(previous?.messages.orEmpty()), attachments, model = selectedModel ?: config.activeModel()))
         } catch (_: IllegalArgumentException) {
             fail()
             return
@@ -175,8 +198,9 @@ internal class AiWorkbenchController(
         token: Long = generation.get(),
         data: Long = dataGeneration.current(),
     ) {
+        val config = configuration()
         val current = { generation.get() == token && dataGeneration.isCurrent(data) &&
-            configuration()?.saveConversations == true }
+            config?.saveConversations == true && configuration() == config }
         try {
             executor.execute {
                 if (!current()) return@execute
@@ -189,12 +213,13 @@ internal class AiWorkbenchController(
         } catch (_: RejectedExecutionException) { fail() }
     }
 
-    /** Revoke saved context once at the transition, preserving new unsaved conversations. */
+    /** Provider/model/key changes revoke results and context even before an observer is delivered. */
     private fun reconcilePersistence() {
-        val enabled = configuration()?.saveConversations == true
-        val revoked = persistenceEnabled && !enabled
-        persistenceEnabled = enabled
-        if (revoked) invalidate()
+        val next = configuration()
+        if (boundConfiguration != next) {
+            boundConfiguration = next
+            invalidate()
+        }
     }
 
     private fun copyRequest(request: AiRequest): AiRequest {

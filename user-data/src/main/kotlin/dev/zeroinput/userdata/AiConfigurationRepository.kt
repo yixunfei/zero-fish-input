@@ -8,7 +8,6 @@ import dev.zeroinput.security.SecurityAliases
 import org.json.JSONObject
 import org.json.JSONArray
 import java.nio.charset.StandardCharsets
-import java.net.URI
 
 data class AiConfiguration(
     val enabled: Boolean = false,
@@ -250,7 +249,7 @@ class AiConfigurationRepository(
             require(profile.id.length in 1..64 && profile.name.isNotBlank() && profile.name.length <= 64)
             require(profile.id.none(Char::isISOControl) && profile.name.none(Char::isISOControl))
             require(profile.models.size in 1..32 && profile.models.distinct().size == profile.models.size)
-            require(profile.models.all { it.length in 1..128 && it.none(Char::isISOControl) })
+            require(profile.models.all { it.isNotBlank() && it.length <= 128 && it.none(Char::isISOControl) })
             require(profile.selectedModel in profile.models)
             require(profile.imageModels.all { it in profile.models } && profile.audioModels.all { it in profile.models })
             require(profile.apiKey.length <= 512 && profile.apiKey.none(Char::isISOControl))
@@ -260,11 +259,8 @@ class AiConfigurationRepository(
     }
 
     private fun validateEndpoint(raw: String) {
-        val endpoint = runCatching { URI(raw) }.getOrElse { throw IllegalArgumentException("AI endpoint is invalid") }
-        require(endpoint.scheme == "https" && !endpoint.host.isNullOrBlank() && endpoint.userInfo == null &&
-            endpoint.query == null && endpoint.fragment == null && endpoint.port in -1..65_535 &&
-            endpoint.port != 0) { "AI endpoint must use HTTPS" }
-        require(raw.length <= 512)
+        try { dev.zeroinput.ai.api.AiEndpoint.parse(raw) }
+        catch (_: Exception) { throw IllegalArgumentException("AI endpoint must use a valid HTTPS API address") }
     }
 
     private companion object {

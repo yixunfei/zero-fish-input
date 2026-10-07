@@ -703,3 +703,54 @@ stroke invalidation rule. Candidate prefetch keeps six engine and six personal
 pages at most, preserves ID checks, and clears retained personal pages on revision
 or privacy changes. Device tests use public fixtures to verify real window growth,
 internal search isolation, stale-session clearing, bounded drafts and scroll anchors.
+
+## AI remote model discovery and protocol repair (2026-10-07)
+
+The explicit provider-editor discovery action sends only the draft credential to
+the user-entered HTTPS origin. Both saved network switches are required. It never
+sends editor text, drafts, conversation history, attachments or stored model lists.
+No background discovery, redirects or cross-origin credential forwarding exist.
+Changing endpoint/key/model draft, dismissal, backgrounding, settings revocation
+or clearing AI data cancels the operation and invalidates queued UI results.
+
+Catalog data is untrusted: at most 512 Ki characters and 2,048 entries, strict
+string identifiers of at most 128 characters, no control characters, deduplication,
+no executable content or capability inference. Users explicitly select at most 32
+models and save; unsuccessful discovery preserves manual choices. HTML success
+pages and malformed/oversized catalogs fail closed. Non-streaming JSON generation
+requires one completed text choice with a stop finish; partial/tool results remain
+unavailable for insertion. Server error bodies are not read or displayed.
+
+A request binds its configuration when queued and cannot acquire a replacement
+provider's key later. Queue time consumes the absolute deadline. Cancellation
+cannot silently discard other queued operations. Workbench configuration changes
+revoke pending delivery, insertion and history writes. Tests cover HTML 200,
+authentication failure, redirect rejection, bounded catalogs, cancelled/stale
+UI callbacks, replacement credentials and late persistence.
+
+The temporary live fixture is opt-in instrumentation only and receives credentials
+through explicit runtime arguments. It uses public text, never persists keys or
+responses, and prints only counts/pass categories. Host debugging infrastructure
+and the user's temporary credential lifetime remain outside application storage.
+
+The opt-in live settings acceptance fixture additionally exercises the actual
+protected settings editor and encrypted save. Its temporary credential exists in
+the normal encrypted configuration only during the test; a finally block restores
+the original configuration. It requires an emulator without saved AI conversations,
+uses public draft text and disabled history persistence, and captures no live
+credential/response screenshot. It restores the prior keyboard and privacy settings.
+
+Quick model selection exposes only the current provider's saved identifiers, never
+credentials. It starts fresh context, cancels the old operation, rejects queued
+UI/history delivery, and clears draft and attachment buffers. A model ID supplied
+by the UI cannot select an unsaved model or inherit another model's capabilities.
+Configuration/session revocation dismisses stale model menus. New chat is available
+during generation and discards pending output without deleting saved conversations.
+Tests cover unknown/restricted selections, default restoration, late completion,
+new-chat history isolation and effective-model attachment capability checks.
+
+Streaming completion requires both a normal text stop and the DONE event. Mixed
+tool/text chunks, content after stop, multiple choices and trailing JSON cannot
+create a successful model probe or insertable answer. Bounded multiline SSE events
+and usage-only chunks are accepted. Live follow-up tests assert a public word from
+prior context, not merely a nonempty response.

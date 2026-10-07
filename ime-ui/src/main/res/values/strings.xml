@@ -145,6 +145,9 @@
     <string name="secure_clipboard_cancel_paste">取消粘贴</string>
     <string name="word_associations">联想</string>
     <string name="ai_new_conversation">新会话</string>
+    <string name="ai_switch_model">选择模型</string>
+    <string name="ai_current_model">%1$s ▾</string>
+    <string name="ai_switch_named_model">当前模型 %1$s，点击切换并新开会话</string>
     <string name="ai_delete_conversation">删除</string>
     <string name="ai_confirm_delete">确认删除</string>
     <string name="ai_delete_named">删除会话 %1$s</string>

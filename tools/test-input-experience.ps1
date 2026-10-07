@@ -1,9 +1,10 @@
 [CmdletBinding()]
-param([string]$Serial, [string]$TestClass)
+param([string]$Serial, [string]$TestClass, [string]$ApkPath)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+. (Join-Path $PSScriptRoot 'lib/TestApkArtifact.ps1')
 $sdkSetting = Get-Content (Join-Path $repositoryRoot "local.properties") |
     Where-Object { $_ -match '^sdk\.dir=' } | Select-Object -First 1
 if (-not $sdkSetting) { throw "Configure sdk.dir in local.properties before running device tests." }
@@ -29,16 +30,28 @@ if ($abi -notin @("arm64-v8a", "armeabi-v7a", "x86_64")) { throw "Unsupported te
 
 Push-Location $repositoryRoot
 try {
-    & ./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest -PrequireRime=true --no-parallel "-Pandroid.injected.build.abi=$abi"
+    $tasks = @(':app:assembleDebugAndroidTest')
+    if (-not $ApkPath) { $tasks += ':app:assembleDebug' }
+    & ./gradlew.bat @tasks -PrequireRime=true --no-parallel "-Pandroid.injected.build.abi=$abi"
     if ($LASTEXITCODE -ne 0) { throw "Device test APK build failed." }
-    $appDirectory = Join-Path $repositoryRoot "app/build/intermediates/apk/debug"
     $testDirectory = Join-Path $repositoryRoot "app/build/intermediates/apk/androidTest/debug"
-    $appMetadata = Get-Content (Join-Path $appDirectory "output-metadata.json") -Raw | ConvertFrom-Json
     $testMetadata = Get-Content (Join-Path $testDirectory "output-metadata.json") -Raw | ConvertFrom-Json
-    $appArtifact = @($appMetadata.elements | Where-Object { $_.filters.value -contains $abi })
-    if ($appArtifact.Count -ne 1 -or @($testMetadata.elements).Count -ne 1) { throw "Unexpected test APK outputs." }
-    Invoke-Adb @("install", "-r", "-t", (Join-Path $appDirectory $appArtifact[0].outputFile))
+    if (@($testMetadata.elements).Count -ne 1) { throw "Unexpected test APK outputs." }
+    $selectedApk = if ($ApkPath) { (Resolve-Path -LiteralPath $ApkPath).Path }
+        else { (Resolve-TestApkArtifact -RepositoryRoot $repositoryRoot -Abi $abi).Path }
+    $expectedHash = (Get-FileHash -LiteralPath $selectedApk -Algorithm SHA256).Hash.ToLowerInvariant()
+    Invoke-Adb @("install", "-r", "-t", $selectedApk)
     Invoke-Adb @("install", "-r", "-t", (Join-Path $testDirectory $testMetadata.elements[0].outputFile))
+    $installedPaths = @(Invoke-Adb @('shell', 'pm', 'path', 'dev.zeroinput.ime.debug'))
+    if ($installedPaths.Count -ne 1 -or $installedPaths[0] -notmatch '^package:(/data/app/[^\s]+/base\.apk)$') {
+        throw 'Expected one installed base APK for verification.'
+    }
+    $installedPath = $Matches[1]
+    $hashOutput = (Invoke-Adb @('shell', 'sha256sum', $installedPath)) -join ''
+    if ($hashOutput -notmatch '^([a-fA-F0-9]{64})\s' -or $Matches[1].ToLowerInvariant() -ne $expectedHash) {
+        throw 'Installed app differs from the APK selected for testing.'
+    }
+    Write-Output "Installed APK SHA-256 verified: $expectedHash"
 
     $originalMethod = @(Invoke-Adb @("shell", "settings", "get", "secure", "default_input_method"))[0].Trim()
     $changedMethod = $false
@@ -59,6 +72,14 @@ try {
         if (($result -join "`n") -notmatch 'OK \(\d+ tests?\)' -or ($result -join "`n") -match 'FAILURES!!!') {
             throw "Device regression tests failed."
         }
+        $finalHash = (Invoke-Adb @('shell', 'sha256sum', $installedPath)) -join ''
+        if ($finalHash -notmatch '^([a-fA-F0-9]{64})\s' -or $Matches[1].ToLowerInvariant() -ne $expectedHash) {
+            throw 'Installed APK changed during device tests.'
+        }
+        @{
+            apk = $selectedApk; sha256 = $expectedHash; serial = $Serial; tests = $TestClass
+            passed = $true; verifiedAtUtc = [DateTime]::UtcNow.ToString('o')
+        } | ConvertTo-Json | Set-Content (Join-Path $repositoryRoot 'build/device-apk-verification.json') -Encoding utf8
     } finally {
         if ($changedMethod) { Invoke-Adb @("shell", "ime", "set", $originalMethod) }
     }

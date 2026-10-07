@@ -68,8 +68,8 @@ class AiSettingsFailureTest {
         assertEquals(original, graph.aiConfiguration.read())
         openSettings(screen)
         onMain {
-            assertEquals("https://api.openai.com/v1/chat/completions", field(R.string.ai_endpoint_hint).text.toString())
-            assertEquals("gpt-4o-mini", field(R.string.ai_models_hint).text.toString())
+            assertEquals("https://api.openai.com/v1", field(R.string.ai_endpoint_hint).text.toString())
+            assertTrue(field(R.string.ai_models_hint).text.isNullOrEmpty())
             assertTrue(field(R.string.ai_key_hint).text.isNullOrEmpty())
         }
     }

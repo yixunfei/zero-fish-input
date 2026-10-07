@@ -22,8 +22,8 @@ macOS implementation and permissions are not copied into the Android input metho
   external editor, editor selection, system clipboard, private clipboard vault,
   personal lexicon or emoji history. The draft has its own conversion session and
   uses a no-op personalization store.
-- The user approved multi-provider OpenAI-compatible Chat Completions and manual
-  model lists. Each model has explicit image/audio capability flags. A mismatch
+- The user approved multi-provider OpenAI-compatible Chat Completions and explicit remote
+  model discovery or manual model lists. Each model has explicit image/audio capability flags. A mismatch
   fails before transport; endpoints, models and credentials are locally encrypted.
 - The exported `AiComposeActivity` accepts bounded plain text from SEND/PROCESS_TEXT.
   It never sends requests, reads editor selections or returns content to the sender.
@@ -53,7 +53,7 @@ macOS implementation and permissions are not copied into the Android input metho
 - The provider does not log endpoint credentials, request text, response text or
   conversation content. Configuration and history are separate encrypted stores.
 - An explicit settings model test reuses the sole transport with the selected
-  saved provider/model, a fixed public prompt, 16 output tokens and at most 15 seconds.
+  saved provider/model, a fixed public prompt, 16 output tokens and at most 30 seconds.
   It requires both network switches, has no history/attachment/editor ports, does
   not persist or expose an insertable result, and is cancelled on dismissal,
   backgrounding, configuration revocation and data clear. Only safe status categories
@@ -70,3 +70,42 @@ The AI workbench is a compact keyboard panel rather than a background assistant:
 there is no automatic context capture, automatic insertion, notification preview,
 remote configuration, telemetry or cloud synchronization. Real provider behavior,
 vendor editor behavior and device authentication still require device validation.
+
+## Provider interoperability amendment (2026-10-07)
+
+The user approved explicit model discovery and repair of real provider connections.
+API base addresses (including versioned proxy prefixes) and full Chat Completions
+addresses resolve on the same HTTPS origin to `chat/completions` and `models`.
+A bare origin uses `/v1`. Embedded URL credentials, query/fragment data, dot segments and
+redirects remain rejected. Configuration format 4 and conversation format remain
+unchanged; no stored data is cleared or migrated for this amendment.
+
+An explicit Fetch available models action in the protected editor may send the
+entered endpoint/key before saving, but only while both saved network switches
+are enabled. GET `/models` has no body or editor/history inputs. Responses are
+bounded to 512 Ki characters and 2,048 entries; only validated model identifiers
+are used. The user chooses up to 32 models, applies them to the draft, and saves
+explicitly. Manually entered models remain selectable; unavailable discovery never
+blocks a model test. Discovery never infers image/audio capabilities.
+
+Model tests use an actual generation request with the fixed public prompt and
+16-token output cap, now with a maximum 30-second deadline. A catalog entry or
+HTTP 200 alone does not establish usability. HTML successes are rejected without
+reading the body. The transport accepts bounded SSE or a complete JSON Chat
+Completions result; truncation, non-text/tool finishes and empty results fail.
+There is no automatic alternate-endpoint retry or duplicate generation request.
+
+Credentials and selected model bind when a request is queued. Deadlines start at
+submission, and cancelling one request cannot remove unrelated queued requests.
+Settings, endpoint/key/draft edits, backgrounding and dialog dismissal invalidate
+model discovery; stale results cannot rewrite the draft. Configuration changes
+also revoke workbench results, context and queued persistence before delayed
+observer delivery. Existing explicit history selection remains available.
+
+The approved quick model selector is workbench-local: it can choose only saved
+models under the active provider and starts empty context. It does not rewrite the
+default or fetch models on opening. The effective request model must pass that
+provider's membership and media-capability checks. New chat cancels pending
+generation and clears the draft/context while retaining this local choice.
+Leaving the workbench restores the saved default. No stored format or network
+surface is added.

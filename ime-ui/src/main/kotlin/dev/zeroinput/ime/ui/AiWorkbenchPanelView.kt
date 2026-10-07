@@ -22,6 +22,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onConversationSelected: (String) -> Unit = {}
     var onConversationDeleted: (String) -> Unit = {}
     var onNewConversation: () -> Unit = {}
+    var onModelSelected: (String) -> Unit = {}
     var onEditingChanged: (Boolean) -> Unit = {}
     var onSettings: () -> Unit = {}
     var onAddContent: () -> Unit = {}
@@ -34,11 +35,21 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private var inputLanguage = InputLanguage.CHINESE
     var editing = false
         private set
-    val editingHeightDp: Int get() = if (attachmentRow.childCount > 0) 224 else 176
+    val editingHeightDp: Int get() = if (attachmentRow.childCount > 0) 272 else 224
 
     private val inputStatus = textView().apply { textSize = 12f; gravity = Gravity.CENTER_VERTICAL }
+    private val model: MaterialButton = button(R.string.ai_switch_model) { modelMenu.show() }.apply {
+        id = R.id.ai_model_button
+    }
+    private val modelMenu: AiModelMenu = AiModelMenu(model, { onModelSelected(it); setEditing(true) }, { onSettings() })
+    private val newConversation = button(R.string.ai_new_conversation) {
+        pendingDelete = null
+        onNewConversation()
+        setEditing(true)
+    }
 
     private val draft = textView().apply {
+        id = R.id.ai_draft_text
         maxLines = 2
         minHeight = dp(48)
         hint = context.getString(R.string.ai_input_hint)
@@ -53,7 +64,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         }
     }
     private val transcript = textView()
-    private val result = textView()
+    private val result = textView().apply { id = R.id.ai_result_text }
     private val conversationRows = LinearLayout(context).apply { orientation = VERTICAL }
     private val detailContent = LinearLayout(context).apply {
         orientation = VERTICAL
@@ -85,6 +96,11 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         if (Build.VERSION.SDK_INT >= 30) importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         isSaveEnabled = false
         setPadding(dp(8), 0, dp(8), 0)
+        addView(LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            addView(model, LayoutParams(0, dp(48), 1f))
+            addView(newConversation, LayoutParams(dp(88), dp(48)))
+        }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(scrollRow(actions.values + target), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(inputStatus, LayoutParams(LayoutParams.MATCH_PARENT, dp(32)))
         addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
@@ -132,11 +148,6 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     fun renderConversations(values: List<AiConversationSummary>) {
         conversationRows.removeAllViews()
-        conversationRows.addView(button(R.string.ai_new_conversation) {
-            pendingDelete = null
-            onNewConversation()
-            setEditing(true)
-        })
         values.take(AiLimits.MAX_CONVERSATIONS).forEach { value ->
             val row = LinearLayout(context).apply { orientation = HORIZONTAL }
             row.addView(buttonText(value.title) {
@@ -170,6 +181,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
                 message.content)
         }
     }
+
+    fun renderModels(models: List<String>, selected: String?) { modelMenu.render(models, selected) }
 
     fun render(event: AiStreamEvent) {
         when (event) {
@@ -231,6 +244,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
 
     fun reset() {
+        modelMenu.render(emptyList(), null)
         renderImportedContent(false, emptyList())
         draft.text = ""
         transcript.text = ""
@@ -241,6 +255,11 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         renderConversations(emptyList())
         render(AiStreamEvent.Cancelled)
         setEditing(false)
+    }
+
+    override fun onDetachedFromWindow() {
+        modelMenu.dismiss()
+        super.onDetachedFromWindow()
     }
 
     private fun submit() {

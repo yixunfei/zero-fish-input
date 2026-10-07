@@ -4,7 +4,8 @@ param(
     [string]$Abi = "universal",
     [switch]$Install,
     [string]$Serial,
-    [switch]$SkipChecks
+    [switch]$SkipChecks,
+    [string]$OutputDirectory
 )
 
 Set-StrictMode -Version Latest
@@ -13,8 +14,9 @@ $ProgressPreference = "SilentlyContinue"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $gradleWrapper = Join-Path $repositoryRoot "gradlew.bat"
-$debugApkRoot = Join-Path $repositoryRoot "app\build\outputs\apk\debug"
-$artifactRoot = Join-Path $repositoryRoot "app\build\outputs\test-apk"
+. (Join-Path $PSScriptRoot 'lib/TestApkArtifact.ps1')
+$artifactRoot = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) }
+    else { Join-Path $repositoryRoot "app\build\outputs\test-apk" }
 $supportedAbis = @("arm64-v8a", "armeabi-v7a", "x86_64")
 
 function Invoke-CheckedCommand {
@@ -199,22 +201,8 @@ try {
     Pop-Location
 }
 
-$outputMetadataPath = Join-Path $debugApkRoot "output-metadata.json"
-if (-not (Test-Path -LiteralPath $outputMetadataPath)) {
-    throw "Gradle APK metadata was not produced: $outputMetadataPath"
-}
-$outputMetadata = Get-Content -LiteralPath $outputMetadataPath -Raw | ConvertFrom-Json
-$outputElement = @($outputMetadata.elements | Where-Object {
-    $abiFilters = @($_.filters | Where-Object { $_.filterType -eq "ABI" })
-    if ($Abi -eq "universal") {
-        $abiFilters.Count -eq 0
-    } else {
-        $abiFilters.Count -eq 1 -and $abiFilters[0].value -eq $Abi
-    }
-}) | Select-Object -First 1
-if (-not $outputElement) { throw "Gradle metadata does not contain the requested $Abi APK." }
-$sourceApk = Join-Path $debugApkRoot $outputElement.outputFile
-if (-not (Test-Path -LiteralPath $sourceApk)) { throw "Expected APK was not produced: $sourceApk" }
+$artifact = Resolve-TestApkArtifact -RepositoryRoot $repositoryRoot -Abi $Abi
+$sourceApk = $artifact.Path
 
 $metadata = Assert-TestApk $sourceApk $androidTools $expectedAbis
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -223,6 +211,20 @@ New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
 $artifactName = "zero-fish-input-$($metadata.VersionName)-$Abi.apk"
 $artifactApk = Join-Path $artifactDirectory $artifactName
 Copy-Item -LiteralPath $sourceApk -Destination $artifactApk
+$sourceHash = (Get-FileHash -LiteralPath $sourceApk -Algorithm SHA256).Hash
+if ((Get-FileHash -LiteralPath $artifactApk -Algorithm SHA256).Hash -ne $sourceHash) {
+    throw 'Packaged APK differs from the current Gradle output.'
+}
+@{
+    sourceApk = $sourceApk
+    sourceMetadata = $artifact.MetadataPath
+    sourceLocator = $artifact.LocatorPath
+    applicationId = $metadata.PackageName
+    versionName = $metadata.VersionName
+    abi = $Abi
+    sha256 = $sourceHash.ToLowerInvariant()
+    packagedAtUtc = [DateTime]::UtcNow.ToString('o')
+} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDirectory 'BUILD-PROVENANCE.json') -Encoding utf8
 
 $noticesName = "zero-fish-input-$($metadata.VersionName)-notices.zip"
 $noticesArchive = Join-Path $artifactDirectory $noticesName
