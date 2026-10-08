@@ -22,6 +22,16 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onConversationSelected: (String) -> Unit = {}
     var onConversationDeleted: (String) -> Unit = {}
     var onNewConversation: () -> Unit = {}
+    var onConversationsRequested: () -> Unit = {}
+    var onConversationRename: (String, String) -> Unit = { _, _ -> }
+    var onRenameCancelled: () -> Unit = {}
+    var onContextAction: (AiContextCommand) -> Unit = {}
+    var onPageRequested: () -> Unit = {}
+    var onPageSelected: (List<Int>) -> Unit = {}
+    var onPageCancelled: () -> Unit = {}
+    private var renaming = false
+    private var detailMode = DetailMode.RESULT
+    private enum class DetailMode { RESULT, CONTEXT, CONVERSATIONS, PAGE }
     var onModelSelected: (String) -> Unit = {}
     var onEditingChanged: (Boolean) -> Unit = {}
     var onSettings: () -> Unit = {}
@@ -30,7 +40,6 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onRemoveAttachment: (Int) -> Unit = {}
     private var action = AiAction.ASK
     private var languageIndex = 0
-    private var pendingDelete: String? = null
     private var streaming = false
     private var inputLanguage = InputLanguage.CHINESE
     var editing = false
@@ -43,7 +52,6 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
     private val modelMenu: AiModelMenu = AiModelMenu(model, { onModelSelected(it); setEditing(true) }, { onSettings() })
     private val newConversation = button(R.string.ai_new_conversation) {
-        pendingDelete = null
         onNewConversation()
         setEditing(true)
     }
@@ -65,16 +73,42 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
     private val transcript = textView()
     private val result = textView().apply { id = R.id.ai_result_text }
-    private val conversationRows = LinearLayout(context).apply { orientation = VERTICAL }
+    private val conversationRows = AiConversationListView(context).apply {
+        onSelect = { onConversationSelected(it); showDetail(DetailMode.RESULT) }
+        onDelete = { onConversationDeleted(it) }
+        onRename = { id, title -> onConversationRename(id, title) }
+        onRefresh = { onConversationsRequested() }
+    }
+    private val contextRows = AiContextView(context).apply {
+        onHistory = { revision, index, included -> onContextAction(AiContextCommand.History(revision, index, included)) }
+        onRecent = { onContextAction(AiContextCommand.Recent(it)) }
+        onClear = { onContextAction(AiContextCommand.Clear(it)) }
+        onRemove = { revision, index -> onContextAction(AiContextCommand.Remove(revision, index)) }
+    }
+    private val pageRows = AiPageSelectionView(context).apply {
+        onSelectionChanged = { selected -> if (detailMode == DetailMode.PAGE) submit.isEnabled = selected }
+    }
+    private val answerButton = button(R.string.ai_show_result) { showDetail(DetailMode.RESULT) }
+    private val contextButton = button(R.string.ai_context_title) { showDetail(DetailMode.CONTEXT) }
+    private val pageButton = button(R.string.ai_page_reference) { onPageRequested() }
+    private val conversationsButton = button(R.string.ai_conversations_title) {
+        showDetail(DetailMode.CONVERSATIONS); onConversationsRequested()
+    }
+    private val renameCancel = button(R.string.ai_rename_cancel) { onRenameCancelled() }.apply { visibility = GONE }
     private val detailContent = LinearLayout(context).apply {
         orientation = VERTICAL
         addView(conversationRows)
+        addView(contextRows)
+        addView(pageRows)
         addView(transcript)
         addView(result)
     }
     private val detail = ScrollView(context).apply { addView(detailContent); isFillViewport = true }
     private val target = button(R.string.ai_target_language_hint) { cycleLanguage() }
-    private val edit = button(R.string.ai_edit) { setEditing(!editing) }
+    private val edit = button(R.string.ai_edit) {
+        if (detailMode == DetailMode.PAGE) { onPageCancelled(); clearPage() }
+        else setEditing(!editing)
+    }
     private val submit = button(R.string.ai_submit) { submit() }
     private val cancel = button(R.string.ai_cancel) { onCancel() }
     private val insert = button(R.string.ai_insert) { onInsert(result.text.toString()) }
@@ -99,9 +133,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         addView(LinearLayout(context).apply {
             orientation = HORIZONTAL
             addView(model, LayoutParams(0, dp(48), 1f))
-            addView(newConversation, LayoutParams(dp(88), dp(48)))
+            addView(newConversation, LayoutParams(dp((88 * resources.configuration.fontScale.coerceAtLeast(1f)).toInt()), dp(48)))
         }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
-        addView(scrollRow(actions.values + target), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        addView(scrollRow(listOf(pageButton, contextButton, conversationsButton, answerButton, renameCancel) +
+            actions.values + target), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(inputStatus, LayoutParams(LayoutParams.MATCH_PARENT, dp(32)))
         addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(HorizontalScrollView(context).apply { addView(attachmentRow) })
@@ -117,6 +152,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         renderConversations(emptyList())
         updateActionStyles()
         render(AiStreamEvent.Cancelled)
+        updateDetailVisibility()
     }
 
     fun renderDraft(value: String, language: InputLanguage = inputLanguage) {
@@ -124,7 +160,16 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         draft.error = null
         inputLanguage = language
         renderInputStatus()
-        submit.isEnabled = !streaming && value.isNotBlank()
+        refreshCommands()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        // Short landscape panels must leave a scrollable reading area below the controls.
+        val compactReading = !editing && (detailMode != DetailMode.RESULT ||
+            MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED && MeasureSpec.getSize(heightMeasureSpec) < dp(320))
+        draft.visibility = if (compactReading) GONE else VISIBLE
+        inputStatus.visibility = if (compactReading) GONE else VISIBLE
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
     fun renderImportedContent(available: Boolean, names: List<String>) {
@@ -139,39 +184,76 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     fun setEditing(value: Boolean) {
         if (editing == value) return
+        if (value && detailMode == DetailMode.PAGE) {
+            onPageCancelled()
+            pageRows.render(null)
+            detailMode = DetailMode.RESULT
+            updateDetailVisibility()
+        }
         editing = value
         detail.visibility = if (value) GONE else VISIBLE
-        edit.setText(if (value) R.string.ai_read else R.string.ai_edit)
+        refreshCommands()
         renderInputStatus()
         onEditingChanged(value)
     }
 
-    fun renderConversations(values: List<AiConversationSummary>) {
-        conversationRows.removeAllViews()
-        values.take(AiLimits.MAX_CONVERSATIONS).forEach { value ->
-            val row = LinearLayout(context).apply { orientation = HORIZONTAL }
-            row.addView(buttonText(value.title) {
-                pendingDelete = null
-                onConversationSelected(value.id)
-                setEditing(false)
-            }, LayoutParams(0, dp(48), 1f))
-            row.addView(button(R.string.ai_delete_conversation) {
-                if (pendingDelete == value.id) {
-                    pendingDelete = null
-                    onConversationDeleted(value.id)
-                } else {
-                    pendingDelete = value.id
-                    renderConversations(values)
-                }
-            }.apply {
-                if (pendingDelete == value.id) setText(R.string.ai_confirm_delete)
-                contentDescription = context.getString(R.string.ai_delete_named, value.title)
-            })
-            conversationRows.addView(row)
+    fun renderConversations(values: List<AiConversationSummary>) { conversationRows.render(values) }
+
+    fun renderHistoryStatus(saving: Boolean, loading: Boolean, failed: Boolean) {
+        conversationRows.status(saving, loading, failed)
+    }
+
+    fun renderContext(value: AiContextState) {
+        contextRows.render(value)
+        contextButton.text = context.getString(R.string.ai_context_short_count,
+            value.references.size + value.selectedHistory.size)
+    }
+
+    fun renderPage(texts: List<String>?, incomplete: Boolean, loading: Boolean) {
+        pageRows.render(texts, incomplete, loading)
+        showDetail(DetailMode.PAGE)
+    }
+
+    fun clearPage() {
+        pageRows.render(null)
+        if (detailMode == DetailMode.PAGE) showDetail(DetailMode.CONTEXT)
+    }
+
+    fun renderRenaming(value: Boolean) {
+        renaming = value
+        refreshCommands()
+        renameCancel.visibility = if (value) VISIBLE else GONE
+        pageButton.isEnabled = !value
+        contextButton.isEnabled = !value
+        conversationsButton.isEnabled = !value
+        actions.values.forEach { it.isEnabled = !value }
+        target.isEnabled = !value
+        renderInputStatus()
+        if (value) setEditing(true)
+    }
+
+    private fun showDetail(mode: DetailMode) {
+        if (detailMode == DetailMode.PAGE && mode != DetailMode.PAGE) {
+            onPageCancelled()
+            pageRows.render(null)
         }
+        detailMode = mode
+        setEditing(false)
+        updateDetailVisibility()
+    }
+
+    private fun updateDetailVisibility() {
+        conversationRows.visibility = if (detailMode == DetailMode.CONVERSATIONS) VISIBLE else GONE
+        contextRows.visibility = if (detailMode == DetailMode.CONTEXT) VISIBLE else GONE
+        pageRows.visibility = if (detailMode == DetailMode.PAGE) VISIBLE else GONE
+        transcript.visibility = if (detailMode == DetailMode.RESULT) VISIBLE else GONE
+        result.visibility = if (detailMode == DetailMode.RESULT) VISIBLE else GONE
+        refreshCommands()
+        requestLayout()
     }
 
     fun renderConversation(value: AiConversation?) {
+        conversationRows.current(value?.id)
         val messages = value?.messages.orEmpty()
         val latest = messages.lastOrNull()?.takeIf { it.role == AiRole.ASSISTANT }
         result.text = latest?.content.orEmpty()
@@ -189,7 +271,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             AiStreamEvent.Started -> {
                 streaming = true
                 result.text = ""
-                setEditing(false)
+                showDetail(DetailMode.RESULT)
                 submit.isEnabled = false
                 cancel.isEnabled = true
                 cancel.visibility = VISIBLE
@@ -208,7 +290,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             }
             is AiStreamEvent.Failed -> {
                 streaming = false
-                setEditing(false)
+                if (detailMode != DetailMode.CONVERSATIONS) showDetail(DetailMode.RESULT)
+                else setEditing(false)
                 result.setText(aiErrorMessage(event.error))
                 submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false
@@ -226,10 +309,12 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
                 insert.isEnabled = false
             }
         }
+        refreshCommands()
     }
 
     private fun renderInputStatus() {
-        if (streaming) inputStatus.setText(R.string.ai_generating)
+        if (renaming) inputStatus.setText(R.string.ai_conversation_rename)
+        else if (streaming) inputStatus.setText(R.string.ai_generating)
         else inputStatus.text = context.getString(if (editing) R.string.ai_draft_mode else R.string.ai_result_mode,
             context.getString(if (inputLanguage == InputLanguage.CHINESE) R.string.ai_input_chinese else R.string.ai_input_english))
         draft.isSelected = editing
@@ -244,11 +329,16 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
 
     fun reset() {
+        renderRenaming(false)
+        detailMode = DetailMode.RESULT
+        updateDetailVisibility()
+        contextRows.render(AiContextState())
+        pageRows.render(null)
+        conversationRows.status(false, false, false)
         modelMenu.render(emptyList(), null)
         renderImportedContent(false, emptyList())
         draft.text = ""
         transcript.text = ""
-        pendingDelete = null
         languageIndex = 0
         action = AiAction.ASK
         updateActionStyles()
@@ -262,7 +352,16 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         super.onDetachedFromWindow()
     }
 
+    private fun refreshCommands() {
+        val selecting = detailMode == DetailMode.PAGE
+        submit.setText(when { selecting -> R.string.ai_page_add; renaming -> R.string.ai_rename_save; else -> R.string.ai_submit })
+        edit.setText(when { selecting -> R.string.ai_page_cancel; editing -> R.string.ai_read; else -> R.string.ai_edit })
+        insert.visibility = if (selecting) GONE else VISIBLE
+        submit.isEnabled = if (selecting) pageRows.selection.isNotEmpty() else !streaming && draft.text.isNotBlank()
+    }
+
     private fun submit() {
+        if (detailMode == DetailMode.PAGE) { onPageSelected(pageRows.selection); return }
         if (streaming) return
         val text = draft.text.toString().trim()
         if (text.isBlank()) { draft.error = context.getString(R.string.ai_input_required); return }

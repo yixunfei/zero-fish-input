@@ -211,7 +211,6 @@
     <string name="ai_add_attachment">添加文件、图片或音频</string>
     <string name="ai_remove_attachment">移除 %1$s</string>
     <string name="ai_attachment_failed">无法读取此附件，或附件超出大小限制。</string>
-    <string name="ai_attachment_prompt">请分析附件内容</string>
     <string name="ai_network_disabled">AI 网络功能未启用</string>
     <string name="ai_enabled">启用 AI 功能</string>
     <string name="ai_network">允许 AI 联网请求</string>

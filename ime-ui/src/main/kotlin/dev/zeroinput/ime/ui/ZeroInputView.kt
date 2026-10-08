@@ -1,7 +1,6 @@
 package dev.zeroinput.ime.ui
 
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Color
 import android.util.AttributeSet
 import android.view.Gravity
@@ -82,6 +81,12 @@ class ZeroInputView @JvmOverloads constructor(
     var onAiConversationSelected: (String) -> Unit = {}
     var onAiConversationDeleted: (String) -> Unit = {}
     var onAiNewConversation: () -> Unit = {}
+    var onAiContextAction: (AiContextCommand) -> Unit = {}
+    var onAiPageRequested: () -> Unit = {}
+    var onAiPageSelected: (List<Int>) -> Unit = {}
+    var onAiPageCancelled: () -> Unit = {}
+    var onAiConversationRename: (String, String) -> Unit = { _, _ -> }
+    var onAiRenameCancelled: () -> Unit = {}
     var onAiModelSelected: (String) -> Unit = {}
     var onAiVisibilityChanged: (Boolean) -> Unit = {}
     var onAiDraftChanged: (KeyboardAction) -> Unit = {}
@@ -148,7 +153,7 @@ class ZeroInputView @JvmOverloads constructor(
     private var panelExpansion = PanelExpansion.COMPACT
     val isPanelExpanded: Boolean get() = panelExpansion != PanelExpansion.COMPACT
     private var lastViewport = -1
-    private var lastLandscape = false
+    private var viewportPlan = KeyboardViewportPolicy.resolve(0, 0, resources.displayMetrics.density, editing = false)
     private var engineStatus = InputEngineStatus.HIDDEN
     /** Rendered session status, independent of the optional diagnostic text. */
     val renderedEngineStatus: InputEngineStatus get() = engineStatus
@@ -217,8 +222,7 @@ class ZeroInputView @JvmOverloads constructor(
         changePanelExpansion(if (isPanelExpanded) PanelExpansion.COMPACT else PanelExpansion.EXPANDED)
     }
     private val header = FrameLayout(context).apply {
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(if (landscape) 48 else 72))
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(KeyboardViewportPolicy.STACKED_HEADER_HEIGHT_DP))
         addView(toolbar, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48), Gravity.CENTER_VERTICAL))
         addView(candidateStrip, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(glideSuggestions, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -405,10 +409,11 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderClipboardGuard(enabled: Boolean, changed: Boolean) { clipboardGuard.render(enabled, changed) }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val available = dp(resources.configuration.screenHeightDp)
-        val requestedLimit = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) available
-            else MeasureSpec.getSize(heightMeasureSpec)
+        val requestedLimit = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+            naturalViewportHeight()
+        } else {
+            MeasureSpec.getSize(heightMeasureSpec)
+        }
         // The previous IME root height is the collapsed window, not a limit on
         // its next layout. Only the current parent measure spec is authoritative.
         val parentLimit = requestedLimit
@@ -416,21 +421,21 @@ class ZeroInputView @JvmOverloads constructor(
         // measuring children so the keyboard cannot extend below the IME window.
         val insetHeight = paddingTop + paddingBottom
         val contentLimit = (parentLimit - insetHeight).coerceAtLeast(0)
-        val limit = if (landscape && available > 0 && panelExpansion != PanelExpansion.FULLSCREEN) {
-            minOf(contentLimit, (available - dp(48)).coerceAtLeast(dp(192)))
-        } else {
-            contentLimit
-        }
+        val plan = KeyboardViewportPolicy.resolve(
+            widthPx = (MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight).coerceAtLeast(0),
+            heightPx = contentLimit,
+            density = resources.displayMetrics.density,
+            editing = isDetailEditing(),
+        )
+        applyViewportPlan(plan)
+        val limit = contentLimit
         val reminder = if (clipboardGuard.isVisible) dp(48) else 0
         val preparationHeight = if (enginePreparation.isVisible) enginePreparation.preferredHeight else 0
         panelChromeHeight = header.layoutParams.height + reminder + preparationHeight
         availablePanelHeight = limit
         val bodyLimit = (limit - panelChromeHeight).coerceAtLeast(0)
-        if (bodyLimit != lastViewport || landscape != lastLandscape) {
+        if (bodyLimit != lastViewport) {
             lastViewport = bodyLimit
-            lastLandscape = landscape
-            keyboard.setCompactLandscape(bodyLimit < dp(if (isSearchEditing) 480 else 224))
-            readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
             updatePanelLayout()
         }
         val outerLimit = (limit + insetHeight).coerceAtMost(parentLimit)
@@ -519,6 +524,12 @@ class ZeroInputView @JvmOverloads constructor(
         onAiConversationSelected = {}
         onAiConversationDeleted = {}
         onAiNewConversation = {}
+        onAiContextAction = {}
+        onAiPageRequested = {}
+        onAiPageSelected = {}
+        onAiPageCancelled = {}
+        onAiConversationRename = { _, _ -> }
+        onAiRenameCancelled = {}
         onAiModelSelected = {}
         onAiVisibilityChanged = {}
         onAiDraftChanged = {}
@@ -583,6 +594,16 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderSecureClipboard(enabled: Boolean, items: List<SecureClipboardItemUi>) {
         secureClipboard.render(enabled, items)
     }
+
+    fun renderAiContext(value: dev.zeroinput.ai.api.AiContextState) { ai.renderContext(value) }
+    fun renderAiHistoryStatus(saving: Boolean, loading: Boolean, failed: Boolean) {
+        ai.renderHistoryStatus(saving, loading, failed)
+    }
+    fun renderAiPage(texts: List<String>?, incomplete: Boolean = false, loading: Boolean = false) {
+        ai.renderPage(texts, incomplete, loading)
+    }
+    fun clearAiPage() { ai.clearPage() }
+    fun renderAiRenaming(value: Boolean) { ai.renderRenaming(value) }
 
     fun renderAi(event: AiStreamEvent) { ai.render(event) }
 
@@ -740,6 +761,13 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onConversationSelected = { onAiConversationSelected(it) }
         ai.onConversationDeleted = { onAiConversationDeleted(it) }
         ai.onNewConversation = { onAiNewConversation() }
+        ai.onConversationsRequested = { onAiConversationsRequested() }
+        ai.onContextAction = { onAiContextAction(it) }
+        ai.onPageRequested = { onAiPageRequested() }
+        ai.onPageSelected = { onAiPageSelected(it) }
+        ai.onPageCancelled = { onAiPageCancelled() }
+        ai.onConversationRename = { id, title -> onAiConversationRename(id, title) }
+        ai.onRenameCancelled = { onAiRenameCancelled() }
         ai.onModelSelected = { onAiModelSelected(it) }
         ai.onSettings = { onAiSettingsRequested() }
         ai.onAddContent = { onAiAddContentRequested() }
@@ -893,16 +921,19 @@ class ZeroInputView @JvmOverloads constructor(
         requestLayout()
     }
 
+    private fun updateHeaderMargin(view: View, margin: Int) {
+        val params = view.layoutParams as FrameLayout.LayoutParams
+        if (params.marginEnd != margin) { params.marginEnd = margin; view.layoutParams = params }
+    }
+
     private fun refreshHeader() {
         backNavigation.refresh()
         expansionButton.visibility = if (mode == PanelMode.KEYBOARD) GONE else VISIBLE
         expansionButton.rotation = if (isPanelExpanded) 180f else 0f
         expansionButton.contentDescription = context.getString(if (isPanelExpanded) R.string.panel_collapse else R.string.panel_expand)
-        for (view in listOf(toolbar, candidateStrip)) {
-            val params = view.layoutParams as FrameLayout.LayoutParams
-            val margin = if (expansionButton.isVisible) dp(48) else 0
-            if (params.marginEnd != margin) { params.marginEnd = margin; view.layoutParams = params }
-        }
+        val margin = if (expansionButton.isVisible) dp(48) else 0
+        updateHeaderMargin(toolbar, margin)
+        updateHeaderMargin(candidateStrip, margin)
         aiButton.renderAiEntryAvailability(aiAvailable)
         reconvertButton.visibility = if (canReconvert && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         candidateStrip.renderReconversion(canReconvert && mode == PanelMode.KEYBOARD)
@@ -962,22 +993,21 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     private fun updatePanelLayout() {
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val aiEditing = mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded
         val searchActive = isSearchEditing && !searchCandidatesExpanded
         val editing = searchActive || aiEditing
-        val splitSearch = editing && landscape
+        val splitSearch = editing && viewportPlan.splitDetailPanel
         // AI keeps three primary commands visible; reserve their width in a short landscape window.
         val detailWeight = if (aiEditing) 5f else 1f
         val keyboardWeight = if (aiEditing) 7f else 2f
-        val compactPanel = dp(if (landscape) EMOJI_SEARCH_HEIGHT_DP else PANEL_HEIGHT_DP)
+        val compactPanel = dp(if (viewportPlan.candidateInline) EMOJI_SEARCH_HEIGHT_DP else PANEL_HEIGHT_DP)
         val defaultHeight = when {
             editing && !splitSearch -> keyboard.preferredHeight + dp(if (searchActive) 224 else ai.editingHeightDp)
             mode == PanelMode.CANDIDATES || aiCandidatesExpanded || searchCandidatesExpanded -> keyboard.preferredHeight
             mode == PanelMode.AI && !editing -> dp(360)
             else -> compactPanel
         }
-        val viewport = availablePanelHeight.takeIf { it > 0 } ?: dp(resources.configuration.screenHeightDp)
+        val viewport = availablePanelHeight.takeIf { it > 0 } ?: naturalViewportHeight()
         val body = PanelSizePolicy.bodyHeight(panelExpansion, viewport, panelChromeHeight, defaultHeight)
         val detailHeight = if (editing && !splitSearch) (body - keyboard.preferredHeight).coerceAtLeast(0) else body
         content.orientation = if (splitSearch) HORIZONTAL else VERTICAL
@@ -991,6 +1021,29 @@ class ZeroInputView @JvmOverloads constructor(
             else LayoutParams(LayoutParams.MATCH_PARENT, if (aiEditing) detailHeight else body)
         expandedCandidates.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
     }
+
+    private fun isDetailEditing(): Boolean =
+        (isSearchEditing && !searchCandidatesExpanded) || (mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded)
+
+    private fun applyViewportPlan(plan: KeyboardViewportPlan) {
+        if (viewportPlan == plan) return
+        viewportPlan = plan
+        val params = header.layoutParams
+        val headerHeight = dp(plan.headerHeightDp)
+        if (params.height != headerHeight) {
+            params.height = headerHeight
+            header.layoutParams = params
+        }
+        candidateStrip.applyViewport(plan)
+        keyboard.setCompactLayout(plan.compactKeyboard)
+        readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
+        updatePanelLayout()
+    }
+
+    private fun naturalViewportHeight(): Int = maxOf(
+        keyboard.preferredHeight + dp(KeyboardViewportPolicy.STACKED_HEADER_HEIGHT_DP),
+        dp(NATURAL_VIEWPORT_HEIGHT_DP),
+    )
 
     private fun toolbarButton(label: String, description: String, action: () -> Unit) = MaterialButton(context).apply {
         text = label
@@ -1037,5 +1090,6 @@ class ZeroInputView @JvmOverloads constructor(
     private companion object {
         const val PANEL_HEIGHT_DP = 260
         const val EMOJI_SEARCH_HEIGHT_DP = 224
+        const val NATURAL_VIEWPORT_HEIGHT_DP = 420
     }
 }

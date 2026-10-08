@@ -30,6 +30,72 @@ class InputPipelineTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test
+    fun delayedPreparationPreservesFirstLetterAcrossNativeHandoff() {
+        val graph = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
+        val settings = graph.settings
+        val originalOptions = settings.chineseInputOptions
+        val originalPack = settings.lastLanguagePackKey
+        val originalMethod = shell("settings get secure default_input_method").trim()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val blocker = graph.engineExecutor.submit {
+            entered.countDown()
+            check(release.await(30, TimeUnit.SECONDS))
+        }
+        var activity: InputFixtureActivity? = null
+        try {
+            assertTrue(entered.await(30, TimeUnit.SECONDS))
+            onMain {
+                settings.chineseInputOptions = ChineseInputOptions()
+                settings.lastLanguagePackKey = null
+            }
+            val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
+            shell("ime enable $method")
+            shell("ime set $method")
+            activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
+            val panel = awaitPanel()
+            instrumentation.waitForIdleSync()
+            onMain {
+                val languageAction = panel.context.getString(dev.zeroinput.ime.ui.R.string.key_language)
+                if (descendants(panel).filterIsInstance<android.widget.TextView>().any {
+                    it.isShown && it.contentDescription == languageAction && it.text.toString() == "En"
+                }) panel.onKeyboardAction(KeyboardAction.SwitchLanguage)
+            }
+            instrumentation.waitForIdleSync()
+            onMain {
+                org.junit.Assert.assertEquals(dev.zeroinput.ime.ui.InputEngineStatus.PREPARING, panel.renderedEngineStatus)
+                sendKey(panel, "n")
+            }
+            instrumentation.waitForIdleSync()
+            onMain {
+                org.junit.Assert.assertEquals("n", activity.editor.text.toString())
+                org.junit.Assert.assertEquals(0, android.view.inputmethod.BaseInputConnection.getComposingSpanStart(activity.editor.text))
+            }
+            release.countDown()
+            blocker.get(5, TimeUnit.SECONDS)
+            awaitReady(panel)
+            onMain {
+                org.junit.Assert.assertEquals("n", activity.editor.text.toString())
+                org.junit.Assert.assertEquals(0, android.view.inputmethod.BaseInputConnection.getComposingSpanStart(activity.editor.text))
+                "ihao".forEach { sendKey(panel, it.toString()) }
+                panel.onKeyboardAction(KeyboardAction.Space)
+            }
+            instrumentation.waitForIdleSync()
+            onMain { org.junit.Assert.assertEquals("你好", activity.editor.text.toString()) }
+        } finally {
+            release.countDown()
+            blocker.cancel(true)
+            activity?.let { onMain { it.finish() } }
+            if (originalMethod.isNotBlank() && originalMethod != "null") shell("ime set $originalMethod")
+            onMain {
+                settings.chineseInputOptions = originalOptions
+                settings.lastLanguagePackKey = originalPack
+            }
+        }
+    }
+
+    @Test
     fun realInputWindowLatencyUsesOnlyPublicFixtures() {
         val originalMethod = shell("settings get secure default_input_method").trim()
         val settings = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph.settings
@@ -48,8 +114,9 @@ class InputPipelineTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
             val panel = awaitPanel()
             onMain {
+                val languageAction = panel.context.getString(dev.zeroinput.ime.ui.R.string.key_language)
                 if (descendants(panel).filterIsInstance<android.widget.TextView>().any {
-                    it.contentDescription == "切换中英文" && it.text.toString() == "En"
+                    it.isShown && it.contentDescription == languageAction && it.text.toString() == "En"
                 }) panel.onKeyboardAction(dev.zeroinput.ime.ui.KeyboardAction.SwitchLanguage)
             }
             awaitReady(panel)
@@ -121,7 +188,27 @@ class InputPipelineTest {
         onMain {
             assertTrue(activity.editor.text.toString() == expected)
             val label = panel.context.getString(dev.zeroinput.ime.ui.R.string.reconvert_last_word)
-            descendants(panel).first { it.isShown && it.contentDescription == label }.performClick()
+            val action = descendants(panel).firstOrNull { it.isShown && it.contentDescription == label }
+            if (action != null) action.performClick() else {
+                val more = panel.context.getString(dev.zeroinput.ime.ui.R.string.candidate_more_actions)
+                descendants(panel).first { it.isShown && it.contentDescription == more }.performClick()
+            }
+        }
+        instrumentation.waitForIdleSync()
+        onMain {
+            val label = panel.context.getString(dev.zeroinput.ime.ui.R.string.reconvert_last_word)
+            val item = WindowInspector.getGlobalWindowViews().flatMap(::descendants)
+                .filterIsInstance<android.widget.TextView>().firstOrNull { it.isShown && it.text.toString() == label }
+            if (item != null) {
+                var row: View = item
+                while (row.parent is View && row.parent !is android.widget.AdapterView<*>) {
+                    row = row.parent as View
+                }
+                val list = row.parent as android.widget.AdapterView<*>
+                val position = list.getPositionForView(row)
+                assertTrue(position != android.widget.AdapterView.INVALID_POSITION)
+                list.performItemClick(row, position, list.getItemIdAtPosition(position))
+            }
         }
         instrumentation.waitForIdleSync()
         onMain {
@@ -192,7 +279,12 @@ class InputPipelineTest {
             SystemClock.sleep(100)
         }
         val graph = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
-        error("Input fixture engine was not ready: ${graph.rime.runtime.state.name}")
+        var diagnostic = ""
+        onMain {
+            diagnostic = "runtime=${graph.rime.runtime.state.name}, view=${panel.renderedEngineStatus}, " +
+                "attached=${panel.isAttachedToWindow}, shown=${panel.isShown}, language=${graph.settings.lastLanguage}"
+        }
+        error("Input fixture engine was not ready: $diagnostic")
     }
 
     private fun report(prefix: String, samples: List<Long>) {

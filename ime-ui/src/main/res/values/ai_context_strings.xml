@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_context_count">页面/导入引用 %1$d 条 · 历史 %2$d 条 · %3$d/%4$d 字符</string>
+    <string name="ai_context_choose">修改上下文选择</string>
+    <string name="ai_context_preview">预览将发送的上下文</string>
+    <string name="ai_context_recent">选择最近历史</string>
+    <string name="ai_context_clear">清空全部引用</string>
+    <string name="ai_context_transient">原始页面引用仅在本次面板中保留。开启会话保存后，提问和回答会保存，可能包含引用的信息。</string>
+    <string name="ai_reference_number">引用 %1$d</string>
+    <string name="ai_context_remove">移除此引用</string>
+    <string name="ai_context_empty">未选择上下文，仅发送当前提问和已添加附件。</string>
+    <string name="ai_context_title">上下文</string>
+    <string name="ai_context_short_count">上下文 %1$d</string>
+    <string name="ai_context_rejected">引用已失效或选择超限。请重新选择：最多 16 条引用、12 条历史，合计不超过 16,384 字符。</string>
+    <string name="ai_page_reference">引用页面</string>
+    <string name="ai_page_loading">正在读取当前页面…</string>
+    <string name="ai_page_failed">无法读取或引用已失效，请返回原页面重试。</string>
+    <string name="ai_page_empty">没有可引用的文字。当前应用可能未开放页面内容。</string>
+    <string name="ai_page_partial">仅获取到部分可见文字，请勾选需要的内容。</string>
+    <string name="ai_page_choose">勾选要引用的文字，不会自动发送。</string>
+    <string name="ai_page_add">加入引用</string>
+    <string name="ai_page_cancel">返回上下文</string>
+    <string name="ai_conversations_title">会话</string>
+    <string name="ai_conversations_temporary">当前为临时会话，退出后清除。可在 AI 设置中开启本地加密保存。</string>
+    <string name="ai_conversations_loading">正在加载会话…</string>
+    <string name="ai_conversations_failed">会话操作失败，请重试。</string>
+    <string name="ai_conversations_empty">还没有保存的会话。发送并收到完整回答后会保存。</string>
+    <string name="ai_conversations_saved">本地保存的会话</string>
+    <string name="ai_conversations_retry">重新加载</string>
+    <string name="ai_conversation_current">当前：%1$s</string>
+    <string name="ai_conversation_rename">重命名</string>
+    <string name="ai_rename_save">保存名称</string>
+    <string name="ai_rename_cancel">取消改名</string>
+    <string name="ai_show_result">查看回答</string>
+    <string name="ai_rename_invalid">请输入 1 到 128 字符的会话名称，不要换行。</string>
+</resources>

@@ -34,6 +34,45 @@ fun networkViolation(path: String, text: String): String? {
     return null
 }
 
+fun pageAccessViolation(path: String, text: String): String? {
+    if (!path.contains("/src/main/")) return null
+    val adapter = "app/src/main/kotlin/dev/zeroinput/ime/ai/page/PageReferenceService.kt"
+    val capabilities = Regex("""android\.accessibilityservice\.AccessibilityService|android\.view\.accessibility\.AccessibilityNodeInfo|\brootInActiveWindow\b|\bgetRootInActiveWindow\b""")
+    if (capabilities.containsMatchIn(text) && path != adapter && path != "app/src/main/AndroidManifest.xml") {
+        return "External page reads are restricted to the approved one-shot adapter"
+    }
+    if (path == adapter && Regex("""\b(?:dispatchGesture|performGlobalAction|performAction|takeScreenshot)\b""").containsMatchIn(text)) {
+        return "Page reference service cannot act on or capture the screen"
+    }
+    return null
+}
+
+fun validPageReferenceConfig(file: File, modern: Boolean): Boolean {
+    val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+        isNamespaceAware = true
+        isExpandEntityReferences = false
+        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+    }
+    val root = file.inputStream().use { factory.newDocumentBuilder().parse(it) }.documentElement
+    val expected = mutableMapOf(
+        "description" to "@string/ai_page_access_description",
+        "accessibilityEventTypes" to "typeWindowStateChanged|typeWindowsChanged",
+        "accessibilityFeedbackType" to "feedbackGeneric",
+        "accessibilityFlags" to "flagRetrieveInteractiveWindows",
+        "canRetrieveWindowContent" to "true",
+        "notificationTimeout" to "0",
+    )
+    if (modern) expected["isAccessibilityTool"] = "false"
+    val actual = mutableMapOf<String, String>()
+    for (index in 0 until root.attributes.length) {
+        val attribute = root.attributes.item(index)
+        if (attribute.namespaceURI == "http://schemas.android.com/apk/res/android") {
+            actual[attribute.localName] = attribute.nodeValue
+        }
+    }
+    return root.tagName == "accessibility-service" && actual == expected
+}
+
 tasks.register("testPrivacyBoundary") {
     group = "verification"
     description = "Checks that clipboard source exceptions cannot allow payload reads or arbitrary writes."
@@ -66,6 +105,17 @@ tasks.register("testPrivacyBoundary") {
         }
         check(networkViolation(business, "java.net.URI") == null)
         check(networkViolation(business, "android.permission.INTERNET") != null)
+        val page = "app/src/main/kotlin/dev/zeroinput/ime/ai/page/PageReferenceService.kt"
+        for (capability in listOf("android.accessibilityservice.AccessibilityService", "rootInActiveWindow",
+            "android.view.accessibility.AccessibilityNodeInfo")) {
+            check(pageAccessViolation(business, capability) != null)
+            check(pageAccessViolation("other/$page", capability) != null)
+            check(pageAccessViolation(page, capability) == null)
+        }
+        for (action in listOf("performAction(1)", "dispatchGesture(value)", "takeScreenshot(0)", "performGlobalAction(1)",
+            "service::performAction", "service::dispatchGesture", "service::takeScreenshot", "service::performGlobalAction")) {
+            check(pageAccessViolation(page, action) != null)
+        }
     }
 }
 
@@ -86,6 +136,7 @@ tasks.register("privacyCheck") {
                     val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
                     systemClipboardViolation(path, text)?.let { violations += "$path: $it" }
                     networkViolation(path, text)?.let { violations += "$path: $it" }
+                    pageAccessViolation(path, text)?.let { violations += "$path: $it" }
                 }
         }
 
@@ -106,6 +157,25 @@ tasks.register("privacyCheck") {
                 }
                 val document = manifest.inputStream().use { factory.newDocumentBuilder().parse(it) }
                 val packageName = document.documentElement.getAttribute("package")
+                val services = document.getElementsByTagName("service")
+                val pageName = "dev.zeroinput.ime.ai.page.PageReferenceService"
+                var pageServices = 0
+                for (index in 0 until services.length) {
+                    val service = services.item(index) as org.w3c.dom.Element
+                    val name = service.getAttributeNS(androidNamespace, "name")
+                    val permission = service.getAttributeNS(androidNamespace, "permission")
+                    if (permission == "android.permission.BIND_ACCESSIBILITY_SERVICE" && name != pageName) {
+                        violations += "Unexpected accessibility service"
+                    }
+                    if (name == pageName) {
+                        pageServices++
+                        if (permission != "android.permission.BIND_ACCESSIBILITY_SERVICE" ||
+                            service.getAttributeNS(androidNamespace, "exported") != "true") {
+                            violations += "Page service must be system-bound and explicitly exported"
+                        }
+                    }
+                }
+                if (pageServices != 1) violations += "Missing or duplicate page reference service"
                 val allowedPermissions = setOf(
                     "android.permission.USE_BIOMETRIC",
                     "android.permission.USE_FINGERPRINT",
@@ -130,6 +200,10 @@ tasks.register("privacyCheck") {
                         "Unexpected packaged permissions: ${unexpected.sorted().joinToString()}"
                 }
             }
+        }
+        for (variant in listOf("xml", "xml-v31")) {
+            if (!validPageReferenceConfig(rootProject.file("app/src/main/res/$variant/page_reference_service.xml"),
+                    modern = variant == "xml-v31")) violations += "Unexpected page reference capability"
         }
         check(violations.isEmpty()) { violations.joinToString("\n") }
     }

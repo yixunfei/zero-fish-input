@@ -109,3 +109,14 @@ provider's membership and media-capability checks. New chat cancels pending
 generation and clears the draft/context while retaining this local choice.
 Leaving the workbench restores the saved default. No stored format or network
 surface is added.
+
+
+## Explicit page references amendment (2026-10-07)
+
+ADR 0019 supersedes the blanket exclusion of page acquisition only for the approved
+one-shot noneditable visible-text accessibility flow. It does not allow editor or
+clipboard reads, background content collection or other network transports. Raw
+page references remain transient; individual history selection and encrypted chat
+renaming do not change stored formats. The current content review Activity is
+nonexported; earlier external SEND/PROCESS_TEXT publication descriptions do not
+match the current manifest and that route is not enabled by this amendment.

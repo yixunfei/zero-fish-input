@@ -158,25 +158,28 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val floating = placement.mode == KeyboardPlacementMode.FLOATING
-        val offered = MeasureSpec.getSize(heightMeasureSpec).takeIf { it > 0 }
-            ?: dp(resources.configuration.screenHeightDp)
-        val top = if (floating || keyboard.isPanelExpanded) safeInsets.top else 0
+        val fullWindowPanel = floating || keyboard.isPanelExpanded
+        val offered = MeasureSpec.getSize(heightMeasureSpec).takeIf { it > 0 } ?: dp(NATURAL_IME_VIEWPORT_DP)
+        val top = if (fullWindowPanel) safeInsets.top else 0
+        val bottom = if (fullWindowPanel) safeInsets.bottom else 0
         val availableWidth = (width - safeInsets.left - safeInsets.right).coerceAtLeast(0)
-        val availableHeight = (offered - top - safeInsets.bottom).coerceAtLeast(0)
+        val availableHeight = (offered - top - bottom).coerceAtLeast(0)
         val panelWidth = if (minimized) minOf(dp(56), availableWidth)
             else if (keyboard.isPanelExpanded) availableWidth
             else KeyboardPlacementGeometry.width(placement, availableWidth, dp(240))
         surface.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(availableHeight, MeasureSpec.AT_MOST))
         setMeasuredDimension(width, if (floating || keyboard.isPanelExpanded) offered
-            else minOf(offered, surface.measuredHeight + safeInsets.bottom))
+            else minOf(offered, surface.measuredHeight))
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        val insetTop = if (placement.mode == KeyboardPlacementMode.FLOATING) safeInsets.top else 0
+        val fullWindowPanel = placement.mode == KeyboardPlacementMode.FLOATING || keyboard.isPanelExpanded
+        val insetTop = if (fullWindowPanel) safeInsets.top else 0
+        val insetBottom = if (fullWindowPanel) safeInsets.bottom else 0
         val (x, y) = KeyboardPlacementGeometry.position(placement,
             (width - safeInsets.left - safeInsets.right).coerceAtLeast(0),
-            (height - insetTop - safeInsets.bottom).coerceAtLeast(0), surface.measuredWidth, surface.measuredHeight)
+            (height - insetTop - insetBottom).coerceAtLeast(0), surface.measuredWidth, surface.measuredHeight)
         surface.layout(x + safeInsets.left, y + insetTop,
             x + safeInsets.left + surface.measuredWidth, y + insetTop + surface.measuredHeight)
         onBoundsChanged()
@@ -190,4 +193,8 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         keyboard.onPanelExpansionChanged = {}
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val NATURAL_IME_VIEWPORT_DP = 420
+    }
 }

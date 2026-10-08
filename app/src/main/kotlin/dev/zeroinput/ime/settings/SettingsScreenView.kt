@@ -78,6 +78,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onAiNetworkChanged: (Boolean) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
     var onAiDataClearRequested: () -> Unit = {}
+    var onAiPageSettingsRequested: () -> Unit = {}
 
     private var suppressSwitchCallbacks = false
     private var aiControlsEnabled = true
@@ -193,6 +194,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(valueText().apply { setText(R.string.ai_privacy_notice) })
         statusRow(context.getString(R.string.ai_configuration), aiStatus)
         command(context.getString(R.string.ai_settings)) { onAiSettingsRequested() }
+        command(context.getString(R.string.ai_page_access_title)) { onAiPageSettingsRequested() }
         command(context.getString(R.string.ai_clear_data)) { onAiDataClearRequested() }
 
         section(context.getString(R.string.section_data))

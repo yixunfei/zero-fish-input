@@ -20,7 +20,12 @@ internal class AiWorkbenchController(
     private val renderList: (List<AiConversationSummary>) -> Unit,
     private val renderConversation: (AiConversation?) -> Unit,
     private val renderModels: (List<String>, String?) -> Unit = { _, _ -> },
+    private val renderContext: (AiContextState) -> Unit = {},
+    private val renderHistoryStatus: (Boolean, Boolean, Boolean) -> Unit = { _, _, _ -> },
+    private val contextCurrent: () -> Boolean = { true },
 ) {
+    private val context = AiContextSelection()
+    val contextState: AiContextState get() = context.state
     private val generation = AtomicLong()
     private var selected: AiConversation? = null
     private var result: String? = null
@@ -35,6 +40,8 @@ internal class AiWorkbenchController(
         selectedModel = null
         renderModels(emptyList(), null)
         selected = null
+        context.reset()
+        renderContext(context.state)
         renderConversation(null)
         renderList(emptyList())
     }
@@ -49,10 +56,44 @@ internal class AiWorkbenchController(
         render(AiStreamEvent.Cancelled)
     }
 
+    /** Explicit user cancellation ends the request and clears transient context choices. */
+    fun cancelRequest() {
+        stop()
+        if (context.state.selectedHistory.isNotEmpty() || context.state.references.isNotEmpty()) {
+            context.reset(context.state.messages)
+            renderContext(context.state)
+        }
+    }
+
     fun newConversation() {
         stop()
         selected = null
+        context.reset()
+        renderContext(context.state)
         renderConversation(null)
+    }
+
+    fun includeHistory(revision: Long, index: Int, included: Boolean) = changeContext {
+        context.include(revision, index, included)
+    }
+
+    fun recentHistory(revision: Long) = changeContext { context.recent(revision) }
+    fun clearContext(revision: Long) = changeContext { context.clear(revision) }
+    fun removeReference(revision: Long, index: Int) = changeContext { context.remove(revision, index) }
+    fun addReferences(revision: Long, references: List<AiReference>): Boolean = changeContext {
+        context.add(revision, references)
+    }
+
+    fun clearPageReferences() {
+        if (context.clearPages()) { stop(); renderContext(context.state) }
+    }
+
+    private fun changeContext(change: () -> Boolean): Boolean {
+        reconcilePersistence()
+        if (!allowed() || !change()) return false
+        stop()
+        renderContext(context.state)
+        return true
     }
 
     fun refreshModels() {
@@ -74,8 +115,10 @@ internal class AiWorkbenchController(
         return true
     }
 
-    fun refreshConversations() {
+    fun refreshConversations(showLoading: Boolean = true) {
         reconcilePersistence()
+        val saving = configuration()?.saveConversations == true
+        renderHistoryStatus(saving, false, false)
         if (!allowed()) {
             renderList(emptyList())
             return
@@ -84,7 +127,11 @@ internal class AiWorkbenchController(
             renderList(emptyList())
             return
         }
-        storage({ current -> conversations.listSummaries(current) }, renderList)
+        if (showLoading) renderHistoryStatus(true, true, false)
+        storage({ current -> conversations.listSummaries(current) }, {
+            renderList(it)
+            renderHistoryStatus(true, false, false)
+        })
     }
 
     fun selectConversation(id: String) {
@@ -96,6 +143,8 @@ internal class AiWorkbenchController(
         newConversation()
         storage({ current -> conversations.find(id, current) }, deliver = {
             selected = it
+            context.reset(it?.messages.orEmpty())
+            renderContext(context.state)
             renderConversation(it)
         })
     }
@@ -106,16 +155,31 @@ internal class AiWorkbenchController(
         stop()
         if (selected?.id == id) {
             selected = null
+            context.reset()
+            renderContext(context.state)
             renderConversation(null)
         }
         storage({ current -> conversations.delete(id, current) }, deliver = { refreshConversations() })
+    }
+
+    fun renameConversation(id: String, title: String) {
+        reconcilePersistence()
+        if (!allowed() || configuration()?.saveConversations != true) return
+        stop()
+        storage({ current -> conversations.rename(id, title, current) }, { renamed ->
+            if (renamed != null && selected?.id == id) {
+                selected = renamed
+                renderConversation(renamed)
+            }
+            refreshConversations(showLoading = false)
+        })
     }
 
     fun submit(action: AiAction, input: String, target: String?, attachments: List<AiAttachment> = emptyList()) {
         reconcilePersistence()
         stop()
         val config = configuration()
-        if (!allowed()) {
+        if (!allowed() || !contextCurrent()) {
             fail(AiProviderError.Policy("AI unavailable in this editor"))
             return
         }
@@ -130,7 +194,8 @@ internal class AiWorkbenchController(
         val previous = selected
         val request = try {
             copyRequest(AiRequest(previous?.id, action, input, target,
-                boundedHistory(previous?.messages.orEmpty()), attachments, model = selectedModel ?: config.activeModel()))
+                context.history(), attachments, model = selectedModel ?: config.activeModel(),
+                references = context.state.references.toList()))
         } catch (_: IllegalArgumentException) {
             fail()
             return
@@ -139,7 +204,7 @@ internal class AiWorkbenchController(
         val data = dataGeneration.current()
         val sink = AiStreamDelivery(post) { event ->
             reconcilePersistence()
-            if (generation.get() != token || !dataGeneration.isCurrent(data) || !allowed()) return@AiStreamDelivery
+            if (generation.get() != token || !dataGeneration.isCurrent(data) || !allowed() || !contextCurrent()) return@AiStreamDelivery
             when (event) {
                 is AiStreamEvent.Completed -> {
                     // A provider implementation can emit a terminal event
@@ -173,7 +238,7 @@ internal class AiWorkbenchController(
     /** The UI cannot supply arbitrary text or revive a result from an older editor. */
     fun consumeResult(): String? {
         reconcilePersistence()
-        if (!allowed() || !dataGeneration.isCurrent(resultDataGeneration)) return null
+        if (!allowed() || !contextCurrent() || !dataGeneration.isCurrent(resultDataGeneration)) return null
         return result.also { result = null }
     }
 
@@ -188,6 +253,8 @@ internal class AiWorkbenchController(
             AiConversation(title = conversationTitle(request.input), messages = history)
         } else previous.copy(messages = history, updatedAtEpochMillis = System.currentTimeMillis())
         selected = conversation
+        context.append(history, (previous?.messages.orEmpty().size + 2 - history.size).coerceAtLeast(0))
+        renderContext(context.state)
         renderConversation(conversation)
         if (save) storage({ current -> conversations.upsert(conversation, current) }, { refreshConversations() }, token, data)
     }
@@ -199,7 +266,7 @@ internal class AiWorkbenchController(
         data: Long = dataGeneration.current(),
     ) {
         val config = configuration()
-        val current = { generation.get() == token && dataGeneration.isCurrent(data) &&
+        val current = { generation.get() == token && dataGeneration.isCurrent(data) && contextCurrent() &&
             config?.saveConversations == true && configuration() == config }
         try {
             executor.execute {
@@ -207,10 +274,16 @@ internal class AiWorkbenchController(
                 val value = runCatching { work(current) }
                 post {
                     reconcilePersistence()
-                    if (current() && allowed()) value.fold(deliver) { fail() }
+                    if (current() && allowed()) value.fold(deliver) {
+                        renderHistoryStatus(true, false, true)
+                        fail()
+                    }
                 }
             }
-        } catch (_: RejectedExecutionException) { fail() }
+        } catch (_: RejectedExecutionException) {
+            renderHistoryStatus(true, false, true)
+            fail()
+        }
     }
 
     /** Provider/model/key changes revoke results and context even before an observer is delivered. */
@@ -248,11 +321,4 @@ internal class AiWorkbenchController(
         return title.substring(0, end)
     }
 
-    private fun boundedHistory(messages: List<AiMessage>): List<AiMessage> {
-        var remaining = 16_384
-        return messages.takeLast(12).asReversed().takeWhile {
-            remaining -= it.content.length
-            remaining >= 0
-        }.asReversed()
-    }
 }

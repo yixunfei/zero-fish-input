@@ -52,6 +52,18 @@ class AiConversationRepository(private val store: EncryptedStore) {
         deletionFailed = false
     }
 
+    fun rename(id: String, title: String, current: () -> Boolean = { true }): AiConversation? = synchronized(lock) {
+        checkCurrent(current)
+        val normalized = title.trim()
+        require(normalized.isNotEmpty() && normalized.length <= AiLimits.MAX_TITLE_CHARS &&
+            normalized.none(Char::isISOControl)) { "Invalid AI conversation title" }
+        val values = list()
+        val renamed = values.firstOrNull { it.id == id }?.copy(title = normalized) ?: return null
+        checkCurrent(current)
+        persist(values.map { if (it.id == id) renamed else it })
+        renamed
+    }
+
     fun delete(id: String, current: () -> Boolean = { true }) = synchronized(lock) {
         checkCurrent(current)
         val values = list()

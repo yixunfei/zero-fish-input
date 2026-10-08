@@ -179,7 +179,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         for (index in 0 until childCount) getChildAt(index).layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, rowHeight())
     }
 
-    fun setCompactLandscape(value: Boolean) {
+    /** Applies the compact key geometry chosen from the current IME viewport. */
+    fun setCompactLayout(value: Boolean) {
         if (compact == value) return
         compact = value
         render()
@@ -434,8 +435,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     fun cancelPendingGestures() { glide.cancel(); backspaceRepeater?.cancel(); keys.forEach { it.cancelTouch() } }
     internal val preferredHeight: Int get() = (0 until childCount).sumOf { getChildAt(it).layoutParams.height }
     override fun onDetachedFromWindow() { cancelPendingGestures(); super.onDetachedFromWindow() }
-    private fun rowHeight() = (dp(if (compact) 48 else heightPreset.rowHeight(
-        resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)) * heightScale).toInt()
+    private fun rowHeight() = (dp(if (compact) 48 else heightPreset.rowHeight(false)) * heightScale).toInt()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun ensureKeyColors() {
         if (colorsResolved) return

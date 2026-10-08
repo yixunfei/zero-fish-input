@@ -42,6 +42,15 @@ class AppGraph(context: Context) : AutoCloseable {
         name = "zeroinput-engine-worker",
         queueCapacity = 2,
     )
+    /**
+     * Optional index and pack discovery must not delay creation of the first
+     * native session. Native runtime work remains serialized on
+     * [engineExecutor].
+     */
+    private val engineMaintenanceExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-engine-maintenance",
+        queueCapacity = 1,
+    )
     internal val aiExecutor: ExecutorService = BoundedExecutors.singleThread(
         name = "zeroinput-ai-worker",
         queueCapacity = 1,
@@ -55,6 +64,7 @@ class AppGraph(context: Context) : AutoCloseable {
         queueCapacity = 2,
     )
     internal val aiDocumentExecutor: ExecutorService = BoundedExecutors.singleThread("zeroinput-ai-document", 1)
+    private val pageReferenceExecutor = BoundedExecutors.singleThread("zeroinput-page-reference", 1)
     internal val aiPersistenceExecutor: ExecutorService = BoundedExecutors.singleThread(
         name = "zeroinput-ai-storage",
         queueCapacity = 2,
@@ -88,7 +98,15 @@ class AppGraph(context: Context) : AutoCloseable {
     val aiCoordinator = AiCoordinator(OpenAiCompatibleProvider({ aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor))
     val aiDataGeneration = AiDataGeneration()
     internal val aiContentInbox = dev.zeroinput.ime.ai.AiContentInbox()
-    private val aiImportSettingsObserver = settings.addChangeListener { aiContentInbox.clear() }
+    internal val pageReferences = dev.zeroinput.ime.ai.page.PageReferenceBroker(
+        pageReferenceExecutor, { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
+        enabled = { settings.aiPageReferencesEnabled && settings.learningEnabled && !settings.incognitoMode &&
+            aiConfigurationSnapshot()?.let { it.enabled && it.networkAllowed } == true },
+    )
+    private val aiImportSettingsObserver = settings.addChangeListener {
+        aiContentInbox.clear()
+        pageReferences.invalidate()
+    }
 
     fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
 
@@ -132,6 +150,7 @@ class AppGraph(context: Context) : AutoCloseable {
 
     private fun revokeAiConfiguration(): Long {
         aiContentInbox.clear()
+        pageReferences.invalidate()
         val token = aiConfigurationState.revoke()
         aiDataGeneration.invalidate()
         aiCoordinator.invalidate()
@@ -177,18 +196,25 @@ class AppGraph(context: Context) : AutoCloseable {
 
     init {
         readAiConfiguration {}
-        // Bring the core engine online before hashing optional packs.  Both
-        // operations stay on one background queue so they do not compete for
-        // storage bandwidth during the first input session.
+        // Start the native runtime before any optional data work. Prepared
+        // session creation shares this queue and therefore cannot be delayed
+        // by word-association or language-pack discovery.
         runCatching {
             engineExecutor.execute {
+                runCatching { rime.warmUp() }
+            }
+        }
+        // These reads are independent of native runtime transitions. Keep
+        // their bounded queue separate so a slow optional index cannot delay
+        // the first Chinese composition.
+        runCatching {
+            engineMaintenanceExecutor.execute {
                 associationPredictor = runCatching { dev.zeroinput.engine.dictionary.WordAssociationIndex.loadBundled() }
                     .getOrDefault(dev.zeroinput.engine.api.NextWordPredictor.Empty)
                 associationPredictorReady = true
                 associationPredictorListeners.forEach { listener -> runCatching(listener) }
                 // A broken optional language pack must not prevent the core Rime
                 // runtime from publishing its terminal READY/FAILED state.
-                runCatching { rime.warmUp() }
                 runCatching { refreshLanguagePacks() }
             }
         }
@@ -334,11 +360,14 @@ class AppGraph(context: Context) : AutoCloseable {
         listOf(rime.descriptor, english.descriptor) + languagePackRegistry.descriptors()
 
     override fun close() {
+        pageReferences.invalidate()
+        pageReferenceExecutor.shutdownNow()
         keyboardBackgrounds.close()
         securePaste.close()
         clipboardSelectionTransfer.close()
         clipboardGuard.close()
         engineExecutor.shutdownNow()
+        engineMaintenanceExecutor.shutdownNow()
         aiConfigurationListeners.clear()
         aiCoordinator.close()
         aiContentInbox.clear()

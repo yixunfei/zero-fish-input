@@ -87,6 +87,7 @@
     <string name="keyboard_height_standard">Standard</string>
     <string name="keyboard_height_comfortable">Roomy</string>
     <string name="keyboard_tools">Keyboard tools</string>
+    <string name="candidate_more_actions">More candidate actions</string>
     <string name="keyboard_return">Return to keyboard</string>
     <string name="key_shift">Shift</string>
     <string name="key_caps_lock">Caps lock</string>
@@ -154,7 +155,7 @@
     <string name="ai_user_message">You: %1$s</string>
     <string name="ai_assistant_message">AI: %1$s</string>
     <string name="ai_edit">Edit</string>
-    <string name="ai_read">Preview</string>
+    <string name="ai_read">View</string>
     <string name="fuzzy_short">Fuzzy</string>
     <string name="fuzzy_toggle">Toggle fuzzy pinyin</string>
     <string name="fuzzy_choose_rules">Choose fuzzy pinyin rules in settings first</string>
@@ -179,4 +180,5 @@
     <string name="handwriting_candidate_value">Insert %1$s</string>
     <string name="language_sensitive_protection">Sensitive input protection enabled</string>
     <string name="language_switch">Switch language</string>
+    <string name="ai_page_reference_item">Reference %1$d (%2$d chars): %3$s</string>
 </resources>

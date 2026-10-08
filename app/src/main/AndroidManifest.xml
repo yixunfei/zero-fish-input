@@ -109,6 +109,21 @@
             android:windowSoftInputMode="adjustResize" />
 
         <service
+            android:name=".ai.page.PageReferenceService"
+            android:label="@string/ai_page_access_title"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/page_reference_service" />
+        </service>
+
+        <activity android:name=".ai.page.PageReferenceSettingsActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:theme="@style/Theme.ZeroInput.PrivateImport" />
+
+        <service
             android:name=".ZeroInputService"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|locale|layoutDirection|uiMode"
             android:directBootAware="false"

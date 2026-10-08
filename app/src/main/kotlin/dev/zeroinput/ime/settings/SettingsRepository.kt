@@ -37,6 +37,10 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_LEARNING, true)
         set(value) = edit(KEY_LEARNING, value)
 
+    var aiPageReferencesEnabled: Boolean
+        get() = preferences.getBoolean("ai.pageReferences", false)
+        set(value) = edit("ai.pageReferences", value)
+
     var experimentalModelRanking: Boolean
         get() = preferences.getBoolean(KEY_MODEL_RANKING, false)
         set(value) = edit(KEY_MODEL_RANKING, value)

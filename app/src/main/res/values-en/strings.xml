@@ -217,7 +217,6 @@
     <string name="ai_add_attachment">Add file, image, or audio</string>
     <string name="ai_remove_attachment">Remove %1$s</string>
     <string name="ai_attachment_failed">This attachment could not be read or exceeds the size limit.</string>
-    <string name="ai_attachment_prompt">Analyze the attached content</string>
     <string name="ai_network_disabled">AI network access is disabled</string>
     <string name="ai_enabled">Enable AI features</string>
     <string name="ai_network">Allow AI network requests</string>

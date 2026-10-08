@@ -11,6 +11,9 @@
         </intent>
     </queries>
     <application>
+        <activity android:name="dev.zeroinput.ime.ai.page.ExternalPageFixture"
+            android:exported="true" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
         <activity android:name="dev.zeroinput.ime.clipboardguard.ExternalClipboardFixture"
             android:exported="true" android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />

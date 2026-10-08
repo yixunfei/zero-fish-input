@@ -75,6 +75,8 @@ class KeyboardWindowIntegrationTest {
                     val view = requireNotNull(host())
                     assertTrue(view.height < activity.window.decorView.height)
                     assertTrue(view.inputBounds().right <= view.width)
+                    assertEquals("Docked and one-hand panels must not reserve the navigation bar twice",
+                        view.height, view.inputBounds().bottom)
                     val key = views(view).filterIsInstance<android.widget.TextView>().first { it.text.toString() == "q" && it.isShown }
                     key.performClick()
                 }

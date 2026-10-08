@@ -149,6 +149,9 @@ class MainActivity : AppCompatActivity() {
         screen.onAiNetworkChanged = { updateAiConfig { copy(networkAllowed = it) } }
         screen.onAiSettingsRequested = ::showAiSettings
         screen.onAiDataClearRequested = ::confirmClearAiData
+        screen.onAiPageSettingsRequested = {
+            startActivity(Intent(this, dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java))
+        }
         screen.onAppearanceRequested = { startActivity(Intent(this, KeyboardAppearanceActivity::class.java)) }
         screen.onChineseOptionsChanged = { graph.settings.chineseInputOptions = it; render() }
         screen.onModelRankingChanged = { graph.settings.experimentalModelRanking = it; render() }

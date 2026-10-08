@@ -153,7 +153,33 @@ class ZeroInputService : InputMethodService() {
             renderList = { inputView?.renderAiConversations(it) },
             renderConversation = { inputView?.renderAiConversation(it) },
             renderModels = { models, selected -> inputView?.renderAiModels(models, selected) },
+            renderContext = { inputView?.renderAiContext(it) },
+            renderHistoryStatus = { saving, loading, failed -> inputView?.renderAiHistoryStatus(saving, loading, failed) },
+            contextCurrent = { !aiPageBinding.isInitialized() || aiPages.referencesCurrent() },
         )
+    }
+
+    private val aiNameEditor by lazy {
+        dev.zeroinput.ime.ai.AiConversationNameEditor(
+            draftText = aiDraft::submittedText, clearDraft = aiDraft::clear, appendToDraft = aiDraft::appendImported,
+            stopRequest = aiWorkbench::stop, renameConversation = aiWorkbench::renameConversation,
+            render = { inputView?.renderAiRenaming(it) },
+            rejected = { showAiFeedback(dev.zeroinput.ime.ui.R.string.ai_rename_invalid) },
+        )
+    }
+    private val aiPageBinding: Lazy<dev.zeroinput.ime.ai.page.AiPageReferenceBinding> = lazy {
+        dev.zeroinput.ime.ai.page.AiPageReferenceBinding(graph, mainHandler, aiWorkbench, ::aiAllowed,
+            { currentInputEditorInfo?.packageName }, { inputView },
+            { launchActivity(dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java) },
+            ::showAiContextRejected)
+    }
+    private val aiPages: dev.zeroinput.ime.ai.page.AiPageReferenceBinding by aiPageBinding
+
+    private fun showAiContextRejected() = showAiFeedback(dev.zeroinput.ime.ui.R.string.ai_context_rejected)
+
+    private fun showAiFeedback(message: Int) {
+        android.widget.Toast.makeText(this, message,
+            android.widget.Toast.LENGTH_LONG).show()
     }
 
     // Settings-derived values mirrored in memory so the per-keystroke engine
@@ -166,6 +192,8 @@ class ZeroInputService : InputMethodService() {
     @Volatile private var configuredSoundEffects = false
     @Volatile private var configuredWordAssociations = true
     @Volatile private var configuredPairedSymbols = true
+    @Volatile private var configuredLanguage = InputLanguage.CHINESE
+    @Volatile private var configuredLanguagePackKey: String? = null
 
     private fun refreshConfiguredSettings() {
         configuredChineseOptions = graph.settings.chineseInputOptions
@@ -174,6 +202,8 @@ class ZeroInputService : InputMethodService() {
         configuredSoundEffects = graph.settings.soundEffectsEnabled
         configuredWordAssociations = graph.settings.wordAssociationsEnabled
         configuredPairedSymbols = graph.settings.pairedSymbolsEnabled
+        configuredLanguage = graph.settings.lastLanguage
+        configuredLanguagePackKey = graph.settings.lastLanguagePackKey
     }
     @Volatile
     private var secureClipboardRequest: SecureClipboardRequest? = null
@@ -497,6 +527,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        if (aiPageBinding.isInitialized()) aiPages.close()
         appearanceBinding.close()
         searchDraft.close()
         glideInput?.close()
@@ -806,28 +837,38 @@ class ZeroInputService : InputMethodService() {
             syncSessionPrivacy()
             if (inputView?.isAiEditing == true && aiAllowed()) { aiWorkbench.stop(); aiDraft.handle(it) }
         }
+        bindAiContextView(view)
         view.onAiCancel = ::cancelAiRequest
         view.onAiInsert = { insertAiResult(it) }
         view.onAiConversationsRequested = { aiWorkbench.refreshConversations() }
-        view.onAiConversationSelected = { clearAiAttachments(); aiDraft.clear(); aiWorkbench.selectConversation(it) }
-        view.onAiConversationDeleted = aiWorkbench::deleteConversation
+        view.onAiConversationSelected = {
+            aiNameEditor.reset(); aiPages.invalidate()
+            clearAiAttachments(); aiDraft.clear(); aiWorkbench.selectConversation(it)
+        }
+        view.onAiConversationDeleted = {
+            aiNameEditor.reset(); aiPages.invalidate(); aiWorkbench.deleteConversation(it)
+        }
         view.onAiNewConversation = {
             syncSessionPrivacy()
-            if (aiAllowed()) { clearAiAttachments(); aiWorkbench.newConversation(); aiDraft.clear() }
+            if (aiAllowed()) {
+                aiNameEditor.reset(); aiPages.invalidate()
+                clearAiAttachments(); aiWorkbench.newConversation(); aiDraft.clear()
+            }
         }
         view.onAiModelSelected = { model ->
             syncSessionPrivacy()
-            if (aiWorkbench.selectModel(model)) { clearAiAttachments(); aiDraft.clear() }
+            if (aiWorkbench.selectModel(model)) {
+                aiNameEditor.reset(); aiPages.invalidate(); clearAiAttachments(); aiDraft.clear()
+            }
         }
         view.onAiSettingsRequested = { launchActivity(MainActivity::class.java) }
         view.onAiAddContentRequested = {
             syncSessionPrivacy()
             if (aiAllowed()) {
-                val draft = aiDraft.submittedText().take(dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS)
                 startActivity(Intent(this, dev.zeroinput.ime.ai.AiComposeActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .setAction(dev.zeroinput.ime.ai.AiComposeActivity.ACTION_PICK)
-                    .putExtra(Intent.EXTRA_TEXT, draft))
+                    .putExtra(Intent.EXTRA_TEXT, ""))
             }
         }
         view.onAiImportContentRequested = ::importAiContent
@@ -847,6 +888,30 @@ class ZeroInputService : InputMethodService() {
             else { aiDraft.close(); invalidateAiRequest() }
             updatePrivatePanelWindowFlag()
         }
+    }
+
+    private fun bindAiContextView(view: ZeroInputView) {
+        view.onAiContextAction = { command ->
+            syncSessionPrivacy()
+            val accepted = when (command) {
+                is dev.zeroinput.ime.ui.AiContextCommand.History -> aiWorkbench.includeHistory(command.revision, command.index, command.included)
+                is dev.zeroinput.ime.ui.AiContextCommand.Recent -> aiWorkbench.recentHistory(command.revision)
+                is dev.zeroinput.ime.ui.AiContextCommand.Clear -> aiWorkbench.clearContext(command.revision)
+                is dev.zeroinput.ime.ui.AiContextCommand.Remove -> aiWorkbench.removeReference(command.revision, command.index)
+            }
+            if (!accepted) {
+                view.renderAiContext(aiWorkbench.contextState)
+                showAiContextRejected()
+            }
+        }
+        view.onAiPageRequested = { syncSessionPrivacy(); aiPages.request() }
+        view.onAiPageSelected = aiPages::apply
+        view.onAiPageCancelled = aiPages::cancelReview
+        view.onAiConversationRename = { id, title ->
+            syncSessionPrivacy()
+            if (aiAllowed()) { aiPages.cancelReview(); aiNameEditor.start(id, title) }
+        }
+        view.onAiRenameCancelled = aiNameEditor::cancel
     }
 
     private fun updatePrivatePanelWindowFlag() {
@@ -896,6 +961,9 @@ class ZeroInputService : InputMethodService() {
     private fun submitAiRequest(action: AiAction, @Suppress("UNUSED_PARAMETER") input: String, targetLanguage: String?) {
         syncSessionPrivacy()
         if (!aiAllowed()) return
+        if (aiNameEditor.active) { aiNameEditor.save(); return }
+        if (!aiPages.ensureCurrent()) return
+        aiPages.cancelReview()
         val submitted = aiDraft.submittedText().trim()
         aiWorkbench.submit(action, submitted, targetLanguage, aiAttachments)
     }
@@ -908,20 +976,28 @@ class ZeroInputService : InputMethodService() {
         syncSessionPrivacy()
         if (!aiAllowed()) return
         val content = graph.aiContentInbox.take() ?: return renderAiContent()
-        aiWorkbench.newConversation()
-        aiDraft.clear()
-        aiAttachments.forEach { it.bytes.fill(0) }
-        aiAttachments.clear()
-        val text = String(content.text).ifBlank { getString(R.string.ai_attachment_prompt) }
-        if (aiDraft.appendImported(text)) aiAttachments.addAll(content.attachments)
-        else content.attachments.forEach { it.bytes.fill(0) }
-        content.text.fill('\u0000')
+        val references = runCatching { dev.zeroinput.ime.ai.importedReferences(String(content.text)) }.getOrNull()
+        val attachmentsFit = aiAttachments.size + content.attachments.size <= dev.zeroinput.ai.api.AiLimits.MAX_ATTACHMENTS &&
+            aiAttachments.sumOf { it.bytes.size } + content.attachments.sumOf { it.bytes.size } <=
+            dev.zeroinput.ai.api.AiLimits.MAX_ATTACHMENT_BYTES
+        if (references != null && attachmentsFit && aiWorkbench.addReferences(aiWorkbench.contextState.revision, references)) {
+            aiAttachments.addAll(content.attachments)
+            content.text.fill('\u0000')
+        } else {
+            content.close()
+            showAiContextRejected()
+        }
         renderAiContent()
     }
 
-    private fun cancelAiRequest() = aiWorkbench.stop()
+    private fun cancelAiRequest() {
+        aiWorkbench.cancelRequest()
+        if (aiPageBinding.isInitialized()) aiPages.invalidate()
+    }
 
     private fun invalidateAiRequest() {
+        aiNameEditor.reset()
+        if (aiPageBinding.isInitialized()) aiPages.invalidate()
         clearAiAttachments()
         aiWorkbench.invalidate()
         inputView?.clearAiSession()
@@ -937,6 +1013,7 @@ class ZeroInputService : InputMethodService() {
     private fun insertAiResult(displayedResult: String) {
         syncSessionPrivacy()
         if (!aiAllowed()) return
+        if (!aiPages.ensureCurrent()) return
         val text = aiWorkbench.consumeResult()?.takeIf { it == displayedResult } ?: return
         val session = activeSession ?: return
         val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
@@ -980,7 +1057,6 @@ class ZeroInputService : InputMethodService() {
             KeyboardAction.ShowMoreSymbols,
             -> Unit
         }
-        maybeReloadLanguagePack()
         retryEngineWarmupIfIdle()
     }
 
@@ -1002,13 +1078,17 @@ class ZeroInputService : InputMethodService() {
         syncSessionPrivacy()
         maybeReloadLanguagePack()
         controller?.handle(command)
-        maybeReloadLanguagePack()
         retryEngineWarmupIfIdle()
     }
 
     private fun retryEngineWarmupIfIdle() {
         val session = activeSession ?: return
-        if (engineWarmupRetry && !session.controller.state.snapshot.isComposing) {
+        if (session.controller.state.snapshot.isComposing) return
+        if (languagePackReloadPending &&
+            (session.controller.state.language != configuredLanguage ||
+                session.controller.state.languagePackKey != configuredLanguagePackKey)
+        ) maybeReloadLanguagePack()
+        if (engineWarmupRetry) {
             engineWarmupRetry = false
             scheduleEngineWarmup(session, force = true)
         }
@@ -1352,18 +1432,14 @@ class ZeroInputService : InputMethodService() {
     private fun scheduleEngineWarmup(session: InputSession, force: Boolean = false) {
         if (activeSession !== session) return
         reconcileChineseOptions()
-        val request = session.warmupRequest(sessionChineseOptions, nativeRetryRequested)
-        if (!request.privacy.suggestionsAllowed) {
+        if (!session.controller.state.privacy.suggestionsAllowed) {
             cancelEngineWarmup(clearInstalled = true)
             return
         }
-        if (session.controller.state.snapshot.isComposing) {
-            engineWarmupRetry = true
-            return
-        }
-        if (installedEngineWarmupContext == request) return
-        if (!force && unavailableEngineWarmupContext == request) return
-        if (engineWarmupInFlight && engineWarmupContext == request) return
+        if (session.matchesWarmup(installedEngineWarmupContext, sessionChineseOptions, nativeRetryRequested)) return
+        if (!force && session.matchesWarmup(unavailableEngineWarmupContext, sessionChineseOptions, nativeRetryRequested)) return
+        if (engineWarmupInFlight && session.matchesWarmup(engineWarmupContext, sessionChineseOptions, nativeRetryRequested)) return
+        val request = session.warmupRequest(sessionChineseOptions, nativeRetryRequested)
 
         if (nativeRetryRequested && graph.rime.runtime.state == RimeRuntimeState.FAILED) {
             session.controller.reloadEngineIfIdle()
@@ -1398,9 +1474,7 @@ class ZeroInputService : InputMethodService() {
 
             is EngineWarmupResult.Prepared -> {
                 val session = activeSession
-                if (session == null || !isWarmupSessionCurrent(session, result.request) ||
-                    session.controller.state.snapshot.isComposing
-                ) {
+                if (session == null || !isWarmupSessionCurrent(session, result.request)) {
                     result.engine.close()
                     engineWarmupRetry = true
                     return
@@ -1515,8 +1589,8 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun reconcileLanguagePackSession(session: InputSession) {
-        val configuredLanguage = graph.settings.lastLanguage
-        val configuredKey = graph.settings.lastLanguagePackKey
+        val configuredLanguage = this.configuredLanguage
+        val configuredKey = configuredLanguagePackKey
         val currentLanguage = session.controller.state.language
         val currentKey = session.controller.state.languagePackKey
         if (configuredLanguage != currentLanguage || configuredKey != currentKey) {
@@ -1537,6 +1611,7 @@ class ZeroInputService : InputMethodService() {
             // is no longer available. Clear it before preparing the built-in
             // engine so the stale package cannot be resurrected by a callback.
             graph.settings.lastLanguagePackKey = null
+            configuredLanguagePackKey = null
             languagePackReloadPending = true
         } else {
             // Discovery may still be in flight.  Preserve the requested key
@@ -1548,10 +1623,13 @@ class ZeroInputService : InputMethodService() {
 
     private fun maybeReloadLanguagePack() {
         val session = activeSession ?: return
-        val language = graph.settings.lastLanguage
-        val key = graph.settings.lastLanguagePackKey
+        val language = configuredLanguage
+        val key = configuredLanguagePackKey
         if (language != session.controller.state.language || key != session.controller.state.languagePackKey) {
-            if (session.controller.state.snapshot.isComposing) return
+            if (session.controller.state.snapshot.isComposing) {
+                languagePackReloadPending = true
+                return
+            }
             cancelEngineWarmup(clearInstalled = true)
             session.controller.setLanguage(language, key)
             languagePackReloadPending = false
@@ -1571,7 +1649,7 @@ class ZeroInputService : InputMethodService() {
 
     private fun maybeReloadEngine() {
         val session = activeSession ?: return
-        if (graph.settings.lastLanguagePackKey != null) {
+        if (configuredLanguagePackKey != null) {
             engineReloadPending = false
             return
         }
@@ -1606,7 +1684,7 @@ class ZeroInputService : InputMethodService() {
             sessionChineseOptions != configuredChineseOptions -> InputEngineStatus.PENDING_CONFIGURATION
             graph.rime.runtime.state == RimeRuntimeState.FAILED ||
                 unavailableEngineWarmupContext != null -> InputEngineStatus.FAILED
-            installedEngineWarmupContext == session.warmupRequest(sessionChineseOptions, nativeRetryRequested) -> InputEngineStatus.READY
+            session.matchesWarmup(installedEngineWarmupContext, sessionChineseOptions, nativeRetryRequested) -> InputEngineStatus.READY
             else -> InputEngineStatus.PREPARING
         }
         inputView?.renderEngineStatus(status)
@@ -1710,6 +1788,13 @@ class ZeroInputService : InputMethodService() {
         val connectionBinding: SessionConnectionBinding,
         val packageName: String?,
     ) {
+        fun matchesWarmup(request: EngineWarmupRequest?, options: ChineseInputOptions, retry: Boolean): Boolean {
+            val state = controller.state
+            return request != null && request.sessionToken == token && request.packageName == packageName &&
+                request.language == state.language && request.languagePackKey == state.languagePackKey &&
+                request.privacy == state.privacy && request.chineseOptions == options && request.retryInitialization == retry
+        }
+
         fun warmupRequest(options: ChineseInputOptions, retry: Boolean): EngineWarmupRequest = EngineWarmupRequest(
             sessionToken = token,
             language = controller.state.language,

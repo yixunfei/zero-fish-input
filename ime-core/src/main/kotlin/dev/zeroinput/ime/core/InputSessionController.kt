@@ -348,15 +348,19 @@ class InputSessionController(
 
     /**
      * Installs an engine that was prepared for this exact editor context.
-     * Sensitive/session changes and an active pre-edit reject the result and
-     * close it, preventing stale native state from crossing an editor
-     * boundary.  The caller retains no ownership after this method returns.
+     * Sensitive/session changes reject the result and close it, preventing
+     * stale native state from crossing an editor boundary. A small built-in
+     * pinyin pre-edit may be restored into a prepared composition engine so
+     * native startup never turns its first letter into literal editor text.
+     * The caller retains no ownership after this method returns.
      */
     fun adoptPreparedEngine(prepared: PreparedInputEngine): Boolean {
-        if (!matches(prepared) || state.snapshot.isComposing) {
+        if (!matches(prepared)) {
             prepared.close()
             return false
         }
+        val previous = state.snapshot
+        if (previous.isComposing) return adoptPreparedComposition(prepared, previous)
         val candidate = prepared.takeEngine()
         if (candidate == null) return false
         closeEngine()
@@ -366,6 +370,54 @@ class InputSessionController(
         publish(prepared.snapshot)
         return true
     }
+
+    /**
+     * Transfers only a plain fallback pinyin pre-edit. Selected segments and
+     * package engines can carry engine-specific state, so retaining the
+     * existing engine is safer than attempting a lossy migration.
+     */
+    private fun adoptPreparedComposition(
+        prepared: PreparedInputEngine,
+        previous: EngineSnapshot,
+    ): Boolean {
+        val current = engine
+        val input = previous.rawInput
+        if (!canRestorePreparedComposition(current, input, previous)) {
+            prepared.close()
+            return false
+        }
+        val candidate = prepared.takeEngine() ?: return false
+        val restored = runCatching {
+            (candidate as? CompositionEditingEngine)?.restoreComposition(input)
+        }.getOrNull()
+        if (!isRestoredComposition(restored, input)) {
+            closeSafely(candidate)
+            return false
+        }
+
+        closeEngine()
+        routes = emptyList()
+        engine = candidate
+        languagePackKey = prepared.languagePackKey
+        apply(requireNotNull(restored))
+        return true
+    }
+
+    private fun canRestorePreparedComposition(
+        current: InputEngine?,
+        input: String,
+        snapshot: EngineSnapshot,
+    ): Boolean = language == InputLanguage.CHINESE &&
+        languagePackKey == null &&
+        current?.descriptor?.isFallback == true &&
+        current is CompositionEditingEngine &&
+        !snapshot.canUndoSelection &&
+        input.length in 1..MAX_HANDOFF_PINYIN_LENGTH &&
+        input.all(::isHandoffPinyinCharacter)
+
+    private fun isRestoredComposition(update: EngineUpdate?, input: String): Boolean =
+        update != null && update.consumed && update.committedText.isEmpty() &&
+            update.snapshot.isComposing && update.snapshot.rawInput == input
 
     private fun replaceEngine() {
         closeEngine()
@@ -454,6 +506,13 @@ class InputSessionController(
             prepared.privacy == privacy &&
             prepared.snapshot.isComposing.not() &&
             runCatching { language in prepared.descriptor.languages }.getOrDefault(false)
+
+    private companion object {
+        const val MAX_HANDOFF_PINYIN_LENGTH = 128
+
+        fun isHandoffPinyinCharacter(value: Char): Boolean =
+            value in 'a'..'z' || value in '2'..'9' || value == '\'' || value == ';'
+    }
 
     private fun handleKey(activeEngine: InputEngine, key: EngineKey, fallbackBackspace: Boolean = false) {
         if (state.modelRanked && key is EngineKey.Character &&

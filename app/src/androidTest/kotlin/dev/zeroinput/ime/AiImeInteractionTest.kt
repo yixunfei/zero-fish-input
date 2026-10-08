@@ -86,7 +86,12 @@ class AiImeInteractionTest {
                 it.isShown && it.text == it.context.getString(UiR.string.ai_import_content)
             }
         }
-        await { draft().text.toString() == "public imported context" }
+        onMain {
+            assertTrue(draft().text.isEmpty())
+            views(panel()).filterIsInstance<TextView>().first { it.text.toString().startsWith(
+                it.context.getString(UiR.string.ai_context_title)) }.performClick()
+        }
+        await { views(panel()).filterIsInstance<TextView>().any { it.isShown && it.text.toString() == "public imported context" } }
         onMain { assertFalse(graph.aiContentInbox.available()); assertTrue(editor.editor.text.isEmpty()) }
         onMain {
             editor.editor.imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING

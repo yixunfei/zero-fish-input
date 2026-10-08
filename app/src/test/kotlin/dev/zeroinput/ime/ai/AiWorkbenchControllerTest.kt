@@ -15,6 +15,32 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun explicitCancelDropsReferencesAndHistoryButEditingStopPreservesSelections() {
+        val f = Fixture()
+        f.controller.submit(AiAction.ASK, "first", null)
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.flush()
+        f.controller.addReferences(f.controller.contextState.revision, listOf(AiReference("page"),
+            AiReference("import", AiReference.Source.IMPORT)))
+        val selected = f.controller.contextState
+        f.controller.stop()
+        assertSame(selected, f.controller.contextState)
+        f.controller.submit(AiAction.ASK, "second", null)
+        assertFalse(f.provider.requests.last().history.isEmpty())
+        assertEquals(2, f.provider.requests.last().references.size)
+        f.provider.emit(AiStreamEvent.Completed("late"))
+        f.controller.cancelRequest()
+        f.flush()
+        assertNull(f.controller.consumeResult())
+        assertTrue(f.controller.contextState.revision > selected.revision)
+        assertFalse(f.controller.includeHistory(selected.revision, 0, true))
+        f.controller.stop()
+        f.controller.submit(AiAction.ASK, "edited question", null)
+        assertTrue(f.provider.requests.last().references.isEmpty())
+        assertTrue(f.provider.requests.last().history.isEmpty())
+        assertEquals(2, f.controller.contextState.messages.size)
+    }
+
     @Test fun quickModelSwitchClearsOldContextAndPendingCompletionWithoutChangingDefault() {
         val f = Fixture(save = false)
         f.profile = f.profile.copy(models = listOf("fixture-model", "other-model"))
@@ -128,6 +154,7 @@ class AiWorkbenchControllerTest {
         f.controller.newConversation()
         f.controller.selectConversation(id)
         f.flush()
+        f.controller.recentHistory(f.controller.contextState.revision)
         f.controller.submit(AiAction.ASK, "follow up", null)
         assertEquals(id, f.provider.requests.last().conversationId)
         assertEquals(listOf("first", "answer"), f.provider.requests.last().history.map { it.content })
@@ -160,6 +187,7 @@ class AiWorkbenchControllerTest {
         f.repository.upsert(AiConversation(id = "saved", title = "fixture", messages = history))
         f.controller.selectConversation("saved")
         f.flush()
+        f.controller.recentHistory(f.controller.contextState.revision)
         f.controller.submit(AiAction.ASK, "follow up", null)
         assertEquals(12, f.provider.requests.last().history.size)
         f.provider.emit(AiStreamEvent.Completed("answer"))
@@ -267,6 +295,83 @@ class AiWorkbenchControllerTest {
         assertEquals("answer", f.controller.consumeResult())
     }
 
+    @Test fun savedHistoryRequiresSelectionAndPageReferencesNeverBecomeSavedMessages() {
+        val f = Fixture()
+        f.repository.upsert(AiConversation(id = "saved", title = "name", messages = listOf(
+            AiMessage(AiRole.USER, "old question"), AiMessage(AiRole.ASSISTANT, "old answer"))))
+        f.controller.selectConversation("saved")
+        f.flush()
+        assertTrue(f.controller.contextState.selectedHistory.isEmpty())
+        f.controller.includeHistory(f.controller.contextState.revision, 1, true)
+        f.controller.addReferences(f.controller.contextState.revision, listOf(AiReference("selected public page")))
+        f.controller.submit(AiAction.ASK, "new question", null)
+        val sent = f.provider.requests.last()
+        assertEquals(listOf("old answer"), sent.history.map { it.content })
+        assertEquals(listOf("selected public page"), sent.references.map { it.text })
+        f.provider.emit(AiStreamEvent.Completed("new answer"))
+        f.flush()
+        assertEquals(listOf("old question", "old answer", "new question", "new answer"),
+            f.repository.list().single().messages.map { it.content })
+        f.controller.newConversation()
+        assertTrue(f.controller.contextState.references.isEmpty())
+    }
+
+    @Test fun deselectingContextCancelsGenerationAndCannotReviveItsResult() {
+        val f = Fixture()
+        f.controller.addReferences(f.controller.contextState.revision, listOf(AiReference("public page")))
+        f.controller.submit(AiAction.ASK, "question", null)
+        f.provider.emit(AiStreamEvent.Completed("old answer"))
+        f.controller.clearContext(f.controller.contextState.revision)
+        f.flush()
+        assertNull(f.controller.consumeResult())
+        assertTrue(f.repository.list().isEmpty())
+    }
+
+    @Test fun renameUsesExistingFormatAndQueuedRenameCannotResurrectDeletedOrClearedHistory() {
+        val f = Fixture()
+        f.repository.upsert(AiConversation(id = "saved", title = "old"))
+        f.controller.renameConversation("saved", "new")
+        f.flush()
+        assertEquals("new", f.repository.list().single().title)
+        f.controller.renameConversation("saved", "late")
+        f.controller.deleteConversation("saved")
+        f.flush()
+        assertTrue(f.repository.list().isEmpty())
+        f.repository.upsert(AiConversation(id = "saved", title = "old"))
+        f.controller.renameConversation("saved", "late")
+        f.generation.invalidate()
+        f.repository.clear()
+        f.flush()
+        assertTrue(f.repository.list().isEmpty())
+    }
+
+    @Test fun renamingRefreshesTheListWithoutEnteringLoadingState() {
+        val f = Fixture()
+        f.repository.upsert(AiConversation(id = "saved", title = "old"))
+        f.controller.renameConversation("saved", "new")
+        f.flush()
+        assertEquals("new", f.summaries.single().title)
+        assertTrue(f.historyLoading.none { it })
+        f.controller.refreshConversations()
+        assertTrue(f.historyLoading.last())
+        f.flush()
+        assertFalse(f.historyLoading.last())
+    }
+
+    @Test fun pageRevocationRejectsCompletionAndPersistenceBeforeUiObserverRuns() {
+        for (completed in listOf(false, true)) {
+            val f = Fixture()
+            f.controller.addReferences(f.controller.contextState.revision, listOf(AiReference("public page")))
+            f.controller.submit(AiAction.ASK, "question", null)
+            f.provider.emit(AiStreamEvent.Completed("old answer"))
+            if (completed) f.ui.drain()
+            f.contextCurrent = false
+            f.flush()
+            assertNull(f.controller.consumeResult())
+            assertTrue(f.repository.list().isEmpty())
+        }
+    }
+
     private class Fixture(save: Boolean = true) {
         val worker = Queue()
         val ui = Queue()
@@ -274,8 +379,11 @@ class AiWorkbenchControllerTest {
         val generation = AiDataGeneration()
         val repository = AiConversationRepository(MemoryStore())
         var allowed = true
+        var contextCurrent = true
         var persistenceEnabled = save
         val events = mutableListOf<AiStreamEvent>()
+        var summaries = emptyList<AiConversationSummary>()
+        val historyLoading = mutableListOf<Boolean>()
         var profile = AiProviderProfile(
             id = "fixture",
             name = "Fixture",
@@ -294,7 +402,9 @@ class AiWorkbenchControllerTest {
                     selectedProviderId = profile.id,
                 )
             },
-            generation, { ui.execute(it); true }, { allowed }, events::add, {}, {})
+            generation, { ui.execute(it); true }, { allowed }, events::add, { summaries = it }, {},
+            renderHistoryStatus = { _, loading, _ -> historyLoading += loading },
+            contextCurrent = { contextCurrent })
         fun flush() { repeat(3) { ui.drain(); worker.drain() }; ui.drain() }
     }
     private class Queue : Executor {

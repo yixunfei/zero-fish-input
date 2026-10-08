@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_page_access_title">Page text references</string>
+    <string name="ai_page_access_description">Only tapping Reference page in the AI keyboard reads visible text exposed by the current app for your selection. No automatic collection, editable-field reading or clipboard access. Unchecked text is never sent; Send delivers selected text to your configured AI provider. Some apps expose no text, and ordinary labels may contain sensitive information. Review your selection. System accessibility authorization is also required. Return to the keyboard and tap again; authorization never starts capture.</string>
+    <string name="ai_page_enable">Allow explicit page text references</string>
+    <string name="ai_page_authorize">Open accessibility authorization</string>
+    <string name="ai_page_authorized">Service connected. Return to the keyboard to capture.</string>
+    <string name="ai_page_not_authorized">Service disconnected. Authorize it in system settings.</string>
+</resources>

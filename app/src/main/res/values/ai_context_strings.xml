@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_page_access_title">页面文字引用</string>
+    <string name="ai_page_access_description">仅在键盘 AI 中点击“引用页面”时，通过无障碍服务读取当前页面公开的可见文字，供你逐条勾选。不会自动采集、读取输入框或剪贴板。未勾选内容不会发送；只有点击发送才会交给你配置的 AI 服务商。部分应用无法读取，普通文字也可能含敏感信息，请检查后选择。开启功能后还需在系统中授权；返回键盘后再次点击引用，不会自动读取。</string>
+    <string name="ai_page_enable">允许主动引用页面文字</string>
+    <string name="ai_page_authorize">打开系统无障碍授权</string>
+    <string name="ai_page_authorized">服务已连接，请返回键盘主动引用</string>
+    <string name="ai_page_not_authorized">服务尚未连接，请在系统设置中授权</string>
+</resources>

@@ -9,6 +9,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.appcompat.widget.PopupMenu
 import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.PageDirection
 
@@ -71,39 +72,56 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private val undo = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.undo_segment) { onUndoSelectionRequested() }
     private val syllable = panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.select_single_syllable) { onSyllableRequested() }
     private val retry = panelIconButton(context, android.R.drawable.ic_popup_sync, R.string.retry_engine) { onRetryRequested() }
+    private val overflow = panelIconButton(context, android.R.drawable.ic_menu_more, R.string.candidate_more_actions) {
+        showOverflowActions()
+    }
     private val buttons = mutableListOf<CandidateItemView>()
     private var previousSnapshot: EngineSnapshot? = null
     private var expanded = false
     private var lastStatus: InputEngineStatus? = null
     private var diagnostics: String? = null
     private var lastAnnouncedCandidate: String? = null
+    private var actionDensity = CandidateActionDensity.FULL
+    private var candidateInline = false
+    private var aiEntryVisible = false
+    private var reconversionAvailable = false
+    private val statusRow = LinearLayout(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        addView(composition, LayoutParams(0, dp(24), 0.55f))
+        addView(progress, LayoutParams(dp(18), dp(18)))
+        addView(status, LayoutParams(0, dp(24), 0.45f).apply { marginEnd = dp(8) })
+    }
+    private val actionRow = LinearLayout(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        addView(tools, LayoutParams(dp(48), dp(48)))
+        addView(reconvert, LayoutParams(dp(48), dp(48)))
+        addView(ai, LayoutParams(dp(48), dp(48)))
+        addView(undo, LayoutParams(dp(48), dp(48)))
+        addView(syllable, LayoutParams(dp(48), dp(48)))
+        addView(previousPage, LayoutParams(dp(48), dp(48)))
+        addView(browser, LayoutParams(0, dp(48), 1f))
+        addView(nextPage, LayoutParams(dp(48), dp(48)))
+        addView(retry, LayoutParams(dp(48), dp(48)))
+        addView(overflow, LayoutParams(dp(48), dp(48)))
+        addView(expand, LayoutParams(dp(48), dp(48)))
+    }
 
     init {
-        val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        orientation = if (landscape) HORIZONTAL else VERTICAL
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(if (landscape) 48 else 72))
-        val statusRow = LinearLayout(context).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(composition, LayoutParams(0, dp(24), 0.55f))
-            addView(progress, LayoutParams(dp(18), dp(18)))
-            addView(status, LayoutParams(0, dp(24), 0.45f).apply { marginEnd = dp(8) })
-        }
-        addView(statusRow, if (landscape) LayoutParams(0, dp(48), 1f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(24)))
-        addView(LinearLayout(context).apply {
-            addView(tools, LayoutParams(dp(48), dp(48)))
-            addView(reconvert, LayoutParams(dp(48), dp(48)))
-            addView(ai, LayoutParams(dp(48), dp(48)))
-            addView(undo, LayoutParams(dp(48), dp(48)))
-            addView(syllable, LayoutParams(dp(48), dp(48)))
-            addView(previousPage, LayoutParams(dp(48), dp(48)))
-            addView(browser, LayoutParams(0, dp(48), 1f))
-            addView(nextPage, LayoutParams(dp(48), dp(48)))
-            addView(retry, LayoutParams(dp(48), dp(48)))
-            addView(expand, LayoutParams(dp(48), dp(48)))
-        }, if (landscape) LayoutParams(0, dp(48), 3f) else LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        orientation = VERTICAL
+        addView(statusRow)
+        addView(actionRow)
+        updateViewportLayout()
         renderStatus(InputEngineStatus.HIDDEN)
         undo.visibility = GONE
         syllable.visibility = GONE
+    }
+
+    internal fun applyViewport(plan: KeyboardViewportPlan) {
+        if (candidateInline == plan.candidateInline && actionDensity == plan.candidateActions) return
+        candidateInline = plan.candidateInline
+        actionDensity = plan.candidateActions
+        updateViewportLayout()
+        updateActionVisibility()
     }
 
     fun render(snapshot: EngineSnapshot) {
@@ -116,8 +134,6 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             snapshot.candidates != previousSnapshot?.candidates
         previousSnapshot = snapshot
         if (snapshot.candidates.isEmpty()) lastAnnouncedCandidate = null
-        undo.visibility = if (snapshot.canUndoSelection) VISIBLE else GONE
-        syllable.visibility = if (snapshot.canSelectSyllable && !snapshot.canUndoSelection) VISIBLE else GONE
         val associations = snapshot.candidates.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
         composition.text = if (associations) context.getString(R.string.word_associations)
             else snapshot.composition.ifEmpty { snapshot.rawInput }
@@ -132,9 +148,6 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             button.visibility = if (candidate == null) View.GONE else View.VISIBLE
             if (candidate != null) button.bind(candidate, index, index == snapshot.highlightedIndex) else button.clear()
         }
-        expand.visibility = if (snapshot.candidates.isEmpty() || associations) View.INVISIBLE else View.VISIBLE
-        previousPage.visibility = if (snapshot.hasPreviousPage && !associations) View.VISIBLE else View.GONE
-        nextPage.visibility = if (snapshot.hasNextPage && !associations) View.VISIBLE else View.GONE
         previousPage.isEnabled = snapshot.hasPreviousPage && !associations
         nextPage.isEnabled = snapshot.hasNextPage && !associations
         if (changedInput) scroll.scrollTo(0, 0)
@@ -149,6 +162,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             if (previousSnapshot == snapshot) buttons.getOrNull(pageTarget)?.let { scroll.scrollTo(it.left, 0) }
         }
         updateStatusVisibility()
+        updateActionVisibility()
     }
 
     fun setExpanded(value: Boolean) {
@@ -159,12 +173,14 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     }
 
     fun renderAiEntry(available: Boolean, visible: Boolean) {
-        ai.visibility = if (visible) VISIBLE else GONE
+        aiEntryVisible = visible
         ai.renderAiEntryAvailability(available)
+        updateActionVisibility()
     }
 
     fun renderReconversion(available: Boolean) {
-        reconvert.visibility = if (available) VISIBLE else GONE
+        reconversionAvailable = available
+        updateActionVisibility()
     }
 
     fun renderStatus(value: InputEngineStatus) {
@@ -179,8 +195,8 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         }
         status.text = diagnostics ?: label?.let(context::getString).orEmpty()
         progress.visibility = if (value == InputEngineStatus.PREPARING) View.VISIBLE else View.GONE
-        retry.visibility = if (value == InputEngineStatus.FAILED) View.VISIBLE else View.GONE
         updateStatusVisibility()
+        updateActionVisibility()
     }
 
     /** Shows the Debug-only editor metadata diagnostic while preserving the composition text. */
@@ -198,10 +214,89 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         updateStatusVisibility()
     }
 
+    private fun updateViewportLayout() {
+        orientation = if (candidateInline) HORIZONTAL else VERTICAL
+        statusRow.layoutParams = if (candidateInline) LayoutParams(0, dp(48), 1f)
+            else LayoutParams(LayoutParams.MATCH_PARENT, dp(24))
+        actionRow.layoutParams = if (candidateInline) LayoutParams(0, dp(48), 3f)
+            else LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
+    }
+
+    private fun updateActionVisibility() {
+        val snapshot = previousSnapshot
+        val associations = snapshot?.candidates?.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
+        val canExpand = snapshot?.candidates?.isNotEmpty() == true && !associations
+        val canUndo = snapshot?.canUndoSelection == true
+        val canSelectSyllable = snapshot?.canSelectSyllable == true && !canUndo
+        val canPrevious = snapshot?.hasPreviousPage == true && !associations
+        val canNext = snapshot?.hasNextPage == true && !associations
+        val canRetry = lastStatus == InputEngineStatus.FAILED
+        val compact = actionDensity != CandidateActionDensity.FULL
+        val minimal = actionDensity == CandidateActionDensity.MINIMAL
+        tools.visibility = if (minimal) GONE else VISIBLE
+        reconvert.visibility = if (!compact && reconversionAvailable) VISIBLE else GONE
+        ai.visibility = if (!compact && aiEntryVisible) VISIBLE else GONE
+        undo.visibility = if (!compact && canUndo) VISIBLE else GONE
+        syllable.visibility = if (!compact && canSelectSyllable) VISIBLE else GONE
+        previousPage.visibility = if (!compact && canPrevious) VISIBLE else GONE
+        nextPage.visibility = if (!compact && canNext) VISIBLE else GONE
+        retry.visibility = if (!compact && canRetry) VISIBLE else GONE
+        expand.visibility = if (!minimal && canExpand) VISIBLE else GONE
+        overflow.visibility = if (compact && (minimal || reconversionAvailable || aiEntryVisible || canUndo ||
+                canSelectSyllable || canPrevious || canNext || canRetry || canExpand)) VISIBLE else GONE
+    }
+
+    private fun showOverflowActions() {
+        val snapshot = previousSnapshot
+        val associations = snapshot?.candidates?.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
+        PopupMenu(context, overflow).apply {
+            if (actionDensity == CandidateActionDensity.MINIMAL) menu.add(0, ACTION_TOOLS, 0, R.string.keyboard_tools)
+            if (reconversionAvailable) menu.add(0, ACTION_RECONVERT, 1, R.string.reconvert_last_word)
+            if (aiEntryVisible) menu.add(0, ACTION_AI, 2, R.string.ai_open)
+            if (snapshot?.canUndoSelection == true) menu.add(0, ACTION_UNDO, 3, R.string.undo_segment)
+            if (snapshot?.canSelectSyllable == true && snapshot.canUndoSelection.not()) {
+                menu.add(0, ACTION_SYLLABLE, 4, R.string.select_single_syllable)
+            }
+            if (snapshot?.hasPreviousPage == true && !associations) menu.add(0, ACTION_PREVIOUS, 5, R.string.previous_candidates)
+            if (snapshot?.hasNextPage == true && !associations) menu.add(0, ACTION_NEXT, 6, R.string.next_candidates)
+            if (lastStatus == InputEngineStatus.FAILED) menu.add(0, ACTION_RETRY, 7, R.string.retry_engine)
+            if (snapshot?.candidates?.isNotEmpty() == true && !associations) {
+                menu.add(0, ACTION_EXPAND, 8, if (expanded) R.string.collapse_candidates else R.string.expand_candidates)
+            }
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    ACTION_TOOLS -> onToolsRequested()
+                    ACTION_RECONVERT -> onReconvertRequested()
+                    ACTION_AI -> onAiRequested()
+                    ACTION_UNDO -> onUndoSelectionRequested()
+                    ACTION_SYLLABLE -> onSyllableRequested()
+                    ACTION_PREVIOUS -> onPageChanged(PageDirection.PREVIOUS)
+                    ACTION_NEXT -> onPageChanged(PageDirection.NEXT)
+                    ACTION_RETRY -> onRetryRequested()
+                    ACTION_EXPAND -> onExpandRequested()
+                }
+                true
+            }
+            show()
+        }
+    }
+
     private fun updateStatusVisibility() {
         status.visibility = if (diagnostics == null && lastStatus == InputEngineStatus.READY && previousSnapshot?.isComposing == true)
             View.GONE else View.VISIBLE
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val ACTION_TOOLS = 1
+        const val ACTION_RECONVERT = 2
+        const val ACTION_AI = 3
+        const val ACTION_UNDO = 4
+        const val ACTION_SYLLABLE = 5
+        const val ACTION_PREVIOUS = 6
+        const val ACTION_NEXT = 7
+        const val ACTION_RETRY = 8
+        const val ACTION_EXPAND = 9
+    }
 }

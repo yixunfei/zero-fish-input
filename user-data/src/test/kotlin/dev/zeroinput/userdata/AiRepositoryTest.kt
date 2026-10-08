@@ -334,6 +334,24 @@ class AiRepositoryTest {
         assertEquals("", configuration.read().activeKey())
     }
 
+    @Test fun renameFailureRevocationAndMissingConversationPreserveStoredData() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        repository.upsert(AiConversation(id = "one", title = "original"))
+        store.failWrite = true
+        assertThrows(IOException::class.java) { repository.rename("one", "new") }
+        store.failWrite = false
+        assertEquals("original", repository.list().single().title)
+        assertTrue(store.lastWrite?.all { it == 0.toByte() } == true)
+        assertThrows(IllegalStateException::class.java) { repository.rename("one", "new") { false } }
+        for (title in listOf("", "x".repeat(129), "invalid\nname")) {
+            assertThrows(IllegalArgumentException::class.java) { repository.rename("one", title) }
+        }
+        assertNull(repository.rename("missing", "new"))
+        assertEquals("original", repository.list().single().title)
+        assertEquals("renamed", repository.rename("one", " renamed ")?.title)
+    }
+
     private fun providerProfile(
         endpoint: String = "https://provider.example/v1/chat/completions",
         apiKey: String = "fixture-api-key",

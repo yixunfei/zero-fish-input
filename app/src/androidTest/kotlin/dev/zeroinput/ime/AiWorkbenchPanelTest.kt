@@ -24,6 +24,33 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AiWorkbenchPanelTest {
+    @Test fun pageChecklistKeepsOnlyBoundedUnicodePreviewAndPreservesSelectionIndices() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = ZeroInputView(context)
+        panel.renderSession(InputSessionState(privacy = SessionPrivacy(false, true, true, PrivacyReason.NONE)))
+        visible(panel).first { it.contentDescription == context.getString(dev.zeroinput.ime.ui.R.string.ai_open) }.performClick()
+        val prefix = "x".repeat(159)
+        val source = prefix + "\uD83D\uDE00" + "public excluded tail".repeat(100)
+        var selected = emptyList<Int>()
+        panel.onAiPageSelected = { selected = it }
+        panel.renderAiPage(listOf(source, "public second reference"))
+        val choices = visible(panel).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>()
+        assertEquals(2, choices.size)
+        assertTrue(choices.none { it.isChecked })
+        val preview = choices.first().text.toString()
+        assertTrue(preview.contains(prefix))
+        assertFalse(preview.contains("public excluded tail"))
+        assertTrue(preview.none { it.isSurrogate() })
+        choices.last().isChecked = true
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_page_add)
+        }.performClick()
+        assertEquals(listOf(1), selected)
+        panel.clearAiPage()
+        assertTrue(visible(panel).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>().isEmpty())
+        panel.release()
+    }
+
     @Test fun newChatIsAvailableDuringEditingAndGenerationAndDoesNotSend() = onMain {
         val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
         val panel = AiWorkbenchPanelView(context)
@@ -68,9 +95,10 @@ class AiWorkbenchPanelTest {
     }
 
     @Test fun draftAndResultsRemainInsidePanelAcrossThemesAndRotation() = onMain {
-        for (night in listOf(false, true)) for (landscape in listOf(false, true)) {
+        for (night in listOf(false, true)) for (landscape in listOf(false, true)) for (scale in listOf(1f, 1.3f)) {
             val target = InstrumentationRegistry.getInstrumentation().targetContext
             val configuration = Configuration(target.resources.configuration).apply {
+                fontScale = scale
                 orientation = if (landscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
                 screenWidthDp = if (landscape) 640 else 320
                 screenHeightDp = if (landscape) 320 else 640
@@ -89,11 +117,21 @@ class AiWorkbenchPanelTest {
             panel.renderAiDraft("public fixture", InputSessionState())
             panel.renderAiModels(listOf("public-long-model-name", "public-other"), "public-long-model-name")
             captureAndCheck(panel, configuration, night, "draft")
+            panel.renderAiPage(listOf("public first reference", "public unchecked reference"), false)
+            captureAndCheck(panel, configuration, night, "page")
+            panel.renderAiContext(dev.zeroinput.ai.api.AiContextState(references =
+                listOf(dev.zeroinput.ai.api.AiReference("public selected reference"))))
+            panel.clearAiPage()
+            captureAndCheck(panel, configuration, night, "context")
             panel.renderAi(AiStreamEvent.Started)
             panel.renderAi(AiStreamEvent.Completed("public response"))
             assertEquals(0, inserts)
             measure(panel, configuration.screenWidthDp, configuration.screenHeightDp)
             captureAndCheck(panel, configuration, night, "result")
+            val response = visible(workbench).filterIsInstance<TextView>().single {
+                it.id == dev.zeroinput.ime.ui.R.id.ai_result_text }
+            val viewport = response.parent.parent as android.widget.ScrollView
+            assertTrue("Answer must have a readable viewport", viewport.height >= 48 * context.resources.displayMetrics.density)
             assertTrue(workbench.height > 0)
             assertTrue(panel.measuredHeight <= (configuration.screenHeightDp * context.resources.displayMetrics.density).toInt())
             visible(workbench).filterIsInstance<TextView>().first {
@@ -107,6 +145,62 @@ class AiWorkbenchPanelTest {
         }
     }
 
+    @Test fun pageChecklistAndContextSelectionRequireExplicitActions() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        var selected = emptyList<Int>()
+        var sends = 0
+        panel.onPageSelected = { selected = it }
+        panel.onSubmit = { _, _, _ -> sends++ }
+        panel.renderDraft("question")
+        panel.renderPage(listOf("public first", "public second"), false, false)
+        val checks = visible(panel).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>()
+        assertEquals(2, checks.size)
+        assertTrue(checks.none { it.isChecked })
+        checks[1].isChecked = true
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_page_add)
+        }.performClick()
+        assertEquals(listOf(1), selected)
+        assertEquals(0, sends)
+        panel.clearPage()
+        assertFalse(visible(panel).filterIsInstance<TextView>().any { it.text == "public first" })
+        panel.renderContext(dev.zeroinput.ai.api.AiContextState(4,
+            listOf(dev.zeroinput.ai.api.AiMessage(dev.zeroinput.ai.api.AiRole.USER, "public history"))))
+        var intent: dev.zeroinput.ime.ui.AiContextCommand? = null
+        panel.onContextAction = { intent = it }
+        visible(panel).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>().single().isChecked = true
+        assertEquals(dev.zeroinput.ime.ui.AiContextCommand.History(4, 0, true), intent)
+        assertEquals(0, sends)
+        panel.reset()
+        assertFalse(visible(panel).filterIsInstance<TextView>().any { it.text == "public history" })
+    }
+
+    @Test fun conversationListIsSeparateAndRenameUsesExplicitSave() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        var rename = ""
+        panel.onConversationRename = { id, _ -> rename = id }
+        panel.renderHistoryStatus(true, false, false)
+        panel.renderConversations(listOf(dev.zeroinput.ai.api.AiConversationSummary("one", "public title", 0)))
+        assertFalse(visible(panel).filterIsInstance<TextView>().any { it.text == "public title" })
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_conversations_title)
+        }.performClick()
+        assertTrue(visible(panel).filterIsInstance<TextView>().any { it.text == "public title" })
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_conversation_rename)
+        }.performClick()
+        assertEquals("one", rename)
+        panel.renderRenaming(true)
+        assertTrue(panel.editing)
+        assertTrue(visible(panel).filterIsInstance<TextView>().any {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_rename_save) })
+        panel.renderRenaming(false)
+        assertTrue(visible(panel).filterIsInstance<TextView>().any {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_submit) })
+    }
+
     private fun captureAndCheck(panel: ZeroInputView, configuration: Configuration, night: Boolean, stage: String) {
         measure(panel, configuration.screenWidthDp, configuration.screenHeightDp)
         val workbench = visible(panel).filterIsInstance<AiWorkbenchPanelView>().single()
@@ -115,7 +209,9 @@ class AiWorkbenchPanelTest {
             .getColorForState(selectedAction.drawableState, 0)
         assertTrue("Selected action text must remain readable", ColorUtils.calculateContrast(
             selectedAction.currentTextColor, container) >= 4.5)
-        val labels = listOf(dev.zeroinput.ime.ui.R.string.ai_submit, dev.zeroinput.ime.ui.R.string.ai_insert,
+        val labels = if (stage == "page") listOf(dev.zeroinput.ime.ui.R.string.ai_page_add,
+            dev.zeroinput.ime.ui.R.string.ai_page_cancel, dev.zeroinput.ime.ui.R.string.ai_new_conversation)
+        else listOf(dev.zeroinput.ime.ui.R.string.ai_submit, dev.zeroinput.ime.ui.R.string.ai_insert,
             dev.zeroinput.ime.ui.R.string.ai_new_conversation,
             if (panel.isAiEditing) dev.zeroinput.ime.ui.R.string.ai_read else dev.zeroinput.ime.ui.R.string.ai_edit)
         for (label in labels) {
@@ -125,7 +221,7 @@ class AiWorkbenchPanelTest {
                 rect.left >= 0 && rect.right <= workbench.width)
             assertTrue("Command must remain a full touch target", button.height >= 48 * button.resources.displayMetrics.density)
             val layout = checkNotNull(button.layout)
-            assertTrue("Command text must fit", (0 until layout.lineCount).all { layout.getEllipsisCount(it) == 0 })
+            assertTrue("Command text must fit: ${button.text} at ${configuration.screenWidthDp}dp / ${configuration.fontScale}", (0 until layout.lineCount).all { layout.getEllipsisCount(it) == 0 })
         }
         visible(panel).forEach { it.viewTreeObserver.dispatchOnPreDraw() }
         val image = Bitmap.createBitmap(panel.width, panel.height, Bitmap.Config.ARGB_8888)
@@ -141,7 +237,7 @@ class AiWorkbenchPanelTest {
             assertTrue("More command must render a visible icon", pixels.distinct().size > 1)
             val folder = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
                 "ai-interaction-fixtures").apply { mkdirs() }
-            java.io.File(folder, "ai-$stage-${configuration.screenWidthDp}-${if (night) "dark" else "light"}.png")
+            java.io.File(folder, "ai-$stage-${configuration.screenWidthDp}-${configuration.fontScale}-${if (night) "dark" else "light"}.png")
                 .outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } finally { image.recycle() }
     }

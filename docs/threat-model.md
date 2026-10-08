@@ -63,7 +63,9 @@
   语言设置，避免系统显示的 subtype 与实际引擎状态分离。
   键盘上的语言切换同步系统子类型；系统回调仍执行交互失效和个性化任务取消，旧认证结果不能
   因语言恢复或窗口重建而继续提交。
-  已准备引擎必须匹配会话令牌、编辑器包名、语言包键和隐私快照，且仅在无组合文本时接管；
+  已准备引擎必须匹配会话令牌、编辑器包名、语言包键和隐私快照。通常只在无组合文本时接管；
+  内置轻量全拼降级引擎的未分词纯拼音组合可由已准备的全拼引擎恢复。恢复失败、已选分词、语言包
+  或不支持组合恢复的引擎均保留当前组合；
   会话切换、隐私收紧或任务取消会关闭过期 native/data 引擎，避免跨编辑器状态泄露和句柄泄漏。
   后台结果在投递到 IME 线程前由生命周期所有权交接器托管；服务销毁、Handler 回调移除或投递
   拒绝时会关闭仍未交接的引擎。
@@ -601,8 +603,9 @@ exported component is added. See ADR 0017 and the scoped validation reports.
 
 ## AI workbench additions
 
-The user-approved import surface adds one exported, input-only Activity for plain
-text SEND/PROCESS_TEXT. Intent actions, MIME and text length are validated; arbitrary
+The content review Activity is currently nonexported. Earlier plans described an
+external SEND/PROCESS_TEXT route; its parser remains defensive, but the manifest
+does not publish that route. Intent actions, MIME and text length are validated; arbitrary
 URIs/streams from senders are never opened. The Activity shows a protected review
 and uses only OpenDocument grants for attachments. It has no network or editor write
 port and always returns RESULT_CANCELED. A confirmed draft expires after two minutes
@@ -754,3 +757,63 @@ tool/text chunks, content after stop, multiple choices and trailing JSON cannot
 create a successful model probe or insertable answer. Bounded multiline SSE events
 and usage-only chunks are accepted. Live follow-up tests assert a public word from
 prior context, not merely a nonempty response.
+
+
+## Explicit page references and selected history (2026-10-07)
+
+The approved exception in ADR 0019 adds access to another application's visible
+noneditable accessibility labels only after an explicit action in an eligible IME
+session. The separate default-off preference and platform accessibility grant are
+both required, as are AI/network enablement and existing editor privacy gates.
+The system-bound service has no network, file storage, clipboard or editor-write
+port. It has no gesture, screenshot, key-filter or scrolling capability.
+
+Protected assets include unselected page labels, transient selected references,
+source window identity and the user's question. Malicious source applications may
+expose misleading text, huge trees, duplicate blocks or instruction-like content.
+Collection excludes nonmatching packages, invisible/editable/password and marked
+sensitive subtrees before accessing node text, bounds traversal and selected text,
+and does not expand to another window when source identity is uncertain. Blocks
+under the keyboard or other higher windows are excluded. Text remains plain data.
+Quotes cannot supply message roles, execute tools or change provider credentials;
+prompt injection may still influence model output, so no automatic effects exist.
+
+Platform node IPC and Android internals can temporarily hold additional data or
+outlive application deadlines. API 33+ disables node caching and prefetch; older
+platform copies and immutable JVM strings cannot be reliably zeroed. The app does
+not inspect excluded node text, retain nodes after traversal, or persist raw page
+references. App code releases snapshot/UI strings on cancellation or expiry. The
+application timeout rejects late callbacks without spawning replacement workers.
+
+The broker generation invalidates on settings/data clear, source window changes,
+lock, disconnection, IME panel/session changes and chat/model changes. Source events
+never read text or enumerate windows. Both window-state and window-set events revoke
+review even if a source package/window ID is reused. Unselected snapshots expire in
+30 seconds. Generation validity is
+checked synchronously before Send and Insert, preventing a queued revocation UI
+callback from leaving an old result usable. Repeated capture cancels pending reads.
+The source package and window ID remain local and are never sent or logged. Review
+text is shown in the checklist only as a bounded preview; the complete snapshot
+remains in the binding until explicit confirmation or expiry.
+Imported references share the immutable JVM string limitation; temporary mutable
+import buffers and attachment bytes are wiped on consumption or rejection. No raw
+page or imported reference is added to the saved conversation format.
+
+Context selection has its own revision so stale checkboxes cannot modify a later
+conversation. Saved messages are separate from the selected request projection;
+opening a saved conversation sends nothing and initially selects no history.
+Changing context revokes active output. Over-budget selections are rejected intact.
+Only explicit submission sends checked references/history and the question.
+
+Rename preserves conversation format 1; configuration format 4 is unchanged. Reads,
+rename, delete and clear retain serialized storage and generation checks. Missing
+or failed renames do not recreate deleted chats. Raw references are not persisted,
+but ordinary saved questions/answers may include information from those references;
+the UI discloses this retention distinction. Source sensitivity labeling and the
+provider's retention policies remain outside the application's guarantees.
+
+Tests use fixed public content from a separate-UID test Activity, which is absent
+from the main APK. Unit tests cover bounds, cancellation, unchecked data, context
+roles, stale revisions, failed rename and clear/delete races. Platform verification
+covers actual node filtering, opt-in/disconnection, keyboard layout and draft
+isolation. Validation outcomes are recorded in `ai-page-context-validation.md`.

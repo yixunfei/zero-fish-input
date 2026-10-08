@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_context_count">References %1$d · History %2$d · %3$d/%4$d characters</string>
+    <string name="ai_context_choose">Select</string>
+    <string name="ai_context_preview">Preview</string>
+    <string name="ai_context_recent">Recent history</string>
+    <string name="ai_context_clear">Clear context</string>
+    <string name="ai_context_transient">Raw page references last only in this workbench session. With history saving enabled, saved questions and answers may contain information from references.</string>
+    <string name="ai_reference_number">Reference %1$d</string>
+    <string name="ai_context_remove">Remove reference</string>
+    <string name="ai_context_empty">No context selected. Only the question and added attachments will be sent.</string>
+    <string name="ai_context_title">Context</string>
+    <string name="ai_context_short_count">Context %1$d</string>
+    <string name="ai_context_rejected">References expired or the selection exceeds the limit. Select again: up to 16 references, 12 messages and 16,384 characters combined.</string>
+    <string name="ai_page_reference">Reference page</string>
+    <string name="ai_page_loading">Reading the current page…</string>
+    <string name="ai_page_failed">Page unavailable or capture expired. Return to the source page and retry.</string>
+    <string name="ai_page_empty">No available text. This app may not expose its page content.</string>
+    <string name="ai_page_partial">Only some visible text was available. Select what you need.</string>
+    <string name="ai_page_choose">Select text to reference.</string>
+    <string name="ai_page_add">Add</string>
+    <string name="ai_page_cancel">Cancel</string>
+    <string name="ai_conversations_title">Chats</string>
+    <string name="ai_conversations_temporary">Temporary chat: cleared when you leave. Enable encrypted local history in AI settings to retain chats.</string>
+    <string name="ai_conversations_loading">Loading chats…</string>
+    <string name="ai_conversations_failed">Chat operation failed. Please retry.</string>
+    <string name="ai_conversations_empty">No saved chats. A chat is saved after a complete response.</string>
+    <string name="ai_conversations_saved">Locally saved chats</string>
+    <string name="ai_conversations_retry">Reload</string>
+    <string name="ai_conversation_current">Current: %1$s</string>
+    <string name="ai_conversation_rename">Rename</string>
+    <string name="ai_rename_save">Save name</string>
+    <string name="ai_rename_cancel">Cancel rename</string>
+    <string name="ai_show_result">View answer</string>
+    <string name="ai_rename_invalid">Enter a conversation name of 1 to 128 characters without line breaks.</string>
+</resources>

@@ -73,6 +73,12 @@ adapts the IME content/visible/touchable insets. Floating mode reserves no full-
 content inset and only its visible rectangle receives input; docked/one-hand modes
 reserve their measured height. No application overlay window or permission is used.
 Only public geometry is stored, separately for portrait and landscape.
+Keyboard and candidate layout decisions use the measured IME viewport, including the
+current split-screen or freeform width and height, rather than device orientation or
+full display size. Docked and one-hand surfaces consume the window's supplied bottom
+edge directly; only floating and expanded full-window panels reserve system-bar safety
+insets. Narrow viewports retain candidate browsing width by moving secondary actions
+into an accessible overflow menu.
 
 The complete Emoji 18.0 catalog and suffix trie are built on a bounded worker from
 hash-verified bundled data. UI category lookup uses immutable indexes; text searches
@@ -92,8 +98,9 @@ units only for the user's explicit Backspace action and retains no context histo
    再回退到本地设置；这样即使 Android 调整 subtype 回调时序，系统选择也不会被旧设置覆盖。
    键盘上的中英文切换同时更新 Android 当前子类型，避免旋转或切换输入框时恢复旧语言。
   `EngineWarmupCoordinator` 在共享的有界单线程队列中创建并启动目标引擎，结果携带会话令牌、
-  编辑器包名、语言包键和完整隐私快照；只有仍处于同一编辑器且没有组合文本时才转移所有权，
-  过期或拒绝的结果立即关闭。结果投递到 IME 所在线程前由独立的所有权交接器暂存，服务销毁或
+  编辑器包名、语言包键和完整隐私快照；结果只有仍处于同一编辑器时才可转移所有权。无组合文本可
+  直接交接；内置轻量拼音降级引擎的纯拼音组合可由准备好的全拼引擎恢复后受限接管，任何恢复失败、
+  已选分词、语言包或不受支持的引擎均保留原组合。过期或拒绝的结果立即关闭。结果投递到 IME 所在线程前由独立的所有权交接器暂存，服务销毁或
   Handler 拒绝/移除回调时会回收尚未交接的引擎，避免后台 native 句柄成为孤儿。全拼引擎的
   related-reading secondary 会话也只在首次请求关联读音扩展时由同一有界执行器创建，并由
   会话代次和运行时锁保证过期任务不会留下 native 句柄。
@@ -187,7 +194,9 @@ per profile, with image/audio support declared per model. `AiComposeActivity` ow
 explicit text review and the system document picker; `AiAttachmentReader` bounds
 reads on an application-owned document worker. `AiContentInbox` is a single expiring,
 memory-only transfer. A fresh user tap in the eligible IME claims the content and
-starts a new AI conversation; it never binds or retains an old editor connection.
+adds separate references and attachments without replacing the current question;
+it never binds or retains an old editor connection. The review Activity is
+nonexported; external sharing is not currently published in the manifest.
 `AiWorkbenchController` copies selected attachments into each request. The provider
 owns and wipes request copies exactly once, including queued rejection and transport
 deadline cancellation; a running request releases them after serialization and
@@ -626,3 +635,36 @@ SSE data lines are assembled per event within fixed limits. Completion requires 
 single text choice ending with `stop`, followed by `[DONE]`. Missing stops,
 post-stop content, tool payloads, multiple choices and trailing JSON are rejected;
 usage-only events remain supported.
+
+
+## Explicit AI page references (2026-10-07)
+
+ADR 0019 adds a separate optional platform adapter under `app/ai/page`.
+`PageReferenceService` owns Android accessibility nodes; `PageTextCollector`
+performs bounded traversal through a testable node port. `PageReferenceBroker`
+connects that service to `AiPageReferenceBinding`, whose lifetime belongs to the
+IME. The broker retains no text or InputConnection. It uses its own one-thread,
+one-queued-task worker, independent of key conversion, transport and storage.
+Event callbacks only invalidate via window metadata; only an explicit capture
+request retrieves nodes. Generation checks occur during traversal, UI delivery,
+reference acceptance, Send and Insert. See ADR 0019 for limits and OS caveats.
+Window-state and window-set events conservatively revoke review without synchronous
+window enumeration, including navigation that reuses source identifiers. Unselected
+snapshots expire after 30 seconds; checklist views retain only 160-character previews,
+and the binding alone owns the complete snapshot until confirmation or expiry.
+
+`ai-api/AiReference` defines platform-free source content and the combined context
+budget. `AiContextSelection` owns selected message indices and transient references,
+independent of the saved transcript. The provider encodes references as quoted
+USER data and never promotes source text to SYSTEM instructions. The context view
+can preview exactly selected history and references; unchecked blocks do not enter
+requests. New chat/model/editor transitions reset selection and revoke page work.
+Explicit Cancel also clears selected history/references and revokes page work;
+ordinary draft editing stops output while preserving the user's context choices.
+
+`AiConversationListView`, `AiContextView` and `AiPageSelectionView` split presentation
+by responsibility within a bounded keyboard viewport. `AiConversationNameEditor`
+uses the isolated draft for a title, then restores the question. Encrypted rename
+uses the existing title field and serial storage worker; there is no format change.
+Internal imported text becomes removable references. `AiComposeActivity` remains
+nonexported: earlier external sharing descriptions are superseded by this entry.
