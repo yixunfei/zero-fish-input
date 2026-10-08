@@ -14,6 +14,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 /** A data-only engine for installed language packs. */
 class LanguagePackEngineFactory(
@@ -165,31 +166,35 @@ private object LanguagePackDictionaryLoader {
         val result = LinkedHashSet<PackDictionaryEntry>()
         var remainingBytes = MAX_TOTAL_TEXT_BYTES
         pack.manifest.files.forEach { declared ->
-            val isJson = declared.path.substringAfterLast('.', "").equals("json", ignoreCase = true)
-            if (declared.size > MAX_TEXT_FILE_BYTES || declared.size > remainingBytes) {
-                if (isJson) return emptyList()
-                return@forEach
-            }
-            if (result.size >= MAX_ENTRIES && !isJson) return@forEach
-            val file = PackPathPolicy.resolveInside(pack.directory, declared.path)
-            if (!file.isFile) {
-                if (isJson) return emptyList()
-                return@forEach
-            }
+            if (declared.size !in 1..MAX_TEXT_FILE_BYTES || declared.size > remainingBytes) return emptyList()
+            val file = runCatching { PackPathPolicy.resolveInside(pack.directory, declared.path) }.getOrNull()
+                ?: return emptyList()
+            val text = readVerified(file, declared) ?: return emptyList()
             remainingBytes -= declared.size
             when (file.extension.lowercase()) {
-                "json" -> if (!parseJson(file, result)) return emptyList()
-                "txt", "yaml" -> parseLines(file, result)
+                "json" -> if (!parseJson(text, result)) return emptyList()
+                "txt", "yaml" -> text.lineSequence().forEach { line ->
+                    if (result.size < MAX_ENTRIES) parseLine(line, result)
+                }
+                else -> return emptyList()
             }
         }
         return result.toList()
     }
 
-    private fun parseJson(file: File, output: MutableSet<PackDictionaryEntry>): Boolean =
+    /** Verify the bytes actually parsed, including files beyond the candidate budget. */
+    private fun readVerified(file: File, declared: LanguagePackFile): String? = runCatching {
+        require(file.isFile && file.length() == declared.size)
+        val text = file.inputStream().use { LanguagePackManifestReader.read(it, declared.size.toInt()) }
+        val bytes = text.toByteArray(StandardCharsets.UTF_8)
+        require(bytes.size.toLong() == declared.size)
+        val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        require(hash == declared.sha256)
+        text
+    }.getOrNull()
+
+    private fun parseJson(json: String, output: MutableSet<PackDictionaryEntry>): Boolean =
         runCatching {
-            val json = file.inputStream().use {
-                LanguagePackManifestReader.read(it, MAX_TEXT_FILE_BYTES.toInt())
-            }
             val value = LanguagePackJson.parse(json)
             require(value is JSONObject || value is JSONArray) { "Invalid language pack dictionary" }
             if (output.size >= MAX_ENTRIES) return@runCatching
@@ -230,17 +235,6 @@ private object LanguagePackDictionaryLoader {
                         val pair = item.asSequence().take(2).toList()
                         if (pair.size == 2) addPair(pair[0].toString(), pair[1].toString(), output)
                     }
-                }
-            }
-        }
-    }
-
-    private fun parseLines(file: File, output: MutableSet<PackDictionaryEntry>) {
-        runCatching {
-            file.useLines(StandardCharsets.UTF_8) { lines ->
-                lines.forEach { line ->
-                    if (output.size >= MAX_ENTRIES) return@forEach
-                    parseLine(line, output)
                 }
             }
         }

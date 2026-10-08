@@ -39,6 +39,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var heightPreset = KeyboardHeight.STANDARD
     private var heightScale = 1f
     private var compact = false
+    private var landscape = false
     private var pairedSymbolsEnabled = true
     private var symbolSwipeStartX = 0f
     private var symbolSwipeStartY = 0f
@@ -180,9 +181,10 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     /** Applies the compact key geometry chosen from the current IME viewport. */
-    fun setCompactLayout(value: Boolean) {
-        if (compact == value) return
+    fun setViewportLayout(value: Boolean, landscape: Boolean) {
+        if (compact == value && this.landscape == landscape) return
         compact = value
+        this.landscape = landscape
         render()
         for (index in 0 until childCount) getChildAt(index).layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, rowHeight())
     }
@@ -435,7 +437,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     fun cancelPendingGestures() { glide.cancel(); backspaceRepeater?.cancel(); keys.forEach { it.cancelTouch() } }
     internal val preferredHeight: Int get() = (0 until childCount).sumOf { getChildAt(it).layoutParams.height }
     override fun onDetachedFromWindow() { cancelPendingGestures(); super.onDetachedFromWindow() }
-    private fun rowHeight() = (dp(if (compact) 48 else heightPreset.rowHeight(false)) * heightScale).toInt()
+    private fun rowHeight() = (dp(if (compact) 48 else heightPreset.rowHeight(landscape)) * heightScale).toInt()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun ensureKeyColors() {
         if (colorsResolved) return

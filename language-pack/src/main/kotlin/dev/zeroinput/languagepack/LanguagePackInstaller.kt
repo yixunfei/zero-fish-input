@@ -34,6 +34,7 @@ class LanguagePackInstaller(
         val archive = copyArchiveToTemporaryFile(input)
         try {
             return synchronized(lock) {
+                ZipEntryTypePolicy.validate(archive, MAX_ZIP_ENTRIES)
                 validateAndInstall(archive).also(::mergeInstalledCache)
             }
         } finally {
@@ -174,7 +175,7 @@ class LanguagePackInstaller(
             File(staging, MANIFEST_PATH).writeText(manifestJson, StandardCharsets.UTF_8)
             val destination = destinationFor(manifest)
             LanguagePackDirectoryReplacement.replace(staging, destination)
-            val enabled = readEnabledState()[key(manifest.id, manifest.version)] ?: true
+            val enabled = readEnabledState()[key(manifest.id, manifest.version)] ?: !enabledStateInvalid
             InstalledLanguagePack(manifest, destination, enabled)
         } catch (error: Throwable) {
             staging.deleteRecursively()

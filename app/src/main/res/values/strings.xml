@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clear_secure_clipboard">清空安全剪贴板</string>
+    <string name="clear_secure_clipboard_message">将永久删除 ZeroInput 安全剪贴板中的全部条目，且无法恢复。不会清理系统剪贴板。关闭安全剪贴板开关只停用功能，不删除内容。</string>
+    <string name="secure_clipboard_cleared">安全剪贴板已清空</string>
     <string name="experimental_model_ranking">短词智能排序（实验）</string>
     <string name="experimental_model_help">根据本次输入的中文调整两字词顺序，全程离线。可能误改首选词，也会增加内存和耗电；默认关闭，隐私模式下停用。</string>
     <string name="experimental_typo_correction">防误触纠错（实验）</string>

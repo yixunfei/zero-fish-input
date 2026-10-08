@@ -28,9 +28,7 @@ internal class AiPageSelectionView(context: Context) : LinearLayout(context) {
         })
         texts.orEmpty().forEachIndexed { index, text ->
             addView(MaterialCheckBox(context).apply {
-                var end = minOf(text.length, PREVIEW_CHARS)
-                if (end < text.length && text[end - 1].isHighSurrogate() && text[end].isLowSurrogate()) end--
-                val preview = text.substring(0, end).replace('\n', ' ')
+                val preview = referencePreview(text)
                 this.text = context.getString(R.string.ai_page_reference_item, index + 1, text.length, preview)
                 isSaveEnabled = false
                 minHeight = (48 * resources.displayMetrics.density).toInt()
@@ -42,5 +40,4 @@ internal class AiPageSelectionView(context: Context) : LinearLayout(context) {
         }
     }
 
-    private companion object { const val PREVIEW_CHARS = 160 }
 }

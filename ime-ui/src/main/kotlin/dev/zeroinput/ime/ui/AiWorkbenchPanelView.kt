@@ -233,6 +233,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
 
     private fun showDetail(mode: DetailMode) {
+        if (detailMode == DetailMode.CONTEXT && mode != DetailMode.CONTEXT) contextRows.closePreview()
         if (detailMode == DetailMode.PAGE && mode != DetailMode.PAGE) {
             onPageCancelled()
             pageRows.render(null)
@@ -290,8 +291,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             }
             is AiStreamEvent.Failed -> {
                 streaming = false
-                if (detailMode != DetailMode.CONVERSATIONS) showDetail(DetailMode.RESULT)
-                else setEditing(false)
+                showDetail(DetailMode.RESULT)
                 result.setText(aiErrorMessage(event.error))
                 submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false

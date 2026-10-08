@@ -66,6 +66,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onAppearanceRequested: () -> Unit = {}
     var onPersonalDataClearRequested: () -> Unit = {}
     var onSecureClipboardRequested: () -> Unit = {}
+    var onSecureClipboardClearRequested: () -> Unit = {}
     var onClipboardGuardRequested: () -> Unit = {}
     var onLanguagePackRequested: () -> Unit = {}
     var onLanguagePackEnabledChanged: (String, Boolean) -> Unit = { _, _ -> }
@@ -202,6 +203,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         command(context.getString(R.string.expression_manager_title)) { onExpressionsRequested() }
         command(context.getString(R.string.clear_personal_data)) { onPersonalDataClearRequested() }
         command(context.getString(R.string.secure_clipboard)) { onSecureClipboardRequested() }
+        command(context.getString(R.string.clear_secure_clipboard)) { onSecureClipboardClearRequested() }
 
         section(context.getString(R.string.section_language_packs))
         command(context.getString(R.string.setting_import_pack)) { onLanguagePackRequested() }

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clear_secure_clipboard">Clear secure clipboard</string>
+    <string name="clear_secure_clipboard_message">Permanently delete every item in the ZeroInput secure clipboard. This cannot be undone and does not clear the system clipboard. Turning off the secure clipboard only disables the feature; it keeps your items.</string>
+    <string name="secure_clipboard_cleared">Secure clipboard cleared</string>
     <string name="experimental_model_ranking">Smart word ranking (beta)</string>
     <string name="experimental_model_help">Uses Chinese entered in this session to reorder two-character words offline. May choose an incorrect first suggestion and uses more memory and power. Off by default; inactive in private input.</string>
     <string name="experimental_typo_correction">Typo correction (beta)</string>
@@ -208,7 +211,7 @@
     <string name="keyboard_preview">Preview</string>
     <string name="clipboard_selection_unavailable">Select text in a regular input field first, then tap Copy (up to 8192 characters)</string>
     <string name="setting_word_associations">Next-word suggestions</string>
-    <string name="setting_paired_symbols">Auto-complete paired symbols</string>
+    <string name="setting_paired_symbols">Auto-pair symbols</string>
     <string name="ai_title">AI workbench</string>
     <string name="ai_import_title">Add AI context</string>
     <string name="ai_import_notice">Review this content, return to a regular text field, open AI and tap “Use selected content”. Up to 2 attachments, 1 MB total; text files must be UTF-8. Confirming does not send a request.</string>

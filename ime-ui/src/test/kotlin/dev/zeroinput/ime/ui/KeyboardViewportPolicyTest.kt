@@ -12,6 +12,7 @@ class KeyboardViewportPolicyTest {
         assertFalse(plan.candidateInline)
         assertEquals(CandidateActionDensity.FULL, plan.candidateActions)
         assertFalse(plan.compactKeyboard)
+        assertFalse(plan.landscapeKeyboard)
     }
 
     @Test fun narrowLandscapeKeepsCandidateBrowserAndDoesNotCompressKeyColumns() {
@@ -20,6 +21,7 @@ class KeyboardViewportPolicyTest {
         assertTrue(plan.candidateInline)
         assertEquals(CandidateActionDensity.COMPACT, plan.candidateActions)
         assertFalse(plan.compactKeyboard)
+        assertTrue(plan.landscapeKeyboard)
     }
 
     @Test fun shortWideViewportUsesCompactRowsAndInlineCandidateHeader() {
@@ -42,6 +44,9 @@ class KeyboardViewportPolicyTest {
         val plan = KeyboardViewportPolicy.resolve(widthPx = 1200, heightPx = 600, density = 1f, editing = true)
 
         assertTrue(plan.splitDetailPanel)
+        assertTrue(plan.landscapeKeyboard)
+        assertFalse(plan.compactKeyboard)
+        assertEquals(52, KeyboardHeight.COMFORTABLE.rowHeight(plan.landscapeKeyboard))
     }
 
     @Test fun extremelyNarrowViewportKeepsCommandsOutOfTheCandidateBrowser() {

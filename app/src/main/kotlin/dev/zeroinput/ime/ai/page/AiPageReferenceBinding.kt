@@ -2,14 +2,14 @@ package dev.zeroinput.ime.ai.page
 
 import android.os.Handler
 import dev.zeroinput.ai.api.AiReference
-import dev.zeroinput.ime.AppGraph
 import dev.zeroinput.ime.ai.AiWorkbenchController
 import dev.zeroinput.ime.ui.ZeroInputView
 import java.lang.ref.WeakReference
 
 /** IME-owned review state. Neither the broker nor the service retains captured text. */
 internal class AiPageReferenceBinding(
-    private val graph: AppGraph,
+    private val broker: PageReferenceBroker,
+    private val enabled: () -> Boolean,
     private val handler: Handler,
     private val workbench: AiWorkbenchController,
     private val allowed: () -> Boolean,
@@ -25,16 +25,16 @@ internal class AiPageReferenceBinding(
     private var pending = false
     private var operation = 0L
     private var expires: Runnable? = null
-    private val observer = graph.pageReferences.observeInvalidation {
+    private val observer = broker.observeInvalidation {
         handler.post {
-            if (reviewToken?.let { !graph.pageReferences.isCurrent(it) } == true ||
-                referenceToken?.let { !graph.pageReferences.isCurrent(it) } == true) clearState()
+            if (reviewToken?.let { !broker.isCurrent(it) } == true ||
+                referenceToken?.let { !broker.isCurrent(it) } == true) clearState()
         }
     }
 
     fun request() {
         if (!allowed()) return
-        if (!graph.settings.aiPageReferencesEnabled || !graph.pageReferences.connected) {
+        if (!enabled() || !broker.connected) {
             openSettings()
             return
         }
@@ -53,13 +53,18 @@ internal class AiPageReferenceBinding(
         }.also { expires = it }
         handler.postDelayed(captureTimeout, PageReferenceBroker.CAPTURE_TIMEOUT_MS)
         val owner = WeakReference(this)
-        reviewToken = graph.pageReferences.capture(source) { token, value ->
+        reviewToken = broker.capture(source) { token, value ->
             owner.get()?.deliver(ticket, token, value)
         }
     }
 
     private fun deliver(ticket: Long, token: Long, value: PageTextSnapshot?) {
-        if (ticket != operation || !allowed() || contextRevision != workbench.contextState.revision) return
+        if (ticket != operation) return
+        if (!allowed() || contextRevision != workbench.contextState.revision || !broker.isCurrent(token)) {
+            cancelReview()
+            view()?.clearAiPage()
+            return
+        }
         expires?.let(handler::removeCallbacks)
         pending = false
         reviewToken = token
@@ -74,7 +79,7 @@ internal class AiPageReferenceBinding(
     fun apply(indices: List<Int>) {
         val token = reviewToken ?: return
         val value = snapshot ?: return
-        if (!allowed() || !graph.pageReferences.isCurrent(token) ||
+        if (!allowed() || !broker.isCurrent(token) ||
             contextRevision != workbench.contextState.revision) { invalidate(); rejected(); return }
         if (indices.isEmpty() || indices.size > AiReference.MAX_REFERENCES ||
             indices.distinct().size != indices.size || indices.any { it !in value.texts.indices }) {
@@ -90,21 +95,21 @@ internal class AiPageReferenceBinding(
     /** Submit rechecks synchronously, including before queued invalidation UI callbacks run. */
     fun ensureCurrent(): Boolean {
         val token = referenceToken ?: return true
-        if (graph.pageReferences.isCurrent(token)) return true
+        if (broker.isCurrent(token)) return true
         invalidate()
         rejected()
         return false
     }
 
-    fun referencesCurrent(): Boolean = referenceToken?.let(graph.pageReferences::isCurrent) != false
+    fun referencesCurrent(): Boolean = referenceToken?.let(broker::isCurrent) != false
 
     fun cancelReview() {
         val hadReview = pending || snapshot != null
         releaseReview()
-        if (hadReview && referenceToken == null) graph.pageReferences.invalidate()
+        if (hadReview && referenceToken == null) broker.invalidate()
     }
 
-    fun invalidate() { clearState(); graph.pageReferences.invalidate() }
+    fun invalidate() { clearState(); broker.invalidate() }
 
     private fun clearState() {
         releaseReview()

@@ -168,7 +168,8 @@ class ZeroInputService : InputMethodService() {
         )
     }
     private val aiPageBinding: Lazy<dev.zeroinput.ime.ai.page.AiPageReferenceBinding> = lazy {
-        dev.zeroinput.ime.ai.page.AiPageReferenceBinding(graph, mainHandler, aiWorkbench, ::aiAllowed,
+        dev.zeroinput.ime.ai.page.AiPageReferenceBinding(graph.pageReferences, { graph.settings.aiPageReferencesEnabled },
+            mainHandler, aiWorkbench, ::aiAllowed,
             { currentInputEditorInfo?.packageName }, { inputView },
             { launchActivity(dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java) },
             ::showAiContextRejected)
@@ -194,6 +195,7 @@ class ZeroInputService : InputMethodService() {
     @Volatile private var configuredPairedSymbols = true
     @Volatile private var configuredLanguage = InputLanguage.CHINESE
     @Volatile private var configuredLanguagePackKey: String? = null
+    @Volatile private var configuredModelRanking = false
 
     private fun refreshConfiguredSettings() {
         configuredChineseOptions = graph.settings.chineseInputOptions
@@ -204,6 +206,7 @@ class ZeroInputService : InputMethodService() {
         configuredPairedSymbols = graph.settings.pairedSymbolsEnabled
         configuredLanguage = graph.settings.lastLanguage
         configuredLanguagePackKey = graph.settings.lastLanguagePackKey
+        configuredModelRanking = graph.settings.experimentalModelRanking
     }
     @Volatile
     private var secureClipboardRequest: SecureClipboardRequest? = null
@@ -334,8 +337,8 @@ class ZeroInputService : InputMethodService() {
             syncSessionPrivacy()
             reconcileChineseOptions()
             scheduleEngineWarmup(session)
-            if (session.controller.state.language != graph.settings.lastLanguage ||
-                session.controller.state.languagePackKey != graph.settings.lastLanguagePackKey
+            if (session.controller.state.language != configuredLanguage ||
+                session.controller.state.languagePackKey != configuredLanguagePackKey
             ) {
                 reconcileLanguagePackSession(session)
             }
@@ -1043,8 +1046,8 @@ class ZeroInputService : InputMethodService() {
             KeyboardAction.SwitchLanguage -> {
                 controller?.switchLanguage()
                 controller?.state?.language?.let {
-                    graph.settings.lastLanguage = it
-                    graph.settings.lastLanguagePackKey = null
+                    graph.settings.selectBuiltInLanguage(it)
+                    refreshConfiguredSettings()
                     selectSystemSubtype(it)
                 }
             }
@@ -1164,7 +1167,7 @@ class ZeroInputService : InputMethodService() {
             invalidateAiRequest()
             inputView?.cancelPendingGestures()
             inputView?.configureSoundEffects(configuredSoundEffects)
-              inputView?.configurePairedSymbols(configuredPairedSymbols)
+            inputView?.configurePairedSymbols(configuredPairedSymbols)
             // A prepared engine carries the old policy. Invalidate it before
             // publishing the new state, then let the worker build a context
             // that matches the tightened policy.
@@ -1759,8 +1762,8 @@ class ZeroInputService : InputMethodService() {
         secureClipboardRequest = null
     }
 
-    private fun modelRankingAllowed(): Boolean = inputViewActive && graph.settings.experimentalModelRanking &&
-        graph.settings.learningEnabled && !graph.settings.incognitoMode &&
+    private fun modelRankingAllowed(): Boolean = inputViewActive && configuredModelRanking &&
+        configuredPrivacy.learningEnabled && !configuredPrivacy.incognitoMode &&
         activeSession?.connectionBinding?.resolve(currentInputConnection) != null &&
         controller?.state?.let { it.language == InputLanguage.CHINESE && it.languagePackKey == null &&
             it.privacy.personalizationAllowed && !it.privacy.isSensitive } == true

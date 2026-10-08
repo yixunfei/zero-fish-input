@@ -15,6 +15,28 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun failedRenameReportsAStorageOperationWithoutClaimingHistoryLoadingFailed() {
+        for (reject in listOf(false, true)) {
+            val f = Fixture()
+            f.repository.upsert(AiConversation(id = "saved", title = "old"))
+            f.worker.reject = reject
+            f.store.failWrite = !reject
+            f.controller.renameConversation("saved", "new")
+            f.flush()
+            assertTrue(f.events.filterIsInstance<AiStreamEvent.Failed>().single().error is AiProviderError.Storage)
+            assertTrue(f.historyFailed.none { it })
+            assertEquals("old", f.repository.list().single().title)
+        }
+    }
+
+    @Test fun failedHistoryLoadRetainsTheSpecificListFailureStatus() {
+        val f = Fixture()
+        f.worker.reject = true
+        f.controller.refreshConversations()
+        assertTrue(f.historyFailed.last())
+        assertTrue(f.events.filterIsInstance<AiStreamEvent.Failed>().single().error is AiProviderError.Storage)
+    }
+
     @Test fun explicitCancelDropsReferencesAndHistoryButEditingStopPreservesSelections() {
         val f = Fixture()
         f.controller.submit(AiAction.ASK, "first", null)
@@ -377,13 +399,15 @@ class AiWorkbenchControllerTest {
         val ui = Queue()
         val provider = Provider()
         val generation = AiDataGeneration()
-        val repository = AiConversationRepository(MemoryStore())
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
         var allowed = true
         var contextCurrent = true
         var persistenceEnabled = save
         val events = mutableListOf<AiStreamEvent>()
         var summaries = emptyList<AiConversationSummary>()
         val historyLoading = mutableListOf<Boolean>()
+        val historyFailed = mutableListOf<Boolean>()
         var profile = AiProviderProfile(
             id = "fixture",
             name = "Fixture",
@@ -403,13 +427,17 @@ class AiWorkbenchControllerTest {
                 )
             },
             generation, { ui.execute(it); true }, { allowed }, events::add, { summaries = it }, {},
-            renderHistoryStatus = { _, loading, _ -> historyLoading += loading },
+            renderHistoryStatus = { _, loading, failed -> historyLoading += loading; historyFailed += failed },
             contextCurrent = { contextCurrent })
         fun flush() { repeat(3) { ui.drain(); worker.drain() }; ui.drain() }
     }
     private class Queue : Executor {
+        var reject = false
         val pending = ArrayDeque<Runnable>()
-        override fun execute(command: Runnable) { pending.add(command) }
+        override fun execute(command: Runnable) {
+            if (reject) throw java.util.concurrent.RejectedExecutionException()
+            pending.add(command)
+        }
         fun drain() { while (pending.isNotEmpty()) pending.removeFirst().run() }
     }
     private class Provider : AiProvider {
@@ -423,9 +451,13 @@ class AiWorkbenchControllerTest {
         fun emit(event: AiStreamEvent) = listener(event)
     }
     private class MemoryStore : EncryptedStore {
+        var failWrite = false
         private var bytes: ByteArray? = null
         override fun read() = bytes?.copyOf()
-        override fun write(plaintext: ByteArray) { bytes = plaintext.copyOf() }
+        override fun write(plaintext: ByteArray) {
+            if (failWrite) throw java.io.IOException("Public fixture failure")
+            bytes = plaintext.copyOf()
+        }
         override fun delete(deleteKey: Boolean) { bytes = null }
     }
 }

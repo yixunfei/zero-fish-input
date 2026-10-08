@@ -140,6 +140,11 @@ class SecureClipboardVault(
 
     fun clear(grant: AuthenticationGrant) {
         require(grant.consume()) { "Authentication expired or was already used" }
+        purge()
+    }
+
+    /** Explicit user-confirmed deletion only; never reads plaintext or consumes a read grant. */
+    fun purge() {
         generation.incrementAndGet()
         synchronized(lock) {
             deletionPending = true

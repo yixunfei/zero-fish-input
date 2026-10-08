@@ -24,6 +24,42 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AiWorkbenchPanelTest {
+    @Test fun confirmedReferencesUseShortRowsUntilExplicitPreviewAndResetOnPaneExit() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        val reference = "public reference ".repeat(80)
+        panel.renderContext(dev.zeroinput.ai.api.AiContextState(references = listOf(dev.zeroinput.ai.api.AiReference(reference))))
+        panel.renderPage(emptyList(), false, false)
+        panel.clearPage()
+        assertFalse(visible(panel).filterIsInstance<TextView>().any { it.text == reference })
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_context_preview)
+        }.performClick()
+        assertTrue(visible(panel).filterIsInstance<TextView>().any { it.text == reference })
+        panel.render(AiStreamEvent.Started)
+        panel.renderPage(emptyList(), false, false)
+        panel.clearPage()
+        assertFalse(visible(panel).filterIsInstance<TextView>().any { it.text == reference })
+    }
+
+    @Test fun streamFailureWhileBrowsingConversationsBecomesVisibleAndDisablesInsertion() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        panel.renderDraft("public question")
+        panel.render(AiStreamEvent.Started)
+        panel.render(AiStreamEvent.Delta("public partial response"))
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_conversations_title)
+        }.performClick()
+        assertFalse(visible(panel).any { it.id == dev.zeroinput.ime.ui.R.id.ai_result_text })
+        panel.render(AiStreamEvent.Failed(dev.zeroinput.ai.api.AiProviderError.Response("public fixture failure")))
+        val result = visible(panel).filterIsInstance<TextView>().single { it.id == dev.zeroinput.ime.ui.R.id.ai_result_text }
+        assertEquals(context.getString(dev.zeroinput.ime.ui.R.string.ai_response_invalid), result.text.toString())
+        assertFalse(visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+        }.isEnabled)
+    }
+
     @Test fun pageChecklistKeepsOnlyBoundedUnicodePreviewAndPreservesSelectionIndices() = onMain {
         val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
         val panel = ZeroInputView(context)

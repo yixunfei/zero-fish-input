@@ -183,3 +183,21 @@ AI 面板快捷切换仅能选择当前 Provider 已保存的模型，并清空�
 来源标识不离开设备，引用不能成为系统角色或触发工具。
 原始引用不落盘，但用户开启会话保存后，保存的提问与回答可能包含引用信息。
 会话重命名沿用加密格式；上下文逐条选择独立于历史存储，超限不静默截断，过期操作不能恢复已删除数据。
+
+
+## 2026-10-08 review hardening
+
+The independent **Clear secure clipboard** command permanently deletes all private
+vault entries and their body/index keys after explicit confirmation. It works while
+the feature is disabled and never reads content or grants read access. Turning the
+feature off retains entries; clearing personalization keeps its stated scope.
+Deletion invalidates old work before waiting for storage and reports incomplete
+cleanup; retry is required after failure. Management authentication drafts expire
+after 30 seconds, with worker-side deadline checks as well as timer cleanup.
+
+Language packs reject special ZIP entry types, including symlinks, and reject a
+whole dictionary when any declared payload fails bounded UTF-8/hash validation.
+ZIP64 and multi-disk archives are unsupported. AI context reference rows use short
+previews unless the user explicitly opens full preview; leaving the pane removes
+that full display. Immutable JVM strings and platform copies cannot be securely
+wiped. No new network path, permission, component or storage format is introduced.

@@ -25,6 +25,40 @@ import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 class SettingsPanelTest {
+    @Test fun wholeVaultClearIsSeparateFromDisableAndPersonalizationAndRequiresConfirmation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val graph = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
+        val original = graph.settings.secureClipboardEnabled
+        val generation = graph.secureClipboard.captureGeneration()
+        var activity: dev.zeroinput.ime.settings.MainActivity? = null
+        try {
+            onMain { graph.settings.secureClipboardEnabled = false }
+            activity = instrumentation.startActivitySync(android.content.Intent(instrumentation.targetContext,
+                dev.zeroinput.ime.settings.MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                as dev.zeroinput.ime.settings.MainActivity
+            instrumentation.waitForIdleSync()
+            val owner = activity
+            onMain {
+                descendants(owner.window.decorView).filterIsInstance<TextView>().single {
+                    it.text == owner.getString(R.string.clear_secure_clipboard)
+                }.performClick()
+                val dialog = android.view.inspector.WindowInspector.getGlobalWindowViews().single {
+                    it.findViewById<View>(android.R.id.button1) != null
+                }
+                assertTrue(descendants(dialog).filterIsInstance<TextView>().any {
+                    it.text == owner.getString(R.string.clear_secure_clipboard_message)
+                })
+                dialog.findViewById<View>(android.R.id.button2).performClick()
+            }
+            instrumentation.waitForIdleSync()
+            assertEquals(generation, graph.secureClipboard.captureGeneration())
+            assertTrue(!graph.settings.secureClipboardEnabled)
+        } finally {
+            onMain { activity?.finish(); graph.settings.secureClipboardEnabled = original }
+            instrumentation.waitForIdleSync()
+        }
+    }
+
     @Test fun fuzzyMasterUpdatesEveryVisibleRuleAndIndividualRulesRemainUsable() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         var result: Result<Unit>? = null

@@ -12,7 +12,7 @@ internal class SecurePasteConsent(
     val generation: Long,
     private val now: () -> Long,
 ) : AutoCloseable {
-    private var deadline = now() + 60_000L
+    private var deadline = now() + 30_000L
     private var grant: AuthenticationGrant? = null
     private var targetSession: Long? = null
     private var closed = false

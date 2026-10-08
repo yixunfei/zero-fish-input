@@ -131,7 +131,7 @@ internal class AiWorkbenchController(
         storage({ current -> conversations.listSummaries(current) }, {
             renderList(it)
             renderHistoryStatus(true, false, false)
-        })
+        }, historyRead = true)
     }
 
     fun selectConversation(id: String) {
@@ -264,6 +264,7 @@ internal class AiWorkbenchController(
         deliver: (T) -> Unit,
         token: Long = generation.get(),
         data: Long = dataGeneration.current(),
+        historyRead: Boolean = false,
     ) {
         val config = configuration()
         val current = { generation.get() == token && dataGeneration.isCurrent(data) && contextCurrent() &&
@@ -275,14 +276,16 @@ internal class AiWorkbenchController(
                 post {
                     reconcilePersistence()
                     if (current() && allowed()) value.fold(deliver) {
-                        renderHistoryStatus(true, false, true)
-                        fail()
+                        if (historyRead) renderHistoryStatus(true, false, true)
+                        fail(AiProviderError.Storage())
                     }
                 }
             }
         } catch (_: RejectedExecutionException) {
-            renderHistoryStatus(true, false, true)
-            fail()
+            if (current() && allowed()) {
+                if (historyRead) renderHistoryStatus(true, false, true)
+                fail(AiProviderError.Storage())
+            }
         }
     }
 

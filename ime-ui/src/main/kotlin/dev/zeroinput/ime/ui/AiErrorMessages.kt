@@ -5,6 +5,7 @@ import dev.zeroinput.ai.api.AiProviderError
 
 fun aiErrorMessage(error: AiProviderError): Int = when (error) {
     is AiProviderError.Policy -> R.string.ai_policy_unavailable
+    is AiProviderError.Storage -> R.string.ai_storage_failed
     is AiProviderError.Configuration -> R.string.ai_configuration_invalid
     is AiProviderError.Response -> R.string.ai_response_invalid
     is AiProviderError.Network -> when (error.reason) {

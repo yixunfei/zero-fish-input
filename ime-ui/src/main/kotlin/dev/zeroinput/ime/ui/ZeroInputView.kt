@@ -1035,7 +1035,7 @@ class ZeroInputView @JvmOverloads constructor(
             header.layoutParams = params
         }
         candidateStrip.applyViewport(plan)
-        keyboard.setCompactLayout(plan.compactKeyboard)
+        keyboard.setViewportLayout(plan.compactKeyboard, plan.landscapeKeyboard)
         readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
         updatePanelLayout()
     }

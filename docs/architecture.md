@@ -668,3 +668,41 @@ uses the isolated draft for a title, then restores the question. Encrypted renam
 uses the existing title field and serial storage worker; there is no format change.
 Internal imported text becomes removable references. `AiComposeActivity` remains
 nonexported: earlier external sharing descriptions are superseded by this entry.
+
+
+## Review hardening (2026-10-08, round 2)
+
+Settings exposes explicit whole-vault deletion independently of feature enablement
+and personalization clearing. `SecureClipboardVault.purge` reads no plaintext;
+it shares the authenticated clear path's generation, lock, two-store/key deletion
+and fail-closed retry behavior. The UI cancels pending paste consent before
+scheduling storage work. See ADR 0002 for the approved deletion semantics.
+Management additions have a 30-second monotonic deadline and an owner-thread
+expiry callback; late workers recheck the deadline and clear owned buffers.
+
+Language selection writes the built-in language and cleared package in one
+preference transaction, then refreshes the IME mirrors before another key.
+Viewport policy supplies the wide-window row-height choice separately from the
+compact-row constraint. Unused public Rime configuration deletion is best effort;
+failures are retried on a later configuration switch and do not disable a valid
+selected schema. Persistent filesystem failure may retain unused public files.
+
+Language-pack dictionary loading verifies bounded, strictly decoded UTF-8 and the
+manifest hash of every parsed file, including files after the entry budget fills.
+Any missing, truncated, modified or unreadable payload rejects the entire load.
+ZIP central-directory metadata is checked before extraction: special Unix types,
+including symlinks, are rejected. This metadata-only bounded parser supplements
+`ZipFile`, canonical paths, staging isolation and manifest/hash validation; it
+never extracts files. Multi-disk, ZIP64 and inconsistent central-directory layouts
+are rejected. The installer uses the same fail-closed enablement fallback as scans
+when saved enablement state is corrupt.
+
+AI storage errors have a distinct user-visible classification; failed mutations
+do not claim history loading failed. All stream failures show the result pane.
+Page-reference binding accepts the broker and enablement query directly, preserving
+its owner-thread lifecycle while allowing isolated delayed-delivery regressions.
+Current-but-invalid delivery releases pending review immediately; superseded
+callbacks cannot clear a newer request. Confirmed reference rows default to bounded
+Unicode-safe previews. Full context remains available by explicit preview, and
+leaving that pane resets the full-text display. This reduces View text copies;
+the controller's bounded immutable strings still remain until context invalidation.

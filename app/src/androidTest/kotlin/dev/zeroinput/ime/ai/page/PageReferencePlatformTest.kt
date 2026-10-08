@@ -32,7 +32,12 @@ class PageReferencePlatformTest {
     private val graph get() = (context.applicationContext as ZeroInputApplication).graph
 
     @Test fun actualExternalPageIsExplicitlySelectedAndRevokedWithoutReadingEditors() = withFixture {
-        onMain { labelled(UiR.string.ai_open).performClick() }
+        onMain {
+            if (visible().none { it.contentDescription == it.context.getString(UiR.string.ai_open) }) {
+                labelled(UiR.string.keyboard_tools).performClick()
+            }
+            labelled(UiR.string.ai_open).performClick()
+        }
         await { panelOrNull()?.isAiOpen == true }
         onMain { textButton(UiR.string.ai_page_reference).performClick() }
         await { visible().filterIsInstance<MaterialCheckBox>().any { it.text.toString().contains("Public first reference") } }
@@ -48,7 +53,7 @@ class PageReferencePlatformTest {
             assertFalse(visible().filterIsInstance<TextView>().any { it.text.toString() == "Public unchecked reference" })
             assertEquals("", checkNotNull(panelOrNull()).findViewById<TextView>(UiR.id.ai_draft_text).text.toString())
         }
-        shell("settings put secure enabled_accessibility_services null")
+        shell("settings delete secure enabled_accessibility_services")
         await { !graph.pageReferences.connected }
         await { visible().filterIsInstance<TextView>().none { it.text.toString() == "Public first reference" } }
         onMain { assertFalse(textButton(UiR.string.ai_insert).isEnabled) }
@@ -101,10 +106,14 @@ class PageReferencePlatformTest {
             shell("am start -W -n ${instrumentation.context.packageName}/dev.zeroinput.ime.ai.page.ExternalPageFixture -f 0x10008000")
             await("Page service did not connect") { graph.pageReferences.connected }
             await("Fixture keyboard did not open") { panelOrNull() != null }
+            instrumentation.waitForIdleSync()
+            automation.waitForIdle(300, 5_000)
             test()
         } finally {
             repeat(3) { shell("input keyevent 4") }
-            shell("settings put secure enabled_accessibility_services ${previousServices ?: "null"}")
+            if (previousServices.isNullOrBlank() || previousServices == "null") {
+                shell("settings delete secure enabled_accessibility_services")
+            } else shell("settings put secure enabled_accessibility_services $previousServices")
             shell("settings put secure accessibility_enabled $previousEnabled")
             if (!previousIme.isNullOrBlank()) shell("ime set $previousIme")
             onMain {
@@ -127,8 +136,8 @@ class PageReferencePlatformTest {
     private fun panelOrNull() = WindowInspector.getGlobalWindowViews().flatMap(::views)
         .filterIsInstance<ZeroInputView>().singleOrNull { it.isShown }
     private fun visible() = panelOrNull()?.let(::views).orEmpty().filter { it.isShown }
-    private fun labelled(id: Int) = visible().first { it.contentDescription == context.getString(id) }
-    private fun textButton(id: Int) = visible().filterIsInstance<TextView>().first { it.text == context.getString(id) }
+    private fun labelled(id: Int) = visible().first { it.contentDescription == it.context.getString(id) }
+    private fun textButton(id: Int) = visible().filterIsInstance<TextView>().first { it.text == it.context.getString(id) }
     private fun <T> onMain(action: () -> T): T {
         var result: Result<T>? = null
         instrumentation.runOnMainSync { result = runCatching(action) }

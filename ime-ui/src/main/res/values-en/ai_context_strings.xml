@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ai_storage_failed">Conversation operation failed. Please try again.</string>
     <string name="ai_context_count">References %1$d · History %2$d · %3$d/%4$d characters</string>
     <string name="ai_context_choose">Select</string>
     <string name="ai_context_preview">Preview</string>

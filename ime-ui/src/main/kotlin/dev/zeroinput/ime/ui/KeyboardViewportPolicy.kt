@@ -9,6 +9,7 @@ internal data class KeyboardViewportPlan(
     val candidateInline: Boolean,
     val candidateActions: CandidateActionDensity,
     val compactKeyboard: Boolean,
+    val landscapeKeyboard: Boolean,
     val splitDetailPanel: Boolean,
 )
 
@@ -25,6 +26,7 @@ internal object KeyboardViewportPolicy {
                 candidateInline = false,
                 candidateActions = CandidateActionDensity.FULL,
                 compactKeyboard = false,
+                landscapeKeyboard = false,
                 splitDetailPanel = false,
             )
         }
@@ -40,6 +42,7 @@ internal object KeyboardViewportPolicy {
                 else -> CandidateActionDensity.FULL
             },
             compactKeyboard = short && !narrow,
+            landscapeKeyboard = wideViewport,
             splitDetailPanel = editing && wideViewport && !narrow,
         )
     }

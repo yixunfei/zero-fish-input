@@ -83,6 +83,11 @@ class SettingsRepository(context: Context) {
         }.getOrDefault(InputLanguage.CHINESE)
         set(value) = preferences.edit().putString(KEY_LANGUAGE, value.name).apply()
 
+    /** Observers always see the new built-in language together with the cleared package. */
+    fun selectBuiltInLanguage(language: InputLanguage) {
+        preferences.edit().putString(KEY_LANGUAGE, language.name).remove(KEY_LANGUAGE_PACK).apply()
+    }
+
     fun keyboardPlacement(landscape: Boolean): KeyboardPlacement {
         val prefix = if (landscape) "placement.landscape." else "placement.portrait."
         return KeyboardPlacement(

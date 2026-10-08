@@ -52,6 +52,7 @@ class PageReferenceService : AccessibilityService() {
     override fun onInterrupt() { revoke() }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        unregisterLockReceiver()
         registration?.close()
         registration = null
         invalidationObserver?.close()
@@ -65,8 +66,7 @@ class PageReferenceService : AccessibilityService() {
         invalidationObserver = null
         registration?.close()
         registration = null
-        if (receiverRegistered) unregisterReceiver(lockReceiver)
-        receiverRegistered = false
+        unregisterLockReceiver()
         revoke()
         super.onDestroy()
     }
@@ -75,6 +75,11 @@ class PageReferenceService : AccessibilityService() {
         sourceWindow = -1
         sourcePackage = null
         graph.pageReferences.invalidate()
+    }
+
+    private fun unregisterLockReceiver() {
+        if (receiverRegistered) unregisterReceiver(lockReceiver)
+        receiverRegistered = false
     }
 
     internal companion object {

@@ -117,6 +117,7 @@ sealed class AiProviderError(message: String, cause: Throwable? = null) : Except
         val reason: AiNetworkFailure = AiNetworkFailure.CONNECTION) : AiProviderError(message, cause)
     class Response(message: String) : AiProviderError(message)
     class Policy(message: String) : AiProviderError(message)
+    class Storage : AiProviderError("AI conversation storage operation failed")
 }
 
 enum class AiNetworkFailure { CONNECTION, TIMEOUT, AUTHENTICATION, MODEL_OR_ENDPOINT, RATE_LIMIT, SERVICE }

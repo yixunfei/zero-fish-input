@@ -817,3 +817,38 @@ from the main APK. Unit tests cover bounds, cancellation, unchecked data, contex
 roles, stale revisions, failed rename and clear/delete races. Platform verification
 covers actual node filtering, opt-in/disconnection, keyboard layout and draft
 isolation. Validation outcomes are recorded in `ai-page-context-validation.md`.
+
+
+## Second-round review controls (2026-10-08)
+
+- Whole secure-clipboard deletion is an explicit Settings confirmation, available
+  even while the feature is disabled. It requires no read grant, reads no plaintext,
+  and deletes the body/index and their separate keys on a background worker. Old
+  generations are invalidated before lock acquisition. Both deletions are attempted;
+  failures block in-process access until retry and are surfaced without contents.
+  Disabling the feature preserves encrypted data; personalization clear does not
+  broaden its documented scope. Deletion-pending state is still process-local,
+  and physical flash erasure is not guaranteed. See ADR 0002.
+- Pending management additions expire after 30 seconds; a scheduled callback wipes
+  waiting buffers and cancels authentication. Monotonic deadline checks also reject
+  late callbacks/workers if UI timer delivery is delayed. A running worker owns its
+  buffer until finally cleanup and checks cancellation before persistence. Immutable
+  temporary label/JSON strings remain a documented JVM limitation.
+- Package loading fails as a whole on missing, unreadable, truncated, over-budget,
+  malformed UTF-8 or hash-mismatched dictionary files, including after an earlier
+  valid file. ZIP entry type metadata is explicitly checked; symlinks, devices,
+  sockets and FIFOs cannot enter staging. Existing path, size, hash and atomic
+  replacement checks remain. Central-directory bounds reject ZIP64 and multi-disk
+  archives; no dependency or executable-content exception is introduced.
+- A corrupt enablement file cannot default newly installed packages to enabled.
+  A last known valid in-memory state may still be used for known package keys.
+- Invalid current page capture releases loading/review immediately; stale captures
+  cannot clear newer requests. Service unbind releases its screen-off receiver.
+  Context reference labels default to bounded previews and explicit full preview
+  is closed on pane exit. Controller strings and older Android node-cache copies
+  cannot be reliably zeroed; no claim of complete heap wiping is made.
+
+Negative tests cover deletion failures and retries, old generations, draft expiry,
+malformed/changed/missing package payloads, ZIP special types and corrupt enablement,
+storage errors and delayed page delivery. Platform results and remaining physical
+acceptance are recorded in `review-round2-validation.md`.

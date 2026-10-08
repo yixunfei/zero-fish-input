@@ -14,3 +14,22 @@ Status: accepted
 也不自动提交。安全剪贴板索引和正文的 Keystore
 解密、JSON 解析均在输入法主线程之外执行，确认粘贴才排队正文读取，避免首次解密或较大
 vault 卡住按键响应。
+
+
+## Explicit whole-vault deletion (2026-10-08)
+
+The user approved an independent Settings > Clear secure clipboard command.
+After explicit destructive confirmation it purges both encrypted files and both
+isolated keys without decrypting content or requiring a read grant. It advances
+the deletion generation before waiting for the vault lock, so queued additions,
+reads and authenticated operations cannot restore or deliver pre-deletion data.
+Both deletions are attempted even when one fails; a failure is reported and the
+vault remains unavailable in-process until an explicit retry succeeds.
+
+Turning the feature off retains encrypted entries. Clear personalization data
+continues to cover only the items stated in its confirmation. Neither action
+implicitly purges the vault. This avoids treating an ordinary feature toggle as
+an irreversible deletion action. Whole-vault deletion works while the feature is
+disabled or its contents cannot be decrypted; it never authorizes a plaintext read.
+Storage formats and key aliases are unchanged. Settings owns confirmation and
+background execution; user-data owns serialized deletion and generations.

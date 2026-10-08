@@ -18,6 +18,12 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
 
     init { orientation = VERTICAL; isSaveEnabled = false }
 
+    fun closePreview() {
+        if (!preview) return
+        preview = false
+        render(state)
+    }
+
     fun render(value: AiContextState) {
         state = value
         removeAllViews()
@@ -37,7 +43,7 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
         })
         value.references.forEachIndexed { index, reference ->
             addView(label(context.getString(R.string.ai_reference_number, index + 1)))
-            addView(label(reference.text))
+            addView(label(if (preview) reference.text else referencePreview(reference.text)))
             if (!preview) addView(button(R.string.ai_context_remove) { onRemove(value.revision, index) })
         }
         value.messages.forEachIndexed { index, message ->

@@ -21,6 +21,28 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LanguagePackJsonPlatformTest {
+    @Test fun corruptedEnableStateCannotEnableANewlyInstalledPack() = withInstaller { installer ->
+        val original = install(installer, manifest())
+        val state = File(requireNotNull(requireNotNull(requireNotNull(original.directory.parentFile).parentFile).parentFile), "enabled.json")
+        state.writeText("{ invalid public fixture")
+        val added = install(installer, manifest().replace("\"id\":\"fixture\"", "\"id\":\"second\""))
+        assertFalse(added.enabled)
+        assertTrue(installer.listInstalled().none { it.enabled })
+    }
+
+    @Test fun symlinkMarkedPayloadIsRejectedBeforeReplacingAnInstalledPack() = withInstaller { installer ->
+        val original = install(installer, manifest())
+        val bytes = archive(manifest())
+        val headers = (0 until bytes.size - 46).filter { offset ->
+            bytes[offset] == 0x50.toByte() && bytes[offset + 1] == 0x4b.toByte() &&
+                bytes[offset + 2] == 1.toByte() && bytes[offset + 3] == 2.toByte()
+        }
+        bytes[headers.last() + 5] = 3
+        bytes[headers.last() + 41] = 0xa0.toByte()
+        assertThrows(IllegalArgumentException::class.java) { bytes.inputStream().use(installer::install) }
+        assertEquals(listOf(original), installer.listInstalled())
+    }
+
     @Test fun rapidSerialTogglesUseRequestedValueEvenWithTheOriginalPackSnapshot() = withInstaller { installer ->
         val original = install(installer, manifest())
         val worker = java.util.concurrent.Executors.newSingleThreadExecutor()

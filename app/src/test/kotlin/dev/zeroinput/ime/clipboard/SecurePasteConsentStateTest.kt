@@ -5,6 +5,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SecurePasteConsentStateTest {
+    @Test fun preauthorizationExpiresAtThirtySecondsEvenWithoutTimerDelivery() {
+        var now = 0L
+        val consent = SecurePasteConsent("fixture", source, 7) { now }
+        now = 29_999
+        assertTrue(consent.leaveEditor())
+        now = 30_000
+        assertFalse(consent.leaveEditor())
+        assertFalse(consent.bind(1, source))
+    }
+
     private val source = PasteEditorIdentity("public.fixture", 7, 1)
 
     @Test fun credentialSelectionBeforeReturnDoesNotCancelAuthenticationNavigation() {

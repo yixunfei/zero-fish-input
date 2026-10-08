@@ -16,6 +16,20 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SecurityStorageBoundaryTest {
+    @Test fun vaultPurgeDeletesBothEncryptedFilesAndKeysWithoutParsingTheirContents() = withStore { body, bodyFile, bodyAlias ->
+        withStore { index, indexFile, indexAlias ->
+            body.write("unparseable public body fixture".toByteArray())
+            index.write("unparseable public index fixture".toByteArray())
+            assertTrue(keys().containsAlias(bodyAlias))
+            assertTrue(keys().containsAlias(indexAlias))
+            dev.zeroinput.userdata.SecureClipboardVault(body, index).purge()
+            assertFalse(bodyFile.exists())
+            assertFalse(indexFile.exists())
+            assertFalse(keys().containsAlias(bodyAlias))
+            assertFalse(keys().containsAlias(indexAlias))
+        }
+    }
+
     @Test fun anUnremovedBackupCannotReportASuccessfulWrite() = withStore { store, file, _ ->
         store.write("public fixture".toByteArray())
         File(file.path + ".bak").apply { mkdir(); resolve("public-fixture").writeText("fixture") }

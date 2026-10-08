@@ -5,6 +5,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PendingClipboardAdditionTest {
+    @Test fun expiredAuthenticationWipesTheDraftAndRejectsLateWrites() {
+        var now = 0L
+        val buffer = "public fixture".toCharArray()
+        val draft = PendingClipboardAddition(buffer) { now }
+        now = 29_999
+        assertTrue(draft.isActive())
+        now = 30_000
+        assertFalse(draft.isActive())
+        assertTrue(buffer.all { it == '\u0000' })
+        assertThrows(CancellationException::class.java) { draft.consume { fail("Late write") } }
+    }
+
+    @Test fun expiryDuringWriteRevokesTheOperationAndTheOwnerWipesItsBuffer() {
+        var now = 0L
+        val buffer = "public fixture".toCharArray()
+        val draft = PendingClipboardAddition(buffer) { now }
+        draft.consume {
+            now = 30_000
+            assertFalse(draft.isActive())
+            assertEquals("public fixture", String(it))
+        }
+        assertTrue(buffer.all { it == '\u0000' })
+    }
+
     @Test fun delayedWriteKeepsTheValueUntilConsumedAndThenWipesIt() {
         val buffer = "public fixture".toCharArray()
         val draft = PendingClipboardAddition(buffer)

@@ -12,6 +12,7 @@ import java.nio.file.StandardCopyOption
 internal class RimeConfigurationInstaller(
     private val directories: RimeAssetInstaller.Directories,
     private val publicSyllables: List<String>,
+    private val deleteUnusedFile: (File) -> Boolean = File::delete,
 ) {
     fun prepare(options: ChineseInputOptions): Pair<String, File> {
         val id = PinyinAlgebra.schemaId(options)
@@ -53,7 +54,11 @@ internal class RimeConfigurationInstaller(
                 file.name.startsWith("zeroinput_pinyin_") &&
                     retained.none { file.name == "$it.schema.yaml" || file.name == "$it.prism.bin" } &&
                     (file.name.endsWith(".schema.yaml") || file.name.endsWith(".prism.bin") || file.name.endsWith(".tmp"))
-            }.forEach { check(it.delete()) { "Unable to remove unused input configuration" } }
+            }.forEach { file ->
+                // These files are regenerable and are not selected by this session.
+                // Retry failed cleanup on the next configuration switch.
+                runCatching { deleteUnusedFile(file) }
+            }
         }
     }
 }

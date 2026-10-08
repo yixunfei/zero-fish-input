@@ -165,6 +165,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, dev.zeroinput.ime.expressions.ExpressionManagerActivity::class.java))
         }
         screen.onPersonalDataClearRequested = ::confirmClearPersonalData
+        screen.onSecureClipboardClearRequested = ::confirmClearSecureClipboard
         screen.onSecureClipboardRequested = {
             startActivity(Intent(this, SecureClipboardManagerActivity::class.java))
         }
@@ -246,6 +247,25 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .show()
+    }
+
+    private fun confirmClearSecureClipboard() {
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.clear_secure_clipboard)
+            .setMessage(R.string.clear_secure_clipboard_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                if (isFinishing || isDestroyed) return@setPositiveButton
+                graph.securePaste.cancel()
+                operations.execute({ graph.secureClipboard.purge() }) {
+                    Toast.makeText(this, R.string.secure_clipboard_cleared, Toast.LENGTH_SHORT).show()
+                    render()
+                }
+            }.create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).filterTouchesWhenObscured = true
+        }
+        dialog.show()
     }
 
     private fun updateAiConfig(completed: (Boolean) -> Unit = {}, change: AiConfiguration.() -> AiConfiguration) {

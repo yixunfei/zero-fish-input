@@ -18,6 +18,13 @@ public final class ExternalPageFixture extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(24, 70, 24, 24);
+        content.setOnApplyWindowInsetsListener((view, insets) -> {
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars());
+                view.setPadding(bars.left + 24, bars.top + 24, bars.right + 24, bars.bottom + 24);
+            }
+            return insets;
+        });
         content.addView(label("Public first reference"));
         content.addView(label("Public unchecked reference"));
         EditText password = new EditText(this);

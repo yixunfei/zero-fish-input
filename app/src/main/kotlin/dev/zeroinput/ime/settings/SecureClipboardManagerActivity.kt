@@ -36,6 +36,20 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     private var authenticationRequest: AuthenticationBroker.RequestHandle? = null
     private var privateDialog: androidx.appcompat.app.AlertDialog? = null
     private var pendingAddition: PendingClipboardAddition? = null
+    private val draftHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val expireAddition = Runnable {
+        pendingAddition?.close()
+        pendingAddition = null
+        if (authenticationInProgress) {
+            authenticationGeneration++
+            authenticationRequest?.close()
+            authenticationRequest = null
+            authenticationInProgress = false
+            setBusy(false)
+            screen.clearMetadata()
+            finish()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +71,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        draftHandler.removeCallbacks(expireAddition)
         privateDialog?.dismiss()
         authenticationGeneration++
         authenticationRequest?.close()
@@ -150,8 +165,10 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
                     val draft = PendingClipboardAddition(secret)
                     pendingAddition?.close()
                     pendingAddition = draft
+                    draftHandler.removeCallbacks(expireAddition)
+                    draftHandler.postDelayed(expireAddition, PendingClipboardAddition.TIMEOUT_MILLIS)
                     dialog.dismiss()
-                    authenticate(false, onCancelled = draft::close) { grant ->
+                    authenticate(false, onCancelled = { releaseAddition(draft) }) { grant ->
                         addItem(itemLabel, draft, grant, generation)
                     }
                 }
@@ -191,13 +208,24 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     private fun addItem(label: String, draft: PendingClipboardAddition, grant: AuthenticationGrant, generation: Long) {
         val vault = graph.secureClipboard
         runVaultOperation(
-            operation = { draft.consume { vault.add(label, it, grant, generation, draft::isActive) } },
-            onRejected = draft::close,
+            operation = {
+                try { draft.consume { vault.add(label, it, grant, generation, draft::isActive) } }
+                finally { draftHandler.post { releaseAddition(draft) } }
+            },
+            onRejected = { releaseAddition(draft) },
             onSuccess = { added ->
                 metadata = listOf(added) + metadata
                 screen.renderEntries(metadata)
             },
         )
+    }
+
+    private fun releaseAddition(draft: PendingClipboardAddition) {
+        draft.close()
+        if (pendingAddition === draft) {
+            pendingAddition = null
+            draftHandler.removeCallbacks(expireAddition)
+        }
     }
 
     private fun confirmDelete(item: SecureClipboardMetadata) {

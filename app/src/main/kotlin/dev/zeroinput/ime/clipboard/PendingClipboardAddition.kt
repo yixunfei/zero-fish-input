@@ -5,11 +5,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** Owns a management draft across authentication and a single background write. */
-internal class PendingClipboardAddition(value: CharArray) : AutoCloseable {
+internal class PendingClipboardAddition(
+    value: CharArray,
+    private val now: () -> Long = { System.nanoTime() / 1_000_000L },
+) : AutoCloseable {
     private val pending = AtomicReference<CharArray?>(value)
     private val cancelled = AtomicBoolean()
+    private val createdAt = now()
 
-    fun isActive(): Boolean = !cancelled.get()
+    fun isActive(): Boolean {
+        if (now() - createdAt !in 0 until TIMEOUT_MILLIS) close()
+        return !cancelled.get()
+    }
 
     fun <T> consume(write: (CharArray) -> T): T {
         val value = pending.getAndSet(null) ?: throw CancellationException("Clipboard draft expired")
@@ -28,4 +35,6 @@ internal class PendingClipboardAddition(value: CharArray) : AutoCloseable {
         // UI never waits for storage or wipes a buffer while it is being read.
         pending.getAndSet(null)?.fill('\u0000')
     }
+
+    companion object { const val TIMEOUT_MILLIS = 30_000L }
 }

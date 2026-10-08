@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ai_storage_failed">会话操作失败，请重试</string>
     <string name="ai_context_count">页面/导入引用 %1$d 条 · 历史 %2$d 条 · %3$d/%4$d 字符</string>
     <string name="ai_context_choose">修改上下文选择</string>
     <string name="ai_context_preview">预览将发送的上下文</string>
