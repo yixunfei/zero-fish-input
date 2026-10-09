@@ -39,8 +39,16 @@ physical size, so a nominally lite archive cannot retain that unused space.
   pinyin plus installation/removal of a synthetic public dictionary on lite.
 - Resource settings were inspected in light/dark themes, portrait/landscape and
   a 720 x 1280 viewport. Content wraps and scrolls within system insets.
-- Python publication tools compile; workflow YAML parses. Weekly/manual GitHub
-  workflows have not been executed on GitHub yet.
+- Python publication tools compile; workflow YAML parses. Manual GitHub resource
+  publication passed in [run 37875975549](https://github.com/yixunfei/zero-fish-input/actions/runs/37875975549).
+  An initial run correctly rejected platform-dependent ZIP metadata; fixing the
+  archive creator field preserved reviewed hashes and enabled Linux reproduction.
+- Both public releases are published (not drafts). Their asset sizes and GitHub
+  SHA-256 digests match the reviewed catalog; public download requests returned
+  ZIP headers and the online catalog matches the repository manifest.
+- The weekly update workflow is committed but has not been executed on GitHub.
+  The repository Actions PR creation setting is enabled (GitHub combines this
+  with review approval capability); the workflow never approves or merges PRs.
 
 The resource integration test used the exact prepared release archives copied to
 the emulator, isolating installation/native behavior from network availability.

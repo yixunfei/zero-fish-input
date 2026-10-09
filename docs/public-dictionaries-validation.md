@@ -56,8 +56,8 @@ build-time source/model preparation succeeded on the development host.
 
 - ARM device execution has not been performed; ARM native build/package checks
   passed, while instrumentation ran on x86_64.
-- The weekly workflow is supplied in the working tree and has not been executed
-  on GitHub. Review source licensing, hashes, native behavior and package size
+- The weekly workflow is committed and enabled but has not been executed
+  on GitHub. Actions PR creation is enabled. Review source licensing, hashes, native behavior and package size
   before merging future update PRs.
 - QQ/Sogou website changes and unrecognized binary layouts fail closed and can
   require adapter updates. Optional downloads are not redistributed in the APK.
