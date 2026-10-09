@@ -1,0 +1,50 @@
+{
+  "format": 1,
+  "packs": [
+    {
+      "id": "handwriting",
+      "version": "fc63be44d6b15516",
+      "license": "Apache-2.0 AND LGPL-2.1",
+      "url": "https://github.com/yixunfei/zero-fish-input/releases/download/resources-fc63be44d6b15516/handwriting-fc63be44d6b15516.zip",
+      "bytes": 47303679,
+      "sha256": "74f2dc7c2a63af73ff31103cf4939c0e7e02436bdc9e3bd2624e07127fe9863f",
+      "files": [
+        {
+          "name": "handwriting/model.onnx",
+          "bytes": 16534782,
+          "sha256": "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092"
+        },
+        {
+          "name": "handwriting/characters.txt",
+          "bytes": 74012,
+          "sha256": "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b"
+        },
+        {
+          "name": "handwriting/stroke-simplified.zsh",
+          "bytes": 7016330,
+          "sha256": "fdd47959e8cb95add75fc1e5bd10ff62e88b5d09fc6c6305d284d8f3df57667f"
+        },
+        {
+          "name": "handwriting/stroke-traditional.zsh",
+          "bytes": 39052454,
+          "sha256": "7eaa62001987b03fa0ea24824b1a1203599064db905604026da8bc7e4e3b0288"
+        }
+      ]
+    },
+    {
+      "id": "wanxiang-lts",
+      "version": "010390b381352733",
+      "license": "CC-BY-4.0",
+      "url": "https://github.com/yixunfei/zero-fish-input/releases/download/resources-010390b381352733/wanxiang-lts-010390b381352733.zip",
+      "bytes": 352323465,
+      "sha256": "dfa0c24914e200d0f2f229d4e600d3a32ca5d048fb1f805cf0d667d50ba2239e",
+      "files": [
+        {
+          "name": "rime/wanxiang-lts-zh-hans.gram",
+          "bytes": 398309420,
+          "sha256": "c330bca73a4102b097fd6b239e6d10097a41995864f13004dec06e8cec98f2cc"
+        }
+      ]
+    }
+  ]
+}

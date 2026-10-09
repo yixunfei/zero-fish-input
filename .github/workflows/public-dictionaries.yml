@@ -1,0 +1,52 @@
+name: Review public dictionary updates
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 2 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: public-dictionary-update
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Resolve, verify and convert complete Wanxiang data
+        run: python3 tools/dictionaries/prepare.py --refresh
+      - name: Verify deterministic prepared artifacts
+        run: python3 tools/dictionaries/verify.py
+      - name: Prepare updated optional LTS resource manifest
+        run: python3 tools/resources/prepare.py --lts-only
+      - name: Propose reviewed source lock update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tools/dictionaries/sources.lock.json tools/resources/catalog.json LICENSES/wanxiang-CC-BY-4.0.txt; then exit 0; fi
+          branch=zero/weekly-public-dictionaries
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            git fetch origin "$branch:refs/remotes/origin/$branch"
+          fi
+          git switch -c "$branch"
+          git add tools/dictionaries/sources.lock.json tools/resources/catalog.json LICENSES/wanxiang-CC-BY-4.0.txt
+          git commit -m 'Update pinned Wanxiang dictionaries and grammar model'
+          git push --force-with-lease origin "$branch"
+          cat > /tmp/dictionary-pr.md <<'EOF'
+          Updates the complete Wanxiang core dictionary snapshot and simplified Chinese grammar model used in the APK. All source downloads are hash-verified and dictionary readings are converted deterministically.
+
+          Review source licensing and the pinned revision/model digest before merging. Run the Android Rime contract/device checks and measure package size and cold deployment before release. This workflow never merges or publishes an APK.
+          After approval, run the manual resource publication workflow for this reviewed commit before merging its catalog into main.
+          EOF
+          if gh pr view "$branch" >/dev/null 2>&1; then
+            gh pr edit "$branch" --title 'Update bundled Wanxiang dictionaries and model' --body-file /tmp/dictionary-pr.md
+          else
+            gh pr create --head "$branch" --title 'Update bundled Wanxiang dictionaries and model' --body-file /tmp/dictionary-pr.md
+          fi

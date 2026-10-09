@@ -1,0 +1,31 @@
+name: Publish reviewed public resources
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_ref:
+        description: Reviewed commit containing the source lock and resource catalog
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: publish-public-resources
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.reviewed_ref }}
+      - name: Prepare pinned public resources
+        run: |
+          python3 -m pip install numpy==2.2.6 PyYAML==6.0.2 Pillow==11.3.0
+          python3 tools/dictionaries/prepare.py
+          python3 tools/prepare-handwriting-model.py
+          cp tools/resources/catalog.json /tmp/reviewed-resource-catalog.json
+          python3 tools/resources/prepare.py
+          python3 -c "import json; assert json.load(open('tools/resources/catalog.json')) == json.load(open('/tmp/reviewed-resource-catalog.json'))"
+      - name: Publish immutable data assets and corresponding sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/resources/publish.py

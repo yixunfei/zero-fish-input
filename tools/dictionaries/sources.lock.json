@@ -1,0 +1,54 @@
+{
+  "preparedFiles": {
+  "dicts/zi.dict.yaml": "e2199902609f21a7dfdb15205b724906a9cbad08af60868cbf5c8e53cf0b1a03",
+  "dicts/jichu.dict.yaml": "f6deecb852d13bc686392a64831799972c2a0c897cf151898259ea6b59809f2d",
+  "dicts/lianxiang.dict.yaml": "09303ff70967aad0bcdde4701e6e0f6562e8af34bab80737f042297d5ff56403",
+  "dicts/cuoyin.dict.yaml": "fffb81c2730f73e395babee257bd60dca161f28fd0d2fd02922758296f5f058e",
+  "dicts/duoyin.dict.yaml": "ff0ad83f707cf74344e731883b765dd6ce66872a4aadc13829b2df5dacd21fc9",
+  "dicts/shici.dict.yaml": "0bc14524727ce2a8e9b4ff58f91d275e9a91b65c50b25ca6f0c7578c9ca241f3",
+  "dicts/diming.dict.yaml": "d98fac55660e0c7bc4f45a403ab4d5a50dad180876ebf3cef921df04bbb81360",
+  "dicts/yixue.dict.yaml": "bedae9a94cf02606ce8abf971d899368dd7e172d5f585f59aaba342d27777297",
+  "dicts/huaxue.dict.yaml": "464c643c29df34e880f766e705e5a38909bc156147f5a2572392ace63c2c3d82",
+  "dicts/yaopin.dict.yaml": "9e0f3bd71a6e845b4697a5789383ec8ee02e67072fd361ef7c2969f44c2439ca",
+  "dicts/mingren.dict.yaml": "d77d70cc4fd8231a3a5a5b9283ad884f79b335ea13374eaa9181029a458ff53f",
+  "dicts/yiren.dict.yaml": "038492754c69809b3f719fff960a3919895932125ae2fc28001e5e6468e0669f",
+  "dicts/wuzhong.dict.yaml": "9888fe3fcddf7d35824c9cbdb4e0b1e28bee019aa8f14610275be54ae2bfa803",
+  "dicts/renming.dict.yaml": "7d54297277968524aa6cf094e39d704fa0440a8de60695b48635657ce4960b47",
+  "dicts/taifeng.dict.yaml": "dd574424f09b8ef8e0280d97846edc42e2cd12d08d2e5079b37d5a7e4b451010",
+  "dicts/fangyan.dict.yaml": "47549f7435b84b901d7b9d8fe00efd1ed06f4655a9dc3e09e34cc44f9bb2b6f9",
+  "zeroinput_public.dict.yaml": "e82f751394da8d4750595f72365851f30fc50196623ef2e28e0dc3117a96328a",
+  "wanxiang-lts-zh-hans.gram": "c330bca73a4102b097fd6b239e6d10097a41995864f13004dec06e8cec98f2cc"
+},
+  "format": 1,
+  "version": "v18.1.1",
+  "revision": "26a9efeb18e604c091f4d3890d00bec723fe755f",
+  "license": "CC-BY-4.0",
+  "tables": [
+    "zi",
+    "jichu",
+    "lianxiang",
+    "cuoyin",
+    "duoyin",
+    "shici",
+    "diming",
+    "yixue",
+    "huaxue",
+    "yaopin",
+    "mingren",
+    "yiren",
+    "wuzhong",
+    "renming",
+    "taifeng",
+    "fangyan"
+  ],
+  "archive": {
+    "url": "https://codeload.github.com/amzxyz/rime-wanxiang/zip/26a9efeb18e604c091f4d3890d00bec723fe755f",
+    "sha256": "97c2e440302320e2d35fec56427ac9029c84f841a0df7c3d89b18b02efd11ab3"
+  },
+  "model": {
+    "url": "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+    "sha256": "c330bca73a4102b097fd6b239e6d10097a41995864f13004dec06e8cec98f2cc",
+    "size": 398309420,
+    "assetId": 616996347
+  }
+}
