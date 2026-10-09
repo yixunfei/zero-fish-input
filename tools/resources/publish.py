@@ -75,15 +75,30 @@ def sources(pack):
     return target
 
 
+def find_release(token, tag):
+    try:
+        return request(token, 'releases/tags/' + tag)
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise
+    # GitHub's tag lookup does not return unpublished draft releases.
+    # Reuse an interrupted draft rather than creating another publication.
+    for page in range(1, 101):
+        releases = request(token, f'releases?per_page=100&page={page}')
+        found = next((release for release in releases if release['tag_name'] == tag), None)
+        if found:
+            return found
+        if len(releases) < 100:
+            return None
+    raise ValueError('Release lookup exceeded page limit')
+
+
 def publish(token, pack):
     archive = OUT / Path(urllib.parse.urlparse(pack['url']).path).name
     assert archive.stat().st_size == pack['bytes'] and digest(archive) == pack['sha256']
     tag = 'resources-' + pack['version']
-    try:
-        release = request(token, 'releases/tags/' + tag)
-    except urllib.error.HTTPError as error:
-        if error.code != 404:
-            raise
+    release = find_release(token, tag)
+    if release is None:
         commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
         release = request(token, 'releases', 'POST', {'tag_name': tag, 'target_commitish': commit,
             'name': pack['id'] + ' resources ' + pack['version'], 'draft': True, 'make_latest': 'false',
