@@ -69,7 +69,7 @@ Its derived character table is 74,012 bytes (SHA-256
 The pinned source YAML is SHA-256
 `5dfeb2777f6d0db8177d8128a8acfcf6e6276dc4ac73ea3bf0dc06d6a5e85d8e`.
 ONNX Runtime is already included for the short-word scorer;
-the app has no runtime download. The upstream line-recognition benchmark does
+full builds bundle the data; lightweight builds offer explicit resource downloads. The upstream line-recognition benchmark does
 not establish accuracy for this single-character touch UI.
 
 The hybrid recognizer also adapts Zinnia's feature/scoring algorithm in Kotlin
@@ -135,3 +135,29 @@ are staged from ignored build directories with strict size and SHA-256 checks.
 Source revision, conversion changes, hashes and the accepted experimental quality
 exception are in [model evaluation](docs/small-model-evaluation.md),
 [model integration](docs/model-integration.md), and NOTICE.
+# Public dictionary additions (2026-10-09)
+
+| Component | Version | License | Use |
+| --- | --- | --- | --- |
+| amzxyz/rime-wanxiang | reviewed sources.lock.json | CC-BY-4.0 | All 16 core tables; tone marks normalized |
+| amzxyz/RIME-LMDG | reviewed LTS asset/hash | CC-BY-4.0 | Simplified Chinese grammar model |
+| lotem/librime-octagram | 57d18b9f58e5284bd891d559f6bdd16cf60341e9 | BSD-3-Clause | Static grammar reader |
+| org.yaml:snakeyaml | 2.4 | Apache-2.0 | Bounded safe dictionary header parsing |
+| org.jsoup:jsoup | 1.18.3 | MIT | Nonexecuting public HTML catalog parsing |
+
+SnakeYAML/jsoup are small maintained parsers, add no implicit network components
+and operate offline; they avoid ad-hoc YAML/HTML parsing. Downloads are isolated
+in the application's explicit transport. Full source/model checksums are pinned;
+weekly updates remain review PRs. Ice, zhwiki, QQ and Sogou are device-only
+opt-in sources, not APK data. Ice repository licensing and per-file notices and
+Wikimedia data attribution must not be confused with generator licensing.
+
+
+## Resource delivery variants
+
+LTS and handwriting data are bundled only in full APKs and optionally downloaded
+from this repository's Releases in lightweight APKs. Their licenses, fixed hashes
+and sources are unchanged. Release companion archives include relevant notices,
+Tegaki source archives and rebuild scripts. Native ONNX/Octagram libraries remain
+inside both APK variants; no runtime library is downloaded. Luna/essay source files
+remain development references; production glide readings derive from Wanxiang.

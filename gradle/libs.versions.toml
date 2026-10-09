@@ -1,4 +1,6 @@
 [versions]
+jsoup = "1.18.3"
+snakeyaml = "2.4"
 agp = "8.10.1"
 kotlin = "2.1.21"
 androidx-core = "1.16.0"
@@ -15,6 +17,8 @@ robolectric = "4.16.1"
 onnxruntime = "1.26.0"
 
 [libraries]
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "androidx-biometric" }

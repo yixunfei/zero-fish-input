@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="public_dictionary_title">内置与下载词库</string>
+    <string name="public_dictionary_home">已安装</string>
+    <string name="public_dictionary_cancel">取消任务</string>
+    <string name="public_dictionary_cancelled">已取消未完成任务，已保存的词库仍保留</string>
+    <string name="public_dictionary_builtin">万象完整核心词库</string>
+    <string name="public_dictionary_builtin_detail">内置全部核心字词和专业词汇，离线可用。基础词库随应用更新，增强资源可单独管理。</string>
+    <string name="public_dictionary_restore">恢复仅使用内置词库</string>
+    <string name="public_dictionary_restore_confirm">停用全部下载词库，保留文件以便再次启用？</string>
+    <string name="public_dictionary_sources">下载来源</string>
+    <string name="public_dictionary_installed">已安装的扩展词库</string>
+    <string name="public_dictionary_pending">词库已保存，将在输入会话释放后重新准备。</string>
+    <string name="public_dictionary_offline">已安装词库可离线使用</string>
+    <string name="public_dictionary_item">%1$s\n来源：%2$s · %3$d 条 · %4$d KB\n版本：%5$s</string>
+    <string name="public_dictionary_enable">启用</string>
+    <string name="public_dictionary_update">浏览来源更新</string>
+    <string name="public_dictionary_remove">删除</string>
+    <string name="public_dictionary_remove_confirm">删除扩展词库“%1$s”？个人词组不受影响。</string>
+    <string name="public_dictionary_network_notice">浏览分类和下载将连接所选来源及其文件服务。对方可获知网络地址与所选词库；不会发送输入内容或个人词库。离开本页取消未完成请求。</string>
+    <string name="public_dictionary_browse">联网浏览</string>
+    <string name="public_dictionary_categories">返回分类</string>
+    <string name="public_dictionary_license_wanxiang">万象数据：CC BY 4.0。内置完整核心已包含常用及专业词库。</string>
+    <string name="public_dictionary_license_ice">雾凇：上游仓库标示 GPL-3.0，数据保留各自来源声明。</string>
+    <string name="public_dictionary_license_wiki">维基词库：生成工具与数据许可不同，数据适用维基媒体原始许可。</string>
+    <string name="public_dictionary_license_website">用户上传词库的权利归原作者；仅下载自用，不随本应用重新分发。</string>
+    <string name="public_dictionary_choose">选择分类或词库</string>
+    <string name="public_dictionary_install_notice">下载、校验并安装此公开词库？同一词库会替换旧版本，失败时保留旧版本。词库内容可能影响候选排序。</string>
+    <string name="public_dictionary_download">下载安装</string>
+    <string name="public_dictionary_progress">已下载 %1$d KB</string>
+    <string name="public_dictionary_working">正在处理…</string>
+    <string name="public_dictionary_failed">未能完成。来源可能暂不可用、下载受限或格式不受支持；请稍后重试。</string>
+    <string name="public_dictionary_wanxiang">万象拼音</string>
+    <string name="public_dictionary_ice">雾凇拼音</string>
+    <string name="public_dictionary_wiki">中文维基词库</string>
+    <string name="public_dictionary_qq">QQ 输入法词库</string>
+    <string name="public_dictionary_sogou">搜狗细胞词库</string>
+</resources>

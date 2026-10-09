@@ -9,9 +9,23 @@
 
 ## Enforced controls
 
-- Manifest 只为用户主动开启的 AI 网络工作台声明 `INTERNET`；CI 扫描项目源码中的联网权限和
+- Explicit public dictionary downloads are the separately approved network
+  exception in [ADR 0020](adr/0020-public-dictionaries.md). Catalog HTML is parsed
+  without execution. Every redirect remains HTTPS on the source host allowlist;
+  bounded responses, strict format validation, SQLite size limits and atomic
+  registry publication protect against malformed downloads. No editor or private
+  data is available to the transport. The source observes IP/file choices.
+  Runtime imports cannot load schemas, executable code or grammar binaries.
+  The pinned bundled model is hash-verified before native deployment. Cancellation
+  before registry publication preserves the old item; after publication the new
+  item persists even when the settings Activity disappears. Source locks protect
+  generation copies from deletion races. Failed native updates retain the last
+  verified generation (also recorded for subsequent process starts); if none is
+  usable, the existing fallback remains available.
+
+- Manifest 为用户主动开启的 AI 网络工作台及显式公开词库下载声明 `INTERNET`；CI 扫描项目源码中的联网权限和
   系统剪贴板 API，并解析 Debug/Release 合并清单执行权限白名单校验，防止依赖间接引入网络、
-  存储或其他敏感权限。网络传输仅允许 `OpenAiCompatibleProvider`，只接受 HTTPS、禁止明文、
+  存储或其他敏感权限。AI 网络传输仅允许 `OpenAiCompatibleProvider`，只接受 HTTPS、禁止明文、
   查询参数、片段、用户信息和重定向，并限制请求、超时、SSE 单行及整体响应大小。系统剪贴板
   正文读取始终禁止；仅专用防护适配器可在用户开启后监听、检查时间戳和清理。AndroidX 文本控件
   只可能在用户明确执行标准粘贴操作时进入系统编辑路径。
@@ -852,3 +866,18 @@ Negative tests cover deletion failures and retries, old generations, draft expir
 malformed/changed/missing package payloads, ZIP special types and corrupt enablement,
 storage errors and delayed page delivery. Platform results and remaining physical
 acceptance are recorded in `review-round2-validation.md`.
+
+## Optional resources (ADR 0021)
+
+An explicitly fetched repository catalog and GitHub Release archives are new public
+data inputs. HTTPS alone does not validate data: supported IDs, exact file sets,
+format version, allowed license identifiers, declared byte limits and archive/file
+SHA-256 checks precede atomic publication. Extraction uses hash filenames, never
+archive paths. Unknown/duplicate entries and interrupted downloads reject the
+transaction. Source-repository compromise remains a supply-chain risk requiring
+review and fixed content versions. Models execute only through bundled readers;
+no remote code/native libraries are accepted. Public-resource leases protect active
+readers from deletion. Handwriting generations reject results after a resource
+change; Rime switches only without live editor engines. These operations cannot
+read private input, clipboard or learned vocabulary. Network tests and corrupted
+archive/cancellation/removal tests cover the boundary.

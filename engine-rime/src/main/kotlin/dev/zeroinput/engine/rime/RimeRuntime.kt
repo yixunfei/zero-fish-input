@@ -9,13 +9,32 @@ import dev.zeroinput.engine.api.InputEngine
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
-class RimeRuntime(context: Context) : AutoCloseable {
+class RimeRuntime(context: Context,
+    private val dictionaries: dev.zeroinput.engine.api.PublicDictionarySource = dev.zeroinput.engine.api.PublicDictionarySource.Empty,
+    private val resources: dev.zeroinput.engine.api.PublicResourceSource? = null,
+) : AutoCloseable {
     private val applicationContext = context.applicationContext
     private val lock = Any()
     private val activeEngines = AtomicInteger(0)
     private var configurationInstaller: RimeConfigurationInstaller? = null
     private var preparedSchemaId: String? = null
     private var initializationGeneration = 0L
+    private val dictionaryRevision = java.util.concurrent.atomic.AtomicLong()
+    private var preparedDictionaryRevision = -1L
+    private var workingDirectories: RimeAssetInstaller.Directories? = null
+    private var resourceLease: dev.zeroinput.engine.api.PublicResourceLease? = null
+
+    /** A publication signal only; native work waits until no editor owns an engine. */
+    fun dictionariesChanged() { dictionaryRevision.incrementAndGet() }
+
+    fun prepareDictionariesIfIdle() {
+        val pending = synchronized(lock) {
+            if (preparedDictionaryRevision == dictionaryRevision.get() || activeEngines.get() != 0 ||
+                initializationInFlightGeneration != null) false
+            else { close(); true }
+        }
+        if (pending) initialize()
+    }
     /** Keeps a cancelled worker as the sole owner until its native work returns. */
     private var initializationInFlightGeneration: Long? = null
     private var finalizeWhenIdle = false
@@ -57,6 +76,7 @@ class RimeRuntime(context: Context) : AutoCloseable {
     }
 
     fun initialize(): Boolean {
+        val requestedDictionaryRevision = dictionaryRevision.get()
         val generation = synchronized(lock) {
             if (isReady) return true
             if (activeEngines.get() != 0 || initializationInFlightGeneration != null || nativeInitialized) return false
@@ -79,19 +99,29 @@ class RimeRuntime(context: Context) : AutoCloseable {
         return try {
             // Asset deployment and native verification may perform substantial I/O.
             // Keep them outside the runtime monitor so input callbacks can fail fast.
-            val directories = RimeAssetInstaller(applicationContext).install()
-            val installer = RimeConfigurationInstaller(directories, publicSyllables)
-            check(NativeRimeBridge.nativeInitialize(
-                directories.shared.absolutePath,
-                directories.user.absolutePath,
-            )) { "Native Rime initialization returned false" }
-            synchronized(lock) {
-                nativeInitialized = true
-                nativeInitializationGeneration = generation
+            val candidateLease = resources?.acquire("wanxiang-lts")
+            val assets = RimeAssetInstaller(applicationContext, dictionaries,
+                resources != null || !applicationContext.assets.list("rime").orEmpty().contains("wanxiang-lts-zh-hans.gram"),
+                candidateLease?.files?.get("rime/wanxiang-lts-zh-hans.gram"))
+            val previous = workingDirectories ?: assets.lastVerified()
+            val directories = try {
+                assets.install().also {
+                    try { verifyDirectories(it, generation) }
+                    catch (error: Throwable) { candidateLease?.close(); throw error }
+                    resourceLease?.close()
+                    resourceLease = candidateLease
+                }
+            } catch (error: Exception) {
+                candidateLease?.close()
+                synchronized(lock) { finalizeNativeLocked() }
+                if (previous == null) throw error
+                // A failed extension must not retire the last verified public vocabulary.
+                verifyDirectories(previous, generation)
+                previous
             }
+            val installer = RimeConfigurationInstaller(directories, publicSyllables)
             // A schema can create a session even when its translator has no
             // usable dictionary. Validate conversion before publishing readiness.
-            RimeInputEngine().use { RimeSessionVerifier.verify(it) }
             val version = NativeRimeBridge.nativeVersion().ifBlank { "unavailable" }
             synchronized(lock) {
                 if (generation != initializationGeneration || state != RimeRuntimeState.INITIALIZING) {
@@ -100,6 +130,8 @@ class RimeRuntime(context: Context) : AutoCloseable {
                     return false
                 }
                 configurationInstaller = installer
+                workingDirectories = directories
+                preparedDictionaryRevision = requestedDictionaryRevision
                 runtimeVersion = version
                 initializationError = null
                 preparedSchemaId = "zeroinput_pinyin"
@@ -108,10 +140,23 @@ class RimeRuntime(context: Context) : AutoCloseable {
                 setState(RimeRuntimeState.READY)
                 finishInitializationLocked(generation)
             }
+            // Cleanup is best effort and must not turn a verified runtime into a failure.
+            runCatching { assets.markVerified(directories); assets.removeUnused(setOf(directories)) }
             true
         } catch (error: Throwable) {
             failInitialization(generation, error)
         }
+    }
+
+    private fun verifyDirectories(directories: RimeAssetInstaller.Directories, generation: Long) {
+        check(NativeRimeBridge.nativeInitialize(directories.shared.absolutePath, directories.user.absolutePath)) {
+            "Native Rime initialization returned false"
+        }
+        synchronized(lock) {
+            nativeInitialized = true
+            nativeInitializationGeneration = generation
+        }
+        RimeInputEngine().use { RimeSessionVerifier.verify(it) }
     }
 
     private fun failInitialization(generation: Long, error: Throwable): Boolean = synchronized(lock) {

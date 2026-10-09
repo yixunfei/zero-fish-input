@@ -6,6 +6,8 @@ plugins {
 }
 
 val modelAssets = layout.buildDirectory.dir("generated/modelAssets")
+val resourceBundle = providers.gradleProperty("resourceBundle").orElse("full")
+check(resourceBundle.get() in setOf("full", "lite"))
 val modelSource = rootProject.file("build/model-evaluation/android-assets/mini-int8/model.onnx")
 val vocabSource = rootProject.file("build/model-evaluation/mini/vocab.txt")
 val handwritingModel = rootProject.file("build/handwriting-model/inference.onnx")
@@ -20,6 +22,7 @@ val prepareModelAssets = tasks.register("prepareModelAssets") {
     inputs.files(modelSource, vocabSource, handwritingModel, handwritingCharacters)
     inputs.files(strokeModels.map { it.first })
     outputs.dir(modelAssets)
+    inputs.property("resourceBundle", resourceBundle)
     doLast {
         val files = listOf(
             Triple(modelSource, 14_898_764L, "5fb4dbe2c618e8757258253e10481ea9181e8a7b9a8efea03ee70c3a5ca19446"),
@@ -37,10 +40,13 @@ val prepareModelAssets = tasks.register("prepareModelAssets") {
         // These are obsolete generated duplicates, not source assets.
         target.resolve("inference.onnx").delete()
         target.resolve("characters.txt").delete()
-        val handwritingTarget = modelAssets.get().dir("handwriting").asFile.apply { mkdirs() }
-        handwritingModel.copyTo(handwritingTarget.resolve("model.onnx"), overwrite = true)
-        handwritingCharacters.copyTo(handwritingTarget.resolve("characters.txt"), overwrite = true)
-        strokeModels.forEach { (source, _, _) -> source.copyTo(handwritingTarget.resolve(source.name), overwrite = true) }
+        val handwritingTarget = modelAssets.get().dir("handwriting").asFile
+        if (resourceBundle.get() == "full") {
+            handwritingTarget.mkdirs()
+            handwritingModel.copyTo(handwritingTarget.resolve("model.onnx"), overwrite = true)
+            handwritingCharacters.copyTo(handwritingTarget.resolve("characters.txt"), overwrite = true)
+            strokeModels.forEach { (source, _, _) -> source.copyTo(handwritingTarget.resolve(source.name), overwrite = true) }
+        } else delete(handwritingTarget)
     }
 }
 

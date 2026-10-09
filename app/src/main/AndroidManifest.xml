@@ -34,6 +34,11 @@
         </activity>
 
         <activity
+            android:name=".dictionaries.DictionaryManagerActivity"
+            android:exported="false"
+            android:parentActivityName=".settings.MainActivity" />
+
+        <activity
             android:name=".settings.KeyboardAppearanceActivity"
             android:exported="false"
             android:parentActivityName=".settings.MainActivity" />

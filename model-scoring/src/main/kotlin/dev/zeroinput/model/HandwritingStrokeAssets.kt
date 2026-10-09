@@ -13,12 +13,14 @@ internal object HandwritingStrokeAssets {
         Asset("stroke-traditional.zsh", 39_052_454L, "7eaa62001987b03fa0ea24824b1a1203599064db905604026da8bc7e4e3b0288"),
     )
 
-    fun load(context: Context): List<HandwritingStrokeModel> = assets.map { asset ->
+    fun load(context: Context, files: Map<String, dev.zeroinput.engine.api.PublicResourceFile>? = null): List<HandwritingStrokeModel> = assets.map { asset ->
         val digest = MessageDigest.getInstance("SHA-256")
-        val model = context.assets.open("handwriting/${asset.name}").use { source ->
-            DigestInputStream(source, digest).use { input -> HandwritingStrokeModel.read(input, asset.size) }
+        val spec = files?.get("handwriting/${asset.name}")
+        val model = (spec?.let { java.io.File(it.path).inputStream() }
+            ?: context.assets.open("handwriting/${asset.name}")).use { source ->
+            DigestInputStream(source, digest).use { input -> HandwritingStrokeModel.read(input, spec?.bytes ?: asset.size) }
         }
-        check(digest.digest().joinToString("") { "%02x".format(it) } == asset.hash) { "Invalid stroke model" }
+        check(digest.digest().joinToString("") { "%02x".format(it) } == (spec?.sha256 ?: asset.hash)) { "Invalid stroke model" }
         model
     }
 }

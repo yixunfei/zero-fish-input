@@ -272,9 +272,9 @@ ONNX Runtime 使用 MIT 许可；模型采用项目已确认的 UER Apache-2.0 �
 密钥丢失或文件提交失败会报告失败，旧的排队操作不能恢复已清除内容。认证流程和存储格式
 保持不变，验证与尚未覆盖的设备边界见[安全存储验证](docs/security-storage-validation.md)。
 
-- 应用仅为用户主动开启的 AI 工作台声明 `INTERNET` 权限，不包含广告、统计或崩溃上报 SDK；
-  AI 默认关闭，中文、英文、词库、emoji 和安全剪贴板在无网络时仍可用。网络请求只来自唯一
-  的 OpenAI-compatible provider，强制 HTTPS、禁止明文、查询参数、片段和重定向，并限制请求、
+- 应用仅为用户主动开启的 AI 工作台及显式公开词库浏览、下载声明 `INTERNET` 权限，不包含广告、统计或崩溃上报 SDK；
+  AI 默认关闭，中文、英文、已安装词库、emoji 和安全剪贴板在无网络时仍可用。AI 网络请求只来自
+  OpenAI-compatible provider，强制 HTTPS、禁止明文、查询参数、片段和重定向，并限制请求、
   超时、SSE 单行及整体响应大小。
 - AI 工作台只发送用户在键盘面板主动提交的文本、选定上下文与附件，以及用户明确选择的会话历史。不自动读取编辑器
   周边内容、选区、系统剪贴板、安全剪贴板、个人词库、emoji 历史或其他输入历史。密码、PIN、
@@ -535,7 +535,7 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
 - `ime-core`：输入会话、编辑器交互和隐私策略。
 - `model-scoring`：可选的离线 Mini INT8 候选评分、模型校验和推理资源管理。
 - `ime-ui`：键盘、候选栏、安全剪贴板入口和 emoji 面板。
-- `app` 中的 `AiCoordinator` 与 `OpenAiCompatibleProvider`：AI 面板编排和唯一网络适配器；
+- `app` 中的 `AiCoordinator` 与 `OpenAiCompatibleProvider`：AI 面板编排和唯一 AI 网络适配器；
   provider 只接受 HTTPS 并使用有界流式响应。
 - `security`：Android Keystore、AES-GCM 与认证授权。
 - `user-data`：用户词组、词频、emoji 历史、安全剪贴板以及独立加密的 AI 配置/可选会话。
@@ -660,3 +660,58 @@ AI 引用列表默认显示短预览，点击预览可核对完整发送上下�
 语言包导入显式拒绝符号链接等特殊条目，ZIP64/分卷归档不受支持。加载时任一声明词典文件
 损坏会使整个包不可用；请重新导入完整包。本轮核查与验收记录见
 [第二轮修复验证](docs/review-round2-validation.md)。
+# Public dictionary preparation and management
+
+The default Chinese dictionary includes the complete Wanxiang core (16 tables)
+and simplified Chinese LTS grammar model. Settings provide installed dictionary
+switches, removal, restore-to-built-in and explicit catalog/download entry points
+for Wanxiang, Rime Ice, zhwiki, QQ and Sogou. QQ/Sogou expose categories and page
+links directly; no URL entry is required. Installed dictionaries work offline.
+
+After bootstrapping native dependencies, explicitly prepare the reviewed assets:
+
+```powershell
+python tools/dictionaries/prepare.py
+python tools/dictionaries/verify.py
+./gradlew.bat :app:assembleDebug -PrequireRime=true
+```
+
+Python 3.11+ is required. Gradle verifies the reviewed hashes and never fetches
+dictionary data. The grammar model is 398,309,420 bytes; allow several GiB for
+source caches, APK, deployment and compiled dictionaries. First preparation on
+the device can take minutes; typing uses the existing fallback until ready.
+The model ranks the current composition; cross-commit contextual suggestions and
+Rime's own user dictionary remain disabled.
+
+`.github/workflows/public-dictionaries.yml` checks weekly (Monday 02:17 UTC) and
+on manual dispatch, opening a PR for the source lock. Enable Actions permission
+to create pull requests in repository settings. Review licensing, dictionary
+quality, native checks and package size before merging. No automatic merge occurs.
+QQ/Sogou and other optional downloads do not become package assets.
+
+
+## Full and lightweight packages
+
+Use `-PresourceBundle=full` (default) for all offline resources or
+`-PresourceBundle=lite` for all Wanxiang core dictionaries with optional LTS and
+handwriting downloads. In dictionary settings, check/download, enable/disable or
+remove these public resources. Downloads are explicit; installed features run
+offline. The short-word model and shared ONNX runtime remain bundled in both.
+Both APKs share one application ID and replace each other rather than installing
+side by side.
+
+Build both ARM64 Debug packages and SHA-256 receipts:
+
+```powershell
+./tools/package-resource-variants.ps1 -Abi arm64-v8a
+```
+
+For Release use `./gradlew.bat :app:clean :app:assembleRelease -PrequireRime=true -PresourceBundle=lite --no-parallel`
+(or `full`). Release artifacts remain unsigned. Source preparation is unchanged;
+see [resource publication](tools/resources/README.md) for data assets, licenses
+and the reviewed manual publication workflow.
+Recreate app packaging when changing contents: incremental APK updates can retain
+removed ZIP bytes. The two-package script handles this and verifies actual APK
+contents and space usage with `tools/resources/verify-apk.py`.
+Measured sizes and verification limits are recorded in
+[optional resource validation](docs/optional-resources-validation.md).

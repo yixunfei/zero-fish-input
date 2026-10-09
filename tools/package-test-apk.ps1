@@ -180,6 +180,8 @@ $expectedAbis = if ($Abi -eq "universal") { $supportedAbis } else { @($Abi) }
 
 Push-Location $repositoryRoot
 try {
+    Invoke-CheckedCommand "python" @("tools/dictionaries/prepare.py")
+    Invoke-CheckedCommand "python" @("tools/dictionaries/verify.py")
     if (-not $SkipChecks) {
         Write-Output "Running unit tests, privacy checks, and Android Lint..."
         Invoke-CheckedCommand $gradleWrapper @(

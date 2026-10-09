@@ -108,3 +108,22 @@ in `model-scoring/build.gradle.kts` and `HandwritingStrokeAssets.kt`. Rebuild th
 APK with the repository Gradle wrapper. Integrity checks remain enabled. The
 runtime Kotlin adaptation is in `model-scoring/src/main/kotlin/dev/zeroinput/model/`
 and is distributed in the corresponding-source archive for this build.
+# Wanxiang source and transformations
+
+Run `python tools/dictionaries/prepare.py` to obtain the reviewed source archive
+and model from `tools/dictionaries/sources.lock.json`, verify their hashes and
+reproduce all normalized package files. The lock includes upstream source URLs,
+revision, original checksums and transformed checksums. Wanxiang is authored by
+amzxyz and contributors: https://github.com/amzxyz/rime-wanxiang and
+https://github.com/amzxyz/RIME-LMDG, under CC-BY-4.0. Tone marks are removed only
+from readings; source words/frequencies and dictionary header notices are retained.
+The grammar reader source is https://github.com/lotem/librime-octagram/tree/57d18b9f58e5284bd891d559f6bdd16cf60341e9.
+
+
+## Optional resource releases
+
+`tools/resources/catalog.json` records immutable release asset names, file sets,
+sizes and hashes. `tools/resources/publish.py` uploads public resource archives
+and companion license/source archives. Tegaki redistribution includes the original
+0.3 source archives and conversion scripts alongside the runtime data. See
+`tools/resources/README.md` and ADR 0021 for publication and replacement details.

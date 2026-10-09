@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="public_resource_title">Optional resources</string>
+    <string name="public_resource_lts">Wanxiang language model</string>
+    <string name="public_resource_handwriting">Chinese handwriting</string>
+    <string name="public_resource_bundled">Bundled</string>
+    <string name="public_resource_downloaded">Downloaded</string>
+    <string name="public_resource_missing">Not installed</string>
+    <string name="public_resource_item">%1$s · %2$s · Installed size %3$d MiB</string>
+    <string name="public_resource_check">Check updates or download</string>
+    <string name="public_resource_network_notice">Connect to GitHub to check public resource versions. No input or personal data is sent. Resources download only after confirmation.</string>
+    <string name="public_resource_download_notice">Download about %1$d MiB for offline use. License: %2$s. Download and installation require temporary storage.</string>
+    <string name="public_resource_current">The current resource version is installed</string>
+    <string name="public_resource_remove_confirm">Delete downloaded resources and disable this feature? Bundled resources remain in the app and can be enabled again.</string>
+</resources>

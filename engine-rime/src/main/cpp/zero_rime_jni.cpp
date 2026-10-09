@@ -2,6 +2,7 @@
 #include <rime_api.h>
 #include <opencc/Config.hpp>
 #include <opencc/Converter.hpp>
+bool ZeroInputLoadGrammar();
 
 #include <algorithm>
 #include <cstdint>
@@ -157,8 +158,15 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeInitialize(
   traits.app_name = "rime.zeroinput";
   traits.min_log_level = 3;
   traits.log_dir = "";
+  const char* modules[] = {"default", "octagram", nullptr};
+  traits.modules = modules;
   api->setup(&traits);
   api->initialize(&traits);
+  if (!ZeroInputLoadGrammar()) {
+    api->finalize();
+    api = nullptr;
+    return JNI_FALSE;
+  }
   // A successful setup/initialize is not enough to use a schema: librime
   // must also complete its maintenance pass.  Treat a failed maintenance
   // start as initialization failure and tear down the partially initialized

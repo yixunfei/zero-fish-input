@@ -168,7 +168,7 @@
     <string name="handwriting_hint">Write one Chinese character below</string>
     <string name="handwriting_recognizing">Recognizing…</string>
     <string name="handwriting_no_match">No Chinese character found. Try again.</string>
-    <string name="handwriting_unavailable">Handwriting recognition unavailable</string>
+    <string name="handwriting_unavailable">Handwriting unavailable. Check handwriting resources in dictionary settings.</string>
     <string name="handwriting_undo">Undo</string>
     <string name="handwriting_clear">Clear</string>
     <string name="handwriting_delete">Delete</string>

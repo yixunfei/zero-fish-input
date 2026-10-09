@@ -167,7 +167,13 @@ class AppGraph(context: Context) : AutoCloseable {
     internal val clipboardSelectionTransfer = dev.zeroinput.ime.clipboard.ClipboardSelectionTransfer()
     val languagePacks = LanguagePackInstaller(applicationContext)
     val languagePackRegistry = LanguagePackRegistry(languagePacks)
-    val rime = RimeEngineFactory(applicationContext, engineExecutor)
+    val publicDictionaries = dev.zeroinput.languagepack.PublicDictionaryStore(applicationContext)
+    val publicResources = dev.zeroinput.languagepack.PublicResourceStore(applicationContext)
+    val rime = RimeEngineFactory(applicationContext, engineExecutor, publicDictionaries, publicResources)
+        .also { factory ->
+            publicDictionaries.onPublished = { factory.runtime.dictionariesChanged() }
+            publicResources.onPublished = { factory.runtime.dictionariesChanged() }
+        }
     @Volatile private var associationPredictor: dev.zeroinput.engine.api.NextWordPredictor =
         dev.zeroinput.engine.api.NextWordPredictor.Empty
     @Volatile private var associationPredictorReady = false
@@ -249,6 +255,9 @@ class AppGraph(context: Context) : AutoCloseable {
      */
     internal fun prepareEngine(request: EngineWarmupRequest): InputEngine? {
         if (!request.privacy.suggestionsAllowed) return null
+        if (request.language == InputLanguage.CHINESE && request.languagePackKey == null) {
+            rime.runtime.prepareDictionariesIfIdle()
+        }
         if (request.retryInitialization && request.language == InputLanguage.CHINESE &&
             request.languagePackKey == null && !rime.runtime.isReady) rime.warmUp()
         val candidate = if (request.languagePackKey != null) {

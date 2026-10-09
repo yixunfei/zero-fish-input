@@ -27,9 +27,10 @@ fun systemClipboardViolation(path: String, text: String): String? {
 fun networkViolation(path: String, text: String): String? {
     val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http|http\b)|java\.nio\.channels\.SocketChannel|javax\.net\.|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|Class\.forName\s*\(\s*[\"']java\.net\.)""")
     val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
-    if (network.containsMatchIn(text) && path != provider) return "Runtime network transport is restricted to the AI provider"
+    val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
+    if (network.containsMatchIn(text) && path != provider && path != dictionaries) return "Runtime network transport is restricted to approved adapters"
     if (text.contains("android.permission.INTERNET") && path != "app/src/main/AndroidManifest.xml") {
-        return "Only the approved app manifest may declare AI networking"
+        return "Only the approved app manifest may declare networking"
     }
     return null
 }
@@ -102,6 +103,9 @@ tasks.register("testPrivacyBoundary") {
             check(networkViolation(business, source) != null)
             check(networkViolation("other/$provider", source) != null)
             check(networkViolation(provider, source) == null)
+            val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
+            check(networkViolation(dictionaries, source) == null)
+            check(networkViolation("other/$dictionaries", source) != null)
         }
         check(networkViolation(business, "java.net.URI") == null)
         check(networkViolation(business, "android.permission.INTERNET") != null)

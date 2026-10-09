@@ -57,6 +57,7 @@ internal class HandwritingCoordinator(
     private val handler: Handler,
     private val createRecognizer: () -> HandwritingRecognizer,
     private val deliver: (List<String>?, Boolean) -> Unit,
+    private val resourceRevision: () -> Long = { 0L },
 ) : AutoCloseable {
     private val worker = BoundedExecutors.singleThread("zeroinput-handwriting", queueCapacity = 1)
     private val generation = AtomicLong()
@@ -65,6 +66,7 @@ internal class HandwritingCoordinator(
     private var task: Future<*>? = null
     private var taskRequest: HandwritingRequest? = null
     private var recognizer: HandwritingRecognizer? = null
+    private var preparedResourceRevision = -1L
     private val deliveryLock = Any()
     private var delivery: Runnable? = null
     @Volatile private var closed = false
@@ -78,6 +80,7 @@ internal class HandwritingCoordinator(
             return
         }
         val ticket = generation.get()
+        val resourceTicket = resourceRevision()
         val runnable = Runnable {
             pending = null
             pendingRequest = null
@@ -89,9 +92,16 @@ internal class HandwritingCoordinator(
                 taskRequest = request
                 task = worker.submit {
                     request.run { snapshot ->
-                        val cancelled = { closed || generation.get() != ticket || Thread.currentThread().isInterrupted }
+                        val cancelled = { closed || generation.get() != ticket || resourceRevision() != resourceTicket ||
+                            Thread.currentThread().isInterrupted }
                         val outcome = runCatching {
                             if (cancelled()) emptyList() else {
+                                val revision = resourceRevision()
+                                if (preparedResourceRevision != revision) {
+                                    recognizer?.close()
+                                    recognizer = null
+                                    preparedResourceRevision = revision
+                                }
                                 val engine = recognizer ?: createRecognizer().also { recognizer = it }
                                 engine.recognize(snapshot, cancelled)
                             }

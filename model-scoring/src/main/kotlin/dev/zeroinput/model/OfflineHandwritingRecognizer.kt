@@ -9,18 +9,23 @@ import android.os.Looper
 import java.nio.FloatBuffer
 
 /** Worker-owned, fully offline single-character handwriting recognizer. */
-class OfflineHandwritingRecognizer(context: Context) : AutoCloseable {
+class OfflineHandwritingRecognizer(context: Context, resources: dev.zeroinput.engine.api.PublicResourceSource? = null) : AutoCloseable {
     private val ownerThread = Thread.currentThread()
     private val environment: OrtEnvironment
     private val session: OrtSession
     private val characters: List<String>
     private var strokeModels: List<HandwritingStrokeModel> = emptyList()
+    private val resourceLease: dev.zeroinput.engine.api.PublicResourceLease?
 
     init {
         check(Looper.myLooper() != Looper.getMainLooper()) { "Handwriting model requires worker thread" }
-        val model = HandwritingAssets.model(context)
-        characters = HandwritingAssets.characters(context)
-        strokeModels = HandwritingStrokeAssets.load(context)
+        resourceLease = resources?.acquire("handwriting")
+        check(resources == null || resourceLease != null) { "Handwriting resource not installed" }
+        try {
+        val files = resourceLease?.files
+        val model = HandwritingAssets.model(context, files)
+        characters = HandwritingAssets.characters(context, files)
+        strokeModels = HandwritingStrokeAssets.load(context, files)
         environment = OrtEnvironment.getEnvironment(OrtLoggingLevel.ORT_LOGGING_LEVEL_FATAL)
         session = OrtSession.SessionOptions().use { options ->
             options.setIntraOpNumThreads(1)
@@ -29,6 +34,7 @@ class OfflineHandwritingRecognizer(context: Context) : AutoCloseable {
             options.setSessionLogLevel(OrtLoggingLevel.ORT_LOGGING_LEVEL_FATAL)
             environment.createSession(model.absolutePath, options)
         }
+        } catch (error: Throwable) { resourceLease?.close(); throw error }
     }
 
     fun recognize(strokes: List<FloatArray>, cancelled: () -> Boolean = { false }): List<String> {
@@ -69,6 +75,6 @@ class OfflineHandwritingRecognizer(context: Context) : AutoCloseable {
     override fun close() {
         check(Thread.currentThread() === ownerThread) { "Handwriting recognition requires its worker" }
         strokeModels = emptyList()
-        session.close()
+        try { session.close() } finally { resourceLease?.close() }
     }
 }

@@ -79,7 +79,22 @@ add_subdirectory("${RIME_ROOT}" "${CMAKE_BINARY_DIR}/librime" EXCLUDE_FROM_ALL)
 target_compile_options(rime-static PRIVATE -Wno-error=deprecated-declarations)
 
 add_library(zeroinput_rime SHARED zero_rime_jni.cpp)
+set(OCTAGRAM_ROOT "${RIME_DEPS_ROOT}/librime-octagram")
+if(NOT EXISTS "${OCTAGRAM_ROOT}/src/octagram.cc")
+  message(FATAL_ERROR "Pinned Octagram sources are required. Run tools/bootstrap-rime.ps1")
+endif()
+target_sources(rime-static PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/octagram_runtime.cpp"
+  "${OCTAGRAM_ROOT}/src/gram_db.cc"
+  "${OCTAGRAM_ROOT}/src/gram_encoding.cc"
+  "${OCTAGRAM_ROOT}/src/grammar_module.cc"
+  "${OCTAGRAM_ROOT}/src/octagram.cc"
+)
+target_include_directories(rime-static PRIVATE "${OCTAGRAM_ROOT}/src")
 target_include_directories(zeroinput_rime PRIVATE
+  "${OCTAGRAM_ROOT}/src"
+  "${RIME_ROOT}/deps/darts-clone/include"
+  "${RIME_ROOT}/deps/utf8cpp/source"
   "${ZEROINPUT_OPENCC_INCLUDE}"
   "${RIME_ROOT}/src"
   "${RIME_ROOT}/include"

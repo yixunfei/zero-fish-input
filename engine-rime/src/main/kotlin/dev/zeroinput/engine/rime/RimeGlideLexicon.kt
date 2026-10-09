@@ -10,6 +10,21 @@ import java.util.concurrent.CancellationException
 
 /** Reuses pinned public Rime data and the engine's existing double-pinyin mapping, never a user dictionary. */
 object RimeGlideLexicon {
+    /** A build-time bounded projection of verified Wanxiang readings; shared by every Chinese layout. */
+    fun readPrepared(reader: Reader, isCancelled: () -> Boolean = { false }): List<GlideLexiconEntry> {
+        val output = LinkedHashMap<Pair<GlideLayout, String>, GlideLexiconEntry>()
+        forEachBoundedLine(reader, 24_000, isCancelled) { line ->
+            val fields = line.split('\t')
+            require(fields.size == 2)
+            val syllables = fields[0].split(' ')
+            require(syllables.size in 1..8 && syllables.all { s -> s.length in 1..8 && s.all { it in 'a'..'z' } })
+            val weight = requireNotNull(fields[1].toIntOrNull())
+            require(weight >= 0)
+            addReading(output, Reading("", syllables), weight)
+        }
+        require(output.isNotEmpty())
+        return output.values.toList()
+    }
     private data class Reading(val text: String, val syllables: List<String>, val probability: Float = 1f)
     private data class Frequency(val text: String, val weight: Int)
     private data class Presets(val explicitWeights: Map<String, Int>, val words: List<Frequency>)

@@ -927,7 +927,8 @@ class ZeroInputService : InputMethodService() {
 
     private fun handwriting(): HandwritingCoordinator = handwritingCoordinator ?: HandwritingCoordinator(
         handler = mainHandler,
-        createRecognizer = { OnnxHandwritingRecognizer(OfflineHandwritingRecognizer(applicationContext)) },
+        createRecognizer = { OnnxHandwritingRecognizer(OfflineHandwritingRecognizer(applicationContext, graph.publicResources)) },
+        resourceRevision = { graph.publicResources.revision },
         deliver = { values, failed ->
             val view = inputView
             if (inputViewActive && view?.isHandwritingOpen == true &&

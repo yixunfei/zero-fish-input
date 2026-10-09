@@ -172,7 +172,7 @@
     <string name="handwriting_hint">在下方书写单个汉字</string>
     <string name="handwriting_recognizing">识别中…</string>
     <string name="handwriting_no_match">未识别出汉字，请重写</string>
-    <string name="handwriting_unavailable">手写识别暂不可用</string>
+    <string name="handwriting_unavailable">手写识别暂不可用，请在词库设置中检查手写资源</string>
     <string name="handwriting_undo">撤销</string>
     <string name="handwriting_clear">清空</string>
     <string name="handwriting_delete">删除</string>

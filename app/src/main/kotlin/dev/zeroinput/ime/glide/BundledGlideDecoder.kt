@@ -11,10 +11,8 @@ internal object BundledGlideDecoder {
     fun create(context: Context): GlideDecoder {
         val cancelled = { Thread.currentThread().isInterrupted }
         val english = EnglishGlideLexicon.loadBundled(cancelled)
-        val chinese = context.assets.open("rime/luna_pinyin.dict.yaml").bufferedReader().use { dictionary ->
-            context.assets.open("rime/essay.txt").bufferedReader().use { frequencies ->
-                RimeGlideLexicon.read(dictionary, frequencies, cancelled)
-            }
+        val chinese = context.assets.open("glide-zh.tsv").bufferedReader().use { dictionary ->
+            RimeGlideLexicon.readPrepared(dictionary, cancelled)
         }
         check(!cancelled()) { "Glide preparation cancelled" }
         return DictionaryGlideDecoder(english + chinese, cancelled)

@@ -12,7 +12,8 @@ internal object HandwritingAssets {
     const val CHARACTERS_BYTES = 74_012L
     const val CHARACTERS_HASH = "d1979e9f794c464c0d2e0b70a7fe14dd978e9dc644c0e71f14158cdf8342af1b"
 
-    fun model(context: Context): File {
+    fun model(context: Context, files: Map<String, dev.zeroinput.engine.api.PublicResourceFile>? = null): File {
+        if (files != null) return File(requireNotNull(files["handwriting/model.onnx"]).path)
         val directory = File(context.noBackupFilesDir, "public-model").apply { mkdirs() }
         val file = File(directory, "handwriting.onnx")
         if (file.isFile && file.length() == MODEL_BYTES && file.inputStream().use {
@@ -43,10 +44,12 @@ internal object HandwritingAssets {
         } finally { temporary.delete() }
     }
 
-    fun characters(context: Context): List<String> {
-        val bytes = context.assets.open("handwriting/characters.txt").use { it.readBytes() }
-        check(bytes.size.toLong() == CHARACTERS_BYTES &&
-            MiniModelAssets.verified(ByteArrayInputStream(bytes), CHARACTERS_BYTES, CHARACTERS_HASH)) {
+    fun characters(context: Context, files: Map<String, dev.zeroinput.engine.api.PublicResourceFile>? = null): List<String> {
+        val spec = files?.get("handwriting/characters.txt")
+        val bytes = (spec?.let { File(it.path).inputStream() }
+            ?: context.assets.open("handwriting/characters.txt")).use { it.readBytes() }
+        check(bytes.size.toLong() == (spec?.bytes ?: CHARACTERS_BYTES) &&
+            MiniModelAssets.verified(ByteArrayInputStream(bytes), spec?.bytes ?: CHARACTERS_BYTES, spec?.sha256 ?: CHARACTERS_HASH)) {
             "Invalid handwriting character table"
         }
         val values = bytes.toString(Charsets.UTF_8).trimEnd('\n').split('\n')

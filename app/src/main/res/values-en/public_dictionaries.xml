@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="public_dictionary_title">Built-in and downloaded dictionaries</string>
+    <string name="public_dictionary_home">Installed</string>
+    <string name="public_dictionary_cancel">Cancel task</string>
+    <string name="public_dictionary_cancelled">Unfinished task cancelled; saved dictionaries are retained</string>
+    <string name="public_dictionary_builtin">Complete Wanxiang core dictionaries</string>
+    <string name="public_dictionary_builtin_detail">Includes core characters, words and specialized vocabulary for offline input. Dictionaries update with the app; optional resources are managed separately.</string>
+    <string name="public_dictionary_restore">Use built-in dictionaries only</string>
+    <string name="public_dictionary_restore_confirm">Disable all downloaded dictionaries and keep their files for later?</string>
+    <string name="public_dictionary_sources">Download sources</string>
+    <string name="public_dictionary_installed">Installed extensions</string>
+    <string name="public_dictionary_pending">Saved. Dictionaries will be prepared again after input sessions are released.</string>
+    <string name="public_dictionary_offline">Installed dictionaries work offline</string>
+    <string name="public_dictionary_item">%1$s\nSource: %2$s · Entries: %3$d · %4$d KB\nVersion: %5$s</string>
+    <string name="public_dictionary_enable">Enable</string>
+    <string name="public_dictionary_update">Browse source updates</string>
+    <string name="public_dictionary_remove">Delete</string>
+    <string name="public_dictionary_remove_confirm">Delete “%1$s”? Personal phrases are unaffected.</string>
+    <string name="public_dictionary_network_notice">Browsing and downloading connects to this source and its file services. The source can see your network address and selected dictionaries. No input or personal dictionary is sent. Leaving this page cancels unfinished requests.</string>
+    <string name="public_dictionary_browse">Browse online</string>
+    <string name="public_dictionary_categories">Back to categories</string>
+    <string name="public_dictionary_license_wanxiang">Wanxiang data: CC BY 4.0. The built-in core already includes general and specialized dictionaries.</string>
+    <string name="public_dictionary_license_ice">Rime Ice: upstream declares GPL-3.0; data retains its source notices.</string>
+    <string name="public_dictionary_license_wiki">Wiki dictionaries: generated data has a separate license from the generator and follows Wikimedia source terms.</string>
+    <string name="public_dictionary_license_website">Uploaded dictionaries belong to their authors. Downloads are for local use and are not redistributed with this app.</string>
+    <string name="public_dictionary_choose">Choose a category or dictionary</string>
+    <string name="public_dictionary_install_notice">Download, validate and install this public dictionary? An existing copy will be replaced only after successful conversion. Dictionary content may affect candidate order.</string>
+    <string name="public_dictionary_download">Download and install</string>
+    <string name="public_dictionary_progress">Downloaded %1$d KB</string>
+    <string name="public_dictionary_working">Working…</string>
+    <string name="public_dictionary_failed">Unable to complete. The source may be unavailable, the download restricted, or the format unsupported. Try again later.</string>
+    <string name="public_dictionary_wanxiang">Wanxiang Pinyin</string>
+    <string name="public_dictionary_ice">Rime Ice</string>
+    <string name="public_dictionary_wiki">Chinese Wiki dictionaries</string>
+    <string name="public_dictionary_qq">QQ Pinyin dictionaries</string>
+    <string name="public_dictionary_sogou">Sogou cell dictionaries</string>
+</resources>

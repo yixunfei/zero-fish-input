@@ -95,7 +95,7 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
   提交的文本和用户明确选择的会话历史，不读取编辑器周边内容、选区、系统剪贴板、安全剪贴板、
   个人词库、emoji 历史或其他输入历史。密码、PIN、邮箱、网址、隐身、未知和隐私收紧的输入
   fail-closed。受限场景中的 AI 图标仅显示固定的不可用说明，不打开工作台、不加载会话、不发送请求；
-  点击后重新校验隐私策略，已显示的旧图标不能绕过限制。网络仅由唯一的 OpenAI-compatible provider 发起，强制 HTTPS、无重定向、无查询
+  点击后重新校验隐私策略，已显示的旧图标不能绕过限制。AI 网络仅由 OpenAI-compatible provider 发起，强制 HTTPS、无重定向、无查询
   参数或片段，并限制请求、超时、SSE 单行和整体响应大小。流式输出留在面板，只有用户点击
   “插入结果”才提交到当前编辑器；切换会话、设置、服务销毁、清除 AI 数据或编辑器都会使旧
   请求失效。AI 配置（含 API key）与可选会话历史使用相互独立的 AES-GCM/Keystore 存储，会话保存默认关闭，
@@ -201,3 +201,21 @@ ZIP64 and multi-disk archives are unsupported. AI context reference rows use sho
 previews unless the user explicitly opens full preview; leaving the pane removes
 that full display. Immutable JVM strings and platform copies cannot be securely
 wiped. No new network path, permission, component or storage format is introduced.
+# Public dictionaries
+
+Foreground dictionary settings have a separately approved HTTPS download boundary
+(docs/adr/0020-public-dictionaries.md). Only public catalogs/files are requested;
+input, learning and clipboard data remain offline. Downloaded data is bounded and
+parsed before atomic publication. QQ/Sogou user uploads are never bundled.
+Only reviewed, pinned Wanxiang data/model assets enter the APK. Weekly updates
+require a reviewed PR and never merge automatically.
+
+
+## Optional public model data
+
+Full and lightweight distributions share the same privacy policy. Optional LTS
+and handwriting downloads require explicit settings actions and contain no input
+or personal data. Only supported resources from this project's reviewed catalog
+and immutable Releases are allowed. Files are bounded and hash-verified before
+atomic installation. Executable downloads remain prohibited. See
+[ADR 0021](docs/adr/0021-optional-public-resources.md).

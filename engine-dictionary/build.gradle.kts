@@ -3,11 +3,16 @@ plugins { alias(libs.plugins.kotlin.jvm) }
 kotlin { jvmToolchain(17) }
 
 dependencies {
+    implementation(libs.snakeyaml)
     implementation(project(":engine-api"))
     testImplementation(libs.junit)
 }
 
-tasks.test { useJUnit() }
+tasks.test {
+    useJUnit()
+    providers.gradleProperty("dictionarySample").orNull?.let { systemProperty("dictionary.sample", it) }
+    providers.gradleProperty("sogouSample").orNull?.let { systemProperty("dictionary.sogouSample", it) }
+}
 
 tasks.register<JavaExec>("evaluateWordAssociations") {
     group = "verification"

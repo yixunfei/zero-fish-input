@@ -15,8 +15,10 @@ import java.util.concurrent.ExecutorService
 class RimeEngineFactory(
     context: Context,
     private val executor: ExecutorService,
+    dictionaries: dev.zeroinput.engine.api.PublicDictionarySource = dev.zeroinput.engine.api.PublicDictionarySource.Empty,
+    resources: dev.zeroinput.engine.api.PublicResourceSource? = null,
 ) : ConfigurableChineseEngineFactory, AutoCloseable {
-    val runtime = RimeRuntime(context)
+    val runtime = RimeRuntime(context, dictionaries, resources)
 
     override val descriptor = RimeInputEngine.Descriptor
 

@@ -24,11 +24,20 @@ user-data -> security
 user-data -> ai-api
 ime-ui -> ai-api
 language-pack -> security
+language-pack -> engine-dictionary
 ```
 
 业务层不引用 librime 类型。升级、替换或移除 librime 时，变化限制在 `engine-rime` 模块和语言数据部署器内。
 
 ## Runtime boundaries
+
+Public dictionary settings use a dedicated explicit download adapter and native
+catalog views. `engine-dictionary/importer` owns format conversion; `language-pack`
+owns bounded public storage and atomic registry publication. `engine-api` exposes
+immutable public file snapshots with scoped lifetime. `engine-rime` consumes them
+only on its worker, shares a pinned Wanxiang base between immutable deployments,
+and statically loads the bundled grammar data through Octagram. No personal store
+or AI port participates. See [ADR 0020](adr/0020-public-dictionaries.md).
 
 Composition editing and candidate continuation are described in
 [ADR 0010](adr/0010-composition-editing-and-candidate-continuation.md).
@@ -706,3 +715,14 @@ callbacks cannot clear a newer request. Confirmed reference rows default to boun
 Unicode-safe previews. Full context remains available by explicit preview, and
 leaving that pane resets the full-text display. This reduces View text copies;
 the controller's bounded immutable strings still remain until context invalidation.
+
+## Optional public resource delivery
+
+See [ADR 0021](adr/0021-optional-public-resources.md). Full and lightweight APKs
+share one runtime and all Wanxiang core dictionaries. `engine-api/PublicResourceSource`
+exposes worker-only resource leases; `language-pack/PublicResourceStore` validates,
+publishes and shares immutable data, while app dictionary settings own explicit
+GitHub requests. `engine-rime` and `model-scoring` receive the source by injection.
+LTS and handwriting are optional in lightweight builds. Native libraries stay
+bundled. The bounded Chinese glide index is derived from Wanxiang at build time;
+legacy Luna/essay files are excluded from APKs.

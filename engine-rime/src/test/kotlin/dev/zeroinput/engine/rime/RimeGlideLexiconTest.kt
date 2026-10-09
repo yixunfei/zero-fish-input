@@ -7,6 +7,19 @@ import java.io.File
 import java.util.concurrent.CancellationException
 
 class RimeGlideLexiconTest {
+    @Test fun `prepared Wanxiang projection covers common readings and all Chinese layouts`() {
+        val rows = File("build/generated/glideAssets/glide-zh.tsv").reader().use { RimeGlideLexicon.readPrepared(it) }
+        for (layout in GlideLayout.entries.filter { it != GlideLayout.ENGLISH_QWERTY }) {
+            val values = rows.filter { it.layout == layout }
+            assertTrue(values.size > 10_000)
+            assertTrue(values.any { it.displayText == "ni hao" })
+            assertTrue(values.any { it.displayText == "shu ru fa" })
+            assertEquals(values.size, values.map { it.inputCode }.distinct().size)
+        }
+        assertThrows(IllegalArgumentException::class.java) { RimeGlideLexicon.readPrepared("ni hao\t-1".reader()) }
+        assertThrows(IllegalArgumentException::class.java) { RimeGlideLexicon.readPrepared("Ni hao\t1".reader()) }
+        assertThrows(CancellationException::class.java) { RimeGlideLexicon.readPrepared("ni hao\t1".reader()) { true } }
+    }
     private val dictionary = "---\nname: fixture\n...\n你好\tni hao\n明天\tming tian\n西安\txi an\n先\txian\n谢谢\txie xie\n"
     private val weights = "你好\t200\n明天\t120\n西安\t90\n先\t80\n谢谢\t110\n"
 

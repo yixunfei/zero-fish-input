@@ -62,6 +62,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onWordAssociationsChanged: (Boolean) -> Unit = {}
     var onPairedSymbolsChanged: (Boolean) -> Unit = {}
     var onDictionaryRequested: () -> Unit = {}
+    var onPublicDictionaryRequested: () -> Unit = {}
     var onExpressionsRequested: () -> Unit = {}
     var onAppearanceRequested: () -> Unit = {}
     var onPersonalDataClearRequested: () -> Unit = {}
@@ -200,6 +201,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
 
         section(context.getString(R.string.section_data))
         command(context.getString(R.string.setting_user_phrases)) { onDictionaryRequested() }
+        command(context.getString(R.string.public_dictionary_title)) { onPublicDictionaryRequested() }
         command(context.getString(R.string.expression_manager_title)) { onExpressionsRequested() }
         command(context.getString(R.string.clear_personal_data)) { onPersonalDataClearRequested() }
         command(context.getString(R.string.secure_clipboard)) { onSecureClipboardRequested() }

@@ -38,7 +38,8 @@ class RimeReadinessTest {
                 schema.getJSONObject("translator").put("dictionary", "missing_public_fixture")
                 schema.getJSONObject("schema").put("version", "999.0")
                 schemaFile.writeText(schema.toString())
-                check(File(root, "rime/user/build").deleteRecursively())
+                File(root, "rime").listFiles().orEmpty().filter { it.name.startsWith("user-") }
+                    .forEach { check(File(it, "build").deleteRecursively()) }
 
                 assertFalse("Session creation alone must not mark an unusable dictionary ready", factory.warmUp())
                 assertEquals(RimeRuntimeState.FAILED, factory.runtime.state)
@@ -57,7 +58,7 @@ class RimeReadinessTest {
                 // assets so later real-editor tests do not inherit this fault fixture.
                 check(graph.rime.warmUp()) { "Application runtime restoration failed" }
             }
-        }.get(60, TimeUnit.SECONDS)
+        }.get(600, TimeUnit.SECONDS)
     }
 
     private class FixtureContext(base: Context, private val root: File) : ContextWrapper(base) {

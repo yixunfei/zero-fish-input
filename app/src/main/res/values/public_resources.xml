@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="public_resource_title">可选增强资源</string>
+    <string name="public_resource_lts">万象语言模型</string>
+    <string name="public_resource_handwriting">中文手写识别</string>
+    <string name="public_resource_bundled">随应用内置</string>
+    <string name="public_resource_downloaded">已下载</string>
+    <string name="public_resource_missing">未安装</string>
+    <string name="public_resource_item">%1$s · %2$s · 安装所需 %3$d MiB</string>
+    <string name="public_resource_check">检查更新或下载</string>
+    <string name="public_resource_network_notice">连接 GitHub 检查公开资源版本。不会发送输入或个人数据；仅在确认下载后获取资源。</string>
+    <string name="public_resource_download_notice">下载约 %1$d MiB，安装后可离线使用。许可：%2$s。下载和安装需要足够的临时空间。</string>
+    <string name="public_resource_current">已安装当前资源版本</string>
+    <string name="public_resource_remove_confirm">删除下载资源并停用此功能？内置资源仍随应用保留，重新启用后可使用。</string>
+</resources>

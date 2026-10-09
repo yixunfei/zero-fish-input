@@ -44,6 +44,10 @@ function Install-PinnedArchive {
 }
 
 Install-PinnedArchive `
+    -Name "librime-octagram" `
+    -Url "https://codeload.github.com/lotem/librime-octagram/tar.gz/57d18b9f58e5284bd891d559f6bdd16cf60341e9" `
+    -Sha256 "7b9c77bcf17566b64204791b72cdb1b4471e22efec5eef9b79ca764ab99a1576"
+Install-PinnedArchive `
     -Name "leveldb" `
     -Url "https://codeload.github.com/google/leveldb/tar.gz/99b3c03b3284f5886f9ef9a4ef703d57373e61be" `
     -Sha256 "bc87b9bbc5674c91246a89813355e78401759761342cc049e1c3d56350a8a9d1"

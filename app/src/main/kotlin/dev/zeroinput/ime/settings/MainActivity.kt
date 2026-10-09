@@ -61,6 +61,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         screen = SettingsScreenView(this)
+        screen.onPublicDictionaryRequested = {
+            startActivity(Intent(this, dev.zeroinput.ime.dictionaries.DictionaryManagerActivity::class.java))
+        }
         setContentView(screen)
         bindScreen()
         if (intent.getBooleanExtra(EXTRA_FUZZY_SETTINGS, false)) screen.post { screen.showFuzzySettings() }

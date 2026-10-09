@@ -92,6 +92,7 @@ android {
 tasks.named("preBuild").configure { dependsOn(prepareLicenseAssets) }
 
 dependencies {
+    implementation(libs.jsoup)
     implementation(project(":engine-api"))
     implementation(project(":engine-english"))
     implementation(project(":engine-rime"))

@@ -15,6 +15,61 @@ check(!requireRime || hasNativeRime) {
 
 val openCcAssets = layout.buildDirectory.dir("generated/openccAssets")
 val syllableAssets = layout.buildDirectory.dir("generated/syllableAssets")
+val publicDictionaryAssets = layout.buildDirectory.dir("generated/publicDictionaryAssets")
+val resourceBundle = providers.gradleProperty("resourceBundle").orElse("full")
+check(resourceBundle.get() in setOf("full", "lite")) { "resourceBundle must be full or lite" }
+val packagedDictionaryAssets = layout.buildDirectory.dir("generated/packagedDictionaryAssets")
+val baseRimeAssets = layout.buildDirectory.dir("generated/baseRimeAssets")
+val packageBaseRimeAssets = tasks.register<Sync>("packageBaseRimeAssets") {
+    from("src/main/assets")
+    exclude("rime/luna_pinyin.dict.yaml", "rime/essay.txt")
+    into(baseRimeAssets)
+}
+val glideAssets = layout.buildDirectory.dir("generated/glideAssets")
+val prepareGlideAssets = tasks.register<Exec>("prepareGlideAssets") {
+    inputs.file(rootProject.file("tools/dictionaries/prepare-glide.py"))
+    inputs.files(publicDictionaryAssets.map { it.dir("rime/dicts") })
+    outputs.dir(glideAssets)
+    commandLine("python", rootProject.file("tools/dictionaries/prepare-glide.py").absolutePath)
+}
+val packageDictionaryAssets = tasks.register<Sync>("packageDictionaryAssets") {
+    from(publicDictionaryAssets)
+    into(packagedDictionaryAssets)
+    if (resourceBundle.get() == "lite") exclude("**/*.gram")
+}
+val verifyPublicDictionaryAssets = tasks.register("verifyPublicDictionaryAssets") {
+    doLast {
+        val root = publicDictionaryAssets.get().dir("rime").asFile
+        val manifest = root.resolve("public-dictionaries.json")
+        check(manifest.isFile) { "Run python tools/dictionaries/prepare.py before building." }
+        val metadata = groovy.json.JsonSlurper().parse(manifest) as Map<*, *>
+        val lock = groovy.json.JsonSlurper().parse(rootProject.file("tools/dictionaries/sources.lock.json")) as Map<*, *>
+        check(metadata["revision"] == lock["revision"]) { "Stale public dictionary assets" }
+        val files = metadata["files"] as Map<*, *>
+        check(files == lock["preparedFiles"]) { "Unreviewed public dictionary artifacts" }
+        val expectedNames = (lock["tables"] as List<*>).map { "dicts/$it.dict.yaml" }.toSet() +
+            setOf("zeroinput_public.dict.yaml", "wanxiang-lts-zh-hans.gram")
+        check(files.keys == expectedNames) { "Incomplete public dictionary assets" }
+        check(root.resolve("wanxiang-lts-zh-hans.gram").length() ==
+            ((lock["model"] as Map<*, *>)["size"] as Number).toLong())
+        check(files["wanxiang-lts-zh-hans.gram"] == (lock["model"] as Map<*, *>)["sha256"])
+        files.forEach { (name, expected) ->
+            val asset = root.resolve(name as String)
+            val digest = MessageDigest.getInstance("SHA-256")
+            asset.inputStream().use { input ->
+                val buffer = ByteArray(65536)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            check(digest.digest().joinToString("") { "%02x".format(it) } == expected) {
+                "Public dictionary checksum mismatch"
+            }
+        }
+    }
+}
 val prepareSyllableAssets = tasks.register("prepareSyllableAssets") {
     val dictionary = file("src/main/assets/rime/luna_pinyin.dict.yaml")
     inputs.file(dictionary)
@@ -64,6 +119,8 @@ val prepareOpenCcAssets = tasks.register<Sync>("prepareOpenCcAssets") {
 }
 
 android {
+    sourceSets["main"].assets.setSrcDirs(listOf(baseRimeAssets, glideAssets))
+    sourceSets.getByName("main").assets.srcDir(packagedDictionaryAssets)
     namespace = "dev.zeroinput.engine.rime"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
@@ -125,4 +182,7 @@ dependencies {
     testImplementation(project(":engine-english"))
 }
 
-tasks.named("preBuild").configure { dependsOn(verifyOpenCcAssets, prepareOpenCcAssets, prepareSyllableAssets) }
+packageDictionaryAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
+prepareGlideAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
+tasks.named("preBuild").configure { dependsOn(verifyOpenCcAssets, prepareOpenCcAssets, prepareSyllableAssets,
+    packageDictionaryAssets, packageBaseRimeAssets, prepareGlideAssets) }

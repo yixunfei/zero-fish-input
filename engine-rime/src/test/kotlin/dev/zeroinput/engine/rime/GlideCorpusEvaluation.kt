@@ -61,10 +61,8 @@ object GlideCorpusEvaluation {
     }
 
     fun chineseLexicon(root: File): List<GlideLexiconEntry> =
-        File(root, "engine-rime/src/main/assets/rime/luna_pinyin.dict.yaml").reader(Charsets.UTF_8).use { dictionary ->
-            File(root, "engine-rime/src/main/assets/rime/essay.txt").reader(Charsets.UTF_8).use { frequencies ->
-                RimeGlideLexicon.read(dictionary, frequencies)
-            }
+        File(root, "engine-rime/build/generated/glideAssets/glide-zh.tsv").reader(Charsets.UTF_8).use { dictionary ->
+            RimeGlideLexicon.readPrepared(dictionary)
         }
 
     fun cases(): List<Case> {
