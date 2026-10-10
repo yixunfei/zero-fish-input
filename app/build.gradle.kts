@@ -47,6 +47,7 @@ android {
         buildConfig = true
         viewBinding = true
     }
+    androidResources { noCompress += "xz" }
 
     sourceSets["main"].assets.srcDir(licenseAssets)
     sourceSets["androidTest"].assets.srcDir(rootProject.file("tools/model-quality-fixtures"))
@@ -72,6 +73,7 @@ android {
     }
 
     packaging {
+        jniLibs.useLegacyPackaging = true
         // ONNX Runtime also ships x86; universal IME packages support only the three Rime ABIs.
         jniLibs.excludes += "lib/x86/**"
         resources.excludes += setOf(

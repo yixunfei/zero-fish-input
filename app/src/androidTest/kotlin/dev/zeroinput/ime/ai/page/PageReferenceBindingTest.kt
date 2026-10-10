@@ -20,6 +20,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PageReferenceBindingTest {
+    @Test fun unavailableBrokerOpensSettingsWithoutStartingCaptureButRestrictedSessionDoesNot() = onMain {
+        for (connected in listOf(false, true)) Fixture().use { f ->
+            if (connected) f.enabled = false else f.disconnect()
+            f.binding.request()
+            assertEquals(1, f.settingsOpened)
+            assertTrue(f.work.isEmpty())
+            assertFalse(f.loading())
+            f.allowed = false
+            f.binding.request()
+            assertEquals(1, f.settingsOpened)
+            assertTrue(f.work.isEmpty())
+        }
+    }
+
     @Test fun invalidSessionOrContextDeliveryImmediatelyClearsLoadingAndCannotAttach() = onMain {
         for (changeContext in listOf(false, true)) Fixture().use { f ->
             f.binding.request()
@@ -52,12 +66,14 @@ class PageReferenceBindingTest {
         val work = ArrayDeque<Runnable>()
         val delivery = ArrayDeque<() -> Unit>()
         var allowed = true
+        var enabled = true
+        var settingsOpened = 0
         private val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext,
             R.style.Theme_ZeroInput_InputMethod)
         private val view = ZeroInputView(context).apply {
             renderSession(InputSessionState(privacy = SessionPrivacy(false, true, true, PrivacyReason.NONE)))
         }
-        private val broker = PageReferenceBroker({ work.addLast(it) }, { delivery.addLast(it); true }, { true })
+        private val broker = PageReferenceBroker({ work.addLast(it) }, { delivery.addLast(it); true }, { enabled })
         private val source = broker.attach(PageTextSource { _, _ -> PageTextSnapshot(listOf("public page"), false) })
         private val store = object : EncryptedStore {
             override fun read(): ByteArray? = null
@@ -70,8 +86,8 @@ class PageReferenceBindingTest {
         }
         val controller = AiWorkbenchController(AiCoordinator(provider), AiConversationRepository(store),
             { it.run() }, { null }, AiDataGeneration(), { it(); true }, { allowed }, {}, {}, {})
-        val binding = AiPageReferenceBinding(broker, { true }, Handler(Looper.getMainLooper()), controller,
-            { allowed }, { "public.fixture" }, { view }, {}, {})
+        val binding = AiPageReferenceBinding(broker, Handler(Looper.getMainLooper()), controller,
+            { allowed }, { "public.fixture" }, { view }, { settingsOpened++ }, {})
 
         init {
             visible(view).first { it.contentDescription == context.getString(dev.zeroinput.ime.ui.R.string.ai_open) }
@@ -81,6 +97,8 @@ class PageReferenceBindingTest {
         fun loading() = visible(view).filterIsInstance<TextView>().any {
             it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_page_loading)
         }
+
+        fun disconnect() { source.close() }
 
         override fun close() { binding.close(); source.close(); view.release() }
     }

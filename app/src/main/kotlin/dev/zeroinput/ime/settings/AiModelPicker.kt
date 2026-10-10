@@ -11,7 +11,6 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ai.api.AiModelCatalogEvent
 import dev.zeroinput.ime.R
-import dev.zeroinput.ime.ui.aiErrorMessage
 import dev.zeroinput.userdata.AiConfiguration
 
 /** Discovery changes only this protected editor's draft, after explicit model selection. */
@@ -21,6 +20,7 @@ internal class AiModelPicker(
     private val configuration: () -> AiConfiguration,
     private val start: (AiConfiguration, (AiModelCatalogEvent) -> Unit) -> AutoCloseable,
     private val secure: (AlertDialog) -> AlertDialog,
+    private val validate: () -> Boolean = { true },
 ) : AutoCloseable {
     private val status = TextView(context).apply { isSaveEnabled = false }
     private val fetch = MaterialButton(context).apply {
@@ -46,17 +46,24 @@ internal class AiModelPicker(
 
     private fun fetch() {
         cancel()
+        if (!validate()) return
+        val snapshot = configuration()
+        if (!snapshot.enabled || !snapshot.networkAllowed) {
+            status.visibility = android.view.View.VISIBLE
+            status.setText(R.string.ai_setup_network_required)
+            return
+        }
         val token = generation
         status.visibility = android.view.View.VISIBLE
         fetch.isEnabled = false
-        val active = start(configuration()) { event ->
+        val active = start(snapshot) { event ->
             if (generation != token) return@start
             fetch.isEnabled = event != AiModelCatalogEvent.Started
             when (event) {
                 AiModelCatalogEvent.Started -> status.setText(R.string.ai_models_loading)
                 AiModelCatalogEvent.Cancelled -> status.setText(R.string.ai_test_cancelled)
                 is AiModelCatalogEvent.Failed -> {
-                    status.text = context.getString(R.string.ai_models_failed, context.getString(aiErrorMessage(event.error)))
+                    status.text = context.getString(R.string.ai_models_failed, aiSettingsError(context, event.error))
                 }
                 is AiModelCatalogEvent.Completed -> {
                     status.text = context.resources.getQuantityString(R.plurals.ai_models_found, event.models.size, event.models.size)

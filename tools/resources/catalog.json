@@ -32,6 +32,26 @@
       ]
     },
     {
+      "id": "mini-int8",
+      "version": "376001ee28f93dcb",
+      "license": "Apache-2.0",
+      "url": "https://github.com/yixunfei/zero-fish-input/releases/download/resources-376001ee28f93dcb/mini-int8-376001ee28f93dcb.zip",
+      "bytes": 12020028,
+      "sha256": "297791c128614ea4528c97f64851192c041cb0b7a0062709b973b02c3c0b2bdf",
+      "files": [
+        {
+          "name": "mini-int8/model.onnx",
+          "bytes": 14898764,
+          "sha256": "5fb4dbe2c618e8757258253e10481ea9181e8a7b9a8efea03ee70c3a5ca19446"
+        },
+        {
+          "name": "mini-int8/vocab.txt",
+          "bytes": 109540,
+          "sha256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c"
+        }
+      ]
+    },
+    {
       "id": "wanxiang-lts",
       "version": "010390b381352733",
       "license": "CC-BY-4.0",

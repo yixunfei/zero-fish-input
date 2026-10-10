@@ -268,7 +268,7 @@ class OpenAiCompatibleProvider internal constructor(
         AiEndpoint.parse(config.activeEndpoint())
         val key = config.activeKey()
         val profile = config.activeProvider() ?: throw AiProviderError.Configuration("AI provider is missing")
-        if (key.isBlank() || key.length > 512 || key.any { it.isISOControl() })
+        if (key.isBlank() || key.length > 512 || key.any { it.isWhitespace() || it.isISOControl() })
             throw AiProviderError.Configuration("AI key is invalid")
         if (request == null) return
         val model = request.model ?: config.activeModel()
@@ -288,16 +288,19 @@ class OpenAiCompatibleProvider internal constructor(
     private fun Throwable.asProviderError(): AiProviderError = when (this) {
         is AiProviderError -> this
         is java.net.SocketTimeoutException -> AiProviderError.Network("AI request timed out", reason = AiNetworkFailure.TIMEOUT)
+        is java.net.UnknownHostException -> AiProviderError.Network("AI host lookup failed", reason = AiNetworkFailure.DNS)
+        is javax.net.ssl.SSLException -> AiProviderError.Network("AI secure connection failed", reason = AiNetworkFailure.TLS)
         is java.io.IOException -> AiProviderError.Network("AI network request failed")
         else -> AiProviderError.Response("AI response could not be processed")
     }
 
     internal fun responseError(status: Int): AiProviderError = when (status) {
         400, 422 -> AiProviderError.Configuration("AI request configuration rejected")
-        401, 403 -> AiProviderError.Network("AI authentication rejected", reason = AiNetworkFailure.AUTHENTICATION)
-        404 -> AiProviderError.Network("AI model or endpoint unavailable", reason = AiNetworkFailure.MODEL_OR_ENDPOINT)
-        429 -> AiProviderError.Network("AI request rate limited", reason = AiNetworkFailure.RATE_LIMIT)
-        in 500..599 -> AiProviderError.Network("AI service unavailable", reason = AiNetworkFailure.SERVICE)
-        else -> AiProviderError.Network("AI service returned an error")
+        in 300..399 -> AiProviderError.Network("AI redirects are not supported", reason = AiNetworkFailure.REDIRECT, statusCode = status)
+        401, 403 -> AiProviderError.Network("AI authentication rejected", reason = AiNetworkFailure.AUTHENTICATION, statusCode = status)
+        404, 405 -> AiProviderError.Network("AI model or endpoint unavailable", reason = AiNetworkFailure.MODEL_OR_ENDPOINT, statusCode = status)
+        429 -> AiProviderError.Network("AI request rate limited", reason = AiNetworkFailure.RATE_LIMIT, statusCode = status)
+        in 500..599 -> AiProviderError.Network("AI service unavailable", reason = AiNetworkFailure.SERVICE, statusCode = status)
+        else -> AiProviderError.Network("AI service returned an error", statusCode = status)
     }
 }

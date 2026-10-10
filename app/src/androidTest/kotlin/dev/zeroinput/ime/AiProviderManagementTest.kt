@@ -36,7 +36,7 @@ class AiProviderManagementTest {
         val callbacks = mutableListOf<(AiProbeState) -> Unit>()
         var closes = 0
         val editor = onMain { AiProviderSettingsDialog(activity, { value }, { next, done -> value = next; done(true) },
-            { callback -> callbacks += callback; callback(AiProbeState.Running); AutoCloseable { closes++ } }) }
+            { _, callback -> callbacks += callback; callback(AiProbeState.Running); AutoCloseable { closes++ } }) }
         try {
             onMain { editor.show() }
             tap { it.text.toString() == context.getString(R.string.ai_test_model) && it is com.google.android.material.button.MaterialButton }

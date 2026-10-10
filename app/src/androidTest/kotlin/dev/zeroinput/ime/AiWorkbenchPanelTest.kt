@@ -24,6 +24,28 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AiWorkbenchPanelTest {
+    @Test fun resetClosesFullPreviewBeforeReusingThePanel() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        val reference = "public reference ".repeat(80)
+        val state = dev.zeroinput.ai.api.AiContextState(references = listOf(dev.zeroinput.ai.api.AiReference(reference)))
+        panel.renderContext(state)
+        panel.renderPage(emptyList(), false, false)
+        panel.clearPage()
+        visible(panel).filterIsInstance<TextView>().single {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_context_preview)
+        }.performClick()
+        assertTrue(visible(panel).filterIsInstance<TextView>().any { it.text == reference })
+        panel.reset()
+        panel.renderContext(state)
+        panel.renderPage(emptyList(), false, false)
+        panel.clearPage()
+        assertFalse(visible(panel).filterIsInstance<TextView>().any { it.text == reference })
+        assertTrue(visible(panel).filterIsInstance<TextView>().any {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_context_preview)
+        })
+    }
+
     @Test fun confirmedReferencesUseShortRowsUntilExplicitPreviewAndResetOnPaneExit() = onMain {
         val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
         val panel = AiWorkbenchPanelView(context)

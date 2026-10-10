@@ -72,11 +72,12 @@ that loop. Long-phrase scoring is therefore outside the proposed product workloa
 it must keep the original Rime order. A timeout alone cannot eliminate the CPU
 cost of a request already running.
 
-The full AAR is 43,596,581 bytes. Its uncompressed native runtime plus JNI is
-33,304,936 bytes for x86_64, 27,520,248 for arm64-v8a and 19,584,296 for armeabi-v7a.
-These are runtime sizes, not model sizes or compressed APK overhead. Only x86_64
-execution is measured here. A reduced runtime and incremental IME PSS would still
-need measurement for a broader production release.
+The verified upstream AAR input is 43,596,581 bytes. Its uncompressed native
+runtime plus JNI is 33,304,936 bytes for x86_64, 27,520,248 for arm64-v8a and
+19,584,296 for armeabi-v7a. Production builds replace those native libraries
+with the reviewed reduced CPU runtime; the Java classes and notices remain from
+the upstream AAR. These are runtime sizes, not model sizes or compressed APK
+overhead. Only x86_64 execution is measured here.
 
 ## Quality against current Rime
 

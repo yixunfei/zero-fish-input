@@ -1,6 +1,8 @@
 package dev.zeroinput.ime.ui
 
 import android.content.Context
+import android.text.TextPaint
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -9,6 +11,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import dev.zeroinput.engine.api.Candidate
+import dev.zeroinput.engine.api.CandidateKind
 import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.PageDirection
 
@@ -16,7 +19,15 @@ import dev.zeroinput.engine.api.PageDirection
 internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: (Int) -> Unit = {}
     var onPageChanged: (PageDirection) -> Unit = {}
-    private val layout = GridLayoutManager(context, 3)
+    private var candidateSpans: List<Int> = emptyList()
+    private val textPaint = TextPaint().apply {
+        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 16f, resources.displayMetrics)
+    }
+    private val layout = GridLayoutManager(context, 1).apply {
+        spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int = candidateSpans.getOrNull(position) ?: spanCount
+        }
+    }
     private val adapter = CandidateAdapter()
     private var lastSnapshot = EngineSnapshot.Empty
     private var revision = 0L
@@ -59,8 +70,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
-        val columns = (width / dp(112)).coerceIn(2, 4)
-        if (layout.spanCount != columns) layout.spanCount = columns
+        updatePacking(width)
         schedulePrefetch()
     }
 
@@ -99,9 +109,22 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         post(prefetch)
     }
 
+    private fun updatePacking(width: Int = scroll.width) {
+        val available = width.coerceAtLeast(1)
+        candidateSpans = CandidateRowPacking.spans(adapter.items.map { candidate ->
+            val label = if (candidate.kind == CandidateKind.RELATED_READING)
+                context.getString(R.string.related_candidate, candidate.text) else candidate.text
+            (kotlin.math.ceil(textPaint.measureText(label)).toInt() + dp(12)).coerceAtLeast(dp(48))
+        }, available)
+        layout.spanCount = available
+        layout.spanSizeLookup.invalidateSpanIndexCache()
+        layout.spanSizeLookup.invalidateSpanGroupIndexCache()
+        scroll.requestLayout()
+    }
+
     private fun prefetch(direction: PageDirection) {
         if (!isShown || scroll.height == 0 || adapter.itemCount == 0) return
-        val margin = layout.spanCount * 2
+        val margin = (scroll.width / dp(48)).coerceAtLeast(1) * 2
         val nearEdge = if (direction == PageDirection.NEXT)
             layout.findLastVisibleItemPosition() >= adapter.itemCount - 1 - margin
         else layout.findFirstVisibleItemPosition() in 0..margin
@@ -170,6 +193,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
             }, false)
             items = values
             highlighted = selected
+            updatePacking()
             changes.dispatchUpdatesTo(this)
         }
 
@@ -177,9 +201,11 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateHolder =
             CandidateHolder(CandidateItemView(parent.context).apply {
                 setSingleLine(false)
-                maxLines = 2
+                maxLines = Int.MAX_VALUE
+                ellipsize = null
+                minHeight = dp(48)
                 textSize = 16f
-                layoutParams = RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
+                layoutParams = RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
                 onSelected = { onCandidateSelected(it) }
             })
 

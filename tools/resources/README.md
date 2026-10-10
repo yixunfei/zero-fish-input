@@ -2,10 +2,10 @@
 
 Two APK contents are supported with the same application ID and runtime:
 
-- `-PresourceBundle=full` (default): all Wanxiang core tables, LTS grammar and Chinese handwriting.
-- `-PresourceBundle=lite`: all Wanxiang core tables; LTS and handwriting download on explicit user request.
+- `-PresourceBundle=full` (default): all Wanxiang core tables, LTS grammar, Mini INT8 and Chinese handwriting.
+- `-PresourceBundle=lite`: all Wanxiang core tables; LTS, Mini and handwriting download on explicit user request.
 
-The short-word Mini INT8 model and its shared ONNX runtime remain bundled in both.
+The reduced ONNX runtime remains bundled in both; only model data is optional.
 No native library, script or executable is downloaded. All installed features run offline.
 
 ## Prepare and publish
@@ -13,6 +13,7 @@ No native library, script or executable is downloaded. All installed features ru
 From the repository root:
 
 ```powershell
+python tools/resources/prepare-mini.py
 python tools/resources/prepare.py
 python tools/resources/publish.py
 ```
@@ -23,6 +24,16 @@ publishing. The publisher uses `GH_TOKEN`, `GITHUB_TOKEN` or the Git credential
 helper without displaying credentials. It uploads immutable content-versioned
 Releases, verifies the server digest and never overwrites existing assets.
 It does not commit, merge, push code or publish an APK.
+
+For first publication, `prepare-mini.py` downloads only the pinned UER source inputs,
+exports/quantizes with the reviewed host tools, and checks the resulting graph and
+vocabulary against the already-reviewed catalog. It does not read a resource Release.
+Use Python 3.11+ with CPU PyTorch 2.12.0, ONNX 1.19.0, ONNX Runtime 1.26.0,
+ml_dtypes 0.5.3 and NumPy 2.2.6 (see the publishing workflow for installation).
+Prepare dictionary and handwriting inputs with their existing scripts first.
+An altered export or ZIP must fail comparison; review the model and catalog together
+before dispatching publication. `fetch-mini.py` is only a convenience for restoring
+an already-published resource into a developer checkout, never a publication prerequisite.
 
 The application checks the catalog from this repository's `main` branch only when
 requested. Every supported resource has a fixed data contract, version, license,
@@ -49,3 +60,9 @@ Keep older releases available for previously installed versions.
 
 Resource updates require review of data compatibility, source license, attribution,
 hashes and regression results. Weekly dictionary PRs never automatically merge.
+
+- Mini INT8 and vocabulary: UER roberta-mini-wwm-chinese-cluecorpussmall,
+  revision `5e567169018f5cf84cf1d85a2b391c8d51211eda`, Apache-2.0 under the
+  existing reviewed UER licensing basis. Companion sources include attribution,
+  export scripts and numerical/quality documentation. Restore reviewed host
+  build inputs with `python tools/resources/fetch-mini.py`.

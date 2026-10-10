@@ -859,13 +859,22 @@ isolation. Validation outcomes are recorded in `ai-page-context-validation.md`.
 - Invalid current page capture releases loading/review immediately; stale captures
   cannot clear newer requests. Service unbind releases its screen-off receiver.
   Context reference labels default to bounded previews and explicit full preview
-  is closed on pane exit. Controller strings and older Android node-cache copies
+  is closed on pane exit and panel reset. Focus revalidation also recycles its
+  temporary root node. Controller strings and older Android node-cache copies
   cannot be reliably zeroed; no claim of complete heap wiping is made.
 
 Negative tests cover deletion failures and retries, old generations, draft expiry,
 malformed/changed/missing package payloads, ZIP special types and corrupt enablement,
 storage errors and delayed page delivery. Platform results and remaining physical
 acceptance are recorded in `review-round2-validation.md`.
+
+Conversation-storage failure reports only a fixed message or list error state;
+it cannot erase a valid completed answer. This does not extend result lifetime:
+editor/context/configuration/data revocation still rejects insertion and delayed
+storage callbacks, including failure notifications. Editing keeps revoking queued
+work even when the output is already empty and no redraw is required. The page
+entry consults the broker's current availability policy without reading nodes;
+restricted sessions still return before settings navigation or capture.
 
 ## Optional resources (ADR 0021)
 
@@ -881,3 +890,39 @@ readers from deletion. Handwriting generations reject results after a resource
 change; Rime switches only without live editor engines. These operations cannot
 read private input, clipboard or learned vocabulary. Network tests and corrupted
 archive/cancellation/removal tests cover the boundary.
+
+## Compressed tables and Mini downloads (ADR 0022)
+
+XZ decoder memory is bounded to 16 MiB, each output to 50 MB, and original and
+compressed hashes/lengths are verified. Concatenated streams, trailing bytes,
+interruption and malformed streams reject the unpublished generation. Original
+core table hashes are rechecked before activation; no dictionary weights change.
+Mini downloads reuse explicit GitHub HTTPS, size/hash checks and atomic storage.
+Mini and handwriting graph hashes are app-pinned to the reduced native kernel
+contract. Resource revisions reject queued rankings and release/recreate the
+scorer on its owner worker. Native code remains bundled; compressed APK libraries
+are extracted by Android, not a custom loader. Negative tests cover decoder bounds,
+corruption, cancellation, graph rejection, missing-model retry and stale results.
+
+## Review hardening (2026-10-10)
+
+- A compromised generated runtime AAR plus a matching generated verification stamp
+  cannot redefine expected hashes. Source-controlled `runtime.lock.json` pins AAR,
+  source/config and all ABI runtime/JNI hashes. Gradle checks the actual variant;
+  APK checks reject changed, missing, mismatched or unsupported runtime libraries.
+  Repository/lock or trusted toolchain compromise still requires separate review;
+  this is not a claim of arbitrary-host reproducible builds or protection from a
+  fully compromised build machine.
+- Public catalog URLs are checked on parsing and again on resolution/download.
+  HTTPS host/userinfo/fragment/port restrictions apply to GitHub asset URLs too.
+  Negative fixtures cover each disallowed address; no download whitelist is widened.
+- Index I/O/decryption failure is reported with fixed UI text, without body/label
+  access or automatic authentication. Transient failure is not cached as empty;
+  later refresh may recover. Authenticated management validates and repairs missing,
+  corrupt or mismatched index data only when needed. Body load and one-use grant
+  checks still precede repair, and the deletion generation is rechecked after index
+  I/O. Tests cover consumed grants, failed writes, transient failures, clear during
+  repair and clearing returned byte buffers. The global vault lock remains in place.
+- Replacing an AI test dialog explicitly cancels the prior request. A delayed
+  dismiss callback is bound to its own window and cannot cancel a newer request;
+  stale probe results cannot enable its replacement's retry button or update status.

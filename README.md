@@ -62,9 +62,18 @@ Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地�
 继续查看；全键盘在原拼音结果结束后给出标有“相近”的有效分组和相近读音。相关来源均已
 检索完会停止，不会用无关内容重复填满列表。
 
+展开候选按词长排列，并将每行剩余空间分配给该行候选。候选栏右侧保留展开/收起，
+辅助功能集中到左侧工具入口；撤销选段、逐字选字可在该入口中操作。横向滑动候选栏或
+滚动展开列表继续浏览，图标缩小但保持 48dp 点击区域。
+
 词库没有完整短语时，可点“逐字选字”，依次选字完成；“撤销上一段选字”用于修改已选片段。
-完整新词在允许学习的输入框中保存至加密用户词库。上屏后工具栏短暂显示“重新选词”，
+完整新词在允许学习的输入框中保存至加密用户词库。上屏后可从工具入口点击“重新选词”，
 要求光标仍在该词后且没有继续编辑；不支持组合区间的应用会拒绝重选，原文字保留。
+
+日常输入时顶栏保留工具、数字、AI 和表情入口，设置、手写等次要操作收进工具中。
+数字使用独立键盘，可直接切换符号；点 `ABC` 或固定返回按钮回到原语言，数字和符号可连续输入。
+中英文切换会先按原样上屏未完成的拼音或英文。候选刷新时保留当前浏览位置，新输入回到首候选；
+较长词句在候选栏限宽，在展开列表中完整换行显示。
 
 设置中的“防误触纠错（实验）”默认关闭，只作用于 Rime 全键盘。它提供临近键、错序、
 漏字母和重复字母的拼音候选，可能增加 CPU 开销和干扰候选，需要手动开启。横屏短窗口使用
@@ -181,15 +190,17 @@ PDF、Office 文档、自动截屏、录音及厂商专有接口不在当前支�
 点击 **引用页面** 可按需设置页面引用：功能默认关闭，需单独开启并在 Android 无障碍设置中授权。
 返回原输入框后再次点击，才读取当前页面开放的可见文字；逐条勾选并点击 **加入引用**，不会自动发送。
 密码、可编辑输入框、平台标记敏感及被遮挡的文字不纳入；自绘界面、未公开文字或部分系统限制下可能无法读取。
-读取最多 512 个节点、128 段和 32,768 字符，未选快照 60 秒后清除。单条引用最多 4,096 字符、共 16 条，
+读取最多 512 个节点、128 段和 32,768 字符，未选快照 30 秒后清除。单条引用最多 4,096 字符、共 16 条，
 所选引用与历史合计不超过 16,384 字符。页面或授权改变会撤销引用，功能不截屏、不自动翻页。
 
 **上下文** 中可逐条移除引用、勾选历史消息、选择最近历史、清空或预览将发送的内容。
+引用默认显示短预览；退出上下文或重置面板后，再看全文需要重新点击预览。
 打开保存的会话不会自动选择历史；本次连续对话的新一轮在额度允许时加入可见选择，可随时取消。
 **会话** 中可新建、打开、重命名和确认删除；改名使用键盘草稿，保存或取消后恢复原提问。
 点击 **查看回答** 返回结果，点击 **编辑** 继续输入；中文转换支持候选展开。
 会话保存默认关闭，临时会话退出后清除；开启后在本地加密保存提问和回答，原始页面引用和附件不保存。
 提问和回答本身可能包含引用的信息。设置页也可清除全部 AI 配置和会话。
+会话保存失败会提示错误，当前有效会话中已完成的回答仍可插入；会话列表加载失败时留在列表，可点击重试。
 关闭面板、切换编辑器或收紧隐私设置会丢弃未保存草稿并取消旧请求。
 
 服务商会收到主动提交的文字及所选会话上下文，可能按其政策保存这些内容。AI 不读取编辑器
@@ -216,7 +227,7 @@ PDF、Office 文档、自动截屏、录音及厂商专有接口不在当前支�
 
 | 评估方案 | 模型与词表合计 | 评分 p95 | 当前用途 |
 | --- | ---: | ---: | --- |
-| **Mini 动态 INT8** | **15.01 MB** | **7.87 ms** | 当前随包实验模型 |
+| **Mini 动态 INT8** | **15.01 MB** | **7.87 ms** | 完整包内置／轻量包按需下载 |
 | Mini FP16 权重存储 / FP32 运算 | 17.72 MB | 19.26 ms | 评估对照 |
 | Tiny FP16 权重存储 / FP32 运算 | 6.54 MB | 4.74 ms | 评估对照，未随输入法打包 |
 
@@ -444,7 +455,7 @@ cd zero-fish-input
 ./tools/bootstrap-rime.ps1
 ```
 
-v0.3.0 同时需要预先生成并校验随包的 Mini INT8 模型与词表，即使运行时排序开关关闭也需要这些
+构建时需要预先准备并校验 Mini INT8 模型与词表，即使运行时排序开关关闭也需要这些
 构建资产。请先按[模型构建说明](docs/model-integration.md#reproduce-assets-and-build)准备固定版本的
 Python 依赖，再从仓库根目录执行：
 
@@ -455,7 +466,7 @@ python -B tools/prepare-handwriting-model.py --include-quality-fixtures
 python -B tools/prepare-handwriting-stroke-model.py
 ```
 
-模型和词表不存入 Git；缺失或哈希不符会使构建失败。以上下载仅发生在开发机，应用不会运行时下载。
+模型和词表不存入 Git；缺失或哈希不符会使构建失败。以上命令在开发机执行；轻量包支持用户在词库管理中主动下载审核后的模型数据。
 手写模型准备脚本需要 `PyYAML`、`NumPy` 和 `Pillow`；固定版本、哈希与验收边界见
 [离线手写决策](docs/adr/0016-offline-chinese-handwriting.md)。
 
@@ -585,6 +596,7 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
    宽横屏的 emoji 搜索面板与键盘并排显示，搜索后切换面板再返回不能改变可用高度。
    在全屏应用中横竖屏切换，确认键盘上方的编辑内容仍可见，键盘与候选未被裁切。
 6. 验证安全剪贴板默认关闭；启用、查看、新增、删除和插入均触发系统认证，取消认证不泄露正文。
+    索引读取失败时应显示明确失败提示而非“暂无安全片段”；重新打开面板可重试，打开管理页并认证后可按需恢复列表。
    在引擎准备尚未完成时发起插入；引擎完成接管和认证成功都不得自动提交，返回后仍需确认。再分别
    验证认证期间继续输入、切换输入框/面板、修改中文配置时均不提交旧请求。Android 16 模拟器已
    自动验证真实设备凭据认证、返回后确认及取消、编辑、切换输入框、设置与删除失效场景；
@@ -693,10 +705,10 @@ QQ/Sogou and other optional downloads do not become package assets.
 ## Full and lightweight packages
 
 Use `-PresourceBundle=full` (default) for all offline resources or
-`-PresourceBundle=lite` for all Wanxiang core dictionaries with optional LTS and
+`-PresourceBundle=lite` for all Wanxiang core dictionaries with optional LTS, Mini and
 handwriting downloads. In dictionary settings, check/download, enable/disable or
 remove these public resources. Downloads are explicit; installed features run
-offline. The short-word model and shared ONNX runtime remain bundled in both.
+offline. The reduced ONNX runtime remains bundled in both.
 Both APKs share one application ID and replace each other rather than installing
 side by side.
 
@@ -707,7 +719,7 @@ Build both ARM64 Debug packages and SHA-256 receipts:
 ```
 
 For Release use `./gradlew.bat :app:clean :app:assembleRelease -PrequireRime=true -PresourceBundle=lite --no-parallel`
-(or `full`). Release artifacts remain unsigned. Source preparation is unchanged;
+(or `full`). Release artifacts remain unsigned. Build the reduced runtime first;
 see [resource publication](tools/resources/README.md) for data assets, licenses
 and the reviewed manual publication workflow.
 Recreate app packaging when changing contents: incremental APK updates can retain
@@ -715,3 +727,12 @@ removed ZIP bytes. The two-package script handles this and verifies actual APK
 contents and space usage with `tools/resources/verify-apk.py`.
 Measured sizes and verification limits are recorded in
 [optional resource validation](docs/optional-resources-validation.md).
+
+### Additional package compression
+
+Full/lite builds now compress native libraries and losslessly package all 16
+Wanxiang tables as XZ. Lite additionally downloads Mini INT8 only on explicit
+request in dictionary settings; missing Mini preserves normal candidates. Full
+still includes all optional resources. Build the reduced ONNX runtime first using
+[the pinned build recipe](tools/onnxruntime/README.md). Native extraction and XZ
+deployment trade smaller APKs for installation space and first-run work.

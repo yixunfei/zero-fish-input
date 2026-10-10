@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_dns_failed">Cannot resolve the service address. Check the hostname and device network or DNS settings.</string>
+    <string name="ai_tls_failed">Cannot establish a secure connection. Check the device clock, proxy and service certificate.</string>
+    <string name="ai_redirect_failed">The service returned a redirect. Enter its final HTTPS API address.</string>
+</resources>

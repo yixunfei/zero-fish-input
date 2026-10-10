@@ -2,13 +2,14 @@
 #include <rime_api.h>
 #include <opencc/Config.hpp>
 #include <opencc/Converter.hpp>
-bool ZeroInputLoadGrammar();
 
 #include <algorithm>
 #include <cstdint>
 #include <mutex>
 #include <string>
 #include <vector>
+
+bool ZeroInputLoadGrammar(const std::string& shared_directory);
 
 namespace {
 std::mutex engine_mutex;
@@ -162,7 +163,7 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeInitialize(
   traits.modules = modules;
   api->setup(&traits);
   api->initialize(&traits);
-  if (!ZeroInputLoadGrammar()) {
+  if (!ZeroInputLoadGrammar(shared_directory)) {
     api->finalize();
     api = nullptr;
     return JNI_FALSE;

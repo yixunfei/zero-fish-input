@@ -35,8 +35,11 @@ val prepareModelAssets = tasks.register("prepareModelAssets") {
             val actual = MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
             check(actual == hash) { "Pinned model asset checksum mismatch: ${file.name}" }
         }
-        val target = modelAssets.get().dir("mini-int8").asFile.apply { mkdirs() }
-        files.take(2).forEach { (source, _, _) -> source.copyTo(target.resolve(source.name), overwrite = true) }
+        val target = modelAssets.get().dir("mini-int8").asFile
+        if (resourceBundle.get() == "full") {
+            target.mkdirs()
+            files.take(2).forEach { (source, _, _) -> source.copyTo(target.resolve(source.name), overwrite = true) }
+        } else delete(target)
         // These are obsolete generated duplicates, not source assets.
         target.resolve("inference.onnx").delete()
         target.resolve("characters.txt").delete()
@@ -50,13 +53,22 @@ val prepareModelAssets = tasks.register("prepareModelAssets") {
     }
 }
 
-val verifyRuntimeArtifact = tasks.register("verifyRuntimeArtifact") {
+fun registerRuntimeVerification(variant: String) = tasks.register("verify${variant.replaceFirstChar(Char::uppercaseChar)}RuntimeArtifact") {
     doLast {
-        val artifact = configurations["debugRuntimeClasspath"].resolvedConfiguration.resolvedArtifacts.single {
-            it.moduleVersion.id.group == "com.microsoft.onnxruntime" && it.name == "onnxruntime-android"
-        }.file
+        val dependency = configurations["${variant}RuntimeClasspath"].resolvedConfiguration.resolvedArtifacts.single {
+            it.moduleVersion.id.group == "dev.zeroinput" && it.name == "onnxruntime-reduced"
+        }
+        val artifact = dependency.file
         val hash = MessageDigest.getInstance("SHA-256").digest(artifact.readBytes()).joinToString("") { "%02x".format(it) }
-        check(hash == "09c0780ae8d734ef2774bdf498b624729a855e6f9a8e488a0e7398a4e7396032") { "Runtime checksum mismatch" }
+        val manifest = rootProject.file("tools/onnxruntime/runtime.lock.json")
+        val metadata = groovy.json.JsonSlurper().parse(manifest) as Map<*, *>
+        check(dependency.moduleVersion.id.version == metadata["version"]) { "Unreviewed runtime version" }
+        check(hash == metadata["aar"]) { "Runtime checksum mismatch" }
+        check(metadata["revision"] == "8c546c37b43caaca1fa25db430dab94b901cf277")
+        val configHash = MessageDigest.getInstance("SHA-256")
+            .digest(rootProject.file("tools/onnxruntime/required-operators.config").readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(configHash == metadata["config"]) { "Rebuild reduced runtime for the reviewed operator set" }
     }
 }
 
@@ -74,9 +86,16 @@ android {
     lint { warningsAsErrors = true; abortOnError = true; disable += "GradleDependency" }
 }
 
-tasks.named("preBuild").configure { dependsOn(prepareModelAssets, verifyRuntimeArtifact) }
+tasks.named("preBuild").configure { dependsOn(prepareModelAssets) }
+val verifyRuntimeArtifact = tasks.register("verifyRuntimeArtifact")
+androidComponents.onVariants { variant ->
+    val verification = registerRuntimeVerification(variant.name)
+    verifyRuntimeArtifact.configure { dependsOn(verification) }
+    tasks.matching { it.name == "pre${variant.name.replaceFirstChar(Char::uppercaseChar)}Build" }
+        .configureEach { dependsOn(verification) }
+}
 dependencies {
     implementation(project(":engine-api"))
-    implementation(libs.onnxruntime.android)
+    implementation("dev.zeroinput:onnxruntime-reduced:1.26.0-zero1")
     testImplementation(libs.junit)
 }

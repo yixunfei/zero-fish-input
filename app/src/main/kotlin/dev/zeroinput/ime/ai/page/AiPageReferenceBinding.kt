@@ -9,7 +9,6 @@ import java.lang.ref.WeakReference
 /** IME-owned review state. Neither the broker nor the service retains captured text. */
 internal class AiPageReferenceBinding(
     private val broker: PageReferenceBroker,
-    private val enabled: () -> Boolean,
     private val handler: Handler,
     private val workbench: AiWorkbenchController,
     private val allowed: () -> Boolean,
@@ -34,7 +33,7 @@ internal class AiPageReferenceBinding(
 
     fun request() {
         if (!allowed()) return
-        if (!enabled() || !broker.connected) {
+        if (!broker.available) {
             openSettings()
             return
         }

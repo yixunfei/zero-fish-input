@@ -64,7 +64,17 @@ class InternalSearchInputTest {
 
     @Test fun realHandwritingFullscreenGrowsTheImeWindowAndReturnsToItsOriginalSize() = withEditor {
         openToolsIfNeeded()
-        DeviceTouch.tap { labelled(UiR.string.handwriting_open) }
+        val sizes = mutableListOf<String>()
+        var layouts = 0
+        onMain {
+            checkNotNull(panel()).addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                layouts++
+                if (sizes.size < 24) sizes += "${view.height}/${(view.parent as View).height}"
+            }
+            labelled(UiR.string.handwriting_open).performClick()
+        }
+        SystemClock.sleep(500)
+        onMain { assertTrue("Handwriting layout must settle: $layouts $sizes", layouts < 10) }
         val compact = onMain { checkNotNull(panel()).height }
         DeviceTouch.tapVisible { labelled(UiR.string.handwriting_fullscreen) }
         await { checkNotNull(panel()).height > compact * 1.5f }

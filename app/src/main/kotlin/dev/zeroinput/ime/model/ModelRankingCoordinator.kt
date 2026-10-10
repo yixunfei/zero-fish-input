@@ -11,10 +11,12 @@ class ModelRankingCoordinator(
     post: (Runnable) -> Boolean,
     private val currentController: () -> InputSessionController?,
     private val allowed: () -> Boolean,
+    private val resourceRevision: () -> Long = { 0L },
 ) : AutoCloseable {
     private val context = CommittedModelContext()
     private var lastRevision = -1L
     private var frozen = true
+    private var modelRevision = -1L
     private val ranker = AsyncCandidateRanker(createScorer, post, ::deliver)
 
     @Synchronized fun invalidate() {
@@ -35,6 +37,11 @@ class ModelRankingCoordinator(
     }
 
     @Synchronized fun refresh(surfaceAvailable: Boolean) {
+        if (modelRevision != resourceRevision()) {
+            ranker.resourcesChanged()
+            lastRevision = -1
+            modelRevision = resourceRevision()
+        }
         if (!allowed()) { invalidate(); return }
         ranker.setEnabled(true)
         if (!surfaceAvailable || frozen) return
@@ -51,7 +58,7 @@ class ModelRankingCoordinator(
     }
 
     @Synchronized private fun deliver(revision: Long, winner: Int) {
-        if (allowed() && !frozen) currentController()?.applyModelWinner(revision, winner)
+        if (allowed() && !frozen && modelRevision == resourceRevision()) currentController()?.applyModelWinner(revision, winner)
     }
 
     @Synchronized override fun close() { context.clear(); ranker.close() }

@@ -37,11 +37,16 @@ internal class EmojiAdapter(
             holder.text.setOnLongClickListener(null)
             ViewCompat.removeAccessibilityAction(holder.text, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK.id)
         }
+        val previousSize = values.size
         values = entries.toList()
         favorites = starred.toSet()
         allowPersonal = allowed
-        // Replace the backing snapshot before one atomic adapter notification.
-        notifyDataSetChanged()
+        // Every existing holder must receive the new revision, even for unchanged
+        // entries. Explicit ranges retain layout positions without a global reset.
+        val shared = minOf(previousSize, values.size)
+        if (shared > 0) notifyItemRangeChanged(0, shared)
+        if (previousSize > shared) notifyItemRangeRemoved(shared, previousSize - shared)
+        if (values.size > shared) notifyItemRangeInserted(shared, values.size - shared)
     }
 
     fun entry(position: Int): EmojiEntry? = values.getOrNull(position)

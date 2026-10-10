@@ -20,6 +20,10 @@ def prepare(lts_only=False):
     lock = json.loads((ROOT / 'tools/dictionaries/sources.lock.json').read_text())
     model = lock['model']
     packs = {
+        'mini-int8': ('Apache-2.0', [
+            ('mini-int8/model.onnx', 'build/model-evaluation/android-assets/mini-int8/model.onnx', 14898764, '5fb4dbe2c618e8757258253e10481ea9181e8a7b9a8efea03ee70c3a5ca19446'),
+            ('mini-int8/vocab.txt', 'build/model-evaluation/mini/vocab.txt', 109540, '45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c'),
+        ]),
         'wanxiang-lts': ('CC-BY-4.0', [
             ('rime/wanxiang-lts-zh-hans.gram', 'engine-rime/build/generated/publicDictionaryAssets/rime/wanxiang-lts-zh-hans.gram', model['size'], model['sha256']),
         ]),

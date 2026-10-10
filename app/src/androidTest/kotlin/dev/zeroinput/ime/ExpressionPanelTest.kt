@@ -158,6 +158,9 @@ class ExpressionPanelTest {
                 assertTrue(adapter.itemCount > 0)
                 adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
                     override fun onChanged() { notifications += adapter.itemCount }
+                    override fun onItemRangeChanged(positionStart: Int, itemCount: Int) { notifications += adapter.itemCount }
+                    override fun onItemRangeInserted(positionStart: Int, itemCount: Int) { notifications += adapter.itemCount }
+                    override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) { notifications += adapter.itemCount }
                 })
                 listOf("k", "ka", "kai", "kaix", "kaixin").forEach(panel::renderQuery)
                 assertTrue("Existing rows remain until the replacement is ready", adapter.itemCount > 0)
@@ -165,8 +168,8 @@ class ExpressionPanelTest {
             }
             await { notifications.isNotEmpty() }
             onMain {
-                assertEquals(1, notifications.size)
-                assertTrue(notifications.single() > 0)
+                assertTrue(notifications.isNotEmpty())
+                assertTrue("No observer may see an intermediate empty snapshot", notifications.all { it > 0 })
             }
         } finally { onMain { activity.finish() } }
     }
@@ -197,7 +200,8 @@ class ExpressionPanelTest {
 
     private fun measure(view: View, width: Int, height: Int?) {
         view.measure(View.MeasureSpec.makeMeasureSpec(dp(view, width), View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(dp(view, height ?: 1000), if (height == null) View.MeasureSpec.AT_MOST else View.MeasureSpec.EXACTLY))
+            View.MeasureSpec.makeMeasureSpec(dp(view, height ?: view.resources.configuration.screenHeightDp),
+                if (height == null) View.MeasureSpec.AT_MOST else View.MeasureSpec.EXACTLY))
         view.layout(0, 0, view.measuredWidth, view.measuredHeight)
     }
 

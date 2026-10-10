@@ -41,4 +41,29 @@ class DictionaryCatalogTest {
         }
         assertEquals("github.com", DictionaryDownloadTransport.validate("https://github.com/a").host)
     }
+
+    @Test fun zhwikiRejectsUnsafeAssetAddressesBeforeDisplayingRows() {
+        for (url in listOf("http://github.com/a", "https://evil.example/a",
+            "https://u:p@github.com/a", "https://github.com:8443/a", "https://github.com/a#fragment")) {
+            assertThrows(IllegalArgumentException::class.java) { catalog.parseZhwiki(release(url)) }
+        }
+        val address = "https://github.com/felixonmars/fcitx5-pinyin-zhwiki/releases/download/test/zhwiki.dict.yaml"
+        assertEquals(address, catalog.parseZhwiki(release(address)).single().address)
+    }
+
+    @Test fun directCatalogResolutionRevalidatesAllGithubSources() {
+        for (source in listOf(DictionarySource.ZHWIKI, DictionarySource.ICE, DictionarySource.WANXIANG)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                catalog.resolve(source, CatalogItem("fixture", "fixture", "https://evil.example/a"))
+            }
+        }
+    }
+
+    private fun release(address: String) = org.json.JSONObject().apply {
+        put("tag_name", "test")
+        put("assets", org.json.JSONArray().put(org.json.JSONObject().apply {
+            put("name", "zhwiki.dict.yaml")
+            put("browser_download_url", address)
+        }))
+    }.toString()
 }

@@ -16,7 +16,9 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.content.withStyledAttributes
+import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
+import androidx.core.view.isEmpty
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
 import dev.zeroinput.engine.api.DoublePinyinScheme
@@ -27,6 +29,7 @@ import dev.zeroinput.ime.core.EnterAction
 class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
     var onAction: (KeyboardAction) -> Unit = {}
     var onUserInteraction: () -> Unit = {}
+    var onPageChanged: () -> Unit = {}
     var onClearComposition: () -> Boolean = { false }
     private var backspaceRepeater: BackspaceRepeater? = null
     private var page = KeyboardPage.LETTERS
@@ -118,9 +121,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
                 MotionEvent.ACTION_UP -> {
                     if (symbolSwipeActive) {
                         val direction = event.x - symbolSwipeStartX
-                        onUserInteraction()
-                        page = if (direction < 0) KeyboardPage.MORE_SYMBOLS else KeyboardPage.SYMBOLS
-                        render()
+                        changePage(if (direction < 0) KeyboardPage.MORE_SYMBOLS else KeyboardPage.SYMBOLS)
                         symbolSwipeActive = false
                         return true
                     }
@@ -141,6 +142,21 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     override fun dispatchDraw(canvas: Canvas) { super.dispatchDraw(canvas); glide.draw(canvas) }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val available = (measuredHeight - paddingTop - paddingBottom).coerceAtLeast(0)
+        if (isEmpty() || available >= preferredHeight) return
+        // Very short windows cannot fit the preferred rows. Keep every row
+        // reachable rather than clipping the bottom keys outside the IME.
+        val rowWidth = (measuredWidth - paddingLeft - paddingRight).coerceAtLeast(0)
+        for (index in 0 until childCount) {
+            val top = available * index / childCount
+            val bottom = available * (index + 1) / childCount
+            getChildAt(index).measure(MeasureSpec.makeMeasureSpec(rowWidth, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(bottom - top, MeasureSpec.EXACTLY))
+        }
+    }
 
     private fun glideKeys(): List<GlideKey> {
         if (width <= 0 || height <= 0) return emptyList()
@@ -213,9 +229,17 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     fun showLetters() {
-        if (page == KeyboardPage.LETTERS) return
-        page = KeyboardPage.LETTERS
+        changePage(if (editor.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC)
+    }
+
+    fun showNumbers() = changePage(KeyboardPage.NUMERIC)
+
+    private fun changePage(target: KeyboardPage) {
+        if (page == target) return
+        onUserInteraction()
+        page = target
         render()
+        onPageChanged()
     }
 
     fun setKeyboardLayout(value: ChineseKeyboardLayout) {
@@ -232,14 +256,13 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         render()
     }
 
-    val canNavigateBack: Boolean get() = page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS
+    val canNavigateBack: Boolean get() = page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS ||
+        (page == KeyboardPage.NUMERIC && editor.layout == EditorLayout.TEXT)
 
     fun navigateBack(): Boolean {
         if (!canNavigateBack) return false
-        onUserInteraction()
-        page = if (page == KeyboardPage.MORE_SYMBOLS) KeyboardPage.SYMBOLS
-            else if (editor.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC
-        render()
+        changePage(if (page == KeyboardPage.MORE_SYMBOLS) KeyboardPage.SYMBOLS
+            else if (editor.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC)
         return true
     }
 
@@ -252,8 +275,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         KeyboardPage.NUMERIC -> NumericKeyboardLayout.rows(context, editor)
     }).let { if (compact) CompactKeyboardLayout.rows(it) else it }
 
-    private fun render() {
-        cancelPendingGestures()
+    private fun render(preserveCaseGestures: Boolean = false) {
+        if (!preserveCaseGestures) cancelPendingGestures()
         updateGlideLayout()
         val rows = specs()
         val updated = rows.map { row -> row.map(KeySpec::widthWeight) }
@@ -263,7 +286,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         for (row in rows) {
             for (spec in row) {
                 if (spec.action == KeyboardAction.Enter) enter = spec
-                bind(keys[index++], spec)
+                bind(keys[index++], spec, preserveCaseGestures)
             }
         }
         enterSpec = enter
@@ -372,13 +395,13 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         }
         popup = PopupWindow(row, ViewGroup.LayoutParams.WRAP_CONTENT, dp(56), true).apply {
             elevation = dp(8).toFloat()
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.WHITE))
+            setBackgroundDrawable(Color.WHITE.toDrawable())
             isOutsideTouchable = true
             showAsDropDown(anchor, 0, -anchor.height - dp(64))
         }
     }
 
-    private fun bind(view: KeyboardKeyView, original: KeySpec) {
+    private fun bind(view: KeyboardKeyView, original: KeySpec, preserveCaseGesture: Boolean = false) {
         ensureKeyColors()
         val spec = if (original.action == KeyboardAction.Enter) {
             val label = context.getString(if (composing) R.string.key_enter else enterLabel())
@@ -386,7 +409,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         } else if (original.action == KeyboardAction.Shift) {
             original.copy(label = if (shift == Shift.LOCKED) "⇪" else "⇧")
         } else original
-        view.bind(spec)
+        view.bind(spec, preserveCaseGesture)
         androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(view, 10,
             if (spec.label.length > 2) 13 else 19, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
         val selected = spec.action == KeyboardAction.Shift && shift != Shift.OFF
@@ -420,12 +443,13 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private fun handleAction(action: KeyboardAction) {
         when (action) {
             KeyboardAction.Shift -> { onUserInteraction(); shift = if (shift == Shift.OFF) Shift.ON else Shift.OFF; render() }
-            KeyboardAction.ShowLetters -> { onUserInteraction(); page = KeyboardPage.LETTERS; render() }
-            KeyboardAction.ShowSymbols -> { onUserInteraction(); page = KeyboardPage.SYMBOLS; render() }
-            KeyboardAction.ShowMoreSymbols -> { onUserInteraction(); page = KeyboardPage.MORE_SYMBOLS; render() }
+            KeyboardAction.ShowLetters -> showLetters()
+            KeyboardAction.ShowNumbers -> showNumbers()
+            KeyboardAction.ShowSymbols -> changePage(KeyboardPage.SYMBOLS)
+            KeyboardAction.ShowMoreSymbols -> changePage(KeyboardPage.MORE_SYMBOLS)
             is KeyboardAction.Text -> {
                 onAction(action)
-                if (shift == Shift.ON) { shift = Shift.OFF; render() }
+                if (shift == Shift.ON) { shift = Shift.OFF; render(preserveCaseGestures = true) }
             }
             is KeyboardAction.PairedText -> onAction(
                 if (pairedSymbolsEnabled) action else KeyboardAction.LiteralText(action.opening),

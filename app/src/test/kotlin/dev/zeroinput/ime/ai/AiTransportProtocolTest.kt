@@ -12,6 +12,20 @@ import java.net.URI
 import java.util.concurrent.*
 
 class AiTransportProtocolTest {
+    @Test fun dnsAndTlsFailuresHaveSafeDistinctReasons() {
+        for ((failure, reason) in listOf(
+            java.net.UnknownHostException("secret-host") to AiNetworkFailure.DNS,
+            javax.net.ssl.SSLHandshakeException("secret-certificate") to AiNetworkFailure.TLS,
+            java.net.SocketTimeoutException("secret-timeout") to AiNetworkFailure.TIMEOUT,
+        )) Fixture().use { f ->
+            f.exchange.failure = failure
+            val error = (f.stream().last() as AiStreamEvent.Failed).error as AiProviderError.Network
+            assertEquals(reason, error.reason)
+            assertFalse(error.toString().contains("secret"))
+            assertNull(error.cause)
+        }
+    }
+
     @Test fun quickChoiceUsesBoundProviderModelsAndItsOwnAttachmentCapabilities() {
         Fixture().use { f ->
             assertTrue(f.stream(AiRequest(null, AiAction.ASK, "fixture", model = "model-one")).last() is AiStreamEvent.Completed)
@@ -78,6 +92,8 @@ class AiTransportProtocolTest {
                 assertFalse(error.toString().contains("secret"))
                 assertEquals(0, f.exchange.reads)
                 if (status == 401) assertEquals(AiNetworkFailure.AUTHENTICATION, (error as AiProviderError.Network).reason)
+                if (status == 302) assertEquals(AiNetworkFailure.REDIRECT, (error as AiProviderError.Network).reason)
+                if (status != 200) assertEquals(status, (error as AiProviderError.Network).statusCode)
             }
         }
     }
@@ -158,6 +174,7 @@ class AiTransportProtocolTest {
         var key = ""
         var reads = 0
         var disconnected = false
+        var failure: java.io.IOException? = null
         val written = ByteArrayOutputStream()
         override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?) {
             this.method = method; this.key = key
@@ -165,7 +182,7 @@ class AiTransportProtocolTest {
             assertEquals(method == "POST", bodySize != null)
         }
         override fun timeout(timeoutMs: Int) { assertTrue(timeoutMs > 0) }
-        override fun connect() = Unit
+        override fun connect() { failure?.let { throw it } }
         override fun output() = written
         override fun status() = code
         override fun contentType() = type

@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AiReferencePreviewTest {
+    @Test fun exactlyOneHundredSixtyUnitsDoNotAddAnEllipsis() {
+        for (text in listOf("x".repeat(160), "x".repeat(158) + "😀")) {
+            assertEquals(text, referencePreview(text))
+        }
+    }
+
     @Test fun truncationPreservesSupplementaryCharactersAndSignalsOmittedContent() {
         assertEquals("x".repeat(159) + "…", referencePreview("x".repeat(159) + "😀tail"))
         assertEquals("x".repeat(158) + "😀…", referencePreview("x".repeat(158) + "😀tail"))

@@ -119,8 +119,16 @@ class PageReferenceService : AccessibilityService() {
         return try {
             all.count { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused } == 1 &&
                 all.any { it.id == id && it.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
-                    it.isFocused && it.root?.packageName?.toString() == expectedPackage }
+                    it.isFocused && rootPackage(it) == expectedPackage }
         } finally { all.forEach(::releaseWindow) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun rootPackage(window: AccessibilityWindowInfo): String? {
+        val root = if (Build.VERSION.SDK_INT >= 33) window.getRoot(0) else window.root
+        return root?.let { node ->
+            try { node.packageName?.toString() } finally { node.recycle() }
+        }
     }
 
     @Suppress("DEPRECATION")

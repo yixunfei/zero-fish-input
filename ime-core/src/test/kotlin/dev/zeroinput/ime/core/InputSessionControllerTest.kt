@@ -25,6 +25,59 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InputSessionControllerTest {
+    @Test fun `rejected explicit language commit keeps composition and language`() {
+        val connection = object : EditorConnection by RecordingConnection() {
+            override fun commitText(text: String) = false
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, RecordingPersonalization())
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        val before = controller.state.snapshot
+        controller.switchLanguage()
+        assertEquals(InputLanguage.CHINESE, controller.state.language)
+        assertEquals(before, controller.state.snapshot)
+        controller.close()
+    }
+
+    @Test fun `privacy tightening before language switch never commits old input`() {
+        val connection = RecordingConnection()
+        val store = RecordingPersonalization()
+        val controller = InputSessionController(connection, { TestEngine() }, store)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.updatePrivacy(PrivacyConfiguration(incognitoMode = true))
+        controller.switchLanguage()
+        assertTrue(connection.commits.isEmpty())
+        assertTrue(store.learned.isEmpty())
+        assertFalse(controller.state.snapshot.isComposing)
+        controller.close()
+    }
+
+    @Test fun `explicit language switch preserves raw input without learning`() {
+        val connection = RecordingConnection()
+        val store = RecordingPersonalization()
+        val controller = InputSessionController(connection, { TestEngine() }, store)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.switchLanguage()
+        assertEquals(listOf("ni"), connection.commits)
+        assertEquals(InputLanguage.ENGLISH, controller.state.language)
+        assertFalse(controller.state.snapshot.isComposing)
+        assertTrue(store.learned.isEmpty())
+        controller.close()
+    }
+
+    @Test fun `configuration language change still cancels composition`() {
+        val connection = RecordingConnection()
+        val controller = InputSessionController(connection, { TestEngine() }, RecordingPersonalization())
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        controller.setLanguage(InputLanguage.ENGLISH)
+        assertTrue(connection.commits.isEmpty())
+        assertFalse(controller.state.snapshot.isComposing)
+        controller.close()
+    }
+
     @Test fun `kaomoji follows rime candidates and stale custom selection cannot commit`() {
         val connection = RecordingConnection()
         val store = RecordingPersonalization()

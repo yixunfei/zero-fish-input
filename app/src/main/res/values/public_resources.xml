@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="public_resource_mini">Mini 短词排序</string>
     <string name="public_resource_title">可选增强资源</string>
     <string name="public_resource_lts">万象语言模型</string>
     <string name="public_resource_handwriting">中文手写识别</string>

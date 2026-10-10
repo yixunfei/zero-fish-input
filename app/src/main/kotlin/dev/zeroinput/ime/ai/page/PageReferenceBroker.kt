@@ -20,6 +20,7 @@ internal class PageReferenceBroker(
     private val generation = AtomicLong()
     private val observers = CopyOnWriteArrayList<() -> Unit>()
     val connected: Boolean get() = source != null
+    val available: Boolean get() = connected && enabled()
 
     fun attach(value: PageTextSource): AutoCloseable {
         source = value

@@ -3,9 +3,11 @@ package dev.zeroinput.ime.ui
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Rect
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
@@ -14,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat
 
 /** Hosts every input panel inside one movable, bounded IME surface. */
 class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGroup(context) {
+    constructor(context: Context) : this(context, ZeroInputView(context))
     var onPlacementChanged: (KeyboardPlacement) -> Unit = {}
     var onInteraction: () -> Unit = {}
     var onBoundsChanged: () -> Unit = {}
@@ -78,8 +81,10 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         }
         ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            safeInsets.set(bars.left, bars.top, bars.right, bars.bottom)
-            requestLayout()
+            if (safeInsets != Rect(bars.left, bars.top, bars.right, bars.bottom)) {
+                safeInsets.set(bars.left, bars.top, bars.right, bars.bottom)
+                requestLayout()
+            }
             insets
         }
         render()
@@ -164,6 +169,13 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         val bottom = if (fullWindowPanel) safeInsets.bottom else 0
         val availableWidth = (width - safeInsets.left - safeInsets.right).coerceAtLeast(0)
         val availableHeight = (offered - top - bottom).coerceAtLeast(0)
+        // A WRAP_CONTENT IME can be remeasured against its previous collapsed
+        // height. Use window bounds for responsive policy, not that feedback.
+        val windowHeight = if (!isAttachedToWindow) offered
+            else if (Build.VERSION.SDK_INT >= 30) context.getSystemService(WindowManager::class.java)
+                .currentWindowMetrics.bounds.height()
+            else dp(resources.configuration.screenHeightDp)
+        keyboard.setHostViewportHeight((windowHeight - safeInsets.top - safeInsets.bottom).coerceAtLeast(0))
         val panelWidth = if (minimized) minOf(dp(56), availableWidth)
             else if (keyboard.isPanelExpanded) availableWidth
             else KeyboardPlacementGeometry.width(placement, availableWidth, dp(240))

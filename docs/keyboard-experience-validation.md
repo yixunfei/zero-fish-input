@@ -1,5 +1,19 @@
 # Keyboard experience validation
 
+## Candidate density update (2026-10-09)
+
+Expanded candidates use measured word widths with a 48dp minimum touch width and
+distribute each row's remaining space. Strip padding is 6dp per side; shared panel
+icons use 14dp padding in their existing 48dp targets. Composition secondary
+actions live in the left tools entry; the right overflow menu is removed.
+
+Verified `:ime-ui:testDebugUnitTest`, `:app:assembleDebug`, `privacyCheck`, and
+`:app:lintDebug`. The API 36 emulator passed 11 tests in `CandidateDensityTest`,
+`PanelInteractionRegressionTest`, and `KeyboardToolbarRegressionTest`, including
+240/360/720dp light/dark packing, continuous prefetch/anchor preservation, and
+tool/AI navigation. Public fixture renders are under `build/candidate-density`.
+Physical-device rotation and Android 8 rendering remain manual checks.
+
 Date: 2026-09-07. Baseline: `aab7366`.
 
 ## Layout and behavior

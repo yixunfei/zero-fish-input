@@ -4,7 +4,7 @@
     <string name="clear_secure_clipboard_message">将永久删除 ZeroInput 安全剪贴板中的全部条目，且无法恢复。不会清理系统剪贴板。关闭安全剪贴板开关只停用功能，不删除内容。</string>
     <string name="secure_clipboard_cleared">安全剪贴板已清空</string>
     <string name="experimental_model_ranking">短词智能排序（实验）</string>
-    <string name="experimental_model_help">根据本次输入的中文调整两字词顺序，全程离线。可能误改首选词，也会增加内存和耗电；默认关闭，隐私模式下停用。</string>
+    <string name="experimental_model_help">根据本次输入的中文调整两字词顺序，全程离线。可能误改首选词，也会增加内存和耗电；默认关闭，隐私模式下停用。 需先在词库管理中安装并启用 Mini 资源；未安装时使用原候选排序。</string>
     <string name="experimental_typo_correction">防误触纠错（实验）</string>
     <string name="experimental_typo_help">仅用于26键，可能增加候选干扰和耗电。</string>
     <string name="clipboard_guard_title">系统剪贴板防护</string>
@@ -242,8 +242,6 @@
     <string name="ai_model_audio">%1$s 支持音频</string>
     <string name="ai_provider_save_failed">无法保存，请检查 HTTPS 地址、模型及密钥后重试。</string>
     <string name="ai_provider_invalid">请输入名称和 1 至 32 个模型</string>
-    <string name="ai_support_images">当前模型支持图片</string>
-    <string name="ai_support_audio">当前模型支持音频</string>
     <string name="ai_endpoint_hint">HTTPS API 地址（例如 https://example.com/v1）</string>
     <string name="ai_key_hint">API key（留空保留现有值）</string>
     <string name="ai_save_conversations">保存 AI 会话</string>

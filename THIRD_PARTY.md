@@ -161,3 +161,22 @@ and sources are unchanged. Release companion archives include relevant notices,
 Tegaki source archives and rebuild scripts. Native ONNX/Octagram libraries remain
 inside both APK variants; no runtime library is downloaded. Luna/essay source files
 remain development references; production glide readings derive from Wanxiang.
+
+## Compressed data and reduced runtime (2026-10-09)
+
+XZ for Java 1.10 (`org.tukaani:xz:1.10`) is 0BSD, with license in
+`LICENSES/xz-java-0BSD.txt`. JAR SHA-256:
+`95c63c1a55b22dd6453890a419cc1a640f790bbf7d8ae82db1e30aefefb08888`.
+The 168,569-byte host artifact supplies only bounded offline XZ decoding; it adds
+no network, native loader or background component. The Android platform does not
+provide an XZ decoder, so this small dependency enables lossless table compression.
+
+ONNX Runtime remains 1.26.0/MIT at commit
+`8c546c37b43caaca1fa25db430dab94b901cf277`, now built with the reviewed Mini and
+handwriting CPU operator set. Native dependency archives have SHA-256 locks in
+`tools/onnxruntime/dependencies.lock.json`. Existing runtime/third-party notices
+remain bundled; Java classes use the same hash-pinned upstream AAR; JNI is rebuilt from the
+same source revision for CPU-only operation. Build and
+redistribution instructions are in `tools/onnxruntime/README.md`. Mini derivative
+and vocabulary are Apache-2.0 under the already reviewed UER licensing basis and
+are now available as explicit downloads in lite; full retains them offline.

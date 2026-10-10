@@ -206,6 +206,12 @@ class InputSessionController(
     }
 
     fun switchLanguage() {
+        if (state.snapshot.isComposing) {
+            // Explicit switching preserves the user's unfinished input without learning.
+            // commitText replaces the composing span; a rejected commit keeps this session.
+            val raw = fallbackComposition(state.snapshot)
+            if (raw.isNotEmpty() && !connection.commitText(raw)) return
+        }
         setLanguage(if (language == InputLanguage.CHINESE) InputLanguage.ENGLISH else InputLanguage.CHINESE)
     }
 

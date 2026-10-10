@@ -34,6 +34,15 @@ class OptionalResourcePlatformTest {
                     val values = recognizer.recognize(listOf(floatArrayOf(0.15f, 0.5f, 0.85f, 0.5f)))
                     assertTrue(values.isNotEmpty())
                 }
+                dev.zeroinput.model.RobertaMiniScorer(graph.publicResources).use { scorer ->
+                    val scores = scorer.score("我买了一件新".toCharArray(),
+                        arrayOf("衣服".toCharArray(), "依附".toCharArray())) { false }
+                    assertArrayEquals(floatArrayOf(-2.2595852f, -14.597835f), requireNotNull(scores), .025f)
+                    graph.publicResources.remove("mini-int8")
+                    assertNull(graph.publicResources.acquire("mini-int8"))
+                    assertNotNull(scorer.score("我买了一件新".toCharArray(),
+                        arrayOf("衣服".toCharArray(), "依附".toCharArray())) { false })
+                }
             } finally {
                 packs.forEach { graph.publicResources.remove(it.id) }
                 graph.rime.close()
@@ -42,6 +51,10 @@ class OptionalResourcePlatformTest {
             assertTrue(graph.rime.runtime.isReady)
             assertChineseInput(graph)
             assertNull(graph.publicResources.acquire("handwriting"))
+            assertNull(graph.publicResources.acquire("mini-int8"))
+            assertThrows(IllegalStateException::class.java) {
+                dev.zeroinput.model.RobertaMiniScorer(graph.publicResources)
+            }
         }.get(600, TimeUnit.SECONDS)
     }
 

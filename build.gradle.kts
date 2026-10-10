@@ -25,7 +25,8 @@ fun systemClipboardViolation(path: String, text: String): String? {
 }
 
 fun networkViolation(path: String, text: String): String? {
-    val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http|http\b)|java\.nio\.channels\.SocketChannel|javax\.net\.|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|Class\.forName\s*\(\s*[\"']java\.net\.)""")
+    // These TLS exception values contain no I/O capability; transports remain restricted in every source set.
+    val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http|http\b)|java\.nio\.channels\.SocketChannel|javax\.net\.(?!ssl\.SSL(?:Exception|HandshakeException)\b)|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|Class\.forName\s*\(\s*[\"']java\.net\.)""")
     val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
     val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
     if (network.containsMatchIn(text) && path != provider && path != dictionaries) return "Runtime network transport is restricted to approved adapters"
@@ -108,6 +109,13 @@ tasks.register("testPrivacyBoundary") {
             check(networkViolation("other/$dictionaries", source) != null)
         }
         check(networkViolation(business, "java.net.URI") == null)
+        for (path in listOf(business, "app/src/test/kotlin/TransportTest.kt")) {
+            check(networkViolation(path, "javax.net.ssl.SSLHandshakeException") == null)
+            check(networkViolation(path, "javax.net.ssl.SSLException") == null)
+            check(networkViolation(path, "javax.net.ssl.SSLSocketFactory") != null)
+            check(networkViolation(path, "javax.net.ssl.SSLContext") != null)
+            check(networkViolation(path, "java.net.URL") != null)
+        }
         check(networkViolation(business, "android.permission.INTERNET") != null)
         val page = "app/src/main/kotlin/dev/zeroinput/ime/ai/page/PageReferenceService.kt"
         for (capability in listOf("android.accessibilityservice.AccessibilityService", "rootInActiveWindow",

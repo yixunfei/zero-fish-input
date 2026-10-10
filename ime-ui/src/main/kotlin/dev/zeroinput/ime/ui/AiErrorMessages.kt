@@ -10,6 +10,9 @@ fun aiErrorMessage(error: AiProviderError): Int = when (error) {
     is AiProviderError.Response -> R.string.ai_response_invalid
     is AiProviderError.Network -> when (error.reason) {
         AiNetworkFailure.CONNECTION -> R.string.ai_connection_failed
+        AiNetworkFailure.DNS -> R.string.ai_dns_failed
+        AiNetworkFailure.TLS -> R.string.ai_tls_failed
+        AiNetworkFailure.REDIRECT -> R.string.ai_redirect_failed
         AiNetworkFailure.TIMEOUT -> R.string.ai_timeout
         AiNetworkFailure.AUTHENTICATION -> R.string.ai_authentication_failed
         AiNetworkFailure.MODEL_OR_ENDPOINT -> R.string.ai_model_unavailable

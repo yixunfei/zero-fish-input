@@ -24,6 +24,7 @@ class SecureClipboardPanelView @JvmOverloads constructor(
     var onPasteCancelled: () -> Unit = {}
     private var pasteConfirmation = false
     private var enabled = false
+    private var failed = false
     private var items = emptyList<SecureClipboardItemUi>()
     private val copySelection = MaterialButton(context).apply {
         setText(R.string.secure_clipboard_copy_selection)
@@ -45,9 +46,10 @@ class SecureClipboardPanelView @JvmOverloads constructor(
         addView(list)
     }
 
-    fun render(enabled: Boolean, items: List<SecureClipboardItemUi>) {
+    fun render(enabled: Boolean, items: List<SecureClipboardItemUi>, failed: Boolean = false) {
         this.enabled = enabled
         this.items = items
+        this.failed = failed
         list.removeAllViews()
         if (pasteConfirmation) {
             addStatus(context.getString(R.string.secure_clipboard_confirm_hint))
@@ -58,6 +60,7 @@ class SecureClipboardPanelView @JvmOverloads constructor(
         list.addView(copySelection)
         when {
             !enabled -> addStatus(context.getString(R.string.secure_clipboard_disabled))
+            failed -> addStatus(context.getString(R.string.secure_clipboard_load_failed))
             items.isEmpty() -> addStatus(context.getString(R.string.secure_clipboard_empty))
             else -> items.forEach(::addItem)
         }
@@ -69,7 +72,7 @@ class SecureClipboardPanelView @JvmOverloads constructor(
     fun renderPasteConfirmation(visible: Boolean) {
         if (pasteConfirmation == visible) return
         pasteConfirmation = visible
-        render(enabled, items)
+        render(enabled, items, failed)
     }
 
     private fun addCommand(label: Int, action: () -> Unit) {

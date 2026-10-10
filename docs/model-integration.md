@@ -44,7 +44,7 @@ establish population accuracy or parity with mainstream keyboards.
 
 Use a local Python environment with PyTorch 2.12.0+cpu, ONNX Runtime 1.26.0,
 ONNX 1.19.0, ml_dtypes 0.5.3 and NumPy. Developer downloads occur only on the host;
-the Android application never downloads a model or code. From the repository root:
+the Android application explicitly downloads reviewed model data in lite, never code. From the repository root:
 
 ```powershell
 python -B tools/evaluate-small-model.py --model mini --download
@@ -54,22 +54,30 @@ python -B tools/export-model-benchmark.py --model mini --int8
 
 The build deliberately fails if pinned assets are absent or differ. The graph is
 read from `build/model-evaluation/android-assets/mini-int8/model.onnx`, and the
-vocabulary from `build/model-evaluation/mini/vocab.txt`. Only those two files are
-staged into `mini-int8/` in the APK. Generated graphs and host dependency caches
-remain untracked. Exporter/library changes require an independent numerical and
+vocabulary from `build/model-evaluation/mini/vocab.txt`. Only full builds stage those two files into `mini-int8/`; lite uses explicit resource downloads. Build the reduced runtime with
+`tools/onnxruntime/build.py` before invoking Gradle (see that directory's README).
+The reduced AAR is intentionally generated under ignored `build/onnx-maven`; a
+clean checkout must run this host build before any Gradle task that resolves
+`model-scoring`. Generated graphs, the AAR and host dependency caches remain
+untracked. Exporter/library changes require an independent numerical and
 quality review before changing hashes, not merely an updated checksum.
 
 | Asset | Bytes | SHA-256 |
 | --- | ---: | --- |
 | Mini INT8 | 14,898,764 | `5fb4dbe2c618e8757258253e10481ea9181e8a7b9a8efea03ee70c3a5ca19446` |
 | Vocabulary | 109,540 | `45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c` |
-| ONNX Runtime Android 1.26.0 AAR | 43,596,581 | `09c0780ae8d734ef2774bdf498b624729a855e6f9a8e488a0e7398a4e7396032` |
+| Upstream 1.26.0 AAR (verified Java/classes and notices input) | 43,596,581 | `09c0780ae8d734ef2774bdf498b624729a855e6f9a8e488a0e7398a4e7396032` |
 
 Model plus vocabulary is 15,008,304 bytes, separate from runtime/native/APK and
-resident-memory costs. Runtime initialization validates both assets, then copies
-only the public graph atomically to `noBackupFilesDir/public-model`. Cached graph
-corruption triggers replacement from verified APK assets. No input or optimized
+resident-memory costs. Managed runtime initialization acquires verified immutable public-resource leases
+for both files. Bundled and downloaded copies share content-addressed blobs. No input or optimized
 model containing input-specific state is stored there.
+
+The upstream AAR is not shipped as-is: its runtime and JNI libraries are replaced
+by the reviewed reduced CPU libraries. Variant-specific Gradle tasks check the AAR
+against `tools/onnxruntime/runtime.lock.json`; the APK verifier checks both native
+libraries for each packaged ABI against that same source-controlled lock. Generated
+`verification.json` is not trusted as an expected-hash source.
 
 Run `testDebugUnitTest :engine-api:test :engine-english:test :engine-dictionary:test`,
 `privacyCheck`, `:app:lintDebug`, `:app:assembleDebug`, and

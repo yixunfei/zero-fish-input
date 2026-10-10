@@ -133,6 +133,7 @@ class InputPipelineTest {
             verifyBurst(panel, activity, "nihao".map(Char::toString), "rime-full", KeyboardAction.Space, "你好")
             verifyBurst(panel, activity, "da".map(Char::toString), "rime-raw", KeyboardAction.Enter, "da")
             verifyReconversion(panel, activity)
+            verifyLanguageAndNumberHandoff(panel, activity)
             onMain { panel.onLayoutSwitchRequested() }
             awaitReady(panel)
             instrumentation.waitForIdleSync()
@@ -190,8 +191,9 @@ class InputPipelineTest {
             val label = panel.context.getString(dev.zeroinput.ime.ui.R.string.reconvert_last_word)
             val action = descendants(panel).firstOrNull { it.isShown && it.contentDescription == label }
             if (action != null) action.performClick() else {
-                val more = panel.context.getString(dev.zeroinput.ime.ui.R.string.candidate_more_actions)
+                val more = panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_tools)
                 descendants(panel).first { it.isShown && it.contentDescription == more }.performClick()
+                descendants(panel).first { it.isShown && it.contentDescription == label }.performClick()
             }
         }
         instrumentation.waitForIdleSync()
@@ -217,6 +219,45 @@ class InputPipelineTest {
         }
         instrumentation.waitForIdleSync()
         onMain { assertTrue(activity.editor.text.toString() == expected) }
+    }
+
+    private fun verifyLanguageAndNumberHandoff(panel: ZeroInputView, activity: InputFixtureActivity) {
+        var prefix = ""
+        onMain {
+            if (panel.canNavigateBack) panel.navigateBack()
+            prefix = activity.editor.text.toString()
+            "nihao".forEach { sendKey(panel, it.toString()) }
+            sendKey(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.key_language))
+        }
+        instrumentation.waitForIdleSync()
+        onMain {
+            org.junit.Assert.assertEquals(prefix + "nihao", activity.editor.text.toString())
+            org.junit.Assert.assertEquals(-1, android.view.inputmethod.BaseInputConnection.getComposingSpanStart(activity.editor.text))
+            "hel".forEach { sendKey(panel, it.toString()) }
+            sendKey(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.key_language))
+        }
+        awaitReady(panel)
+        instrumentation.waitForIdleSync()
+        onMain {
+            org.junit.Assert.assertEquals(prefix + "nihaohel", activity.editor.text.toString())
+            org.junit.Assert.assertEquals(-1, android.view.inputmethod.BaseInputConnection.getComposingSpanStart(activity.editor.text))
+            "nihao".forEach { sendKey(panel, it.toString()) }
+            sendKey(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.key_symbols))
+        }
+        instrumentation.waitForIdleSync()
+        onMain {
+            descendants(panel).first { it.isShown && it.contentDescription == panel.context.getString(dev.zeroinput.ime.ui.R.string.key_numbers) }
+                .performClick()
+        }
+        instrumentation.waitForIdleSync()
+        onMain { sendKey(panel, "1"); sendKey(panel, "2"); assertTrue(panel.navigateBack()) }
+        instrumentation.waitForIdleSync()
+        onMain {
+            org.junit.Assert.assertEquals(prefix + "nihaohel你好12", activity.editor.text.toString())
+            org.junit.Assert.assertEquals(-1, android.view.inputmethod.BaseInputConnection.getComposingSpanStart(activity.editor.text))
+            assertTrue(descendants(panel).any { it.isShown && it is android.widget.TextView &&
+                it.text.toString() == "中" && it.contentDescription == panel.context.getString(dev.zeroinput.ime.ui.R.string.key_language) })
+        }
     }
 
     private fun verifyBurst(panel: ZeroInputView, activity: InputFixtureActivity, labels: List<String>,

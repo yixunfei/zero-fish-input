@@ -23,7 +23,7 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
     }
 
     fun resolve(source: DictionarySource, item: CatalogItem): String {
-        if (source != DictionarySource.QQ && source != DictionarySource.SOGOU) return item.address
+        if (source != DictionarySource.QQ && source != DictionarySource.SOGOU) return validatedAddress(item.address)
         val html = read(item.address)
         val document = Jsoup.parse(html, item.address)
         val link = document.select("a[href]").firstOrNull {
@@ -83,17 +83,21 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
             val path = it.getString("path")
             require(path.matches(Regex("[a-zA-Z0-9_./-]+")) && !path.contains(".."))
             CatalogItem(path.substringAfterLast('/').removeSuffix(".dict.yaml"), path.substringAfterLast('/'),
-                "https://raw.githubusercontent.com/$repo/$commit/$path", version = commit)
+                validatedAddress("https://raw.githubusercontent.com/$repo/$commit/$path"), version = commit)
         }
     }
 
     private fun zhwiki(): List<CatalogItem> {
-        val release = JSONObject(read("https://api.github.com/repos/felixonmars/fcitx5-pinyin-zhwiki/releases/latest"))
+        return parseZhwiki(read("https://api.github.com/repos/felixonmars/fcitx5-pinyin-zhwiki/releases/latest"))
+    }
+
+    internal fun parseZhwiki(json: String): List<CatalogItem> {
+        val release = JSONObject(json)
         val assets: JSONArray = release.getJSONArray("assets")
         return (0 until assets.length()).map { assets.getJSONObject(it) }
             .filter { it.getString("name").endsWith(".dict.yaml") }.map {
                 CatalogItem(it.getString("name").removeSuffix(".dict.yaml"), it.getString("name"),
-                    it.getString("browser_download_url"), version = release.getString("tag_name"))
+                    validatedAddress(it.getString("browser_download_url")), version = release.getString("tag_name"))
             }
     }
 
@@ -108,6 +112,8 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
 
     private fun secureResolve(base: String, href: String): String {
         val resolved = URI(base).resolve(href).toASCIIString()
-        return DictionaryDownloadTransport.validate(resolved).toASCIIString()
+        return validatedAddress(resolved)
     }
+
+    private fun validatedAddress(address: String): String = DictionaryDownloadTransport.validate(address).toASCIIString()
 }

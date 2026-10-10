@@ -1,0 +1,86 @@
+package dev.zeroinput.ime
+
+import android.content.Intent
+import android.os.SystemClock
+import android.view.View
+import android.view.ViewGroup
+import android.view.inspector.WindowInspector
+import android.widget.EditText
+import android.widget.TextView
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
+import androidx.test.platform.app.InstrumentationRegistry
+import dev.zeroinput.ime.settings.AiProviderSettingsDialog
+import dev.zeroinput.ime.settings.MainActivity
+import dev.zeroinput.userdata.AiConfiguration
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = 29)
+class AiProviderSetupTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+    @Test fun invalidDraftNeverReachesPersistenceOrRevokesWorkingNetworkSettings() = withEditor { editor, saved ->
+        onMain { editor.show() }
+        tap(R.string.ai_add_provider)
+        onMain {
+            field(R.string.ai_provider_name).setText("Public fixture")
+            field(R.string.ai_endpoint_hint).setText("http://invalid.example/v1")
+            field(R.string.ai_key_hint).setText("public-key")
+            field(R.string.ai_models_hint).setText("model")
+        }
+        tap(R.string.save)
+        onMain {
+            assertEquals("Invalid editor input must not reach storage", 0, saved.size)
+            assertNotNull(field(R.string.ai_endpoint_hint).error)
+        }
+    }
+
+    @Test fun blankCredentialMustBeCorrectedBeforeSavingANewProvider() = withEditor { editor, saved ->
+        onMain { editor.show() }
+        tap(R.string.ai_add_provider)
+        onMain {
+            field(R.string.ai_provider_name).setText("Public fixture")
+            field(R.string.ai_models_hint).setText("model")
+        }
+        tap(R.string.save)
+        onMain {
+            assertTrue("A provider with no usable credential must not be saved", saved.isEmpty())
+            assertNotNull(field(R.string.ai_key_hint).error)
+        }
+    }
+
+    private fun withEditor(test: (AiProviderSettingsDialog, List<AiConfiguration>) -> Unit) {
+        val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+        val saved = mutableListOf<AiConfiguration>()
+        val editor = onMain { AiProviderSettingsDialog(activity,
+            { AiConfiguration(enabled = true, networkAllowed = true) },
+            { value, done -> saved += value; done(false) }) }
+        try { test(editor, saved) } finally { onMain { editor.dismiss(); activity.finish() } }
+    }
+
+    private fun field(id: Int) = texts().filterIsInstance<EditText>().single { it.hint == it.context.getString(id) }
+    private fun texts() = WindowInspector.getGlobalWindowViews().last().let(::views).filterIsInstance<TextView>()
+    private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup)
+        (0 until root.childCount).flatMap { views(root.getChildAt(it)) } else emptyList()
+    private fun tap(id: Int) {
+        val end = SystemClock.uptimeMillis() + 5_000
+        while (SystemClock.uptimeMillis() < end) {
+            if (onMain { texts().firstOrNull { it.isShown && it.isEnabled && it.text == it.context.getString(id) }
+                    ?.let { it.performClick(); true } == true }) {
+                instrumentation.waitForIdleSync()
+                return
+            }
+            SystemClock.sleep(50)
+        }
+        fail("Setup action unavailable")
+    }
+    private fun <T> onMain(action: () -> T): T {
+        var result: Result<T>? = null
+        instrumentation.runOnMainSync { result = runCatching(action) }
+        return checkNotNull(result).getOrThrow()
+    }
+}

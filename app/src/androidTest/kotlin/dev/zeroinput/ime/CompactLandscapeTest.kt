@@ -33,7 +33,7 @@ class CompactLandscapeTest {
             panel.measure(View.MeasureSpec.makeMeasureSpec(dp(panel, width), View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(dp(panel, height), View.MeasureSpec.AT_MOST))
             panel.layout(0, 0, panel.measuredWidth, panel.measuredHeight)
-            assertTrue("Landscape must reserve editor space", panel.height <= dp(panel, height - 48))
+            assertTrue("Landscape $width x $height must reserve editor space: ${panel.height}/${dp(panel, height - 48)}", panel.height <= dp(panel, height - 48))
             val keyboard = descendants(panel).filterIsInstance<KeyboardPanel>().single()
             for (key in descendants(keyboard).filter { it.isShown }) {
                 val bounds = Rect(0, 0, key.width, key.height)

@@ -116,6 +116,23 @@ class AiRepositoryTest {
     }
 
     @Test
+    fun unusableCredentialsCannotReplaceWorkingConfiguration() {
+        val store = MemoryStore()
+        val repository = AiConfigurationRepository(store)
+        val original = AiConfiguration(enabled = true, networkAllowed = true,
+            providers = listOf(providerProfile()), selectedProviderId = "fixture")
+        repository.write(original)
+        val bytes = checkNotNull(store.bytes).copyOf()
+
+        for (key in listOf("", " ", "public key", " public-key", "public-key\t", "public\u00a0key")) {
+            val invalid = original.copy(providers = listOf(providerProfile(apiKey = key)))
+            assertThrows(IllegalArgumentException::class.java) { repository.write(invalid) }
+            assertEquals(original, repository.read())
+            assertArrayEquals(bytes, store.bytes)
+        }
+    }
+
+    @Test
     fun malformedConfigurationIsRejectedWithoutReplacingTheCiphertext() {
         val store = MemoryStore()
         store.bytes = "{\"format\":1,\"apiKey\":\"unterminated}".toByteArray()

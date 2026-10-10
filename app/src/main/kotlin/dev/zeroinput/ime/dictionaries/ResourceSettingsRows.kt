@@ -91,6 +91,7 @@ internal class ResourceSettingsRows(
 
     private fun title(id: String): String = context.getString(when (id) {
         "wanxiang-lts" -> R.string.public_resource_lts
+        "mini-int8" -> R.string.public_resource_mini
         else -> R.string.public_resource_handwriting
     })
 }

@@ -4,29 +4,32 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtLoggingLevel
 import ai.onnxruntime.OrtSession
-import android.content.Context
 import android.os.Looper
 import dev.zeroinput.engine.api.CandidateScorer
 import java.nio.LongBuffer
 
 /** Offline Mini INT8 implementation. Construction, scoring and close belong to one worker. */
-class RobertaMiniScorer(context: Context) : CandidateScorer {
+class RobertaMiniScorer(resources: dev.zeroinput.engine.api.PublicResourceSource) : CandidateScorer {
+    private val resourceLease: dev.zeroinput.engine.api.PublicResourceLease
     private val environment: OrtEnvironment
     private val tokenizer: MaskedWordTokenizer
     private val session: OrtSession
 
     init {
         check(Looper.myLooper() != Looper.getMainLooper()) { "Model requires worker thread" }
-        val model = MiniModelAssets.prepare(context)
-        tokenizer = MiniModelAssets.vocabulary(context)
-        environment = OrtEnvironment.getEnvironment(OrtLoggingLevel.ORT_LOGGING_LEVEL_FATAL)
-        session = OrtSession.SessionOptions().use { options ->
-            options.setIntraOpNumThreads(1)
-            options.setInterOpNumThreads(1)
-            options.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
-            options.setSessionLogLevel(OrtLoggingLevel.ORT_LOGGING_LEVEL_FATAL)
-            environment.createSession(model.absolutePath, options)
-        }
+        resourceLease = checkNotNull(resources.acquire("mini-int8")) { "Mini resource not installed" }
+        try {
+            val model = MiniModelAssets.prepare(resourceLease.files)
+            tokenizer = MiniModelAssets.vocabulary(resourceLease.files)
+            environment = OrtEnvironment.getEnvironment(OrtLoggingLevel.ORT_LOGGING_LEVEL_FATAL)
+            session = OrtSession.SessionOptions().use { options ->
+                options.setIntraOpNumThreads(1)
+                options.setInterOpNumThreads(1)
+                options.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
+                options.setSessionLogLevel(OrtLoggingLevel.ORT_LOGGING_LEVEL_FATAL)
+                environment.createSession(model.absolutePath, options)
+            }
+        } catch (error: Throwable) { resourceLease.close(); throw error }
     }
 
     override fun score(context: CharArray, words: Array<CharArray>, cancelled: () -> Boolean): FloatArray? {
@@ -52,5 +55,5 @@ class RobertaMiniScorer(context: Context) : CandidateScorer {
         }
     }
 
-    override fun close() { session.close() }
+    override fun close() { try { session.close() } finally { resourceLease.close() } }
 }

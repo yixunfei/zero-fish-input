@@ -10,7 +10,7 @@ import kotlin.math.abs
 internal enum class SwipeAxis { HORIZONTAL, VERTICAL }
 
 /** Owns a single-axis drag only after cancelling its child's pending click. */
-internal class HorizontalSwipeFrameLayout(
+internal class HorizontalSwipeFrameLayout @JvmOverloads constructor(
     context: Context,
     private val axis: SwipeAxis = SwipeAxis.HORIZONTAL,
 ) : FrameLayout(context) {

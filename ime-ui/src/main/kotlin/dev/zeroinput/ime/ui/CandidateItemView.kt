@@ -21,6 +21,7 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     private var touchRevision: Long? = null
     private var holding = false
     private val highlightColor: Int
+    private var boundCandidate: Candidate? = null
 
     init {
         setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
@@ -34,7 +35,7 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
         textSize = 18f
         letterSpacing = 0f
         minWidth = dp(48)
-        setPadding(dp(10), 0, dp(10), 0)
+        setPadding(dp(6), 0, dp(6), 0)
         setSingleLine()
         ellipsize = TextUtils.TruncateAt.END
         isClickable = true
@@ -49,6 +50,8 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     }
 
     fun bind(candidate: Candidate, visibleIndex: Int, highlighted: Boolean) {
+        if (boundCandidate == candidate && index == visibleIndex && isSelected == highlighted) return
+        boundCandidate = candidate
         if (identity != candidate.id || identityText != candidate.text || index != visibleIndex) bindingRevision++
         identity = candidate.id
         identityText = candidate.text
@@ -62,6 +65,8 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     }
 
     fun clear() {
+        if (index < 0) return
+        boundCandidate = null
         bindingRevision++
         identity = ""
         identityText = ""

@@ -20,6 +20,7 @@ object PublicResourceCatalog {
     const val ADDRESS = "https://raw.githubusercontent.com/yixunfei/zero-fish-input/main/tools/resources/catalog.json"
     const val MAX_BYTES = 65536
     private val names = mapOf(
+        "mini-int8" to setOf("mini-int8/model.onnx", "mini-int8/vocab.txt"),
         "wanxiang-lts" to setOf("rime/wanxiang-lts-zh-hans.gram"),
         "handwriting" to setOf("handwriting/model.onnx", "handwriting/characters.txt",
             "handwriting/stroke-simplified.zsh", "handwriting/stroke-traditional.zsh"),
@@ -55,7 +56,18 @@ object PublicResourceCatalog {
         }
         require(records.map { it.name }.toSet() == expected)
         val license = json.getString("license")
-        require(license == if (id == "wanxiang-lts") "CC-BY-4.0" else "Apache-2.0 AND LGPL-2.1")
+        require(license == when (id) {
+            "wanxiang-lts" -> "CC-BY-4.0"
+            "mini-int8" -> "Apache-2.0"
+            else -> "Apache-2.0 AND LGPL-2.1"
+        })
+        // Reduced kernels require a new runtime/quality review for new graphs.
+        if (id == "mini-int8") require(records.associate { it.name to it.sha256 } == mapOf(
+            "mini-int8/model.onnx" to "5fb4dbe2c618e8757258253e10481ea9181e8a7b9a8efea03ee70c3a5ca19446",
+            "mini-int8/vocab.txt" to "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+        ))
+        if (id == "handwriting") require(records.single { it.name == "handwriting/model.onnx" }.sha256 ==
+            "da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092")
         return PublicResourcePack(id, version, license, uri.toASCIIString(),
             json.getLong("bytes").also { require(it in 1..550_000_000L) }, hash(json.getString("sha256")), records)
     }

@@ -9,7 +9,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import androidx.appcompat.widget.PopupMenu
+import androidx.core.view.isVisible
 import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.PageDirection
 
@@ -20,8 +20,6 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     var onToolsRequested: () -> Unit = {}
     var onAiRequested: () -> Unit = {}
     var onReconvertRequested: () -> Unit = {}
-    var onUndoSelectionRequested: () -> Unit = {}
-    var onSyllableRequested: () -> Unit = {}
     var onPageChanged: (PageDirection) -> Unit = {}
     private val composition = TextView(context).apply {
         textSize = 14f
@@ -57,24 +55,13 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         onSwipe = { direction -> requestedPage = direction; onPageChanged(direction); requestedPage = null }
         addView(scroll)
     }
-    private val previousPage = panelIconButton(context, android.R.drawable.ic_media_previous, R.string.previous_candidates) {
-        if (previousSnapshot?.hasPreviousPage == true) onPageChanged(PageDirection.PREVIOUS)
-    }
-    private val nextPage = panelIconButton(context, android.R.drawable.ic_media_next, R.string.next_candidates) {
-        if (previousSnapshot?.hasNextPage == true) onPageChanged(PageDirection.NEXT)
-    }
     private val tools = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.keyboard_tools) { onToolsRequested() }
     private val reconvert = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.reconvert_last_word) {
         onReconvertRequested()
     }.apply { visibility = GONE }
     private val ai = aiEntryButton(context) { onAiRequested() }
         .apply { visibility = GONE }
-    private val undo = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.undo_segment) { onUndoSelectionRequested() }
-    private val syllable = panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.select_single_syllable) { onSyllableRequested() }
     private val retry = panelIconButton(context, android.R.drawable.ic_popup_sync, R.string.retry_engine) { onRetryRequested() }
-    private val overflow = panelIconButton(context, android.R.drawable.ic_menu_more, R.string.candidate_more_actions) {
-        showOverflowActions()
-    }
     private val buttons = mutableListOf<CandidateItemView>()
     private var previousSnapshot: EngineSnapshot? = null
     private var expanded = false
@@ -85,6 +72,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private var candidateInline = false
     private var aiEntryVisible = false
     private var reconversionAvailable = false
+    private var pendingAnchor: Pair<String, Int>? = null
     private val statusRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         addView(composition, LayoutParams(0, dp(24), 0.55f))
@@ -96,13 +84,8 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         addView(tools, LayoutParams(dp(48), dp(48)))
         addView(reconvert, LayoutParams(dp(48), dp(48)))
         addView(ai, LayoutParams(dp(48), dp(48)))
-        addView(undo, LayoutParams(dp(48), dp(48)))
-        addView(syllable, LayoutParams(dp(48), dp(48)))
-        addView(previousPage, LayoutParams(dp(48), dp(48)))
         addView(browser, LayoutParams(0, dp(48), 1f))
-        addView(nextPage, LayoutParams(dp(48), dp(48)))
         addView(retry, LayoutParams(dp(48), dp(48)))
-        addView(overflow, LayoutParams(dp(48), dp(48)))
         addView(expand, LayoutParams(dp(48), dp(48)))
     }
 
@@ -112,8 +95,6 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         addView(actionRow)
         updateViewportLayout()
         renderStatus(InputEngineStatus.HIDDEN)
-        undo.visibility = GONE
-        syllable.visibility = GONE
     }
 
     internal fun applyViewport(plan: KeyboardViewportPlan) {
@@ -127,11 +108,16 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     fun render(snapshot: EngineSnapshot) {
         if (snapshot == previousSnapshot) return
         browser.cancelSwipe()
-        val oldTexts = previousSnapshot?.candidates.orEmpty().map { it.text }.toSet()
+        val oldCandidates = previousSnapshot?.candidates.orEmpty()
+        val oldIds = oldCandidates.mapTo(HashSet()) { it.id }
         val pageTarget = if (requestedPage == PageDirection.NEXT)
-            snapshot.candidates.indexOfFirst { it.text !in oldTexts }.coerceAtLeast(0) else 0
+            snapshot.candidates.indexOfFirst { it.id !in oldIds }.coerceAtLeast(0) else 0
         val changedInput = snapshot.rawInput != previousSnapshot?.rawInput ||
-            snapshot.candidates != previousSnapshot?.candidates
+            snapshot.composition != previousSnapshot?.composition
+        val anchorIndex = buttons.indexOfFirst { it.isVisible && it.right > scroll.scrollX }
+        pendingAnchor = if (!changedInput && scroll.scrollX > 0 && pageTarget == 0)
+            pendingAnchor ?: oldCandidates.getOrNull(anchorIndex)?.let { it.id to (buttons[anchorIndex].left - scroll.scrollX) }
+            else null
         previousSnapshot = snapshot
         if (snapshot.candidates.isEmpty()) lastAnnouncedCandidate = null
         val associations = snapshot.candidates.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
@@ -148,8 +134,6 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             button.visibility = if (candidate == null) View.GONE else View.VISIBLE
             if (candidate != null) button.bind(candidate, index, index == snapshot.highlightedIndex) else button.clear()
         }
-        previousPage.isEnabled = snapshot.hasPreviousPage && !associations
-        nextPage.isEnabled = snapshot.hasNextPage && !associations
         if (changedInput) scroll.scrollTo(0, 0)
         if (changedInput && snapshot.candidates.isNotEmpty()) {
             val announcement = snapshot.candidates.first().text
@@ -163,6 +147,24 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         }
         updateStatusVisibility()
         updateActionVisibility()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        // Keep even a sentence-sized first result from consuming the entire strip.
+        val limit = (browser.measuredWidth * 0.65f).toInt().coerceAtLeast(dp(48))
+        var changed = false
+        buttons.forEach { if (it.maxWidth != limit) { it.maxWidth = limit; changed = true } }
+        if (changed) super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        pendingAnchor?.let { (id, offset) ->
+            val index = previousSnapshot?.candidates?.indexOfFirst { it.id == id } ?: -1
+            buttons.getOrNull(index)?.let { scroll.scrollTo(it.left - offset, 0) }
+        }
+        pendingAnchor = null
     }
 
     fun setExpanded(value: Boolean) {
@@ -226,59 +228,14 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         val snapshot = previousSnapshot
         val associations = snapshot?.candidates?.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
         val canExpand = snapshot?.candidates?.isNotEmpty() == true && !associations
-        val canUndo = snapshot?.canUndoSelection == true
-        val canSelectSyllable = snapshot?.canSelectSyllable == true && !canUndo
-        val canPrevious = snapshot?.hasPreviousPage == true && !associations
-        val canNext = snapshot?.hasNextPage == true && !associations
         val canRetry = lastStatus == InputEngineStatus.FAILED
         val compact = actionDensity != CandidateActionDensity.FULL
-        val minimal = actionDensity == CandidateActionDensity.MINIMAL
-        tools.visibility = if (minimal) GONE else VISIBLE
-        reconvert.visibility = if (!compact && reconversionAvailable) VISIBLE else GONE
-        ai.visibility = if (!compact && aiEntryVisible) VISIBLE else GONE
-        undo.visibility = if (!compact && canUndo) VISIBLE else GONE
-        syllable.visibility = if (!compact && canSelectSyllable) VISIBLE else GONE
-        previousPage.visibility = if (!compact && canPrevious) VISIBLE else GONE
-        nextPage.visibility = if (!compact && canNext) VISIBLE else GONE
-        retry.visibility = if (!compact && canRetry) VISIBLE else GONE
-        expand.visibility = if (!minimal && canExpand) VISIBLE else GONE
-        overflow.visibility = if (compact && (minimal || reconversionAvailable || aiEntryVisible || canUndo ||
-                canSelectSyllable || canPrevious || canNext || canRetry || canExpand)) VISIBLE else GONE
-    }
-
-    private fun showOverflowActions() {
-        val snapshot = previousSnapshot
-        val associations = snapshot?.candidates?.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
-        PopupMenu(context, overflow).apply {
-            if (actionDensity == CandidateActionDensity.MINIMAL) menu.add(0, ACTION_TOOLS, 0, R.string.keyboard_tools)
-            if (reconversionAvailable) menu.add(0, ACTION_RECONVERT, 1, R.string.reconvert_last_word)
-            if (aiEntryVisible) menu.add(0, ACTION_AI, 2, R.string.ai_open)
-            if (snapshot?.canUndoSelection == true) menu.add(0, ACTION_UNDO, 3, R.string.undo_segment)
-            if (snapshot?.canSelectSyllable == true && snapshot.canUndoSelection.not()) {
-                menu.add(0, ACTION_SYLLABLE, 4, R.string.select_single_syllable)
-            }
-            if (snapshot?.hasPreviousPage == true && !associations) menu.add(0, ACTION_PREVIOUS, 5, R.string.previous_candidates)
-            if (snapshot?.hasNextPage == true && !associations) menu.add(0, ACTION_NEXT, 6, R.string.next_candidates)
-            if (lastStatus == InputEngineStatus.FAILED) menu.add(0, ACTION_RETRY, 7, R.string.retry_engine)
-            if (snapshot?.candidates?.isNotEmpty() == true && !associations) {
-                menu.add(0, ACTION_EXPAND, 8, if (expanded) R.string.collapse_candidates else R.string.expand_candidates)
-            }
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    ACTION_TOOLS -> onToolsRequested()
-                    ACTION_RECONVERT -> onReconvertRequested()
-                    ACTION_AI -> onAiRequested()
-                    ACTION_UNDO -> onUndoSelectionRequested()
-                    ACTION_SYLLABLE -> onSyllableRequested()
-                    ACTION_PREVIOUS -> onPageChanged(PageDirection.PREVIOUS)
-                    ACTION_NEXT -> onPageChanged(PageDirection.NEXT)
-                    ACTION_RETRY -> onRetryRequested()
-                    ACTION_EXPAND -> onExpandRequested()
-                }
-                true
-            }
-            show()
-        }
+        val hasCandidates = snapshot?.candidates?.isNotEmpty() == true
+        tools.visibility = VISIBLE
+        reconvert.visibility = if (!hasCandidates && !compact && reconversionAvailable) VISIBLE else GONE
+        ai.visibility = if (!hasCandidates && aiEntryVisible) VISIBLE else GONE
+        retry.visibility = if (canRetry) VISIBLE else GONE
+        expand.visibility = if (canExpand) VISIBLE else GONE
     }
 
     private fun updateStatusVisibility() {
@@ -288,15 +245,4 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private companion object {
-        const val ACTION_TOOLS = 1
-        const val ACTION_RECONVERT = 2
-        const val ACTION_AI = 3
-        const val ACTION_UNDO = 4
-        const val ACTION_SYLLABLE = 5
-        const val ACTION_PREVIOUS = 6
-        const val ACTION_NEXT = 7
-        const val ACTION_RETRY = 8
-        const val ACTION_EXPAND = 9
-    }
 }

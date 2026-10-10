@@ -8,7 +8,7 @@ Both APK contents retain all 16 Wanxiang core dictionaries and offline Chinese
 input. `resourceBundle=full` includes the LTS grammar and Chinese handwriting;
 `resourceBundle=lite` omits those optional data files. Both use the same package
 identity, code and settings. Installing one replaces the other through Android's
-normal package update rules. The existing short-word model remains bundled.
+normal package update rules. ADR 0022 extends the same delivery scheme to the Mini short-word model.
 
 Optional data is published to content-versioned GitHub Releases in
 `yixunfei/zero-fish-input`. Git stores only manifests, hashes, licenses and scripts.

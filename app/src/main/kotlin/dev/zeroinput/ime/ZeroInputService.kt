@@ -69,10 +69,11 @@ class ZeroInputService : InputMethodService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val selectionReader = dev.zeroinput.ime.clipboard.ClipboardSelectionReader({ mainHandler.post(it) })
     private val modelRanking = dev.zeroinput.ime.model.ModelRankingCoordinator(
-        createScorer = { dev.zeroinput.model.RobertaMiniScorer(applicationContext) },
+        createScorer = { dev.zeroinput.model.RobertaMiniScorer(graph.publicResources) },
         post = { mainHandler.post(it) },
         currentController = { controller },
         allowed = { modelRankingAllowed() },
+        resourceRevision = { graph.publicResources.revision },
     )
     private var handwritingCoordinator: HandwritingCoordinator? = null
     private var glideInput: dev.zeroinput.ime.glide.GlideInputBinding? = null
@@ -103,6 +104,7 @@ class ZeroInputService : InputMethodService() {
     private var recentEmojiCache: List<String> = emptyList()
     @Volatile
     private var secureClipboardCache: List<SecureClipboardItemUi> = emptyList()
+    private var secureClipboardLoadFailed = false
     @Volatile
     private var localPanelRevision = 0L
     private var localPanelTask: Future<*>? = null
@@ -156,6 +158,7 @@ class ZeroInputService : InputMethodService() {
             renderContext = { inputView?.renderAiContext(it) },
             renderHistoryStatus = { saving, loading, failed -> inputView?.renderAiHistoryStatus(saving, loading, failed) },
             contextCurrent = { !aiPageBinding.isInitialized() || aiPages.referencesCurrent() },
+            storageFailed = { showAiFeedback(dev.zeroinput.ime.ui.R.string.ai_storage_failed) },
         )
     }
 
@@ -168,7 +171,7 @@ class ZeroInputService : InputMethodService() {
         )
     }
     private val aiPageBinding: Lazy<dev.zeroinput.ime.ai.page.AiPageReferenceBinding> = lazy {
-        dev.zeroinput.ime.ai.page.AiPageReferenceBinding(graph.pageReferences, { graph.settings.aiPageReferencesEnabled },
+        dev.zeroinput.ime.ai.page.AiPageReferenceBinding(graph.pageReferences,
             mainHandler, aiWorkbench, ::aiAllowed,
             { currentInputEditorInfo?.packageName }, { inputView },
             { launchActivity(dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java) },
@@ -399,8 +402,8 @@ class ZeroInputService : InputMethodService() {
             // choice so later key/settings callbacks cannot switch the session
             // back to the previous language. A pack selected for the old
             // language is no longer valid in that case.
-            graph.settings.lastLanguage = subtypeLanguage
-            graph.settings.lastLanguagePackKey = null
+            graph.settings.selectBuiltInLanguage(subtypeLanguage)
+            refreshConfiguredSettings()
         }
         val initialPackKey = graph.settings.lastLanguagePackKey
         sessionChineseOptions = configuredChineseOptions
@@ -756,6 +759,11 @@ class ZeroInputService : InputMethodService() {
         view.onTouchStarted = modelRanking::interaction
         view.onTouchFinished = ::refreshModelRanking
         view.onUserInteraction = { modelRanking.invalidate(); registerInteraction(); syncSessionPrivacy() }
+        view.onToolsNavigation = {
+            modelRanking.invalidate()
+            registerInteraction(preserveReconversion = true)
+            syncSessionPrivacy()
+        }
         view.onKeyboardAction = ::handleKeyboardAction
         view.onClearCompositionRequested = clearComposition@{
             if (view.isSearchEditing) return@clearComposition searchDraft.clearComposition()
@@ -1058,6 +1066,7 @@ class ZeroInputService : InputMethodService() {
             KeyboardAction.Shift,
             KeyboardAction.ShowLetters,
             KeyboardAction.ShowSymbols,
+            KeyboardAction.ShowNumbers,
             KeyboardAction.ShowMoreSymbols,
             -> Unit
         }
@@ -1352,9 +1361,9 @@ class ZeroInputService : InputMethodService() {
         if (!personalizationAllowed || personalExpressionRevision != graph.expressions.revision()) {
             personalExpressionCache = PersonalExpressionsUi()
         }
-        if (!enabled) secureClipboardCache = emptyList()
+        if (!enabled) { secureClipboardCache = emptyList(); secureClipboardLoadFailed = false }
         view.renderExpressions(personalizationAllowed, personalExpressionCache, if (personalizationAllowed) recentEmojiCache else emptyList())
-        view.renderSecureClipboard(enabled, if (enabled) secureClipboardCache else emptyList())
+        view.renderSecureClipboard(enabled, if (enabled) secureClipboardCache else emptyList(), enabled && secureClipboardLoadFailed)
         scheduleLocalPanelRefresh(personalizationAllowed, enabled)
     }
 
@@ -1383,7 +1392,7 @@ class ZeroInputService : InputMethodService() {
                         graph.secureClipboard.summaries().mapIndexed { index, item ->
                             SecureClipboardItemUi(item.id, getString(R.string.secure_clipboard_ordinal, index + 1))
                         }
-                    }.getOrDefault(emptyList())
+                    }.getOrNull()
                 } else {
                     emptyList()
                 }
@@ -1399,7 +1408,8 @@ class ZeroInputService : InputMethodService() {
                     // session has become private/disabled, even if the worker
                     // completed a read that started under the old policy.
                     recentEmojiCache = if (currentPersonalizationAllowed) recent else emptyList()
-                    secureClipboardCache = if (currentSecureClipboardEnabled) secureItems else emptyList()
+                    secureClipboardCache = if (currentSecureClipboardEnabled) secureItems.orEmpty() else emptyList()
+                    secureClipboardLoadFailed = currentSecureClipboardEnabled && secureItems == null
                     personalExpressionRevision = personal?.revision ?: -1L
                     personalExpressionCache = if (currentPersonalizationAllowed && personal != null &&
                         personal.revision == graph.expressions.revision()) personal.data.presentation() else PersonalExpressionsUi()
@@ -1407,6 +1417,7 @@ class ZeroInputService : InputMethodService() {
                     inputView?.renderSecureClipboard(
                         currentSecureClipboardEnabled,
                         if (currentSecureClipboardEnabled) secureClipboardCache else emptyList(),
+                        secureClipboardLoadFailed,
                     )
                 }
             }
@@ -1541,8 +1552,8 @@ class ZeroInputService : InputMethodService() {
         // a language pack selected for that language. Only a persisted
         // cross-language change makes the old pack invalid.
         if (graph.settings.lastLanguage != language) {
-            graph.settings.lastLanguage = language
-            graph.settings.lastLanguagePackKey = null
+            graph.settings.selectBuiltInLanguage(language)
+            refreshConfiguredSettings()
         }
         activeSession?.let { scheduleEngineWarmup(it, force = true) }
     }
@@ -1590,6 +1601,7 @@ class ZeroInputService : InputMethodService() {
         personalExpressionRevision = -1L
         inputView?.clearExpressionSession()
         secureClipboardCache = emptyList()
+        secureClipboardLoadFailed = false
     }
 
     private fun reconcileLanguagePackSession(session: InputSession) {

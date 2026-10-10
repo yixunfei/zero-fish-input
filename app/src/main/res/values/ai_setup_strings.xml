@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_settings_saving">正在保存设置…</string>
+    <string name="ai_setup_network_required">请打开“启用 AI 功能”和“允许 AI 联网请求”后，再获取模型或测试连接。</string>
+    <string name="ai_setup_network_ready">联网已允许。点击获取模型或测试连接后才会发送请求。</string>
+    <string name="ai_default_model">默认模型 / 测试模型</string>
+    <string name="ai_test_draft">测试当前配置连接</string>
+    <string name="ai_draft_test_notice">测试使用上方填写的地址、密钥和所选模型，仅发送固定短文本，可能产生少量费用。测试成功不会自动保存。</string>
+    <string name="ai_endpoint_invalid">请输入有效的 HTTPS API 地址，不含账号、查询参数或片段。</string>
+    <string name="ai_key_invalid">请输入有效的 API key，密钥中不能包含空格或换行。</string>
+    <string name="ai_models_invalid">请选择或手动输入 1 至 32 个模型，每个模型 ID 最多 128 个字符。</string>
+    <string name="ai_name_invalid">请输入 Provider 名称，不含换行或控制字符。</string>
+    <string name="ai_provider_limit">最多保存 16 个 Provider，请先删除不再使用的配置。</string>
+    <string name="ai_http_failure">%1$s（HTTP %2$d）</string>
+</resources>

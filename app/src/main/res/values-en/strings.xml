@@ -4,7 +4,7 @@
     <string name="clear_secure_clipboard_message">Permanently delete every item in the ZeroInput secure clipboard. This cannot be undone and does not clear the system clipboard. Turning off the secure clipboard only disables the feature; it keeps your items.</string>
     <string name="secure_clipboard_cleared">Secure clipboard cleared</string>
     <string name="experimental_model_ranking">Smart word ranking (beta)</string>
-    <string name="experimental_model_help">Uses Chinese entered in this session to reorder two-character words offline. May choose an incorrect first suggestion and uses more memory and power. Off by default; inactive in private input.</string>
+    <string name="experimental_model_help">Uses Chinese entered in this session to reorder two-character words offline. May choose an incorrect first suggestion and uses more memory and power. Off by default; inactive in private input. Install and enable Mini in dictionary management first; missing resources preserve the original candidate order.</string>
     <string name="experimental_typo_correction">Typo correction (beta)</string>
     <string name="experimental_typo_help">Full keyboard only. May add distracting suggestions and use more power.</string>
     <string name="clipboard_guard_title">System clipboard guard</string>
@@ -248,8 +248,6 @@
     <string name="ai_model_audio">%1$s supports audio</string>
     <string name="ai_provider_save_failed">Could not save. Check the HTTPS API URL (e.g. https://example.com/v1), models and key, then retry.</string>
     <string name="ai_provider_invalid">Enter a name and 1 to 32 models</string>
-    <string name="ai_support_images">Selected model supports images</string>
-    <string name="ai_support_audio">Selected model supports audio</string>
     <string name="ai_endpoint_hint">HTTPS API URL (e.g. https://example.com/v1)</string>
     <string name="ai_key_hint">API key (leave blank to keep the current key)</string>
     <string name="ai_save_conversations">Save AI conversations</string>

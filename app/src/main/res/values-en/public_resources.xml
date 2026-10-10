@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="public_resource_mini">Mini short-word ranking</string>
     <string name="public_resource_title">Optional resources</string>
     <string name="public_resource_lts">Wanxiang language model</string>
     <string name="public_resource_handwriting">Chinese handwriting</string>

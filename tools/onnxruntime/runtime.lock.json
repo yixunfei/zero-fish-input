@@ -1,0 +1,16 @@
+{
+  "version": "1.26.0-zero1",
+  "aar": "91a413c817fe07db18fa8e9b013b53170ffefcd7c7366edfff40305f67bd6fbe",
+  "config": "2b8904953543bb89203dfee0a7f519e6dfad92df455a3a97dcbc665f08893121",
+  "revision": "8c546c37b43caaca1fa25db430dab94b901cf277",
+  "libraries": {
+    "arm64-v8a": "16ab0f1cd86768d8664430c24b42c920efdfef900a79442b46a07db5aca1ce25",
+    "armeabi-v7a": "980bae584c1b2fa3fdfac13a64b1c63ecb05670ab4058b6caf3b089ecd26628b",
+    "x86_64": "e6e1e31b3006cd9db6f3e7dab5b91a4a935d853b187ebee51bea2a3a2bbf8f59"
+  },
+  "jni": {
+    "arm64-v8a": "dfb403265bcb7eb5c33f6b736b375320517123346fd2f900a2754241538feaab",
+    "armeabi-v7a": "1734d593bc481c707ef6beb28e2fd472169ad5885e503549a45c9f5ab0d41b51",
+    "x86_64": "9c56de5be133cad1c4e0af27cee22264b754c07853d12f9f680f6a87f352ee7c"
+  }
+}

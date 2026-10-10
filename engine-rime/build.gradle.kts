@@ -19,6 +19,13 @@ val publicDictionaryAssets = layout.buildDirectory.dir("generated/publicDictiona
 val resourceBundle = providers.gradleProperty("resourceBundle").orElse("full")
 check(resourceBundle.get() in setOf("full", "lite")) { "resourceBundle must be full or lite" }
 val packagedDictionaryAssets = layout.buildDirectory.dir("generated/packagedDictionaryAssets")
+val compressedDictionaryAssets = layout.buildDirectory.dir("generated/compressedDictionaryAssets")
+val compressDictionaryAssets = tasks.register<Exec>("compressDictionaryAssets") {
+    inputs.file(rootProject.file("tools/dictionaries/compress.py"))
+    inputs.dir(publicDictionaryAssets)
+    outputs.dir(compressedDictionaryAssets)
+    commandLine("python", rootProject.file("tools/dictionaries/compress.py").absolutePath)
+}
 val baseRimeAssets = layout.buildDirectory.dir("generated/baseRimeAssets")
 val packageBaseRimeAssets = tasks.register<Sync>("packageBaseRimeAssets") {
     from("src/main/assets")
@@ -33,7 +40,8 @@ val prepareGlideAssets = tasks.register<Exec>("prepareGlideAssets") {
     commandLine("python", rootProject.file("tools/dictionaries/prepare-glide.py").absolutePath)
 }
 val packageDictionaryAssets = tasks.register<Sync>("packageDictionaryAssets") {
-    from(publicDictionaryAssets)
+    from(publicDictionaryAssets) { exclude("rime/dicts/**") }
+    from(compressedDictionaryAssets)
     into(packagedDictionaryAssets)
     if (resourceBundle.get() == "lite") exclude("**/*.gram")
 }
@@ -117,6 +125,16 @@ val prepareOpenCcAssets = tasks.register<Sync>("prepareOpenCcAssets") {
     from(openCcDictionaryRoot) { include(openCcHashes.keys) }
     into(openCcAssets.map { it.dir("rime/opencc") })
 }
+fun registerXzVerification(variant: String) = tasks.register("verify${variant.replaceFirstChar(Char::uppercaseChar)}XzRuntime") {
+    doLast {
+        val artifact = configurations["${variant}RuntimeClasspath"].resolvedConfiguration.resolvedArtifacts.single {
+            it.moduleVersion.id.group == "org.tukaani" && it.name == "xz"
+        }.file
+        val hash = MessageDigest.getInstance("SHA-256").digest(artifact.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(hash == "95c63c1a55b22dd6453890a419cc1a640f790bbf7d8ae82db1e30aefefb08888")
+    }
+}
 
 android {
     sourceSets["main"].assets.setSrcDirs(listOf(baseRimeAssets, glideAssets))
@@ -175,6 +193,7 @@ android {
 }
 
 dependencies {
+    implementation("org.tukaani:xz:1.10")
     api(project(":engine-api"))
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
@@ -182,7 +201,16 @@ dependencies {
     testImplementation(project(":engine-english"))
 }
 
-packageDictionaryAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
+compressDictionaryAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
+packageDictionaryAssets.configure { dependsOn(compressDictionaryAssets) }
 prepareGlideAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
 tasks.named("preBuild").configure { dependsOn(verifyOpenCcAssets, prepareOpenCcAssets, prepareSyllableAssets,
     packageDictionaryAssets, packageBaseRimeAssets, prepareGlideAssets) }
+
+val verifyXzRuntime = tasks.register("verifyXzRuntime")
+androidComponents.onVariants { variant ->
+    val verification = registerXzVerification(variant.name)
+    verifyXzRuntime.configure { dependsOn(verification) }
+    tasks.matching { it.name == "pre${variant.name.replaceFirstChar(Char::uppercaseChar)}Build" }
+        .configureEach { dependsOn(verification) }
+}

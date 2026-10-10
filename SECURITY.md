@@ -198,9 +198,15 @@ after 30 seconds, with worker-side deadline checks as well as timer cleanup.
 Language packs reject special ZIP entry types, including symlinks, and reject a
 whole dictionary when any declared payload fails bounded UTF-8/hash validation.
 ZIP64 and multi-disk archives are unsupported. AI context reference rows use short
-previews unless the user explicitly opens full preview; leaving the pane removes
-that full display. Immutable JVM strings and platform copies cannot be securely
+previews unless the user explicitly opens full preview; leaving the pane or resetting
+the panel removes that full display. Focus checks release their temporary root node.
+Immutable JVM strings and platform copies cannot be securely
 wiped. No new network path, permission, component or storage format is introduced.
+
+AI conversation-storage failures preserve a completed answer only within its existing
+valid session. Editor, context, settings and data revocation still reject insertion
+and stale storage feedback. Page-reference settings guidance shares the broker's
+enablement policy and never bypasses the editor privacy check.
 # Public dictionaries
 
 Foreground dictionary settings have a separately approved HTTPS download boundary
@@ -219,3 +225,15 @@ or personal data. Only supported resources from this project's reviewed catalog
 and immutable Releases are allowed. Files are bounded and hash-verified before
 atomic installation. Executable downloads remain prohibited. See
 [ADR 0021](docs/adr/0021-optional-public-resources.md).
+
+Package compression keeps all core dictionaries offline. XZ decoding is bounded
+and hash-verified before atomic activation on a worker. Optional Mini downloads
+contain only the reviewed model and vocabulary. Graph updates require a compatible
+app build; no remote native libraries or scripts are accepted. See ADR 0022.
+
+Runtime artifact validation uses the source-controlled ONNX AAR/per-ABI lock;
+generated build stamps cannot redefine trusted hashes. GitHub dictionary catalog
+addresses receive the same validation as download destinations. Private clipboard
+index failures show a generic error without reading body text; repairs require
+authenticated management and retain deletion-generation checks. No stored format,
+permission or authentication boundary changes in these review fixes.

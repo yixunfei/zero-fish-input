@@ -79,3 +79,8 @@ See LICENSES/librime-octagram-BSD-3-Clause.txt.
 SnakeYAML 2.4 is Apache-2.0 (LICENSES/Apache-2.0.txt); jsoup 1.18.3 is MIT
 (LICENSES/jsoup-MIT.txt), Copyright (c) 2009-2024 Jonathan Hedley.
 
+
+XZ for Java 1.10: Copyright The XZ for Java authors and contributors; 0BSD.
+See LICENSES/xz-java-0BSD.txt.
+ONNX Runtime 1.26.0 is rebuilt with a reduced CPU operator configuration.
+Build recipe, source revision and dependency hashes: tools/onnxruntime/.

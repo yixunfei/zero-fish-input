@@ -6,6 +6,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PageReferenceBrokerTest {
+    @Test fun availabilityRequiresBothTheSourceAndTheCurrentEnablementPolicy() {
+        val f = Fixture()
+        assertFalse(f.broker.available)
+        val registration = f.broker.attach(f.source)
+        assertTrue(f.broker.available)
+        f.enabled = false
+        assertFalse(f.broker.available)
+        f.enabled = true
+        assertTrue(f.broker.available)
+        registration.close()
+        assertFalse(f.broker.available)
+        assertEquals(0, f.reads)
+    }
+
     @Test fun connectingOrReceivingInvalidationNeverCapturesAndDisabledCaptureNeverReads() {
         val f = Fixture()
         f.broker.attach(f.source)

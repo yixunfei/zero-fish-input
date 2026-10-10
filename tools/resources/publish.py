@@ -65,6 +65,11 @@ def sources(pack):
             path = ROOT / 'build/handwriting-stroke-model' / name
             assert digest(path) == checksum
             paths.append(path)
+    elif pack['id'] == 'mini-int8':
+        paths += [ROOT / 'LICENSES/Apache-2.0.txt', ROOT / 'tools/evaluate-small-model.py',
+                  ROOT / 'tools/resources/prepare-mini.py',
+                  ROOT / 'tools/export-model-benchmark.py', ROOT / 'docs/small-model-evaluation.md',
+                  ROOT / 'docs/model-integration.md', ROOT / 'NOTICE']
     else:
         paths += [ROOT / 'LICENSES/wanxiang-CC-BY-4.0.txt']
     with zipfile.ZipFile(target, 'w', compression=zipfile.ZIP_DEFLATED) as archive:

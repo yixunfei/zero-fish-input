@@ -252,7 +252,10 @@ class AiConfigurationRepository(
             require(profile.models.all { it.isNotBlank() && it.length <= 128 && it.none(Char::isISOControl) })
             require(profile.selectedModel in profile.models)
             require(profile.imageModels.all { it in profile.models } && profile.audioModels.all { it in profile.models })
-            require(profile.apiKey.length <= 512 && profile.apiKey.none(Char::isISOControl))
+            require(
+                profile.apiKey.isNotBlank() && profile.apiKey.length <= 512 &&
+                    profile.apiKey.none { it.isWhitespace() || it.isISOControl() },
+            )
             validateEndpoint(profile.endpoint)
         }
         require(value.timeoutMs in 1_000L..AiLimits.MAX_TIMEOUT_MS)

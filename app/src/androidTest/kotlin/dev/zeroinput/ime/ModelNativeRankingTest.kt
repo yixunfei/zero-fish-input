@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 /** Real native candidates, production scorer and platform editor; no personal-store side effects. */
 @RunWith(AndroidJUnit4::class)
 class ModelNativeRankingTest {
+    @get:org.junit.Rule val miniResources = dev.zeroinput.ime.testing.MiniResourceRule()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test fun miniPromotionRoutesTapSpaceAndPunctuationWhileEnterCommitsRawInput() {
@@ -33,7 +34,7 @@ class ModelNativeRankingTest {
             var controller: InputSessionController? = null
             lateinit var editor: EditText
             val coordinator = ModelRankingCoordinator(
-                { RobertaMiniScorer(instrumentation.targetContext) }, { Handler(Looper.getMainLooper()).post(it) },
+                { RobertaMiniScorer(graph.publicResources) }, { Handler(Looper.getMainLooper()).post(it) },
                 { controller }, { controller?.state?.privacy?.personalizationAllowed == true },
             )
             try {

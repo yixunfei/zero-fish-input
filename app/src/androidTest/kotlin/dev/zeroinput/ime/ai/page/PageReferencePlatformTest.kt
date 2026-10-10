@@ -39,6 +39,10 @@ class PageReferencePlatformTest {
             labelled(UiR.string.ai_open).performClick()
         }
         await { panelOrNull()?.isAiOpen == true }
+        // Opening the panel changes the IME window; let those revocation events settle
+        // before the explicit capture so this test observes a stable source page.
+        instrumentation.waitForIdleSync()
+        automation.waitForIdle(300, 5_000)
         onMain { textButton(UiR.string.ai_page_reference).performClick() }
         await { visible().filterIsInstance<MaterialCheckBox>().any { it.text.toString().contains("Public first reference") } }
         onMain {

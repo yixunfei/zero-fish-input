@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="key_numbers">Number pad</string>
     <string name="panel_expand">Expand panel</string>
     <string name="panel_collapse">Collapse panel</string>
     <string name="expression_search_input">Enter an expression search term</string>
@@ -180,5 +181,6 @@
     <string name="handwriting_candidate_value">Insert %1$s</string>
     <string name="language_sensitive_protection">Sensitive input protection enabled</string>
     <string name="language_switch">Switch language</string>
-    <string name="ai_page_reference_item">Reference %1$d (%2$d chars): %3$s</string>
+    <string name="ai_page_reference_item">Reference %1$d (characters: %2$d): %3$s</string>
+    <string name="secure_clipboard_load_failed">Unable to load snippets. Retry or open Manage and authenticate to recover.</string>
 </resources>

@@ -114,13 +114,14 @@ interface AiProvider {
 sealed class AiProviderError(message: String, cause: Throwable? = null) : Exception(message, cause) {
     class Configuration(message: String) : AiProviderError(message)
     class Network(message: String, cause: Throwable? = null,
-        val reason: AiNetworkFailure = AiNetworkFailure.CONNECTION) : AiProviderError(message, cause)
+        val reason: AiNetworkFailure = AiNetworkFailure.CONNECTION,
+        val statusCode: Int? = null) : AiProviderError(message, cause)
     class Response(message: String) : AiProviderError(message)
     class Policy(message: String) : AiProviderError(message)
     class Storage : AiProviderError("AI conversation storage operation failed")
 }
 
-enum class AiNetworkFailure { CONNECTION, TIMEOUT, AUTHENTICATION, MODEL_OR_ENDPOINT, RATE_LIMIT, SERVICE }
+enum class AiNetworkFailure { CONNECTION, DNS, TLS, REDIRECT, TIMEOUT, AUTHENTICATION, MODEL_OR_ENDPOINT, RATE_LIMIT, SERVICE }
 
 data class AiGenerationPolicy(
     val enabled: Boolean,

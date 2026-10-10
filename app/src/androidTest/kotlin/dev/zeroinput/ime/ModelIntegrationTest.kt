@@ -27,6 +27,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 30)
 class ModelIntegrationTest {
+    @get:org.junit.Rule val miniResources = dev.zeroinput.ime.testing.MiniResourceRule()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test fun productionMiniMatchesFrozenNumericFixtureAndBounds() {
@@ -35,7 +36,7 @@ class ModelIntegrationTest {
         graph.engineExecutor.submit {}.get(60, java.util.concurrent.TimeUnit.SECONDS)
         val beforePss = android.os.Debug.MemoryInfo().also(android.os.Debug::getMemoryInfo).totalPss
         val started = System.nanoTime()
-        RobertaMiniScorer(instrumentation.targetContext).use { scorer ->
+        RobertaMiniScorer(graph.publicResources).use { scorer ->
             val initialized = (System.nanoTime() - started) / 1_000_000.0
             val prefix = "我买了一件新".toCharArray()
             val words = arrayOf("衣服".toCharArray(), "依附".toCharArray())

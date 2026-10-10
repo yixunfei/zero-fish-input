@@ -129,7 +129,7 @@ class SecureClipboardVaultReliabilityTest {
         assertEquals(1, vault.count())
         index.failWrite = true
         assertThrows(IOException::class.java) { vault.remove(item.id, grant()) }
-        assertTrue(vault.summaries().isEmpty())
+        assertThrows(IOException::class.java) { vault.summaries() }
         index.failWrite = false
         assertTrue(vault.metadata(grant()).isEmpty())
         assertEquals(0, vault.count())

@@ -49,7 +49,7 @@ internal object KeyboardLayouts {
         ) + listOf("*", "\"", "'", ":", ";", "!", "?").map(::symbolKey) + listOf(
             KeySpec("⌫", context.getString(R.string.key_backspace), KeyboardAction.Backspace, 1.2f, KeyStyle.MODIFIER),
         ),
-        symbolBottomRow(context, languageLabel),
+        symbolBottomRow(context),
     )
 
     fun moreSymbols(context: android.content.Context, languageLabel: String): List<List<KeySpec>> = listOf(
@@ -57,7 +57,7 @@ internal object KeyboardLayouts {
         symbolRow("~^%*=\""),
         listOf("€", "£", "$", "¢", "©", "®", "°", "…", "‰", "•").map(::symbolKey) +
             KeySpec("⌫", context.getString(R.string.key_backspace), KeyboardAction.Backspace, 1.2f, KeyStyle.MODIFIER),
-        symbolBottomRow(context, languageLabel),
+        symbolBottomRow(context),
     )
 
     private fun characterRow(characters: String, shifted: Boolean): List<KeySpec> = characters.map { character ->
@@ -67,9 +67,9 @@ internal object KeyboardLayouts {
 
     private fun symbolRow(characters: String): List<KeySpec> = characters.map { symbolKey(it.toString()) }
 
-    private fun symbolBottomRow(context: android.content.Context, languageLabel: String) = listOf(
+    private fun symbolBottomRow(context: android.content.Context) = listOf(
         KeySpec("ABC", context.getString(R.string.key_letters), KeyboardAction.ShowLetters, 1.35f, KeyStyle.MODIFIER),
-        KeySpec(languageLabel, context.getString(R.string.key_language), KeyboardAction.SwitchLanguage, 1.1f, KeyStyle.MODIFIER),
+        KeySpec("123", context.getString(R.string.key_numbers), KeyboardAction.ShowNumbers, 1.1f, KeyStyle.MODIFIER),
         KeySpec(",", context.getString(R.string.key_comma), KeyboardAction.LiteralText(","), 0.9f),
         KeySpec(context.getString(R.string.key_space), context.getString(R.string.key_space), KeyboardAction.Space, 3.8f),
         KeySpec(".", context.getString(R.string.key_period), KeyboardAction.LiteralText("."), 0.9f),

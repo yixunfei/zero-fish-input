@@ -8,6 +8,37 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 
 class AsyncCandidateRankerTest {
+    @Test fun `resource publication retries missing model and discards old queued result`() {
+        val worker = ManualExecutor()
+        val delivery = ArrayDeque<Runnable>()
+        val completed = mutableListOf<Long>()
+        val first = Scorer()
+        val next = Scorer()
+        var attempts = 0
+        val ranker = AsyncCandidateRanker({
+            when (attempts++) { 0 -> error("Resource not installed"); 1 -> first; else -> next }
+        }, { delivery.add(it); true }, { revision, _ -> completed += revision }, { worker }, { 0L })
+        ranker.setEnabled(true)
+        ranker.request(1, "学习".toCharArray(), words())
+        worker.run()
+        ranker.request(2, "学习".toCharArray(), words())
+        worker.run()
+        assertEquals(1, attempts)
+        ranker.resourcesChanged()
+        ranker.request(3, "学习".toCharArray(), words())
+        worker.run()
+        ranker.resourcesChanged()
+        delivery.removeFirst().run()
+        assertTrue(completed.isEmpty())
+        ranker.request(4, "学习".toCharArray(), words())
+        worker.run()
+        delivery.removeFirst().run()
+        assertEquals(1, first.closes)
+        assertEquals(listOf(4L), completed)
+        ranker.close()
+        worker.run()
+        assertEquals(1, next.closes)
+    }
     @Test fun `worker construction failure wipes input and permits later recovery`() {
         val worker = ManualExecutor()
         var attempts = 0

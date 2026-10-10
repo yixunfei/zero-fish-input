@@ -1,11 +1,8 @@
 package dev.zeroinput.model
 
-import android.content.Context
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /** Public model only. Never stores input, token IDs, scores or optimized runtime caches. */
 internal object MiniModelAssets {
@@ -14,43 +11,15 @@ internal object MiniModelAssets {
     const val VOCAB_BYTES = 109_540L
     const val VOCAB_HASH = "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c"
 
-    fun prepare(context: Context): File {
-        val directory = File(context.noBackupFilesDir, "public-model").apply { mkdirs() }
-        val file = File(directory, "mini-int8.onnx")
-        if (file.isFile && file.length() == MODEL_BYTES && file.inputStream().use { verified(it, MODEL_BYTES, MODEL_HASH) }) return file
-        val temporary = Files.createTempFile(directory.toPath(), "mini-int8-", ".tmp").toFile()
-        try {
-            context.assets.open("mini-int8/model.onnx").use { source ->
-                temporary.outputStream().use { output ->
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    val buffer = ByteArray(65_536)
-                    var size = 0L
-                    while (true) {
-                        val count = source.read(buffer)
-                        if (count < 0) break
-                        size += count
-                        check(size <= MODEL_BYTES) { "Invalid model asset" }
-                        digest.update(buffer, 0, count)
-                        output.write(buffer, 0, count)
-                    }
-                    check(size == MODEL_BYTES && hex(digest.digest()) == MODEL_HASH) { "Invalid model asset" }
-                }
-            }
-            try {
-                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-            return file
-        } finally { temporary.delete() }
-    }
+    fun prepare(files: Map<String, dev.zeroinput.engine.api.PublicResourceFile>): File =
+        checkedFile(requireNotNull(files["mini-int8/model.onnx"]), MODEL_BYTES, MODEL_HASH)
 
-    fun vocabulary(context: Context): MaskedWordTokenizer {
-        context.assets.open("mini-int8/vocab.txt").use {
-            check(verified(it, VOCAB_BYTES, VOCAB_HASH)) { "Invalid model vocabulary" }
-        }
-        return MaskedWordTokenizer(context.assets.open("mini-int8/vocab.txt").reader(Charsets.UTF_8))
+    fun vocabulary(files: Map<String, dev.zeroinput.engine.api.PublicResourceFile>): MaskedWordTokenizer =
+        MaskedWordTokenizer(checkedFile(requireNotNull(files["mini-int8/vocab.txt"]), VOCAB_BYTES, VOCAB_HASH).reader(Charsets.UTF_8))
+
+    private fun checkedFile(file: dev.zeroinput.engine.api.PublicResourceFile, bytes: Long, hash: String): File {
+        require(file.bytes == bytes && file.sha256 == hash) { "Unsupported Mini resource" }
+        return File(file.path)
     }
 
     internal fun verified(source: InputStream, expectedBytes: Long, expectedHash: String): Boolean {

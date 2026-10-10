@@ -18,7 +18,7 @@ internal fun panelIconButton(context: Context, icon: Int, description: Int, acti
         setBackgroundResource(backgroundValue.resourceId)
         imageTintList = ColorStateList.valueOf(MaterialColors.getColor(context,
             com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
-        val padding = (12 * resources.displayMetrics.density).toInt()
+        val padding = (14 * resources.displayMetrics.density).toInt()
         setPadding(padding, padding, padding, padding)
         setOnClickListener { action() }
     }

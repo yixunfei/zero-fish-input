@@ -5,7 +5,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 
@@ -63,7 +62,7 @@ internal class KeyboardPlacementControls(context: Context) : LinearLayout(contex
         }
     }
 
-    private fun button(label: String, description: Int) = TextView(context).apply {
+    private fun button(label: String, description: Int) = PlacementButton(context).apply {
         text = label
         contentDescription = context.getString(description)
         textSize = 20f
@@ -73,6 +72,11 @@ internal class KeyboardPlacementControls(context: Context) : LinearLayout(contex
         layoutParams = LayoutParams(dp(48), dp(48))
         setTextColor(com.google.android.material.color.MaterialColors.getColor(context,
             com.google.android.material.R.attr.colorOnSurface, android.graphics.Color.BLACK))
+    }
+
+    private class PlacementButton(context: Context) : androidx.appcompat.widget.AppCompatTextView(context) {
+        override fun performClick(): Boolean = super.performClick()
+        override fun getAccessibilityClassName(): CharSequence = android.widget.Button::class.java.name
     }
 
     private inner class DragListener(val action: (Float, Float, Boolean) -> Unit) : OnTouchListener {

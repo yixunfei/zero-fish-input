@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="key_numbers">数字键盘</string>
     <string name="panel_expand">展开面板</string>
     <string name="panel_collapse">收起面板</string>
     <string name="expression_search_input">输入表情搜索词</string>
@@ -139,6 +140,7 @@
     <string name="secure_clipboard_copy_selection">复制选中文字到 ZeroInput</string>
     <string name="secure_clipboard_disabled">安全剪贴板未启用</string>
     <string name="secure_clipboard_empty">暂无安全片段</string>
+    <string name="secure_clipboard_load_failed">无法读取片段列表，请重试或打开管理页认证后恢复</string>
     <string name="secure_clipboard_manage">管理安全剪贴板</string>
     <string name="secure_clipboard_open">安全剪贴板</string>
     <string name="secure_clipboard_confirm_hint">请确认当前输入框，再粘贴所选片段</string>

@@ -85,6 +85,27 @@ this report. The test prints only pass categories and a model count, not the key
 or model output. It creates no conversation persistence. The key is no longer used
 after this validation; remote revocation remains with the user.
 
+## Revalidation (2026-10-09, Asia/Shanghai)
+
+Installed x86_64 Debug APK SHA-256:
+
+`93b6f95b6709fc1a233b77e0bf35e8c5a9fc1c5b81b89b762f6e6497a22d013a`
+
+The installed package hash was verified before and after each live fixture. The
+temporary provider returned a catalog of three models. Both explicit live
+instrumentation fixtures passed on emulator-5554:
+
+- Transport: catalog discovery, connection probe, completion through base and
+  complete endpoint forms, continued conversation context, and invalid-credential
+  authentication rejection.
+- Settings and IME: disabled-network guidance, invalid-credential error,
+  multi-model selection, unsaved-draft connection testing, explicit save and
+  saved-provider testing, model selection, two-turn keyboard generation, New chat,
+  local quick model switching, and explicit result insertion.
+
+Credentials existed only in the instrumentation process. No credential, remote
+address, prompt, response, or saved conversation is included in this record.
+
 ## Withdrawn artifact and remaining limits
 
 **Withdrawn:** the following ARM64 artifact was incorrectly copied from a stale

@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private var clipboardAuthRequest: AuthenticationBroker.RequestHandle? = null
     private var aiConfig = AiConfiguration()
     private var aiConfigReady = false
+    private var aiReadGeneration = 0L
     private var aiDialog: AiProviderSettingsDialog? = null
     private var languagePackOperationGeneration = 0L
     private val operations = SettingsTaskRunner(
@@ -88,8 +89,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val token = ++aiReadGeneration
         graph.readAiConfiguration { result -> runOnUiThread {
-            if (!isFinishing && !isDestroyed) {
+            if (!isFinishing && !isDestroyed && token == aiReadGeneration) {
                 aiConfig = result.getOrDefault(AiConfiguration())
                 aiConfigReady = result.isSuccess
                 render()
@@ -273,6 +275,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateAiConfig(completed: (Boolean) -> Unit = {}, change: AiConfiguration.() -> AiConfiguration) {
         if (!aiConfigReady) { completed(false); return }
+        aiReadGeneration++
         val next = aiConfig.change()
         aiConfigReady = false
         screen.setAiControlsEnabled(false)
@@ -295,7 +298,7 @@ class MainActivity : AppCompatActivity() {
             .also { it.show() }
     }
 
-    private fun startAiTest(render: (dev.zeroinput.ime.ai.AiProbeState) -> Unit): AutoCloseable {
+    private fun startAiTest(draft: AiConfiguration, render: (dev.zeroinput.ime.ai.AiProbeState) -> Unit): AutoCloseable {
         val active = java.util.concurrent.atomic.AtomicBoolean(true)
         val data = graph.aiDataGeneration.current()
         val config = graph.aiConfigurationSnapshot() ?: AiConfiguration()
@@ -310,7 +313,7 @@ class MainActivity : AppCompatActivity() {
             render = render,
         )
         val observer = graph.observeAiConfiguration { screen.post { if (active.get()) probe.cancel() } }
-        probe.start(config)
+        probe.start(draft.copy(enabled = config.enabled, networkAllowed = config.networkAllowed))
         return AutoCloseable { active.set(false); observer.close(); probe.close() }
     }
 
@@ -349,6 +352,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage(R.string.ai_data_clear_message)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
+                aiReadGeneration++
                 aiConfigReady = false
                 screen.setAiControlsEnabled(false)
                 graph.clearAiData { success -> runOnUiThread {

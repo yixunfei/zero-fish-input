@@ -23,6 +23,7 @@ internal class AiWorkbenchController(
     private val renderContext: (AiContextState) -> Unit = {},
     private val renderHistoryStatus: (Boolean, Boolean, Boolean) -> Unit = { _, _, _ -> },
     private val contextCurrent: () -> Boolean = { true },
+    private val storageFailed: () -> Unit = {},
 ) {
     private val context = AiContextSelection()
     val contextState: AiContextState get() = context.state
@@ -34,6 +35,7 @@ internal class AiWorkbenchController(
     private var resultDataGeneration = -1L
     private var boundConfiguration = configuration()
     private var selectedModel: String? = null
+    private var outputNeedsReset = false
 
     fun invalidate() {
         stop()
@@ -42,18 +44,19 @@ internal class AiWorkbenchController(
         selected = null
         context.reset()
         renderContext(context.state)
-        renderConversation(null)
+        showConversation(null)
         renderList(emptyList())
     }
 
     fun stop() {
+        // Generation revocation is required even when only a storage task is pending.
         generation.incrementAndGet()
         delivery?.close()
         delivery = null
         handle?.cancel()
         handle = null
         result = null
-        render(AiStreamEvent.Cancelled)
+        if (outputNeedsReset) renderOutput(AiStreamEvent.Cancelled)
     }
 
     /** Explicit user cancellation ends the request and clears transient context choices. */
@@ -70,7 +73,7 @@ internal class AiWorkbenchController(
         selected = null
         context.reset()
         renderContext(context.state)
-        renderConversation(null)
+        showConversation(null)
     }
 
     fun includeHistory(revision: Long, index: Int, included: Boolean) = changeContext {
@@ -145,7 +148,7 @@ internal class AiWorkbenchController(
             selected = it
             context.reset(it?.messages.orEmpty())
             renderContext(context.state)
-            renderConversation(it)
+            showConversation(it)
         })
     }
 
@@ -157,7 +160,7 @@ internal class AiWorkbenchController(
             selected = null
             context.reset()
             renderContext(context.state)
-            renderConversation(null)
+            showConversation(null)
         }
         storage({ current -> conversations.delete(id, current) }, deliver = { refreshConversations() })
     }
@@ -169,7 +172,7 @@ internal class AiWorkbenchController(
         storage({ current -> conversations.rename(id, title, current) }, { renamed ->
             if (renamed != null && selected?.id == id) {
                 selected = renamed
-                renderConversation(renamed)
+                showConversation(renamed)
             }
             refreshConversations(showLoading = false)
         })
@@ -213,21 +216,21 @@ internal class AiWorkbenchController(
                     // result or persisting it.
                     if (event.text.isBlank() || event.text.length > AiLimits.MAX_OUTPUT_CHARS) {
                         result = null
-                        render(AiStreamEvent.Failed(AiProviderError.Response("AI response is invalid")))
+                        renderOutput(AiStreamEvent.Failed(AiProviderError.Response("AI response is invalid")))
                     } else {
                         complete(request, previous, event.text, token, data, config.saveConversations)
-                        render(event)
+                        renderOutput(event)
                     }
                 }
                 is AiStreamEvent.Failed, AiStreamEvent.Cancelled -> {
-                    render(event)
+                    renderOutput(event)
                     result = null
                 }
-                else -> render(event)
+                else -> renderOutput(event)
             }
         }
         delivery = sink
-        render(AiStreamEvent.Started)
+        renderOutput(AiStreamEvent.Started)
         try {
             handle = coordinator.submit(request, AiGenerationPolicy(true, true, false), sink::offer)
         } catch (_: Exception) {
@@ -255,7 +258,7 @@ internal class AiWorkbenchController(
         selected = conversation
         context.append(history, (previous?.messages.orEmpty().size + 2 - history.size).coerceAtLeast(0))
         renderContext(context.state)
-        renderConversation(conversation)
+        showConversation(conversation)
         if (save) storage({ current -> conversations.upsert(conversation, current) }, { refreshConversations() }, token, data)
     }
 
@@ -276,17 +279,20 @@ internal class AiWorkbenchController(
                 post {
                     reconcilePersistence()
                     if (current() && allowed()) value.fold(deliver) {
-                        if (historyRead) renderHistoryStatus(true, false, true)
-                        fail(AiProviderError.Storage())
+                        reportStorageFailure(historyRead)
                     }
                 }
             }
         } catch (_: RejectedExecutionException) {
             if (current() && allowed()) {
-                if (historyRead) renderHistoryStatus(true, false, true)
-                fail(AiProviderError.Storage())
+                reportStorageFailure(historyRead)
             }
         }
+    }
+
+    private fun reportStorageFailure(historyRead: Boolean) {
+        if (historyRead) renderHistoryStatus(true, false, true)
+        else storageFailed()
     }
 
     /** Provider/model/key changes revoke results and context even before an observer is delivered. */
@@ -313,7 +319,17 @@ internal class AiWorkbenchController(
 
     private fun fail(error: AiProviderError = AiProviderError.Policy("AI operation unavailable")) {
         result = null
-        render(AiStreamEvent.Failed(error))
+        renderOutput(AiStreamEvent.Failed(error))
+    }
+
+    private fun renderOutput(event: AiStreamEvent) {
+        outputNeedsReset = event != AiStreamEvent.Cancelled
+        render(event)
+    }
+
+    private fun showConversation(value: AiConversation?) {
+        outputNeedsReset = value != null
+        renderConversation(value)
     }
 
     private fun conversationTitle(input: String): String {

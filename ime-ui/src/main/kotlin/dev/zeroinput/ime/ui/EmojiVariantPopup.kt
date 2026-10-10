@@ -1,7 +1,7 @@
 package dev.zeroinput.ime.ui
 
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+import androidx.core.graphics.drawable.toDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -28,7 +28,7 @@ internal class EmojiVariantPopup(
         isFocusable = true
         isOutsideTouchable = true
         inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
-        setBackgroundDrawable(ColorDrawable(MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorSurface)))
+        setBackgroundDrawable(MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorSurface).toDrawable())
         elevation = dp(8).toFloat()
     }
 

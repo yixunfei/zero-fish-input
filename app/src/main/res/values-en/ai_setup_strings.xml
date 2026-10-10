@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_settings_saving">Saving settings…</string>
+    <string name="ai_setup_network_required">Turn on Enable AI and Allow AI network requests before fetching models or testing the connection.</string>
+    <string name="ai_setup_network_ready">Network access is allowed. Requests start only when you fetch models or test the connection.</string>
+    <string name="ai_default_model">Default / test model</string>
+    <string name="ai_test_draft">Test current configuration</string>
+    <string name="ai_draft_test_notice">Uses the address, key and selected model above to send a fixed short test. A small charge may apply. A successful test does not save changes.</string>
+    <string name="ai_endpoint_invalid">Enter a valid HTTPS API address without credentials, query parameters or fragments.</string>
+    <string name="ai_key_invalid">Enter a valid API key without spaces or line breaks.</string>
+    <string name="ai_models_invalid">Choose or enter 1 to 32 models, with at most 128 characters per model ID.</string>
+    <string name="ai_name_invalid">Enter a Provider name without line breaks or control characters.</string>
+    <string name="ai_provider_limit">You can save up to 16 Providers. Remove an unused configuration first.</string>
+    <string name="ai_http_failure">%1$s (HTTP %2$d)</string>
+</resources>

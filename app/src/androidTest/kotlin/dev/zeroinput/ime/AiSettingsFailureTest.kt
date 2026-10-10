@@ -114,11 +114,11 @@ class AiSettingsFailureTest {
         }
     }
 
-    @Test fun rejectedEndpointRetainsSavedFieldsAndKeepsNetworkSwitchesOff() {
+    @Test fun rejectedEditorEndpointRetainsSavedFieldsAndDoesNotRevokeNetwork() {
         val original = graph.aiConfiguration.read()
         val profile = AiProviderProfile("fixture", "Fixture", "https://provider.example/fixture",
             "public-fixture-key", listOf("fixture-model"), "fixture-model")
-        val fixture = AiConfiguration(enabled = true, providers = listOf(profile), selectedProviderId = profile.id)
+        val fixture = AiConfiguration(enabled = true, networkAllowed = true, providers = listOf(profile), selectedProviderId = profile.id)
         saveConfiguration(fixture)
         var activity: MainActivity? = null
         try {
@@ -130,16 +130,17 @@ class AiSettingsFailureTest {
                 field(R.string.ai_endpoint_hint).setText("http://invalid.example/fixture")
                 dialogSave().performClick()
             }
-            await { graph.aiConfigurationSnapshot() == null && fieldOrNull(R.string.ai_endpoint_hint)?.error != null }
+            await { fieldOrNull(R.string.ai_endpoint_hint)?.error != null }
+            assertEquals(fixture, graph.aiConfigurationSnapshot())
             onMain {
                 field(R.string.ai_endpoint_hint).setText(profile.endpoint)
                 assertEquals(profile.selectedModel, field(R.string.ai_models_hint).text.toString())
                 dialogSave().performClick()
             }
-            await { graph.aiConfigurationSnapshot() != null }
+            await { graph.aiConfigurationSnapshot() != null && fieldOrNull(R.string.ai_endpoint_hint) == null }
             val saved = checkNotNull(graph.aiConfigurationSnapshot())
-            assertFalse(saved.enabled)
-            assertFalse(saved.networkAllowed)
+            assertTrue(saved.enabled)
+            assertTrue(saved.networkAllowed)
             assertEquals(profile.endpoint, saved.activeEndpoint())
             assertEquals(profile.selectedModel, saved.activeModel())
             assertEquals(profile.apiKey, saved.activeKey())
@@ -161,7 +162,7 @@ class AiSettingsFailureTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             openSettings(activity)
             onMain {
-                val switches = windows().filterIsInstance<MaterialSwitch>().filter { it.isShown }
+                val switches = foreground().filterIsInstance<MaterialSwitch>().filter { it.isShown }
                 val aiEnabled = switches.single { it.text == activity.getString(R.string.ai_enabled) }
                 val aiNetwork = switches.single { it.text == activity.getString(R.string.ai_network) }
                 assertTrue(aiEnabled.isChecked)
@@ -172,7 +173,7 @@ class AiSettingsFailureTest {
                 graph.aiConfigurationSnapshot()?.let { !it.enabled && !it.networkAllowed } == true
             }
             onMain {
-                val switches = windows().filterIsInstance<MaterialSwitch>().filter { it.isShown }
+                val switches = foreground().filterIsInstance<MaterialSwitch>().filter { it.isShown }
                 assertFalse(switches.single { it.text == activity.getString(R.string.ai_enabled) }.isChecked)
                 assertFalse(switches.single { it.text == activity.getString(R.string.ai_network) }.isChecked)
             }
@@ -227,6 +228,7 @@ class AiSettingsFailureTest {
         it.isShown && it.id == android.R.id.button1
     }
     private fun windows() = WindowInspector.getGlobalWindowViews().flatMap(::views)
+    private fun foreground() = WindowInspector.getGlobalWindowViews().lastOrNull()?.let(::views).orEmpty()
     private fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
     private fun await(condition: () -> Boolean) {

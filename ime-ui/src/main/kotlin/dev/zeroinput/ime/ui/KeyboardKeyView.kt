@@ -12,6 +12,8 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
     private var holding = false
     private var revision = 0L
     private var gestureRevision: Long? = null
+    private var gestureAction: KeyboardAction? = null
+    private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
     private var action: KeyboardAction? = null
     internal val boundAction: KeyboardAction? get() = action
     private var longPressed = false
@@ -26,11 +28,13 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
         isSoundEffectsEnabled = false
         letterSpacing = 0f
         setPadding(0, 0, 0, 0)
-        setOnClickListener { action?.let(onAction) }
+        setOnClickListener { (gestureAction ?: action)?.let(onAction) }
     }
 
-    fun bind(spec: KeySpec) {
-        if (action != spec.action) { revision++; cancelTouch() }
+    fun bind(spec: KeySpec, preserveCaseGesture: Boolean = false) {
+        val sameLetter = action is KeyboardAction.Text && spec.action is KeyboardAction.Text &&
+            (action as KeyboardAction.Text).value.equals(spec.action.value, ignoreCase = true)
+        if (action != spec.action && !(preserveCaseGesture && holding && sameLetter)) { revision++; cancelTouch() }
         action = spec.action
         if (text != spec.label) text = spec.label
         contentDescription = spec.contentDescription
@@ -52,7 +56,7 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
         val current = gestureRevision == null || gestureRevision == revision
         gestureRevision = null
         if (!isEnabled || !current) return false
-        return super.performClick()
+        return try { super.performClick() } finally { gestureAction = null }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -62,27 +66,37 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
                 longPressed = false
                 isPressed = true
                 gestureRevision = revision
+                gestureAction = action
                 if (isLongClickable) postDelayed(longPress, android.view.ViewConfiguration.getLongPressTimeout().toLong())
             }
             MotionEvent.ACTION_MOVE -> if (!inside(event)) cancelTouch()
             MotionEvent.ACTION_UP -> {
                 val click = holding && !longPressed && inside(event)
-                cancelTouch()
+                holding = false
+                isPressed = false
+                removeCallbacks(longPress)
                 // View's posted PerformClick can sit behind another frame and queued keys.
                 if (click) performClick()
+                cancelTouch()
             }
             MotionEvent.ACTION_CANCEL -> cancelTouch()
         }
         return true
     }
 
-    fun cancelTouch() { holding = false; isPressed = false; removeCallbacks(longPress) }
+    fun cancelTouch() {
+        holding = false
+        isPressed = false
+        gestureAction = null
+        removeCallbacks(longPress)
+    }
 
     override fun onDetachedFromWindow() { cancelTouch(); super.onDetachedFromWindow() }
 
     override fun getAccessibilityClassName(): CharSequence = android.widget.Button::class.java.name
 
-    private fun inside(event: MotionEvent): Boolean = event.x >= 0 && event.y >= 0 && event.x < width && event.y < height
+    private fun inside(event: MotionEvent): Boolean = event.x >= -touchSlop && event.y >= -touchSlop &&
+        event.x < width + touchSlop && event.y < height + touchSlop
 
     private fun tile(color: Int, line: Int, radius: Float, inset: Int, appearance: KeyboardAppearance, pressed: Boolean) =
         KeyboardKeyDrawable(color, line, radius, inset, appearance.material, appearance.borders, pressed,

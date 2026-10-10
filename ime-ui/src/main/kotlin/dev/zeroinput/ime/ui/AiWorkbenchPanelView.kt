@@ -10,6 +10,8 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.view.isNotEmpty
+import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.ai.api.*
@@ -44,7 +46,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private var inputLanguage = InputLanguage.CHINESE
     var editing = false
         private set
-    val editingHeightDp: Int get() = if (attachmentRow.childCount > 0) 272 else 224
+    val editingHeightDp: Int get() = if (attachmentRow.isNotEmpty()) 272 else 224
 
     private val inputStatus = textView().apply { textSize = 12f; gravity = Gravity.CENTER_VERTICAL }
     private val model: MaterialButton = button(R.string.ai_switch_model) { modelMenu.show() }.apply {
@@ -322,13 +324,14 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     private fun showMore() {
         val menu = androidx.appcompat.widget.PopupMenu(context, more)
-        val commands = listOf(importContent, addContent, settings).filter { it !== importContent || importContent.visibility == VISIBLE }
+        val commands = listOf(importContent, addContent, settings).filter { it !== importContent || importContent.isVisible }
         commands.forEachIndexed { index, button -> menu.menu.add(0, index, index, button.text) }
         menu.setOnMenuItemClickListener { commands[it.itemId].performClick(); true }
         menu.show()
     }
 
     fun reset() {
+        contextRows.closePreview()
         renderRenaming(false)
         detailMode = DetailMode.RESULT
         updateDetailVisibility()

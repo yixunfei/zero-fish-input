@@ -82,12 +82,18 @@ adapts the IME content/visible/touchable insets. Floating mode reserves no full-
 content inset and only its visible rectangle receives input; docked/one-hand modes
 reserve their measured height. No application overlay window or permission is used.
 Only public geometry is stored, separately for portrait and landscape.
-Keyboard and candidate layout decisions use the measured IME viewport, including the
-current split-screen or freeform width and height, rather than device orientation or
-full display size. Docked and one-hand surfaces consume the window's supplied bottom
+Keyboard and candidate layout decisions use the measured surface width and current
+window bounds, including split-screen or freeform constraints. Attached hosts use
+WindowMetrics (configuration height on Android 8/9/10), so a second WRAP_CONTENT
+measurement against the collapsed IME cannot toggle responsive layouts. Child
+measurement remains bounded by the parent's supplied height. Very short wide
+windows reserve editor space and compress rows only when their preferred height
+cannot fit. Docked and one-hand surfaces consume the window's supplied bottom
 edge directly; only floating and expanded full-window panels reserve system-bar safety
-insets. Narrow viewports retain candidate browsing width by moving secondary actions
-into an accessible overflow menu.
+insets. Candidate viewports retain browsing width by moving secondary actions
+to the left tools entry, with a direct expand/collapse control on the right.
+Expanded candidates pack consecutive words by measured text width and share the
+remaining row width, while preserving the bounded window and scroll anchor.
 
 The complete Emoji 18.0 catalog and suffix trie are built on a bounded worker from
 hash-verified bundled data. UI category lookup uses immutable indexes; text searches
@@ -231,6 +237,12 @@ independent AI data generation invalidate late callbacks and queued conversation
 editor, settings, service or stored AI data changes. Conversation persistence is disabled by
 default, exposes summaries before selection, and uses a dedicated Keystore alias under
 `noBackupFilesDir`.
+
+Conversation-storage failures use a separate feedback callback or the history-list
+error state; they cannot replace a completed answer or cancel an active stream.
+Result insertion still checks the live editor, reference and data generations.
+Repeated draft edits revoke queued work each time but only render cancellation
+when output actually needs clearing.
 
 `LocalDraftInput` retains at most one prepared engine until its current composition
 ends, resumes delivery after draft commands, and retries preparation on Rime readiness.
@@ -654,6 +666,9 @@ performs bounded traversal through a testable node port. `PageReferenceBroker`
 connects that service to `AiPageReferenceBinding`, whose lifetime belongs to the
 IME. The broker retains no text or InputConnection. It uses its own one-thread,
 one-queued-task worker, independent of key conversion, transport and storage.
+The entry point uses the broker's availability policy, including its connection,
+reference opt-in, learning/incognito and AI/network settings; session privacy is
+checked separately before offering settings or starting capture.
 Event callbacks only invalidate via window metadata; only an explicit capture
 request retrieves nodes. Generation checks occur during traversal, UI delivery,
 reference acceptance, Send and Insert. See ADR 0019 for limits and OS caveats.
@@ -726,3 +741,24 @@ GitHub requests. `engine-rime` and `model-scoring` receive the source by injecti
 LTS and handwriting are optional in lightweight builds. Native libraries stay
 bundled. The bounded Chinese glide index is derived from Wanxiang at build time;
 legacy Luna/essay files are excluded from APKs.
+
+## Compressed deployment and reduced inference (ADR 0022)
+
+`engine-rime/XzDictionaryReader` bounds and validates XZ streams on the existing
+Rime worker before atomic generation activation. `model-scoring` consumes Mini
+resource leases; model resource revisions invalidate asynchronous rankings. Lite
+omits Mini/LTS/handwriting, while full bundles all three. The shared ONNX CPU
+runtime is compiled for the reviewed graph/operator set into every APK; downloaded
+resources never introduce native code. See ADR 0022 and tools/onnxruntime/README.md.
+
+Review hardening (2026-10-10): `SecureClipboardVault.summaries` reports index
+unavailability without decrypting the body. The app carries that failure through
+the existing panel/session revision check into a generic UI error. Authenticated
+management compares the authoritative body's IDs/timestamps with the independent
+index and repairs only mismatches or failures, rechecking the deletion generation
+after index I/O. Formats, keys and authentication boundaries remain unchanged.
+Dictionary catalog parsing validates GitHub asset addresses before displaying rows,
+and resolution and transport each revalidate them. Reduced runtime trust is rooted
+in `tools/onnxruntime/runtime.lock.json`; ONNX/XZ checks resolve the matching build
+variant. Public-resource publication builds Mini from pinned upstream inputs and
+compares against the reviewed catalog without fetching the Release being created.

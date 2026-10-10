@@ -15,6 +15,109 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun lateStorageFailureCannotNotifyOrReviveARevokedResult() {
+        for (revocation in 0..4) {
+            val f = Fixture()
+            f.store.failWrite = true
+            f.controller.submit(AiAction.ASK, "public question", null)
+            f.provider.emit(AiStreamEvent.Completed("public answer"))
+            f.ui.drain()
+            f.worker.drain()
+            when (revocation) {
+                0 -> f.controller.invalidate()
+                1 -> f.generation.invalidate()
+                2 -> f.allowed = false
+                3 -> f.contextCurrent = false
+                4 -> f.persistenceEnabled = false
+            }
+            f.ui.drain()
+            assertEquals(0, f.storageFailures)
+            assertNull(f.controller.consumeResult())
+            assertTrue(f.repository.list().isEmpty())
+        }
+    }
+
+    @Test fun rejectedAutomaticListRefreshPreservesTheSavedAnswer() {
+        val f = Fixture()
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.provider.emit(AiStreamEvent.Completed("public answer"))
+        f.ui.drain()
+        f.worker.drain()
+        f.worker.reject = true
+        f.ui.drain()
+        assertTrue(f.historyFailed.last())
+        assertFalse(f.events.any { it is AiStreamEvent.Failed })
+        assertEquals("public answer", f.controller.consumeResult())
+        assertEquals(1, f.repository.list().size)
+    }
+
+    @Test fun editingStillRevokesPendingHistoryWhenNoOutputNeedsClearing() {
+        val f = Fixture()
+        f.repository.upsert(AiConversation(id = "saved", title = "public chat"))
+        f.controller.selectConversation("saved")
+        f.worker.drain()
+        f.controller.stop()
+        f.ui.drain()
+        f.controller.submit(AiAction.ASK, "fresh question", null)
+        assertNull(f.provider.requests.last().conversationId)
+    }
+
+    @Test fun failedSaveOrQueueRejectionPreservesCompletedAnswerForOneInsertion() {
+        for (reject in listOf(false, true)) {
+            val f = Fixture()
+            f.controller.submit(AiAction.ASK, "public question", null)
+            f.worker.reject = reject
+            f.store.failWrite = !reject
+            f.provider.emit(AiStreamEvent.Completed("public answer"))
+            f.flush()
+            assertFalse(f.events.any { it is AiStreamEvent.Failed })
+            assertEquals(1, f.storageFailures)
+            assertEquals("public answer", f.controller.consumeResult())
+            assertNull(f.controller.consumeResult())
+            assertTrue(f.repository.list().isEmpty())
+        }
+    }
+
+    @Test fun historyFailureDoesNotCancelAnActiveRequestOrEraseACompletedAnswer() {
+        for (completed in listOf(false, true)) {
+            val f = Fixture(save = true)
+            f.controller.submit(AiAction.ASK, "public question", null)
+            if (completed) {
+                f.provider.emit(AiStreamEvent.Completed("public answer"))
+                f.flush()
+            }
+            f.worker.reject = true
+            f.controller.refreshConversations()
+            assertTrue(f.historyFailed.last())
+            assertFalse(f.events.any { it is AiStreamEvent.Failed })
+            if (!completed) f.provider.emit(AiStreamEvent.Completed("public answer"))
+            f.flush()
+            assertEquals("public answer", f.controller.consumeResult())
+        }
+    }
+
+    @Test fun repeatedEditingStopsRenderCancellationOnlyOnceAndRejectLateOutput() {
+        val f = Fixture(save = false)
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.events.clear()
+        f.controller.stop()
+        repeat(5) { f.controller.stop() }
+        f.provider.emit(AiStreamEvent.Completed("late answer"))
+        f.flush()
+        assertEquals(listOf(AiStreamEvent.Cancelled), f.events)
+        assertNull(f.controller.consumeResult())
+    }
+
+    @Test fun editingAfterAConfigurationFailureClearsTheErrorOnlyOnce() {
+        val f = Fixture(save = false)
+        f.profile = f.profile.copy(apiKey = "")
+        f.controller.submit(AiAction.ASK, "public question", null)
+        assertTrue(f.events.last() is AiStreamEvent.Failed)
+        f.events.clear()
+        repeat(3) { f.controller.stop() }
+        assertEquals(listOf(AiStreamEvent.Cancelled), f.events)
+    }
+
     @Test fun failedRenameReportsAStorageOperationWithoutClaimingHistoryLoadingFailed() {
         for (reject in listOf(false, true)) {
             val f = Fixture()
@@ -23,7 +126,8 @@ class AiWorkbenchControllerTest {
             f.store.failWrite = !reject
             f.controller.renameConversation("saved", "new")
             f.flush()
-            assertTrue(f.events.filterIsInstance<AiStreamEvent.Failed>().single().error is AiProviderError.Storage)
+            assertFalse(f.events.any { it is AiStreamEvent.Failed })
+            assertEquals(1, f.storageFailures)
             assertTrue(f.historyFailed.none { it })
             assertEquals("old", f.repository.list().single().title)
         }
@@ -34,7 +138,8 @@ class AiWorkbenchControllerTest {
         f.worker.reject = true
         f.controller.refreshConversations()
         assertTrue(f.historyFailed.last())
-        assertTrue(f.events.filterIsInstance<AiStreamEvent.Failed>().single().error is AiProviderError.Storage)
+        assertFalse(f.events.any { it is AiStreamEvent.Failed })
+        assertEquals(0, f.storageFailures)
     }
 
     @Test fun explicitCancelDropsReferencesAndHistoryButEditingStopPreservesSelections() {
@@ -408,6 +513,7 @@ class AiWorkbenchControllerTest {
         var summaries = emptyList<AiConversationSummary>()
         val historyLoading = mutableListOf<Boolean>()
         val historyFailed = mutableListOf<Boolean>()
+        var storageFailures = 0
         var profile = AiProviderProfile(
             id = "fixture",
             name = "Fixture",
@@ -428,7 +534,7 @@ class AiWorkbenchControllerTest {
             },
             generation, { ui.execute(it); true }, { allowed }, events::add, { summaries = it }, {},
             renderHistoryStatus = { _, loading, failed -> historyLoading += loading; historyFailed += failed },
-            contextCurrent = { contextCurrent })
+            contextCurrent = { contextCurrent }, storageFailed = { storageFailures++ })
         fun flush() { repeat(3) { ui.drain(); worker.drain() }; ui.drain() }
     }
     private class Queue : Executor {

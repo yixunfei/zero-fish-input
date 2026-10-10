@@ -136,6 +136,7 @@ class KeyboardNavigationGestureTest {
         panel.renderChineseOptions(configured)
         var toggles = 0
         panel.onFuzzySwitchRequested = { toggles++; panel.renderChineseOptions(configured.copy(fuzzyPinyinEnabled = false)) }
+        tap(panel, UiR.string.keyboard_tools)
         tap(panel, UiR.string.fuzzy_disable)
         assertEquals(1, toggles)
         assertNotNull(find(panel, UiR.string.fuzzy_enable))
@@ -151,6 +152,7 @@ class KeyboardNavigationGestureTest {
         var toggles = 0
         panel.onFuzzySettingsRequested = { settings++ }
         panel.onFuzzySwitchRequested = { toggles++ }
+        tap(panel, UiR.string.keyboard_tools)
         tap(panel, UiR.string.fuzzy_enable)
         assertEquals(0, settings)
         assertEquals(1, toggles)

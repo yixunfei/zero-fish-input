@@ -37,6 +37,14 @@ class AsyncCandidateRanker(
     // Only the worker touches these resources, including destruction.
     private var scorer: CandidateScorer? = null
     private var failed = false
+    private val scorerGeneration = AtomicLong()
+    private var preparedScorerGeneration = -1L
+
+    /** Invalidates pending results and recreates the model on its owning worker. */
+    fun resourcesChanged() = synchronized(lock) {
+        scorerGeneration.incrementAndGet()
+        cancelLocked()
+    }
 
     fun setEnabled(value: Boolean) = synchronized(lock) {
         if (closed || enabled == value) return@synchronized
@@ -108,6 +116,13 @@ class AsyncCandidateRanker(
 
     private fun score(request: Request) {
         val cancelled = { generation.get() != request.generation || now() > request.deadline }
+        val currentScorerGeneration = scorerGeneration.get()
+        if (preparedScorerGeneration != currentScorerGeneration) {
+            try { scorer?.close() } catch (_: Exception) { /* Content-free failure. */ }
+            scorer = null
+            failed = false
+            preparedScorerGeneration = currentScorerGeneration
+        }
         if (failed || cancelled()) return
         try {
             val active = scorer ?: createScorer().also { scorer = it }

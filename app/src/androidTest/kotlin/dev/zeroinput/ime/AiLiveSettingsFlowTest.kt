@@ -48,7 +48,7 @@ class AiLiveSettingsFlowTest {
         val pack = graph.settings.lastLanguagePackKey
         var settings: MainActivity? = null
         try {
-            configure(AiConfiguration(enabled = true, networkAllowed = true))
+            configure(AiConfiguration())
             settings = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             enterProvider(settings, endpoint, checkNotNull(key), model)
@@ -75,11 +75,31 @@ class AiLiveSettingsFlowTest {
         onMain { views(activity.window.decorView).filterIsInstance<TextView>().first {
             it.text == activity.getString(R.string.ai_settings) }.performClick() }
         tap(R.string.ai_add_provider)
+        await { top().filterIsInstance<EditText>().any {
+            it.hint == it.context.getString(R.string.ai_provider_name)
+        } }
         onMain {
             field(R.string.ai_provider_name).setText("Live acceptance")
             field(R.string.ai_endpoint_hint).setText(endpoint)
             field(R.string.ai_key_hint).setText(key)
             assertTrue("New provider should start with no assumed models", field(R.string.ai_models_hint).text.isEmpty())
+        }
+        tap(R.string.ai_fetch_models)
+        onMain {
+            assertTrue("Disabled network must explain how to continue", texts().any {
+                it.text == it.context.getString(R.string.ai_setup_network_required) })
+            assertFalse(checkNotNull(graph.aiConfigurationSnapshot()).networkAllowed)
+        }
+        tap(R.string.ai_enabled)
+        await { graph.aiConfigurationSnapshot()?.enabled == true }
+        tap(R.string.ai_network)
+        await { graph.aiConfigurationSnapshot()?.networkAllowed == true }
+        onMain { field(R.string.ai_key_hint).setText("public-invalid-key") }
+        tap(R.string.ai_fetch_models)
+        await(35_000) { texts().any { it.text.toString().contains("HTTP 401") || it.text.toString().contains("HTTP 403") } }
+        onMain {
+            assertTrue(checkNotNull(graph.aiConfigurationSnapshot()).networkAllowed)
+            field(R.string.ai_key_hint).setText(key)
         }
         tap(R.string.ai_fetch_models)
         await(35_000) { texts().any { it.text == it.context.getString(R.string.ai_models_select) } }
@@ -93,8 +113,15 @@ class AiLiveSettingsFlowTest {
         selectText(choices.first { it != model })
         tap(R.string.ai_models_apply)
         onMain { assertEquals(0, graph.aiConfigurationSnapshot()?.providers?.size) }
+        onMain { top().filterIsInstance<android.widget.Spinner>().single().performClick() }
+        selectText(model)
+        tap(R.string.ai_test_draft)
+        await(35_000) { texts().any { it.text == it.context.getString(R.string.ai_test_available) } }
+        onMain { assertEquals("Draft test must not save credentials", 0, graph.aiConfigurationSnapshot()?.providers?.size) }
+        tap(R.string.cancel)
         tap(R.string.save)
         await { graph.aiConfigurationSnapshot()?.providers?.singleOrNull()?.models?.size == 2 }
+        assertEquals(model, graph.aiConfigurationSnapshot()?.activeModel())
     }
 
     private fun chooseAndProbe(activity: MainActivity, model: String) {
@@ -214,7 +241,9 @@ class AiLiveSettingsFlowTest {
     private fun panel() = all().filterIsInstance<ZeroInputView>().single { it.isShown }
     private fun uiText(id: Int) = views(panel()).filterIsInstance<TextView>().firstOrNull { it.isShown && it.text == it.context.getString(id) }
     private fun tapUi(id: Int) { await { uiText(id)?.isEnabled == true }; onMain { checkNotNull(uiText(id)).performClick() } }
-    private fun top() = WindowInspector.getGlobalWindowViews().lastOrNull()?.let(::views).orEmpty()
+    private fun top() = WindowInspector.getGlobalWindowViews().asReversed().firstOrNull {
+        it.isAttachedToWindow
+    }?.let(::views).orEmpty()
     private fun texts() = top().filterIsInstance<TextView>().filter { it.isShown }
     private fun all() = WindowInspector.getGlobalWindowViews().flatMap(::views)
     private fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)

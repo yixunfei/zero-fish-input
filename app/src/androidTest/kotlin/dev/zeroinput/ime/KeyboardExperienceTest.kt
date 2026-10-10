@@ -59,9 +59,9 @@ class KeyboardExperienceTest {
                 }
                 val context = KeyboardThemeContext.create(instrumentation.targetContext.createConfigurationContext(config), theme)
                 val panel = ZeroInputView(context).apply { setKeyboardHeight(height) }
-                measure(panel, width)
+                measure(panel, width, if (width == 800) 320 else 1000)
                 val keyboard = views(panel).filterIsInstance<KeyboardPanel>().single()
-                assertTrue(panel.height <= dp(panel, if (width == 800) 300 else 340))
+                assertTrue("$theme $height $width: ${panel.height}", panel.height <= dp(panel, if (width == 800) 300 else 340))
                 for (i in 0 until keyboard.childCount) assertTrue(keyboard.getChildAt(i).height >= dp(panel, 48))
                 val foreground = color(context, com.google.android.material.R.attr.colorOnSurface)
                 for (background in listOf(com.google.android.material.R.attr.colorSurface, com.google.android.material.R.attr.colorPrimaryContainer)) {
@@ -177,9 +177,9 @@ class KeyboardExperienceTest {
     private fun top(root: ViewGroup, view: View): Int = android.graphics.Rect(0, 0, view.width, view.height).also {
         root.offsetDescendantRectToMyCoords(view, it)
     }.top
-    private fun measure(view: View, width: Int = 320) {
+    private fun measure(view: View, width: Int = 320, height: Int = 1000) {
         view.measure(View.MeasureSpec.makeMeasureSpec(dp(view, width), View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(dp(view, 1000), View.MeasureSpec.AT_MOST))
+            View.MeasureSpec.makeMeasureSpec(dp(view, height), View.MeasureSpec.AT_MOST))
         view.layout(0, 0, view.measuredWidth, view.measuredHeight)
     }
     private fun touch(view: View, action: Int) {

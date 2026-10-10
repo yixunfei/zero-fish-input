@@ -12,6 +12,11 @@ internal class RimeAssetInstaller(
     private val managedResources: Boolean = false,
     private val grammar: dev.zeroinput.engine.api.PublicResourceFile? = null,
 ) {
+    private val archives by lazy {
+        context.assets.open("rime/dictionary-archives.json").bufferedReader().use { reader ->
+            JSONObject(reader.readText()).also { require(it.getInt("format") == 1) }.getJSONObject("files")
+        }
+    }
     data class Directories(
         val shared: File,
         val user: File,
@@ -45,6 +50,7 @@ internal class RimeAssetInstaller(
     fun install(): Directories = dictionaries.withEnabledFiles { extras -> installSnapshot(extras) }
 
     private fun installSnapshot(snapshot: List<dev.zeroinput.engine.api.PublicDictionaryFile>): Directories {
+        check(android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) { "Dictionary deployment requires worker thread" }
         val root = File(context.noBackupFilesDir, "rime")
         val manifest = context.assets.open("rime/public-dictionaries.json").bufferedReader().use { JSONObject(it.readText()) }
         root.mkdirs()
@@ -150,6 +156,18 @@ internal class RimeAssetInstaller(
         if (managedResources && assetPath.endsWith(".gram")) return
         val children = context.assets.list(assetPath).orEmpty()
         if (children.isEmpty()) {
+            if (assetPath.endsWith(".dict.yaml.xz")) {
+                val spec = archives.getJSONObject(assetPath.removePrefix("rime/").removeSuffix(".xz"))
+                val output = File(destination.parentFile, destination.name.removeSuffix(".xz"))
+                output.parentFile?.mkdirs()
+                context.assets.open(assetPath).use { input ->
+                    output.outputStream().use { stream ->
+                        XzDictionaryReader.copy(input, stream, XzDictionaryReader.Spec(spec.getLong("bytes"),
+                            spec.getString("sha256"), spec.getLong("archiveBytes"), spec.getString("archiveSha256")))
+                    }
+                }
+                return
+            }
             destination.parentFile?.mkdirs()
             context.assets.open(assetPath).use { input ->
                 destination.outputStream().use(input::copyTo)
@@ -165,7 +183,7 @@ internal class RimeAssetInstaller(
 
     private companion object {
         const val ASSET_ROOT = "rime"
-        const val ASSET_VERSION = "8"
+        const val ASSET_VERSION = "9"
     }
 
     private fun grammarIdentity(): String = if (managedResources) grammar?.sha256 ?: "none" else "bundled"

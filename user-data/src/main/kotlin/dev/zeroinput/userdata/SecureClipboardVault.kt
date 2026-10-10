@@ -63,7 +63,7 @@ class SecureClipboardVault(
             require(grant.consume()) { "Authentication expired or was already used" }
             val entries = load().sortedByDescending(SecureClipboardEntry::updatedAtEpochMillis)
             checkOperationActive(expected) { true }
-            persistIndex(entries)
+            repairIndexIfNeeded(entries, expected)
             checkOperationActive(expected) { true }
             entries.map { it.toMetadata() }
         }
@@ -257,15 +257,31 @@ class SecureClipboardVault(
 
     private fun loadIndexSafely(): List<StoredSummary> {
         checkStorageAvailable()
-        if (indexNeedsRepair) return emptyList()
+        if (indexNeedsRepair) throw IOException("Secure clipboard index needs repair")
         indexCache?.let { return it }
         // Do not cache a transient decryption/I/O failure as an empty index.
         // Keystore availability can briefly change while the device is
         // unlocking; caching the failure would make the panel appear empty
         // until a write or process restart repaired it.
-        return runCatching(::loadIndex)
-            .onSuccess { indexCache = it }
-            .getOrDefault(emptyList())
+        return try {
+            loadIndex().also { indexCache = it }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            throw IOException("Secure clipboard index unavailable")
+        }
+    }
+
+    /** Authenticated body is authoritative, including after restart or a missing index. */
+    private fun repairIndexIfNeeded(entries: List<SecureClipboardEntry>, expectedGeneration: Long) {
+        val expected = entries.map { StoredSummary(it.id, it.updatedAtEpochMillis) }.sortedBy { it.id }
+        val actual = try {
+            if (indexNeedsRepair) null else loadIndexSafely().sortedBy { it.id }
+        } catch (_: IOException) {
+            null
+        }
+        checkOperationActive(expectedGeneration) { true }
+        if (actual != expected) persistIndex(entries)
     }
 
     private fun loadIndex(): List<StoredSummary> {
