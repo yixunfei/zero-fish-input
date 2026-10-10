@@ -18,11 +18,7 @@ def credentials():
     token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
     if token:
         return token
-    result = subprocess.run(['git', 'credential', 'fill'], input='protocol=https\nhost=github.com\n\n',
-        text=True, capture_output=True, check=True,
-        env=dict(os.environ, GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never'), timeout=20)
-    values = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
-    return values['password']
+    raise RuntimeError('Set GH_TOKEN or GITHUB_TOKEN explicitly to publish resources')
 
 
 def request(token, path, method='GET', data=None, file=None):

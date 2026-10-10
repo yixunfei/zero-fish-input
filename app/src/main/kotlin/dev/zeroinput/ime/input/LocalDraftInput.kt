@@ -19,6 +19,7 @@ import dev.zeroinput.ime.ui.KeyboardAction
 internal class LocalDraftInput(
     private val graph: () -> AppGraph,
     private val post: (Runnable) -> Boolean,
+    private val removePosted: (Runnable) -> Unit,
     private val render: (String, InputSessionState) -> Unit,
     private val maxChars: Int,
     private val multiline: Boolean = true,
@@ -46,7 +47,8 @@ internal class LocalDraftInput(
         controller = input
         input.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, language,
             PrivacyConfiguration(learningEnabled = false))
-        val handoff = EngineWarmupResultDelivery(post, ready = { !input.state.snapshot.isComposing }) { result ->
+        val handoff = EngineWarmupResultDelivery(post, ready = { !input.state.snapshot.isComposing },
+            removePosted = removePosted) { result ->
             if (session == generation && result is EngineWarmupResult.Prepared) {
                 input.adoptPreparedEngine(result.engine)
             }

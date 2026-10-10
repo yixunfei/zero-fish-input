@@ -172,10 +172,12 @@ open class ClipboardImportActivity : AppCompatActivity() {
         try {
             worker.execute {
                 val success = try {
-                    val text = current.copyText()
-                    if (text == null) false else {
+                    val text = current.copyChars()
+                    if (text == null) false else try {
                         vault.add(label, text, authorization, generation, current::isSaving)
                         true
+                    } finally {
+                        text.fill('\u0000')
                     }
                 } catch (_: Exception) {
                     false

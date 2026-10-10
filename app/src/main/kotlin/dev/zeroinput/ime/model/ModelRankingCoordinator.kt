@@ -17,6 +17,7 @@ class ModelRankingCoordinator(
     private var lastRevision = -1L
     private var frozen = true
     private var modelRevision = -1L
+    private var requestedController: InputSessionController? = null
     private val ranker = AsyncCandidateRanker(createScorer, post, ::deliver)
 
     @Synchronized fun invalidate() {
@@ -24,15 +25,17 @@ class ModelRankingCoordinator(
         ranker.cancel()
         context.clear()
         lastRevision = -1
+        requestedController = null
         frozen = true
     }
 
-    @Synchronized fun interaction() { ranker.cancel(); frozen = true }
+    @Synchronized fun interaction() { ranker.cancel(); requestedController = null; frozen = true }
 
     @Synchronized fun typing() { frozen = false }
 
     @Synchronized fun committed(text: String?) {
         ranker.cancel()
+        requestedController = null
         if (text == null || !allowed()) context.clear() else context.append(text)
     }
 
@@ -50,15 +53,19 @@ class ModelRankingCoordinator(
         if (lastRevision == revision) return
         lastRevision = revision
         ranker.cancel()
+        requestedController = null
         val candidates = controller.modelCandidates()
         if (candidates.isEmpty()) return
         val prefix = context.copy()
         if (prefix.isEmpty()) return
+        requestedController = controller
         ranker.request(revision, prefix, candidates.map { it.text.toCharArray() }.toTypedArray())
     }
 
     @Synchronized private fun deliver(revision: Long, winner: Int) {
-        if (allowed() && !frozen && modelRevision == resourceRevision()) currentController()?.applyModelWinner(revision, winner)
+        val controller = currentController()
+        if (allowed() && !frozen && modelRevision == resourceRevision() &&
+            controller != null && controller === requestedController) controller.applyModelWinner(revision, winner)
     }
 
     @Synchronized override fun close() { context.clear(); ranker.close() }

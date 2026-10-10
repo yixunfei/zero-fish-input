@@ -181,6 +181,8 @@ class AppGraph(context: Context) : AutoCloseable {
         associationPredictor.suggest(language, context, limit)
     }
 
+    fun isAssociationPredictorReady(): Boolean = associationPredictorReady
+
     private val english = EnglishEngineFactory(
         learnedSuggestions = LearnedSuggestionSource { prefix, limit ->
             // Keep English personalization behind the same queued, encrypted

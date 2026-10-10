@@ -28,12 +28,44 @@ class RimeRuntime(context: Context,
     fun dictionariesChanged() { dictionaryRevision.incrementAndGet() }
 
     fun prepareDictionariesIfIdle() {
-        val pending = synchronized(lock) {
-            if (preparedDictionaryRevision == dictionaryRevision.get() || activeEngines.get() != 0 ||
-                initializationInFlightGeneration != null) false
-            else { close(); true }
+        val requestedRevision = dictionaryRevision.get()
+        val shouldCheck = synchronized(lock) {
+            preparedDictionaryRevision != requestedRevision && activeEngines.get() == 0 &&
+                initializationInFlightGeneration == null
         }
-        if (pending) initialize()
+        if (!shouldCheck) return
+        if (!isReady) {
+            initialize()
+            return
+        }
+
+        // Publications are revision signals, not proof that the native asset
+        // identity changed. Resolve the generation first while the runtime is
+        // idle, so a no-op publication does not retire a ready native runtime.
+        val unchanged = runCatching { resolveAssetDirectories() == workingDirectories }
+            .getOrDefault(false)
+        synchronized(lock) {
+            if (activeEngines.get() != 0 || initializationInFlightGeneration != null) return
+            if (unchanged && isReady && dictionaryRevision.get() == requestedRevision) {
+                preparedDictionaryRevision = requestedRevision
+                return
+            }
+            close()
+        }
+        initialize()
+    }
+
+    private fun resolveAssetDirectories(): RimeAssetInstaller.Directories {
+        val candidateLease = resources?.acquire("wanxiang-lts")
+        return try {
+            RimeAssetInstaller(applicationContext, dictionaries,
+                resources != null || !applicationContext.assets.list("rime").orEmpty()
+                    .contains("wanxiang-lts-zh-hans.gram"),
+                candidateLease?.files?.get("rime/wanxiang-lts-zh-hans.gram"))
+                .install()
+        } finally {
+            candidateLease?.close()
+        }
     }
     /** Keeps a cancelled worker as the sole owner until its native work returns. */
     private var initializationInFlightGeneration: Long? = null
@@ -282,6 +314,7 @@ class RimeRuntime(context: Context,
         }
         isReady = false
         preparedSchemaId = null
+        preparedDictionaryRevision = -1L
         configurationInstaller = null
         runtimeVersion = "unavailable"
         initializationError = null

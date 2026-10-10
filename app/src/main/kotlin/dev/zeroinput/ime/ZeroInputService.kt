@@ -135,12 +135,12 @@ class ZeroInputService : InputMethodService() {
     private var nativeRetryRequested = false
     private var diagnosticEditor: InputDiagnostics.EditorMetadata? = null
     private val aiDraft = dev.zeroinput.ime.input.LocalDraftInput(
-        graph = { graph }, post = { mainHandler.post(it) },
+        graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
         render = { text, state -> inputView?.renderAiDraft(text, state) },
         maxChars = dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
     )
     private val searchDraft = dev.zeroinput.ime.input.LocalDraftInput(
-        graph = { graph }, post = { mainHandler.post(it) },
+        graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
         render = { text, state -> inputView?.renderSearchDraft(text, state) },
         maxChars = 64, multiline = false,
     )
@@ -247,6 +247,7 @@ class ZeroInputService : InputMethodService() {
         }
         engineWarmupDelivery = EngineWarmupResultDelivery(
             post = { runnable -> mainHandler.post(runnable) },
+            removePosted = mainHandler::removeCallbacks,
             deliver = ::handleEngineWarmupResult,
         )
         engineWarmupCoordinator = EngineWarmupCoordinator(
@@ -460,6 +461,7 @@ class ZeroInputService : InputMethodService() {
             privacyConfiguration = configuredPrivacy,
             languagePackKey = initialPackKey,
         )
+        if (graph.isAssociationPredictorReady()) newController.refreshWordAssociations()
         renderInputDiagnostics(newController.state)
         scheduleEngineWarmup(session, force = true)
         inputView?.let(::renderLocalPanels)

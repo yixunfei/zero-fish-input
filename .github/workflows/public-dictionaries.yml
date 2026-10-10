@@ -32,13 +32,25 @@ jobs:
           branch=zero/weekly-public-dictionaries
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          expected_tip=''
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
             git fetch origin "$branch:refs/remotes/origin/$branch"
+            expected_tip=$(git rev-parse "refs/remotes/origin/$branch")
+            author=$(git show -s --format=%an "$expected_tip")
+            subject=$(git show -s --format=%s "$expected_tip")
+            if [[ "$author" != 'github-actions[bot]' || "$subject" != 'Update pinned Wanxiang dictionaries and model' ]]; then
+              echo "Refusing to overwrite a branch not created by this workflow"
+              exit 1
+            fi
           fi
           git switch -c "$branch"
           git add tools/dictionaries/sources.lock.json tools/resources/catalog.json LICENSES/wanxiang-CC-BY-4.0.txt
           git commit -m 'Update pinned Wanxiang dictionaries and grammar model'
-          git push --force-with-lease origin "$branch"
+          if [[ -n "$expected_tip" ]]; then
+            git push --force-with-lease="refs/heads/$branch:$expected_tip" origin "$branch"
+          else
+            git push origin "$branch"
+          fi
           cat > /tmp/dictionary-pr.md <<'EOF'
           Updates the complete Wanxiang core dictionary snapshot and simplified Chinese grammar model used in the APK. All source downloads are hash-verified and dictionary readings are converted deterministically.
 

@@ -52,7 +52,11 @@ std::string ToUtf8(JNIEnv* env, jstring value) {
       if (low >= 0xdc00 && low <= 0xdfff) {
         code_point = 0x10000 + ((code_point - 0xd800) << 10) + (low - 0xdc00);
         ++index;
+      } else {
+        code_point = 0xfffd;
       }
+    } else if (code_point >= 0xd800 && code_point <= 0xdfff) {
+      code_point = 0xfffd;
     }
     AppendUtf8(output, code_point);
   }

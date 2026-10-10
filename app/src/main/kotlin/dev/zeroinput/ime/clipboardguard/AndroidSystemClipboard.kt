@@ -10,11 +10,17 @@ import android.os.Build
 internal class AndroidSystemClipboard(private val context: Context) : SystemClipboardPort {
     private val manager = context.applicationContext.getSystemService(ClipboardManager::class.java)
     private var ownEmptyTimestamp: Long? = null
+    private var captureOwnEmptyTimestamp = false
 
     override fun timestamp(): Long? {
         checkUnlocked()
         return try {
-            manager.primaryClipDescription?.timestamp?.takeUnless { it == ownEmptyTimestamp }
+            val timestamp = manager.primaryClipDescription?.timestamp
+            if (captureOwnEmptyTimestamp) {
+                ownEmptyTimestamp = timestamp
+                captureOwnEmptyTimestamp = false
+                null
+            } else timestamp?.takeUnless { it == ownEmptyTimestamp }
         } catch (_: SecurityException) { throw ClipboardAccessException(ClipboardAccessIssue.READ_DENIED) }
     }
 
@@ -25,7 +31,8 @@ internal class AndroidSystemClipboard(private val context: Context) : SystemClip
                 manager.clearPrimaryClip()
             } else {
                 manager.setPrimaryClip(ClipData.newPlainText("", ""))
-                ownEmptyTimestamp = manager.primaryClipDescription?.timestamp
+                ownEmptyTimestamp = null
+                captureOwnEmptyTimestamp = true
             }
         } catch (_: SecurityException) { throw ClipboardAccessException(ClipboardAccessIssue.WRITE_DENIED) }
     }

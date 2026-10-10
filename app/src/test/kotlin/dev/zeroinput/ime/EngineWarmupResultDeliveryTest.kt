@@ -7,35 +7,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class EngineWarmupResultDeliveryTest {
-    @Test fun activeCompositionRetainsNewestEngineUntilOwnerResumes() {
+    @Test fun activeCompositionReleasesPreparedEngineUntilNextWarmup() {
         val queued = mutableListOf<Runnable>()
         var ready = false
         var delivered = 0
-        val delivery = EngineWarmupResultDelivery({ queued += it; true }, { ready }) { delivered++ }
+        val delivery = EngineWarmupResultDelivery({ queued += it; true }, { ready },
+            removePosted = { queued.remove(it) }) { delivered++ }
         val first = TrackingEngine()
-        val second = TrackingEngine()
         delivery.offer(prepared(first))
         queued.removeAt(0).run()
-        assertEquals(0, first.closes)
-        assertEquals(0, delivered)
-        delivery.offer(prepared(second))
         assertEquals(1, first.closes)
-        queued.removeAt(0).run()
+        assertEquals(0, delivered)
         ready = true
         delivery.resume()
-        delivery.resume()
-        assertEquals(1, queued.size)
-        queued.removeAt(0).run()
-        assertEquals(1, delivered)
-        assertEquals(1, second.closes)
+        assertTrue(queued.isEmpty())
+        assertEquals(0, delivered)
         delivery.close()
-        assertEquals(1, second.closes)
+        assertEquals(1, first.closes)
     }
 
     @Test fun closingOrRejectedPostReleasesDeferredNativeOwnership() {
         val queued = mutableListOf<Runnable>()
         val engine = TrackingEngine()
-        val delivery = EngineWarmupResultDelivery({ queued += it; true }, { false }) { error("Stale delivery") }
+        val delivery = EngineWarmupResultDelivery({ queued += it; true }, { false },
+            removePosted = { queued.remove(it) }) { error("Stale delivery") }
         delivery.offer(prepared(engine))
         queued.removeAt(0).run()
         delivery.close()
@@ -45,6 +40,19 @@ class EngineWarmupResultDeliveryTest {
         val rejected = TrackingEngine()
         EngineWarmupResultDelivery({ false }) { error("Rejected") }.offer(prepared(rejected))
         assertEquals(1, rejected.closes)
+    }
+
+    @Test fun closeRemovesQueuedDeliveryAndReleasesItsPreparedEngine() {
+        val queued = mutableListOf<Runnable>()
+        val engine = TrackingEngine()
+        val delivery = EngineWarmupResultDelivery({ queued += it; true },
+            removePosted = { queued.remove(it) }) { error("Closed delivery") }
+
+        delivery.offer(prepared(engine))
+        delivery.close()
+
+        assertTrue(queued.isEmpty())
+        assertEquals(1, engine.closes)
     }
 
     private fun prepared(engine: InputEngine): EngineWarmupResult.Prepared {

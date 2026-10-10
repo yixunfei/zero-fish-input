@@ -58,4 +58,22 @@ class ClipboardImportRequestTest {
         assertNull(replacement.copyText())
         replacement.close()
     }
+
+    @Test
+    fun saveCopyUsesWipeableCharactersAndClosedRequestsRejectCopies() {
+        val source = "private fixture".toCharArray()
+        val request = ClipboardImportRequest(source)
+        request.beginAuthentication()
+        request.authorize()
+        request.beginSave()
+
+        val copy = request.copyChars()
+        assertEquals("private fixture", String(checkNotNull(copy)))
+        request.close()
+        assertTrue(source.all { it == '\u0000' })
+        assertTrue(checkNotNull(copy).any { it != '\u0000' })
+        checkNotNull(copy).fill('\u0000')
+        assertTrue(copy.all { it == '\u0000' })
+        assertNull(request.copyChars())
+    }
 }
