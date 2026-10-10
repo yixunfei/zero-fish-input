@@ -16,7 +16,7 @@
 
 ## 本轮复核结果
 
-报告中的 M1、M2、L1、L2、L5、L6、L7、L8、L9、L10 已修复并有对应单元测试或静态边界验证。L3 在复核时已由 `EmojiCatalogSnapshot.byValue` 提供 Map 查找；L4 的异步结果现在额外绑定发起请求的 `InputSessionController`，比单独的包名检查更强，因此两项不再作为当前问题保留。
+报告中的 M1、M2、L1、L2、L5、L6、L7、L9、L10 已修复并有对应单元测试或静态边界验证。L3 在复核时已由 `EmojiCatalogSnapshot.byValue` 提供 Map 查找；L4 的异步结果现在额外绑定发起请求的 `InputSessionController`，比单独的包名检查更强；L8 复核确认加载路径已经显式使用 `weights_only=True`，且仓库环境的 PyTorch 2.12.0 可加载固定 Mini 权重，因此这三项不再作为当前问题保留。
 
 M1 的不可交付结果会立即关闭 Prepared 引擎，并在可用的 Handler 上移除延迟 Runnable。M2 会先解析资产生成目录，只有身份实际变化时才重建 native runtime；关闭路径同时重置已准备 revision。
 
