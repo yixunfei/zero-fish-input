@@ -71,7 +71,6 @@ class FullscreenInputTest {
             onMain { activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             val panel = awaitPanel(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
             onMain {
-                // Debug diagnostics occupy the candidate strip; open its tools first.
                 click(panel, UiR.string.keyboard_tools)
                 click(panel, UiR.string.expression_smileys)
             }

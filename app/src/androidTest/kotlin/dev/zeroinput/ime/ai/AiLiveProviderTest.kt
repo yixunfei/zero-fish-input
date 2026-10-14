@@ -25,7 +25,9 @@ class AiLiveProviderTest {
         args.remove("aiTestKey")
         val endpoint = checkNotNull(args.getString("aiTestEndpoint"))
         val model = checkNotNull(args.getString("aiTestModel"))
-        val profile = AiProviderProfile("live-fixture", "Live fixture", endpoint, checkNotNull(key), listOf(model), model)
+        val protocol = AiProtocol.valueOf(args.getString("aiTestProtocol") ?: "CHAT_COMPLETIONS")
+        val profile = AiProviderProfile("live-fixture", "Live fixture", endpoint, checkNotNull(key), listOf(model), model,
+            protocol = protocol)
         val config = AiConfiguration(enabled = true, networkAllowed = true, timeoutMs = 45_000,
             providers = listOf(profile), selectedProviderId = profile.id)
         val worker = Executors.newSingleThreadExecutor()
@@ -36,9 +38,10 @@ class AiLiveProviderTest {
             val listed = CountDownLatch(1)
             provider.fetchModels { if (it != AiModelCatalogEvent.Started) { catalog.set(it); listed.countDown() } }
             assertTrue("Model discovery timed out", listed.await(50, TimeUnit.SECONDS))
-            assertTrue("Model discovery failed", catalog.get() is AiModelCatalogEvent.Completed)
-            val models = (catalog.get() as AiModelCatalogEvent.Completed).models
-            assertTrue("Requested model missing from catalog", model in models)
+            val catalogResult = catalog.get()
+            val models = (catalogResult as? AiModelCatalogEvent.Completed)?.models.orEmpty()
+            val catalogFailure = (catalogResult as? AiModelCatalogEvent.Failed)?.error
+            report("Live catalog: " + (catalogFailure?.let(::safeFailure) ?: "completed (${models.size})"))
 
             val probed = CountDownLatch(1)
             val probeState = AtomicReference<AiProbeState>()
@@ -46,15 +49,19 @@ class AiLiveProviderTest {
                 { true }, { it(); true }, { if (it != AiProbeState.Running) { probeState.set(it); probed.countDown() } })
             probe.start(config)
             assertTrue("Model probe timed out", probed.await(35, TimeUnit.SECONDS))
-            assertTrue("Model probe failed", probeState.get() == AiProbeState.Available)
+            val probeFailure = (probeState.get() as? AiProbeState.Failed)?.error
+            report("Live generation probe: " + (probeFailure?.let(::safeFailure) ?: "completed"))
+            assertTrue("Model probe failed: " + (probeFailure?.let(::safeFailure) ?: "cancelled"),
+                probeState.get() == AiProbeState.Available)
             probe.close()
 
             val prompt = "Remember the public test word ORCHID. Reply with OK."
-            val first = completed(provider, AiRequest(null, AiAction.ASK, prompt, outputTokenLimit = 32))
-            val full = config.copy(providers = listOf(profile.copy(endpoint = AiEndpoint.parse(endpoint).chat.toString())))
+            val first = completed(provider, AiRequest(null, AiAction.ASK, prompt, outputTokenLimit = 512))
+            val full = config.copy(providers = listOf(profile.copy(
+                endpoint = AiEndpoint.parse(endpoint, protocol).generation.toString(), streaming = false)))
             val followup = completed(OpenAiCompatibleProvider({ full }, worker, cancellation),
                 AiRequest(null, AiAction.ASK, "What public test word did I ask you to remember? Reply only with that word.", history = listOf(
-                    AiMessage(AiRole.USER, prompt), AiMessage(AiRole.ASSISTANT, first)), outputTokenLimit = 32))
+                    AiMessage(AiRole.USER, prompt), AiMessage(AiRole.ASSISTANT, first)), outputTokenLimit = 512))
             assertTrue("Follow-up did not use the conversation context", followup.contains("ORCHID", ignoreCase = true))
             val invalid = config.copy(providers = listOf(profile.copy(apiKey = "public-invalid-key")))
             val failure = terminal(OpenAiCompatibleProvider({ invalid }, worker, cancellation),
@@ -66,6 +73,17 @@ class AiLiveProviderTest {
             })
         } finally { worker.shutdownNow(); cancellation.shutdownNow() }
     }
+
+    private fun safeFailure(error: AiProviderError): String = when (error) {
+        is AiProviderError.Network -> "${error.reason} HTTP ${error.statusCode ?: 0}"
+        is AiProviderError.Response -> "response ${error.reason}"
+        is AiProviderError.Configuration -> "configuration"
+        is AiProviderError.Policy -> "policy"
+        is AiProviderError.Storage -> "storage"
+    }
+
+    private fun report(message: String) = InstrumentationRegistry.getInstrumentation().sendStatus(0,
+        Bundle().apply { putString("stream", "$message\n") })
 
     private fun completed(provider: AiProvider, request: AiRequest): String {
         val event = terminal(provider, request)

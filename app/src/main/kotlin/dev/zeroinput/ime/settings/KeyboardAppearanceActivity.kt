@@ -22,6 +22,9 @@ import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.ui.KeyboardAppearance
 import dev.zeroinput.ime.ui.ZeroInputView
+import dev.zeroinput.engine.api.Candidate
+import dev.zeroinput.engine.api.EngineSnapshot
+import dev.zeroinput.ime.core.InputSessionState
 import dev.zeroinput.ime.ui.R as UiR
 
 class KeyboardAppearanceActivity : AppCompatActivity() {
@@ -35,6 +38,8 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
     private var selected = KeyboardAppearance()
     private var operation: AutoCloseable? = null
     private var visible = false
+    private var previewExpanded = false
+    private var candidatePreviewSwitch: SwitchMaterial? = null
     private var previewTheme: dev.zeroinput.ime.ui.KeyboardTheme? = null
     private val picker = registerForActivityResult(object : ActivityResultContracts.OpenDocument() {
         override fun createIntent(context: android.content.Context, input: Array<String>): Intent =
@@ -54,11 +59,16 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         selected = settings.keyboardAppearance
+        previewExpanded = savedInstanceState?.getBoolean("candidatePreview", false) ?: false
         setContentView(content())
         refreshOptions()
     }
 
     override fun onPause() { keyboard?.cancelPendingGestures(); super.onPause() }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("candidatePreview", previewExpanded)
+        super.onSaveInstanceState(outState)
+    }
     override fun onStart() { super.onStart(); visible = true; if (::preview.isInitialized) updatePreview() }
     override fun onStop() { visible = false; preview.visibility = View.INVISIBLE; binding.close(); super.onStop() }
     override fun onDestroy() {
@@ -104,6 +114,15 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
         options.removeAllViews()
         options.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            candidatePreviewSwitch = SwitchMaterial(context).apply {
+                setText(UiR.string.expanded_candidates_preview)
+                isChecked = previewExpanded
+                minHeight = dp(48); setPadding(dp(16), 0, dp(16), 0)
+                setOnCheckedChangeListener { _, enabled ->
+                    previewExpanded = enabled
+                    keyboard?.setCandidatesExpanded(enabled)
+                }
+            }.also { addView(it) }
             addView(SwitchMaterial(context).apply {
                 setText(UiR.string.glide_enabled); isChecked = settings.glideTypingEnabled
                 minHeight = dp(48); setPadding(dp(16), 0, dp(16), 0)
@@ -118,6 +137,10 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
 
     private fun select(appearance: KeyboardAppearance, commit: Boolean) {
         val deferBlur = !commit && selected.backgroundBlur != appearance.backgroundBlur
+        if (selected.expandedCandidates != appearance.expandedCandidates) {
+            previewExpanded = true
+            candidatePreviewSwitch?.isChecked = true
+        }
         selected = appearance
         if (commit) settings.keyboardAppearance = appearance
         if (!deferBlur) updatePreview()
@@ -131,11 +154,17 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
             keyboard = ZeroInputView(KeyboardThemeContext.create(this, selected.theme)).apply {
                 // No editor, engine or personal-data callbacks exist in the preview.
                 importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+                renderSession(InputSessionState(snapshot = EngineSnapshot("nihao", "nihao",
+                    resources.getStringArray(UiR.array.expanded_candidates_preview_words).mapIndexed { index, text ->
+                        Candidate("preview:$index", text)
+                    })))
+                setCandidatesExpanded(previewExpanded)
             }.also { preview.addView(it) }
             previewTheme = selected.theme
         }
         keyboard?.let { view ->
             binding.apply(view, selected) { success ->
+                view.setCandidatesExpanded(previewExpanded)
                 if (visible) preview.visibility = View.VISIBLE
                 if (!success) message(UiR.string.appearance_image_missing)
             }

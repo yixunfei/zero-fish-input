@@ -39,6 +39,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var doublePinyinScheme = DoublePinyinScheme.OFF
     private var editor = EditorInputOptions()
     private var composing = false
+    private var syllableSelection = false
+    private var shiftSpec: KeySpec? = null
     private var heightPreset = KeyboardHeight.STANDARD
     private var heightScale = 1f
     private var compact = false
@@ -228,6 +230,14 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         keys.forEach { key -> if (key.boundAction == KeyboardAction.Enter) bind(key, spec) }
     }
 
+    fun setSyllableSelection(value: Boolean) {
+        if (syllableSelection == value) return
+        syllableSelection = value
+        val spec = shiftSpec ?: return
+        keys.filter { it.boundAction == KeyboardAction.Shift || it.boundAction == KeyboardAction.SelectSyllable }
+            .forEach { bind(it, spec) }
+    }
+
     fun showLetters() {
         changePage(if (editor.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC)
     }
@@ -290,6 +300,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             }
         }
         enterSpec = enter
+        shiftSpec = rows.flatten().firstOrNull { it.action == KeyboardAction.Shift }
     }
 
     private fun rebuild(rows: List<List<KeySpec>>, updated: List<List<Float>>) {
@@ -327,6 +338,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         }
         if (spec.action == KeyboardAction.Shift) {
             setOnLongClickListener {
+                if (boundAction != KeyboardAction.Shift) return@setOnLongClickListener false
                 onUserInteraction()
                 shift = if (shift == Shift.LOCKED) Shift.OFF else Shift.LOCKED
                 render()
@@ -407,9 +419,18 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             val label = context.getString(if (composing) R.string.key_enter else enterLabel())
             original.copy(label = if (composing || editor.enterAction == EnterAction.NEW_LINE) "↵" else label, contentDescription = label)
         } else if (original.action == KeyboardAction.Shift) {
-            original.copy(label = if (shift == Shift.LOCKED) "⇪" else "⇧")
+            if (syllableSelection) original.copy(label = context.getString(R.string.key_segment),
+                contentDescription = context.getString(R.string.select_single_syllable), action = KeyboardAction.SelectSyllable)
+            else original.copy(label = if (shift == Shift.LOCKED) "⇪" else "⇧")
         } else original
         view.bind(spec, preserveCaseGesture)
+        if (original.action == KeyboardAction.Shift) {
+            view.isLongClickable = !syllableSelection
+            if (syllableSelection) ViewCompat.removeAccessibilityAction(view,
+                AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK.id)
+            else ViewCompat.replaceAccessibilityAction(view, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
+                context.getString(R.string.key_caps_lock)) { _, _ -> view.performLongClick() }
+        }
         androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(view, 10,
             if (spec.label.length > 2) 13 else 19, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
         val selected = spec.action == KeyboardAction.Shift && shift != Shift.OFF
@@ -451,9 +472,18 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
                 onAction(action)
                 if (shift == Shift.ON) { shift = Shift.OFF; render(preserveCaseGestures = true) }
             }
-            is KeyboardAction.PairedText -> onAction(
-                if (pairedSymbolsEnabled) action else KeyboardAction.LiteralText(action.opening),
-            )
+            is KeyboardAction.PairedText -> {
+                // An apostrophe inside an active Chinese composition is the
+                // pinyin segment delimiter.  Treating the symbol as a paired
+                // literal commits the preedit and inserts "''" at the editor
+                // cursor, which loses the requested caret position.
+                val delimiter = action.opening == "'" && composing && languageLabel == "中"
+                onAction(when {
+                    delimiter -> KeyboardAction.Text("'")
+                    pairedSymbolsEnabled -> action
+                    else -> KeyboardAction.LiteralText(action.opening)
+                })
+            }
             else -> onAction(action)
         }
     }

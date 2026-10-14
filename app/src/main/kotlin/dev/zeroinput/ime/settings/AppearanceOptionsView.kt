@@ -15,6 +15,8 @@ import dev.zeroinput.ime.ui.KeyboardBackground
 import dev.zeroinput.ime.ui.KeyboardHeight
 import dev.zeroinput.ime.ui.KeyboardMaterial
 import dev.zeroinput.ime.ui.KeyboardTheme
+import dev.zeroinput.ime.ui.ExpandedCandidateDensity
+import dev.zeroinput.ime.ui.ExpandedCandidateLayout
 import dev.zeroinput.ime.ui.R
 
 /** Controls emit immutable appearance values; persistence and image access belong to the Activity. */
@@ -50,6 +52,7 @@ internal class AppearanceOptionsView(
         group(dev.zeroinput.ime.R.string.keyboard_height, KeyboardHeight.entries.map { it.label }, initial.height.ordinal) {
             update(value.copy(height = KeyboardHeight.entries[it]))
         }
+        candidateOptions(initial)
         group(R.string.appearance_background, KeyboardBackground.entries.map { it.label }, initial.background.ordinal) {
             val mode = KeyboardBackground.entries[it]
             update(value.copy(background = mode))
@@ -75,6 +78,29 @@ internal class AppearanceOptionsView(
         changed(value, commit)
     }
 
+    private fun candidateOptions(initial: KeyboardAppearance) {
+        heading(R.string.expanded_candidates_heading)
+        group(R.string.expanded_candidates_layout, ExpandedCandidateLayout.entries.map { it.label },
+            initial.expandedCandidates.layout.ordinal) {
+            update(value.copy(expandedCandidates = value.expandedCandidates.copy(layout = ExpandedCandidateLayout.entries[it])))
+        }
+        group(R.string.expanded_candidates_density, ExpandedCandidateDensity.entries.map { it.label },
+            initial.expandedCandidates.density.ordinal) {
+            update(value.copy(expandedCandidates = value.expandedCandidates.copy(density = ExpandedCandidateDensity.entries[it])))
+        }
+        slider(R.string.expanded_candidates_text_size, initial.expandedCandidates.textSize, 24, 16) { size, commit ->
+            update(value.copy(expandedCandidates = value.expandedCandidates.copy(textSize = size)), commit)
+        }
+        addView(SwitchMaterial(context).apply {
+            setText(R.string.expanded_candidates_separators)
+            minHeight = dp(48)
+            isChecked = initial.expandedCandidates.separators
+            setOnCheckedChangeListener { _, enabled ->
+                update(value.copy(expandedCandidates = value.expandedCandidates.copy(separators = enabled)))
+            }
+        })
+    }
+
     private fun group(title: Int, labels: List<Int>, selected: Int, onSelected: (Int) -> Unit) {
         heading(title)
         addView(RadioGroup(context).apply {
@@ -91,12 +117,13 @@ internal class AppearanceOptionsView(
         })
     }
 
-    private fun slider(label: Int, initial: Int, limit: Int, onValue: (Int, Boolean) -> Unit) {
+    private fun slider(label: Int, initial: Int, limit: Int, minimum: Int = 0, onValue: (Int, Boolean) -> Unit) {
         var tracking = false
         val text = TextView(context).apply { text = context.getString(label, initial); setPadding(0, dp(12), 0, 0) }
         addView(text)
         addView(SeekBar(context).apply {
             max = limit
+            min = minimum
             progress = initial
             contentDescription = text.text
             minimumHeight = dp(48)

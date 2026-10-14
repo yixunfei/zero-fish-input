@@ -13,9 +13,15 @@ internal class PersonalCandidatePaging {
     private var first = PersonalSuggestionPage()
     private val pages = TreeMap<Int, PersonalSuggestionPage>()
     private var revision: Long? = null
+    var editsApplied = false
+        private set
+    var editsPending = false
+        private set
     val isBrowsing: Boolean get() = offset > 0
 
     fun clear() {
+        editsApplied = false
+        editsPending = false
         input = ""
         composition = ""
         offset = 0
@@ -51,7 +57,7 @@ internal class PersonalCandidatePaging {
 
     fun publish(native: EngineSnapshot, store: PersonalizationStore, language: InputLanguage,
         allowed: Boolean, normalize: (String) -> String?): EngineSnapshot {
-        if (!allowed || native.rawInput.isBlank() || native.canUndoSelection) { clear(); return native }
+        if (!allowed || native.rawInput.isBlank()) { clear(); return native }
         if (input != native.rawInput || composition != native.composition) {
             clear()
             input = native.rawInput
@@ -73,9 +79,12 @@ internal class PersonalCandidatePaging {
             // later resolution of the same revision is not mistaken for yet
             // another change and hidden again.
             revision = loaded.revision
-            if (!wasFirstPage) return native
+            if (!wasFirstPage) return publish(native, store, language, allowed, normalize)
         }
         revision = loaded.revision
+        editsApplied = loaded.dictionaryEditsApplied
+        editsPending = editsApplied && !loaded.ready
+        if (editsPending) return native.copy(candidates = emptyList(), highlightedIndex = 0)
         if (loaded.ready) {
             val goingBack = requested < offset
             offset = requested
@@ -89,18 +98,23 @@ internal class PersonalCandidatePaging {
         fun rows(page: PersonalSuggestionPage) = page.items.mapNotNull { term ->
             normalize(term.text)?.let { Candidate("personal:${term.id}", it, "个人词组", term.frequency, term.input) }
         }
+        val visibleNative = native.candidates.filterNot {
+            if (it.input.isBlank()) it.text in loaded.suppressedDictionaryTexts else
+                "${it.text}\t${it.input.replace(" ", "").replace("'", "")}" in loaded.suppressedDictionaryEntries ||
+                    "${it.text}\t" in loaded.suppressedDictionaryEntries
+        }
         val includesNative = pages.isEmpty() || pages.firstKey() == 0
         val personal = pages.entries.flatMap { (start, value) ->
-            if (start == 0) rows(value) + native.candidates else rows(value)
+            if (start == 0) rows(value) + visibleNative else rows(value)
         }
-        val items = if (personal.isEmpty() && includesNative) native.candidates else personal.distinctBy(Candidate::text)
+        val items = if (personal.isEmpty() && includesNative) visibleNative else personal.distinctBy(Candidate::text)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         // "Previous" is a personal affordance only while the merged first
         // page has been evicted by deeper browsing (changePage then owns it);
         // while the native first page is still cached the previous edge
         // belongs to the engine.
         val hasPrevious = pages.isNotEmpty() && pages.firstKey() > 0
-        return native.copy(candidates = items, highlightedIndex = if (offset > 0) 0 else
+        return native.copy(candidates = items, highlightedIndex = if (offset > 0 || editsApplied) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
             hasPreviousPage = hasPrevious || includesNative && native.hasPreviousPage,
             hasNextPage = if (isBrowsing) pages.lastEntry()?.value?.hasMore == true else native.hasNextPage || first.hasMore)

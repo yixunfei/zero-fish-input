@@ -133,7 +133,6 @@ class ZeroInputService : InputMethodService() {
     private var engineReloadPending = false
     private var sessionChineseOptions = ChineseInputOptions()
     private var nativeRetryRequested = false
-    private var diagnosticEditor: InputDiagnostics.EditorMetadata? = null
     private val aiDraft = dev.zeroinput.ime.input.LocalDraftInput(
         graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
         render = { text, state -> inputView?.renderAiDraft(text, state) },
@@ -391,11 +390,6 @@ class ZeroInputService : InputMethodService() {
         val connectionBinding = SessionConnectionBinding(currentInputConnection)
         val currentSubtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
         val subtypeLanguage = languageForSubtype(currentSubtype)
-        diagnosticEditor = if (BuildConfig.DEBUG) {
-            InputDiagnostics.capture(attribute, currentSubtype)
-        } else {
-            null
-        }
         val initialLanguage = subtypeLanguage ?: graph.settings.lastLanguage
         if (subtypeLanguage != null && subtypeLanguage != graph.settings.lastLanguage) {
             // Android can deliver the subtype callback before this lifecycle
@@ -431,7 +425,6 @@ class ZeroInputService : InputMethodService() {
             personalization = graph.personalization,
             onStateChanged = { state ->
                 inputView?.renderSession(state)
-                renderInputDiagnostics(state)
                 if (!state.canReconvert) {
                     mainHandler.removeCallbacks(reconversionExpiry)
                     reconversionExpiryScheduled = false
@@ -462,7 +455,6 @@ class ZeroInputService : InputMethodService() {
             languagePackKey = initialPackKey,
         )
         if (graph.isAssociationPredictorReady()) newController.refreshWordAssociations()
-        renderInputDiagnostics(newController.state)
         scheduleEngineWarmup(session, force = true)
         inputView?.let(::renderLocalPanels)
     }
@@ -682,8 +674,6 @@ class ZeroInputService : InputMethodService() {
         registerInteraction()
         invalidatePendingPersonalization()
         languageForSubtype(newSubtype)?.let(::switchTo)
-        diagnosticEditor = diagnosticEditor?.copy(subtype = InputDiagnostics.subtypeLabel(newSubtype))
-        activeSession?.controller?.state?.let(::renderInputDiagnostics)
         activeSession?.let { scheduleEngineWarmup(it, force = true) }
     }
 
@@ -805,7 +795,9 @@ class ZeroInputService : InputMethodService() {
         view.onCandidateSelected = { index, id -> handleControllerCommand(InputCommand.SelectCandidate(index, id)) }
         view.onReconvertRequested = { handleControllerCommand(InputCommand.ReconvertLast) }
         view.onUndoSelectionRequested = { handleControllerCommand(InputCommand.UndoSelection) }
-        view.onSyllableRequested = { handleControllerCommand(InputCommand.SelectSyllable) }
+        view.onCompositionSelection = { selection, input ->
+            handleControllerCommand(InputCommand.SelectComposition(selection, input))
+        }
         view.onReadingSelected = { handleControllerCommand(InputCommand.SelectReading(it)) }
         view.onLayoutSwitchRequested = {
             registerInteraction()
@@ -1052,6 +1044,7 @@ class ZeroInputService : InputMethodService() {
             is KeyboardAction.LiteralText -> controller?.handle(InputCommand.LiteralText(action.value))
             is KeyboardAction.PairedText -> controller?.handle(InputCommand.PairedText(action.opening, action.closing))
             KeyboardAction.Backspace -> controller?.handle(InputCommand.Backspace)
+            KeyboardAction.SelectSyllable -> controller?.handle(InputCommand.SelectSyllable)
             KeyboardAction.Space -> controller?.handle(InputCommand.Space)
             KeyboardAction.Enter -> controller?.handle(InputCommand.Enter)
             KeyboardAction.SwitchLanguage -> {
@@ -1088,7 +1081,8 @@ class ZeroInputService : InputMethodService() {
             return
         }
         if (command == InputCommand.ReconvertLast || command == InputCommand.UndoSelection ||
-            command is InputCommand.SelectReading || command == InputCommand.SelectSyllable) modelRanking.invalidate()
+            command is InputCommand.SelectReading || command == InputCommand.SelectSyllable ||
+            command is InputCommand.SelectComposition) modelRanking.invalidate()
         registerInteraction(preserveReconversion = command == InputCommand.ReconvertLast, preserveWordAssociations = true)
         syncSessionPrivacy()
         maybeReloadLanguagePack()
@@ -1584,8 +1578,6 @@ class ZeroInputService : InputMethodService() {
         controller = null
         editorConnection = null
         inputView?.renderEngineStatus(InputEngineStatus.HIDDEN)
-        diagnosticEditor = null
-        InputDiagnostics.clear(inputView)
         mainHandler.removeCallbacks(reconversionExpiry)
         reconversionExpiryScheduled = false
         languagePackReloadPending = false
@@ -1709,27 +1701,6 @@ class ZeroInputService : InputMethodService() {
         inputView?.renderChineseOptions(configuredChineseOptions)
         inputView?.renderActiveLayout(sessionChineseOptions.keyboardLayout)
         inputView?.renderActiveDoublePinyin(sessionChineseOptions.effectiveDoublePinyinScheme)
-        state?.let(::renderInputDiagnostics)
-    }
-
-    @Suppress("DEPRECATION")
-    private fun renderInputDiagnostics(state: dev.zeroinput.ime.core.InputSessionState) {
-        if (!BuildConfig.DEBUG) return
-        val editor = diagnosticEditor ?: return
-        val text = getString(
-            dev.zeroinput.ime.ui.R.string.input_diagnostics_format,
-            editor.packageName,
-            editor.inputType,
-            editor.inputClass,
-            editor.variation,
-            editor.imeOptions,
-            editor.subtype,
-            state.privacy.reason.name,
-            state.language.name,
-            state.engineDescriptor?.id ?: "none",
-            graph.rime.runtime.state.name,
-        )
-        InputDiagnostics.render(inputView, text)
     }
 
     private fun retryEngine() {

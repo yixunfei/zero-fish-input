@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_request_rejected">The service rejected the request parameters. Check the protocol and model.</string>
+    <string name="ai_output_limit">The output token limit was reached without a complete answer. Check the model reasoning and output budget.</string>
+    <string name="ai_output_empty">The service returned no usable text. Check the model and output settings.</string>
+</resources>

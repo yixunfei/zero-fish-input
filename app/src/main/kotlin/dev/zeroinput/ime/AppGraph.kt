@@ -24,7 +24,6 @@ import dev.zeroinput.userdata.UserLexiconRepository
 import dev.zeroinput.userdata.AiConfiguration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.atomic.AtomicLong
 import dev.zeroinput.ime.ai.AiCoordinator
 import dev.zeroinput.ime.ai.AiDataGeneration
 import dev.zeroinput.ime.ai.OpenAiCompatibleProvider
@@ -75,9 +74,14 @@ class AppGraph(context: Context) : AutoCloseable {
     internal val clipboardGuardPreferences = ClipboardGuardPreferences(applicationContext)
     internal val clipboardGuard = ClipboardGuardRuntime(applicationContext, clipboardGuardPreferences)
     val userLexicon = UserLexiconRepository(applicationContext)
+    val dictionaryEdits = dev.zeroinput.userdata.DictionaryEditRepository(applicationContext)
+    val publicDictionaries = dev.zeroinput.languagepack.PublicDictionaryStore(applicationContext)
+    val builtInDictionaries = dev.zeroinput.languagepack.BuiltInDictionaryStore(applicationContext, publicDictionaries)
+    private val dictionaryPersonalization = dev.zeroinput.ime.personalization.DictionaryPersonalizationStore(
+        userLexicon, dictionaryEdits, builtInDictionaries::activeIds, { settings.chineseInputOptions })
     private val queuedPersonalization = QueuedPersonalizationStore(
-        delegate = userLexicon,
-        preload = userLexicon::warmUp,
+        delegate = dictionaryPersonalization,
+        preload = { userLexicon.warmUp(); dictionaryPersonalization.prepare() },
     )
     val personalization: dev.zeroinput.engine.api.PersonalizationStore = queuedPersonalization
     val emojiHistory = EmojiHistoryRepository(applicationContext)
@@ -167,11 +171,12 @@ class AppGraph(context: Context) : AutoCloseable {
     internal val clipboardSelectionTransfer = dev.zeroinput.ime.clipboard.ClipboardSelectionTransfer()
     val languagePacks = LanguagePackInstaller(applicationContext)
     val languagePackRegistry = LanguagePackRegistry(languagePacks)
-    val publicDictionaries = dev.zeroinput.languagepack.PublicDictionaryStore(applicationContext)
     val publicResources = dev.zeroinput.languagepack.PublicResourceStore(applicationContext)
-    val rime = RimeEngineFactory(applicationContext, engineExecutor, publicDictionaries, publicResources)
+    val rime = RimeEngineFactory(applicationContext, engineExecutor, builtInDictionaries, publicResources)
         .also { factory ->
-            publicDictionaries.onPublished = { factory.runtime.dictionariesChanged() }
+            publicDictionaries.onPublished = { factory.runtime.dictionariesChanged(); dictionaryDataChanged() }
+            builtInDictionaries.onPublished = { factory.runtime.dictionariesChanged(); dictionaryDataChanged() }
+            dictionaryEdits.onPublished = { dictionaryDataChanged() }
             publicResources.onPublished = { factory.runtime.dictionariesChanged() }
         }
     @Volatile private var associationPredictor: dev.zeroinput.engine.api.NextWordPredictor =
@@ -201,6 +206,11 @@ class AppGraph(context: Context) : AutoCloseable {
     private val languagePackListeners = CopyOnWriteArrayList<() -> Unit>()
     private val associationPredictorListeners = CopyOnWriteArrayList<() -> Unit>()
     private val personalizationListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val dictionaryScriptObserver = rime.runtime.addStateListener {
+        // Native OpenCC becomes available with the runtime. Discard worker results
+        // prepared by the fallback before any newly prepared native engine uses them.
+        queuedPersonalization.invalidatePendingWrites()
+    }
 
     init {
         readAiConfiguration {}
@@ -226,6 +236,11 @@ class AppGraph(context: Context) : AutoCloseable {
                 runCatching { refreshLanguagePacks() }
             }
         }
+    }
+
+    private fun dictionaryDataChanged() {
+        queuedPersonalization.invalidatePendingWrites()
+        personalizationListeners.forEach { listener -> runCatching(listener) }
     }
 
     fun createEngine(language: InputLanguage): InputEngine = when (language) {
@@ -389,6 +404,7 @@ class AppGraph(context: Context) : AutoCloseable {
         aiCancellationExecutor.shutdown()
         aiPersistenceExecutor.shutdownNow()
         queuedPersonalization.close()
+        dictionaryScriptObserver.close()
         languagePackSnapshot = emptyList()
         languagePackListeners.clear()
         associationPredictorListeners.clear()

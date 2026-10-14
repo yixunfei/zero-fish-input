@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_request_rejected">服务拒绝了请求参数，请检查协议格式和模型。</string>
+    <string name="ai_output_limit">输出达到 token 上限，未获得完整回答。请检查模型的推理及输出预算。</string>
+    <string name="ai_output_empty">服务没有返回可用文字，请检查模型及输出设置。</string>
+</resources>

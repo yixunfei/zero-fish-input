@@ -24,6 +24,7 @@ internal object AiResponseReader {
         val choices = root.getJSONArray("choices")
         require(choices.length() == 1)
         val choice = choices.getJSONObject(0)
+        if (choice.optString("finish_reason") == "length") throw AiProtocolResponse.outputLimit()
         require(choice.get("finish_reason") == "stop")
         val message = choice.getJSONObject("message")
         requireTextOnly(message)
@@ -37,7 +38,7 @@ internal object AiResponseReader {
         require(message.isNull("tool_calls") || message.optJSONArray("tool_calls")?.length() == 0)
     }
 
-    private fun <T> parse(reader: Reader, cancelled: () -> Boolean, limit: Int, decode: (JSONObject) -> T): T {
+    internal fun <T> parse(reader: Reader, cancelled: () -> Boolean, limit: Int, decode: (JSONObject) -> T): T {
         val text = StringBuilder()
         val buffer = CharArray(2048)
         try {
@@ -52,8 +53,9 @@ internal object AiResponseReader {
             return try {
                 val tokens = JSONTokener(text.toString())
                 val root = tokens.nextValue() as? JSONObject ?: throw IllegalArgumentException()
-                require(tokens.nextClean() == '\u0000' && !root.has("error"))
+                require(tokens.nextClean() == '\u0000' && root.isNull("error"))
                 decode(root)
+            } catch (error: AiProviderError) { throw error
             } catch (_: Exception) { throw AiProviderError.Response("AI response is invalid") }
         } finally { buffer.fill('\u0000'); text.setLength(0) }
     }

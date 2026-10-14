@@ -42,7 +42,7 @@ internal class AiProviderProbe(
         render(AiProbeState.Running)
         try {
             val request = provider(configuration.copy(timeoutMs = minOf(configuration.timeoutMs, 30_000L))).stream(
-                AiRequest(null, AiAction.ASK, "Reply with OK.", outputTokenLimit = 16), sink::offer)
+                AiRequest(null, AiAction.ASK, "Reply with OK.", outputTokenLimit = 512), sink::offer)
             if (token == generation && current()) handle = request else request.cancel()
         } catch (_: Exception) {
             sink.close()

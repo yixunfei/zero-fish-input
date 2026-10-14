@@ -3,10 +3,13 @@ package dev.zeroinput.ime.ui
 import android.content.Context
 import android.text.TextPaint
 import android.util.TypedValue
-import android.view.Gravity
+import android.view.MotionEvent
+import android.os.Bundle
+import android.view.View
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.recyclerview.widget.RecyclerViewAccessibilityDelegate
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.Space
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -19,9 +22,11 @@ import dev.zeroinput.engine.api.PageDirection
 internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) {
     var onCandidateSelected: (Int) -> Unit = {}
     var onPageChanged: (PageDirection) -> Unit = {}
+    private var appearance = ExpandedCandidateAppearance()
+    private val separators = CandidateSeparators()
     private var candidateSpans: List<Int> = emptyList()
     private val textPaint = TextPaint().apply {
-        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 16f, resources.displayMetrics)
+        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 18f, resources.displayMetrics)
     }
     private val layout = GridLayoutManager(context, 1).apply {
         spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
@@ -34,38 +39,83 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
     private var pending: PageDirection? = null
     private var dispatchTask: Runnable? = null
     private var attempted: Pair<EngineSnapshot, PageDirection>? = null
-    private var explicitRequest = false
-    private val prefetch = Runnable { prefetch(PageDirection.NEXT) }
-    private val scroll = RecyclerView(context).apply {
+    private var browseDirection = PageDirection.NEXT
+    private val prefetch = Runnable { prefetch(browseDirection) }
+    private val scroll = object : RecyclerView(context) {
+        override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) attempted = null
+            return super.dispatchTouchEvent(event)
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            val consumed = super.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                prefetch(browseDirection)
+            }
+            return consumed
+        }
+
+        override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+            if (super.performAccessibilityAction(action, arguments)) return true
+            val direction = when (action) {
+                AccessibilityNodeInfoCompat.ACTION_SCROLL_FORWARD -> PageDirection.NEXT
+                AccessibilityNodeInfoCompat.ACTION_SCROLL_BACKWARD -> PageDirection.PREVIOUS
+                else -> return false
+            }
+            val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage else lastSnapshot.hasPreviousPage
+            if (!available) return false
+            attempted = null
+            browseDirection = direction
+            requestPage(direction)
+            return true
+        }
+    }.apply {
         layoutManager = layout
         adapter = this@ExpandedCandidatesView.adapter
         setHasFixedSize(true)
         itemAnimator = null
+        addItemDecoration(separators)
         isSaveEnabled = false
         setItemViewCacheSize(6)
-        addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
-                updateNavigation()
-                if (dy != 0) prefetch(if (dy > 0) PageDirection.NEXT else PageDirection.PREVIOUS)
+        setAccessibilityDelegateCompat(object : RecyclerViewAccessibilityDelegate(this) {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                if (lastSnapshot.hasNextPage) info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_FORWARD)
+                if (lastSnapshot.hasPreviousPage) info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_BACKWARD)
             }
         })
-    }
-    private val previous = panelIconButton(context, android.R.drawable.ic_media_previous, R.string.previous_candidates) {
-        browse(PageDirection.PREVIOUS)
-    }
-    private val next = panelIconButton(context, android.R.drawable.ic_media_next, R.string.next_candidates) {
-        browse(PageDirection.NEXT)
+        addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
+                if (dy != 0) {
+                    browseDirection = if (dy > 0) PageDirection.NEXT else PageDirection.PREVIOUS
+                    prefetch(browseDirection)
+                }
+            }
+        })
     }
 
     init {
         orientation = VERTICAL
+        setBackgroundColor(com.google.android.material.color.MaterialColors.getColor(context,
+            com.google.android.material.R.attr.colorSurface, android.graphics.Color.WHITE))
         addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(LinearLayout(context).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(previous, LayoutParams(dp(48), dp(48)))
-            addView(Space(context), LayoutParams(0, 1, 1f))
-            addView(next, LayoutParams(dp(48), dp(48)))
-        }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+    }
+
+    fun applyAppearance(value: ExpandedCandidateAppearance) {
+        val updated = value.sanitized()
+        if (appearance == updated) return
+        val position = layout.findFirstVisibleItemPosition()
+        val offset = layout.findViewByPosition(position)?.top ?: 0
+        scroll.stopScroll()
+        appearance = updated
+        textPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
+            updated.textSize.toFloat(), resources.displayMetrics)
+        separators.enabled = updated.separators
+        updatePacking()
+        adapter.notifyItemRangeChanged(0, adapter.itemCount)
+        if (position >= 0) layout.scrollToPositionWithOffset(position, offset)
+        scroll.invalidateItemDecorations()
+        schedulePrefetch()
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -78,35 +128,37 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         dispatchTask?.let(::removeCallbacks)
         dispatchTask = null
         val request = pending
-        val explicit = explicitRequest
         pending = null
-        explicitRequest = false
         if (snapshot == lastSnapshot) return
         val position = layout.findFirstVisibleItemPosition()
         val anchor = adapter.items.getOrNull(position)?.id
         val offset = layout.findViewByPosition(position)?.top ?: 0
         val old = adapter.items
         val sameInput = snapshot.rawInput == lastSnapshot.rawInput && snapshot.composition == lastSnapshot.composition
-        val oldIds = old.mapTo(HashSet()) { it.id }
-        val newPage = snapshot.candidates.indexOfFirst { it.id !in oldIds }
         val removedHead = old.firstOrNull()?.id?.let { id -> snapshot.candidates.none { it.id == id } } == true
+        val removedTail = old.lastOrNull()?.id?.let { id -> snapshot.candidates.none { it.id == id } } == true
         lastSnapshot = snapshot
         revision++
         adapter.replace(snapshot.candidates, snapshot.highlightedIndex)
         val preserved = if (sameInput) snapshot.candidates.indexOfFirst { it.id == anchor } else -1
         when {
-            !sameInput -> { scroll.stopScroll(); layout.scrollToPositionWithOffset(0, 0) }
-            explicit && newPage >= 0 -> layout.scrollToPositionWithOffset(newPage, 0)
+            !sameInput -> {
+                browseDirection = PageDirection.NEXT
+                scroll.stopScroll()
+                layout.scrollToPositionWithOffset(0, 0)
+            }
             preserved >= 0 && preserved != position -> layout.scrollToPositionWithOffset(preserved, offset)
         }
-        updateNavigation()
-        // Stop filling when the bounded core window starts evicting rows.
-        if (!removedHead && request != PageDirection.PREVIOUS) schedulePrefetch()
+        if (sameInput && request != null) browseDirection = request
+        // Both directions continue during drag/fling. Idle filling stops at
+        // eviction so a viewport larger than the bounded window cannot drain it.
+        val evicted = if (browseDirection == PageDirection.NEXT) removedHead else removedTail
+        if (!evicted || scroll.scrollState != RecyclerView.SCROLL_STATE_IDLE) schedulePrefetch()
     }
 
     private fun schedulePrefetch() {
         removeCallbacks(prefetch)
-        post(prefetch)
+        postOnAnimation(prefetch)
     }
 
     private fun updatePacking(width: Int = scroll.width) {
@@ -114,7 +166,9 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         candidateSpans = CandidateRowPacking.spans(adapter.items.map { candidate ->
             val label = if (candidate.kind == CandidateKind.RELATED_READING)
                 context.getString(R.string.related_candidate, candidate.text) else candidate.text
-            (kotlin.math.ceil(textPaint.measureText(label)).toInt() + dp(12)).coerceAtLeast(dp(48))
+            if (appearance.layout == ExpandedCandidateLayout.LIST) available else
+                (kotlin.math.ceil(textPaint.measureText(label)).toInt() + dp(appearance.density.horizontalPadding * 2))
+                    .coerceAtLeast(dp(appearance.density.minimumWidth))
         }, available)
         layout.spanCount = available
         layout.spanSizeLookup.invalidateSpanIndexCache()
@@ -124,43 +178,32 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
 
     private fun prefetch(direction: PageDirection) {
         if (!isShown || scroll.height == 0 || adapter.itemCount == 0) return
-        val margin = (scroll.width / dp(48)).coerceAtLeast(1) * 2
+        if (scroll.isLayoutRequested) { schedulePrefetch(); return }
+        val first = layout.findFirstVisibleItemPosition()
+        val last = layout.findLastVisibleItemPosition()
+        if (first < 0 || last < 0) return
+        fun row(position: Int) = layout.spanSizeLookup.getSpanGroupIndex(position, layout.spanCount)
         val nearEdge = if (direction == PageDirection.NEXT)
-            layout.findLastVisibleItemPosition() >= adapter.itemCount - 1 - margin
-        else layout.findFirstVisibleItemPosition() in 0..margin
-        if (nearEdge) requestPage(direction, explicit = false)
+            row(adapter.itemCount - 1) - row(last) <= 2
+        else row(first) <= 2
+        if (nearEdge) requestPage(direction)
     }
 
-    private fun browse(direction: PageDirection) {
-        val step = if (direction == PageDirection.NEXT) 1 else -1
+    private fun requestPage(direction: PageDirection) {
         val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage else lastSnapshot.hasPreviousPage
-        if (available) requestPage(direction, explicit = true)
-        else if (scroll.canScrollVertically(step)) scroll.smoothScrollBy(0, step * scroll.height.coerceAtLeast(dp(48)))
-    }
-
-    private fun requestPage(direction: PageDirection, explicit: Boolean) {
-        val available = if (direction == PageDirection.NEXT) lastSnapshot.hasNextPage else lastSnapshot.hasPreviousPage
-        if (!available || !explicit && (pending != null || attempted == (lastSnapshot to direction))) return
+        if (!available || pending != null || attempted == (lastSnapshot to direction)) return
         dispatchTask?.let(::removeCallbacks)
         pending = direction
-        explicitRequest = explicit
         attempted = lastSnapshot to direction
         val expected = revision
         // Never mutate the adapter from RecyclerView's layout/scroll callback.
         val dispatch = Runnable {
             dispatchTask = null
             if (revision == expected && isShown) onPageChanged(direction)
-            if (revision == expected) { pending = null; explicitRequest = false }
+            if (revision == expected) pending = null
         }
         dispatchTask = dispatch
-        if (!explicit || scroll.isComputingLayout) post(dispatch) else dispatch.run()
-    }
-
-    private fun updateNavigation() {
-        previous.isEnabled = lastSnapshot.hasPreviousPage || scroll.canScrollVertically(-1)
-        next.isEnabled = lastSnapshot.hasNextPage || scroll.canScrollVertically(1)
-        previous.alpha = if (previous.isEnabled) 1f else 0.35f
-        next.alpha = if (next.isEnabled) 1f else 0.35f
+        post(dispatch)
     }
 
     fun clear() {
@@ -173,6 +216,16 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         attempted = null
         render(EngineSnapshot.Empty)
         for (index in 0 until scroll.childCount) (scroll.getChildAt(index) as? CandidateItemView)?.clear()
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(prefetch)
+        dispatchTask?.let(::removeCallbacks)
+        dispatchTask = null
+        pending = null
+        attempted = null
+        revision++
+        super.onDetachedFromWindow()
     }
 
     private inner class CandidateAdapter : RecyclerView.Adapter<CandidateHolder>() {
@@ -203,13 +256,13 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
                 setSingleLine(false)
                 maxLines = Int.MAX_VALUE
                 ellipsize = null
-                minHeight = dp(48)
-                textSize = 16f
+                applyExpandedAppearance(appearance)
                 layoutParams = RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
                 onSelected = { onCandidateSelected(it) }
             })
 
         override fun onBindViewHolder(holder: CandidateHolder, position: Int) {
+            holder.view.applyExpandedAppearance(appearance)
             holder.view.bind(items[position], position, position == highlighted)
         }
 

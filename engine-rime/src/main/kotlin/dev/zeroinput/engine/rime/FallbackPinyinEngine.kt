@@ -5,7 +5,8 @@ import dev.zeroinput.engine.api.*
 /** Small, immediately available engine used while the public native dictionary warms up. */
 internal class FallbackPinyinEngine(
     options: ChineseInputOptions = ChineseInputOptions(),
-) : InputEngine, CompositionEditingEngine {
+) : InputEngine, CompositionEditingEngine, CompositionCursorEngine {
+    private val cursorEditing = options.keyboardLayout == ChineseKeyboardLayout.FULL
     private val pageSize = options.candidatePageSize
     private val doublePinyinScheme = options.effectiveDoublePinyinScheme
     private val readingIndex = buildReadings(options)
@@ -37,7 +38,11 @@ internal class FallbackPinyinEngine(
 
     override fun start(context: EditorContext): EngineSnapshot = reset()
 
-    override fun handle(key: EngineKey): EngineUpdate = when (key) {
+    override fun acceptsCompositionCharacter(character: Char): Boolean =
+        character.isLetterOrDigit() || character == '\'' ||
+            character == ';' && doublePinyinScheme == DoublePinyinScheme.MICROSOFT
+
+    override fun handle(key: EngineKey): EngineUpdate = editComposition(key) ?: when (key) {
         is EngineKey.Character -> character(key.text)
         EngineKey.Backspace -> backspace()
         EngineKey.Space -> if (snapshot.candidates.isNotEmpty()) selectCandidate(0) else commitLiteral(" ")
@@ -62,7 +67,10 @@ internal class FallbackPinyinEngine(
         val target = page + if (direction == PageDirection.NEXT) 1 else -1
         if (target < 0 || target * pageSize >= choices.size) return EngineUpdate(snapshot, consumed = false)
         page = target
-        return render()
+        val selection = snapshot.selection
+        val update = render()
+        snapshot = update.snapshot.copy(selection = selection)
+        return update.copy(snapshot = snapshot)
     }
 
     override fun restoreComposition(input: String): EngineUpdate {
@@ -82,8 +90,31 @@ internal class FallbackPinyinEngine(
         return refresh()
     }
 
+    override fun selectComposition(selection: CompositionSelection): EngineUpdate {
+        if (snapshot.selection == null || !selection.isValidFor(snapshot.rawInput))
+            return EngineUpdate(snapshot, consumed = false)
+        segments.clear()
+        syllableOnly = false
+        refresh()
+        snapshot = snapshot.copy(selection = selection)
+        return EngineUpdate(snapshot)
+    }
+
+    private fun editComposition(key: EngineKey): EngineUpdate? {
+        val edit = PinyinCompositionEdits.replacement(snapshot, key,
+            doublePinyinScheme == DoublePinyinScheme.MICROSOFT) ?: return null
+        if (edit.input == snapshot.rawInput) {
+            snapshot = snapshot.copy(selection = CompositionSelection(edit.caret))
+            return EngineUpdate(snapshot)
+        }
+        val update = if (edit.input.isEmpty()) EngineUpdate(reset()) else restoreComposition(edit.input)
+        snapshot = update.snapshot.copy(selection = if (update.snapshot.isComposing) CompositionSelection(edit.caret) else null)
+        return update.copy(snapshot = snapshot, consumed = true)
+    }
+
     override fun selectSyllable(): EngineUpdate {
         if (input.isEmpty()) return EngineUpdate(snapshot, consumed = false)
+        editComposition(EngineKey.Character("'"))?.let { return it }
         syllableOnly = true
         return refresh()
     }
@@ -178,6 +209,7 @@ internal class FallbackPinyinEngine(
             hasNextPage = (page + 1) * pageSize < choices.size,
             canUndoSelection = segments.isNotEmpty(),
             canSelectSyllable = raw.isNotEmpty(),
+            selection = if (cursorEditing && raw.isNotEmpty()) CompositionSelection(raw.length) else null,
         )
         return EngineUpdate(snapshot)
     }

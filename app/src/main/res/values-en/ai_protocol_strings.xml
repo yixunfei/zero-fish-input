@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_protocol_label">API protocol</string>
+    <string name="ai_protocol_streaming">Stream responses</string>
+    <string name="ai_protocol_routes">Generation: %1$s\nModel catalog: %2$s</string>
+    <string name="ai_protocol_address_invalid">Enter an HTTPS API base or a complete generation URL matching the selected protocol. Model catalog URLs, queries and fragments are not accepted.</string>
+    <string name="ai_catalog_unavailable">Model catalog unavailable (HTTP %1$d). Enter a model manually and test generation; catalog failure does not mean the model is unavailable.</string>
+</resources>

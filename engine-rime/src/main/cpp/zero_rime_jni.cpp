@@ -400,7 +400,7 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeSetInput(
     JNIEnv* env, jobject, jlong session_id, jstring input) {
   const auto value = ToUtf8(env, input);
   if (value.size() > 128 || !std::all_of(value.begin(), value.end(), [](char ch) {
-        return (ch >= 'a' && ch <= 'z') || (ch >= '2' && ch <= '9') || ch == '\'';
+        return (ch >= 'a' && ch <= 'z') || (ch >= '2' && ch <= '9') || ch == '\'' || ch == ';';
       })) return JNI_FALSE;
   std::lock_guard<std::mutex> lock(engine_mutex);
   return api && session_id && api->set_input(session_id, value.c_str()) ? JNI_TRUE : JNI_FALSE;

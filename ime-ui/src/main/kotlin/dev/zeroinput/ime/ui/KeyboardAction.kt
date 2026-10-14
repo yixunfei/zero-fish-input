@@ -10,6 +10,7 @@ sealed interface KeyboardAction {
     data object Backspace : KeyboardAction
 
     data object Shift : KeyboardAction
+    data object SelectSyllable : KeyboardAction
 
     data object Space : KeyboardAction
 

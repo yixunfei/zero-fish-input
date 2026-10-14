@@ -113,7 +113,7 @@
     <string name="user_dictionary_export_warning">将导出应用 Keystore 加密的词库文件，包含中英文词组、输入码、词频和使用时间，不包含 emoji 或安全剪贴板。文件只能在本设备上的 ZeroInput 中导入；选择已有文件会覆盖其内容。</string>
     <string name="user_dictionary_import_notice">导入 ZeroInput 加密词库文件（最多 5 MiB），合并到现有词库。相同语言、输入码和词组的词频及使用时间将被更新。合并后最多 20,000 条；格式无效、无法解密或超限时整次导入取消。</string>
     <string name="clear_personal_data">清除个性化数据</string>
-    <string name="clear_personal_data_message">将删除本地用户词组、词频、表情最近记录、收藏和自定义颜文字，且无法恢复。</string>
+    <string name="clear_personal_data_message">将删除本地用户词组、词频、表情最近记录、收藏和自定义颜文字、词库本地修改及名称，且无法恢复。</string>
     <string name="personal_data_cleared">个性化数据已清除</string>
     <string name="chinese_input_settings">中文输入</string>
     <string name="select_builtin_chinese">使用内置中文引擎</string>

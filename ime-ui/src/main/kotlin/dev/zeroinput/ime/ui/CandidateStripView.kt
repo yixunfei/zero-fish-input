@@ -5,7 +5,6 @@ import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.View
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -21,12 +20,9 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     var onAiRequested: () -> Unit = {}
     var onReconvertRequested: () -> Unit = {}
     var onPageChanged: (PageDirection) -> Unit = {}
-    private val composition = TextView(context).apply {
-        textSize = 14f
-        gravity = Gravity.CENTER_VERTICAL
-        setSingleLine()
-        ellipsize = TextUtils.TruncateAt.MIDDLE
-        setPadding(dp(8), 0, dp(8), 0)
+    var onCompositionSelection: (dev.zeroinput.engine.api.CompositionSelection, String) -> Unit = { _, _ -> }
+    private val composition = CompositionEditorView(context).apply {
+        onSelection = { range, input -> onCompositionSelection(range, input) }
     }
     private val status = TextView(context).apply {
         textSize = 12f
@@ -39,22 +35,18 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     }
     private val progress = ProgressBar(context, null, android.R.attr.progressBarStyleSmall)
     private val candidates = LinearLayout(context).apply { orientation = HORIZONTAL }
-    private val scroll = HorizontalScrollView(context).apply {
-        isHorizontalScrollBarEnabled = false
-        overScrollMode = OVER_SCROLL_NEVER
+    private val scroll = CandidateScrollView(context).apply {
+        canLoad = { if (it == PageDirection.NEXT) previousSnapshot?.hasNextPage == true else previousSnapshot?.hasPreviousPage == true }
+        onNearEdge = ::requestMore
+        onBrowseStarted = { attempted = null }
         addView(candidates)
     }
-    private val expand = panelIconButton(context, android.R.drawable.arrow_down_float, R.string.expand_candidates) { onExpandRequested() }
-    private var requestedPage: PageDirection? = null
-    private val browser = HorizontalSwipeFrameLayout(context).apply {
-        canSwipe = { direction ->
-            val snapshot = previousSnapshot
-            if (direction == PageDirection.NEXT) snapshot?.hasNextPage == true && !scroll.canScrollHorizontally(1)
-            else snapshot?.hasPreviousPage == true && !scroll.canScrollHorizontally(-1)
-        }
-        onSwipe = { direction -> requestedPage = direction; onPageChanged(direction); requestedPage = null }
-        addView(scroll)
-    }
+    private val expand = panelIconButton(context, R.drawable.ic_panel_expand, R.string.expand_candidates) { onExpandRequested() }
+        .apply { rotation = 180f }
+    private var attempted: Pair<EngineSnapshot, PageDirection>? = null
+    private var loadTask: Runnable? = null
+    private var fillAllowed = true
+    private var restoringScroll = false
     private val tools = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.keyboard_tools) { onToolsRequested() }
     private val reconvert = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.reconvert_last_word) {
         onReconvertRequested()
@@ -66,7 +58,6 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private var previousSnapshot: EngineSnapshot? = null
     private var expanded = false
     private var lastStatus: InputEngineStatus? = null
-    private var diagnostics: String? = null
     private var lastAnnouncedCandidate: String? = null
     private var actionDensity = CandidateActionDensity.FULL
     private var candidateInline = false
@@ -75,16 +66,16 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private var pendingAnchor: Pair<String, Int>? = null
     private val statusRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
-        addView(composition, LayoutParams(0, dp(24), 0.55f))
+        addView(composition, LayoutParams(0, dp(48), 0.55f))
         addView(progress, LayoutParams(dp(18), dp(18)))
-        addView(status, LayoutParams(0, dp(24), 0.45f).apply { marginEnd = dp(8) })
+        addView(status, LayoutParams(0, dp(48), 0.45f).apply { marginEnd = dp(8) })
     }
     private val actionRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         addView(tools, LayoutParams(dp(48), dp(48)))
         addView(reconvert, LayoutParams(dp(48), dp(48)))
         addView(ai, LayoutParams(dp(48), dp(48)))
-        addView(browser, LayoutParams(0, dp(48), 1f))
+        addView(scroll, LayoutParams(0, dp(48), 1f))
         addView(retry, LayoutParams(dp(48), dp(48)))
         addView(expand, LayoutParams(dp(48), dp(48)))
     }
@@ -107,22 +98,21 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
 
     fun render(snapshot: EngineSnapshot) {
         if (snapshot == previousSnapshot) return
-        browser.cancelSwipe()
         val oldCandidates = previousSnapshot?.candidates.orEmpty()
-        val oldIds = oldCandidates.mapTo(HashSet()) { it.id }
-        val pageTarget = if (requestedPage == PageDirection.NEXT)
-            snapshot.candidates.indexOfFirst { it.id !in oldIds }.coerceAtLeast(0) else 0
+        loadTask?.let(::removeCallbacks)
+        loadTask = null
         val changedInput = snapshot.rawInput != previousSnapshot?.rawInput ||
             snapshot.composition != previousSnapshot?.composition
         val anchorIndex = buttons.indexOfFirst { it.isVisible && it.right > scroll.scrollX }
-        pendingAnchor = if (!changedInput && scroll.scrollX > 0 && pageTarget == 0)
+        fillAllowed = changedInput || oldCandidates.firstOrNull()?.id?.let { id -> snapshot.candidates.any { it.id == id } } != false
+        pendingAnchor = if (!changedInput)
             pendingAnchor ?: oldCandidates.getOrNull(anchorIndex)?.let { it.id to (buttons[anchorIndex].left - scroll.scrollX) }
             else null
         previousSnapshot = snapshot
         if (snapshot.candidates.isEmpty()) lastAnnouncedCandidate = null
         val associations = snapshot.candidates.firstOrNull()?.kind == dev.zeroinput.engine.api.CandidateKind.NEXT_WORD
-        composition.text = if (associations) context.getString(R.string.word_associations)
-            else snapshot.composition.ifEmpty { snapshot.rawInput }
+        composition.render(snapshot, if (associations) context.getString(R.string.word_associations)
+            else snapshot.composition.ifEmpty { snapshot.rawInput })
         while (buttons.size < snapshot.candidates.size) {
             buttons += CandidateItemView(context).also { button ->
                 button.onSelected = { index -> onCandidateSelected(index) }
@@ -134,16 +124,13 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             button.visibility = if (candidate == null) View.GONE else View.VISIBLE
             if (candidate != null) button.bind(candidate, index, index == snapshot.highlightedIndex) else button.clear()
         }
-        if (changedInput) scroll.scrollTo(0, 0)
+        if (changedInput) restoreScroll(0)
         if (changedInput && snapshot.candidates.isNotEmpty()) {
             val announcement = snapshot.candidates.first().text
             if (announcement != lastAnnouncedCandidate) {
                 lastAnnouncedCandidate = announcement
                 announceForAccessibility(announcement)
             }
-        }
-        if (pageTarget > 0) scroll.post {
-            if (previousSnapshot == snapshot) buttons.getOrNull(pageTarget)?.let { scroll.scrollTo(it.left, 0) }
         }
         updateStatusVisibility()
         updateActionVisibility()
@@ -152,7 +139,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         // Keep even a sentence-sized first result from consuming the entire strip.
-        val limit = (browser.measuredWidth * 0.65f).toInt().coerceAtLeast(dp(48))
+        val limit = (scroll.measuredWidth * 0.65f).toInt().coerceAtLeast(dp(48))
         var changed = false
         buttons.forEach { if (it.maxWidth != limit) { it.maxWidth = limit; changed = true } }
         if (changed) super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -162,15 +149,44 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         super.onLayout(changed, left, top, right, bottom)
         pendingAnchor?.let { (id, offset) ->
             val index = previousSnapshot?.candidates?.indexOfFirst { it.id == id } ?: -1
-            buttons.getOrNull(index)?.let { scroll.scrollTo(it.left - offset, 0) }
+            buttons.getOrNull(index)?.let { restoreScroll(it.left - offset) }
         }
         pendingAnchor = null
+        if (fillAllowed) scroll.checkEdge(PageDirection.NEXT)
+    }
+
+    private fun requestMore(direction: PageDirection) {
+        val snapshot = previousSnapshot ?: return
+        if (expanded || restoringScroll || loadTask != null || attempted == (snapshot to direction)) return
+        attempted = snapshot to direction
+        val task = Runnable {
+            loadTask = null
+            if (!expanded && isShown && previousSnapshot == snapshot) onPageChanged(direction)
+        }
+        loadTask = task
+        post(task)
+    }
+
+    private fun restoreScroll(position: Int) {
+        restoringScroll = true
+        try { scroll.scrollTo(position, 0) } finally { restoringScroll = false }
+    }
+
+    override fun onDetachedFromWindow() {
+        loadTask?.let(::removeCallbacks)
+        loadTask = null
+        attempted = null
+        super.onDetachedFromWindow()
     }
 
     fun setExpanded(value: Boolean) {
         if (expanded == value) return
         expanded = value
-        expand.setImageResource(if (value) android.R.drawable.arrow_up_float else android.R.drawable.arrow_down_float)
+        if (value) {
+            loadTask?.let(::removeCallbacks)
+            loadTask = null
+        }
+        expand.rotation = if (value) 0f else 180f
         expand.contentDescription = context.getString(if (value) R.string.collapse_candidates else R.string.expand_candidates)
     }
 
@@ -195,31 +211,16 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             InputEngineStatus.READY -> R.string.engine_ready
             InputEngineStatus.HIDDEN -> null
         }
-        status.text = diagnostics ?: label?.let(context::getString).orEmpty()
+        status.text = label?.let(context::getString).orEmpty()
         progress.visibility = if (value == InputEngineStatus.PREPARING) View.VISIBLE else View.GONE
         updateStatusVisibility()
         updateActionVisibility()
     }
 
-    /** Shows the Debug-only editor metadata diagnostic while preserving the composition text. */
-    fun renderDiagnostics(value: String?) {
-        if (diagnostics == value) return
-        diagnostics = value
-        val label = when (lastStatus) {
-            InputEngineStatus.PREPARING -> R.string.engine_preparing
-            InputEngineStatus.PENDING_CONFIGURATION -> R.string.engine_pending_configuration
-            InputEngineStatus.FAILED -> R.string.engine_failed
-            InputEngineStatus.READY -> R.string.engine_ready
-            InputEngineStatus.HIDDEN, null -> null
-        }
-        status.text = value ?: label?.let(context::getString).orEmpty()
-        updateStatusVisibility()
-    }
-
     private fun updateViewportLayout() {
         orientation = if (candidateInline) HORIZONTAL else VERTICAL
         statusRow.layoutParams = if (candidateInline) LayoutParams(0, dp(48), 1f)
-            else LayoutParams(LayoutParams.MATCH_PARENT, dp(24))
+            else LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
         actionRow.layoutParams = if (candidateInline) LayoutParams(0, dp(48), 3f)
             else LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
     }
@@ -239,7 +240,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     }
 
     private fun updateStatusVisibility() {
-        status.visibility = if (diagnostics == null && lastStatus == InputEngineStatus.READY && previousSnapshot?.isComposing == true)
+        status.visibility = if (lastStatus == InputEngineStatus.READY && previousSnapshot?.isComposing == true)
             View.GONE else View.VISIBLE
     }
 

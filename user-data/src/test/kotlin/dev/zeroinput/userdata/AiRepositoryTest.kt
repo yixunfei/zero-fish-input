@@ -21,6 +21,30 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiRepositoryTest {
+    @Test fun protocolAndStreamingRoundTripAndUnknownProtocolFailsClosed() {
+        for (protocol in dev.zeroinput.ai.api.AiProtocol.entries) {
+            val store = MemoryStore()
+            val profile = providerProfile().copy(endpoint = "https://example.test/v1", protocol = protocol, streaming = false)
+            val value = AiConfiguration(providers = listOf(profile), selectedProviderId = profile.id)
+            AiConfigurationRepository(store).write(value)
+            assertEquals(value, AiConfigurationRepository(store).read())
+            val json = JSONObject(String(checkNotNull(store.bytes), Charsets.UTF_8))
+            json.getJSONArray("providers").getJSONObject(0).put("protocol", "UNKNOWN")
+            store.bytes = json.toString().toByteArray()
+            assertThrows(IllegalStateException::class.java) { AiConfigurationRepository(store).read() }
+        }
+    }
+
+    @Test fun formatFourProvidersArePurgedIncludingTheirDedicatedKey() {
+        val store = MemoryStore()
+        AiConfigurationRepository(store).write(AiConfiguration(providers = listOf(providerProfile()), selectedProviderId = "fixture"))
+        val old = JSONObject(String(checkNotNull(store.bytes), Charsets.UTF_8)).put("format", 4)
+        old.getJSONArray("providers").getJSONObject(0).remove("protocol")
+        store.bytes = old.toString().toByteArray()
+        assertEquals(AiConfiguration(), AiConfigurationRepository(store).read())
+        assertNull(store.bytes)
+        assertTrue(store.deletedKey)
+    }
     @Test
     fun configurationRoundTripWipesBuffersAndKeepsApiKeyOutOfTheMemoryContract() {
         val store = MemoryStore()
@@ -145,7 +169,7 @@ class AiRepositoryTest {
 
     @Test
     fun legacyConfigurationIsClearedWithoutCompatibilityMigration() {
-        for (format in 1..3) {
+        for (format in 1..4) {
             val store = MemoryStore()
             store.bytes = JSONObject()
                 .put("format", format)

@@ -9,6 +9,13 @@
 
 ## Enforced controls
 
+- Pinyin cursor/range editing is confined to current bounded engine input. Its
+  focus-free view has no platform editing menus, clipboard access, saved view
+  text, autofill or content capture. Input/selection changes cancel gestures;
+  routing checks expected input and valid offsets. Offset-zero Backspace never
+  falls through to external editor deletion. Sensitive sessions expose no
+  composition editing. AI and expression drafts keep separate controllers.
+
 - Explicit public dictionary downloads are the separately approved network
   exception in [ADR 0020](adr/0020-public-dictionaries.md). Catalog HTML is parsed
   without execution. Every redirect remains HTTPS on the source host allowlist;
@@ -766,7 +773,7 @@ during generation and discards pending output without deleting saved conversatio
 Tests cover unknown/restricted selections, default restoration, late completion,
 new-chat history isolation and effective-model attachment capability checks.
 
-Streaming completion requires both a normal text stop and the DONE event. Mixed
+Chat Completions streaming completion requires both a normal text stop and the DONE event. Mixed
 tool/text chunks, content after stop, multiple choices and trailing JSON cannot
 create a successful model probe or insertable answer. Bounded multiline SSE events
 and usage-only chunks are accepted. Live follow-up tests assert a public word from
@@ -926,3 +933,54 @@ corruption, cancellation, graph rejection, missing-model retry and stale results
 - Replacing an AI test dialog explicitly cancels the prior request. A delayed
   dismiss callback is bound to its own window and cannot cancel a newer request;
   stale probe results cannot enable its replacement's retry button or update status.
+
+## Dictionary management and local edits
+
+Local dictionary names, terms, readings, weights and tombstones are personal data.
+They use a dedicated AES-GCM/Keystore store in noBackupFilesDir, separate from public
+originals and user phrase keys. They never enter native YAML, public receipts,
+network requests or logs. Private editors and disabled personalization bypass all
+overlay reads; dictionary disable/delete excludes its overrides. Secure editor UI
+disables saved text, autofill and content capture, clears stopped forms and revokes
+stale callbacks. Global clear deletes file/key and generation-checks queued saves.
+Forms bind their deletion generation before editing or renaming, not when Save
+is clicked. Even if the UI revocation notification is delayed, an old form cannot
+adopt the new generation and recreate reset edits. The device regression delays
+that notification and verifies rejection at persistence. Search cancellation is
+checked before private reads and opening public originals; retained overrides
+stay manageable even if their upstream original disappears after redownload.
+Malformed, truncated, duplicate, oversized or unauthenticated edit data fails closed.
+
+Redownload retains encrypted edits and enabled state. Bundled restore uses verified
+APK data; remote replacement requires the locked archive hash before selecting one
+bounded data entry. Archive paths never become output paths. Download cancellation,
+wrong hashes and parse failures retain published originals. Native activation remains
+separate and preserves a last verified deployment on failure. The base character
+table cannot be disabled/deleted; original APK bytes cannot be physically erased.
+Same-text/same-reading candidates lack source provenance and are suppressed together.
+Native canonical readings cover corrected spellings; deleting one entry does not
+remove other synthesized phrases containing that word.
+See [ADR 0023](adr/0023-dictionary-management.md) and the negative/platform tests.
+
+## Explicit AI protocols (2026-10-14)
+
+Protocol confusion can send a correct credential to the wrong same-origin route
+or misreport catalog failure as model failure. Explicit protocol selection and
+matching endpoint validation prevent route concatenation across formats. Editing
+protocol or streaming cancels the editor's pending tests/discovery; the captured
+configuration also rejects queued work after a protocol change. No automatic
+fallback or redirect forwards a credential or repeats user content.
+
+Responses disables remote response storage and uses no server conversation state.
+Only selected local history, references and attachments enter the request. Protocol
+media constraints supplement the model capability gate. New parsers bound framing,
+JSON, output and deadline; malformed, incomplete, tool and mismatched final output
+cannot become insertable. Error bodies remain unread. Actual vendor retention and
+credential validity are outside the app's control.
+
+The approved format-5 reset deletes only the old AI configuration file/key.
+Conversation keys and content are not touched. Failed purge blocks reads/writes;
+unknown protocols, missing required fields and unknown formats fail closed.
+Negative tests cover reset failure, protocol switching, schema mismatch, truncation,
+redirect rejection, oversized events, cancellation and separate catalog/generation
+404 status. See [ADR 0024](adr/0024-ai-provider-protocols.md).

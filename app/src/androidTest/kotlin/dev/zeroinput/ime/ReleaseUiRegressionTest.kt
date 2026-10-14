@@ -35,13 +35,13 @@ class ReleaseUiRegressionTest {
         assertEquals(keyboardHeight, panel.height)
     }
 
-    @Test fun diagnosticsAndAssociationsKeepReconversionReachableUntilRevoked() = withPanel { panel ->
+    @Test fun associationsKeepReconversionReachableUntilRevoked() = withPanel { panel ->
         val ready = InputSessionState(privacy = SessionPrivacy(false, true, true, PrivacyReason.NONE), canReconvert = true)
         var requests = 0
         panel.onReconvertRequested = { requests++ }
-        panel.renderDiagnostics("Public fixture diagnostic")
         panel.renderSession(ready)
         measure(panel)
+        button(panel, UiR.string.keyboard_tools).performClick()
         button(panel, UiR.string.reconvert_last_word).performClick()
         assertEquals(1, requests)
         panel.renderSession(ready.copy(snapshot = EngineSnapshot(candidates = listOf(

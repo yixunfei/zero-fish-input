@@ -21,7 +21,7 @@ internal class ExpandingRimeEngine(
     private val createSecondary: (EditorContext) -> RimeInputEngine,
     private val executor: ExecutorService,
     private val onSecondaryFailure: (Throwable) -> Unit = {},
-) : InputEngine, CompositionEditingEngine, ReadingSelectionEngine, CandidateTextNormalizer {
+) : InputEngine, CompositionEditingEngine, CompositionCursorEngine, ReadingSelectionEngine, CandidateTextNormalizer {
     private val lifecycleLock = Any()
     @Volatile private var related: RimeInputEngine? = null
     private var secondaryRequested = false
@@ -46,6 +46,8 @@ internal class ExpandingRimeEngine(
         primary.start(context)
         return reset()
     }
+
+    override fun acceptsCompositionCharacter(character: Char) = primary.acceptsCompositionCharacter(character)
 
     override fun handle(key: EngineKey): EngineUpdate {
         if (source >= 0 && key == EngineKey.Space && snapshot.candidates.isNotEmpty()) return selectCandidate(0)
@@ -194,6 +196,10 @@ internal class ExpandingRimeEngine(
     override fun restoreComposition(input: String): EngineUpdate { clearExpansion(); return publish(primary.restoreComposition(input)) }
     override fun undoSelection(): EngineUpdate { clearExpansion(); return publish(primary.undoSelection()) }
     override fun selectSyllable(): EngineUpdate { clearExpansion(); return publish(primary.selectSyllable()) }
+    override fun selectComposition(selection: CompositionSelection): EngineUpdate {
+        clearExpansion()
+        return publish(primary.selectComposition(selection))
+    }
     override fun selectReading(index: Int): EngineUpdate { clearExpansion(); return publish(primary.selectReading(index)) }
     override fun normalizeCandidateText(text: String): String = primary.normalizeCandidateText(text)
     override fun reset(): EngineSnapshot { clearExpansion(); primary.reset(); snapshot = EngineSnapshot.Empty; return snapshot }

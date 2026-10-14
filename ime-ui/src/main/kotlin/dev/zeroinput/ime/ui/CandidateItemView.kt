@@ -22,6 +22,7 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     private var holding = false
     private val highlightColor: Int
     private var boundCandidate: Candidate? = null
+    private var expandedAppearance: ExpandedCandidateAppearance? = null
 
     init {
         setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
@@ -74,6 +75,21 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
         text = ""
         contentDescription = null
         androidx.appcompat.widget.TooltipCompat.setTooltipText(this, null)
+    }
+
+    fun applyExpandedAppearance(appearance: ExpandedCandidateAppearance) {
+        if (expandedAppearance == appearance) return
+        expandedAppearance = appearance
+        // A layout change during a held touch must not select a newly positioned item.
+        bindingRevision++
+        holding = false
+        isPressed = false
+        val density = appearance.density
+        minHeight = dp(density.minimumHeight)
+        textSize = appearance.textSize.toFloat()
+        gravity = if (appearance.layout == ExpandedCandidateLayout.LIST) Gravity.START or Gravity.CENTER_VERTICAL else Gravity.CENTER
+        setPadding(dp(density.horizontalPadding), dp(density.verticalPadding),
+            dp(density.horizontalPadding), dp(density.verticalPadding))
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

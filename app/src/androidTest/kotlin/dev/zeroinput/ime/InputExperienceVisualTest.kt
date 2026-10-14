@@ -86,8 +86,15 @@ class InputExperienceVisualTest {
         val phrase = "这是一段用于验证候选完整展示的公开测试文字".repeat(4)
         panel.renderSession(InputSessionState(snapshot = EngineSnapshot("ceshi", "ce shi", listOf(
             Candidate("public:long", phrase), Candidate("public:short", "测试"), Candidate("public:other", "侧视"),
-        ))))
+        ), canSelectSyllable = true, selection = dev.zeroinput.engine.api.CompositionSelection(2))))
         capture("candidates")
+        panel.renderSession(InputSessionState(snapshot = EngineSnapshot("chaxun", "cha xun", listOf(
+            Candidate("query", "查询"), Candidate("inspect", "查讯")), canSelectSyllable = true,
+            selection = dev.zeroinput.engine.api.CompositionSelection(1, 3))))
+        capture("pinyin-selection")
+        panel.renderSession(InputSessionState(snapshot = EngineSnapshot("ceshi", "ce shi", listOf(
+            Candidate("public:long", phrase), Candidate("public:short", "测试"), Candidate("public:other", "侧视"),
+        ), canSelectSyllable = true, selection = dev.zeroinput.engine.api.CompositionSelection(2))))
         click(UiR.string.expand_candidates)
         capture("expanded")
         val grid = descendants(panel).filterIsInstance<RecyclerView>().single { visible(it, panel) }

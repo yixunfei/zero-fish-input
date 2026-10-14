@@ -44,6 +44,7 @@ data class EngineSnapshot(
     val readings: List<String> = emptyList(),
     val canUndoSelection: Boolean = false,
     val canSelectSyllable: Boolean = false,
+    val selection: CompositionSelection? = null,
 ) {
     val isComposing: Boolean
         get() = rawInput.isNotEmpty() || composition.isNotEmpty()

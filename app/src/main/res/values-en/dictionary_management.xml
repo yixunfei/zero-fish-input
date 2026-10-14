@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictionary_entries">Manage entries</string>
+    <string name="dictionary_search_hint">Search words or pinyin</string>
+    <string name="dictionary_search">Search</string>
+    <string name="dictionary_add">Add entry</string>
+    <string name="dictionary_changes_only">Local changes only</string>
+    <string name="dictionary_entry">%1$s · %2$s · Weight %3$d</string>
+    <string name="dictionary_deleted_entry">Deleted: %1$s · %2$s · Weight %3$d</string>
+    <string name="dictionary_previous">Previous page</string>
+    <string name="dictionary_next">Next page</string>
+    <string name="dictionary_no_entries">No matching entries</string>
+    <string name="dictionary_edit_notice">Tap an entry to edit. Local changes are inactive in private sessions or when personalization is off. Duplicate candidates with the same text and reading are hidden together. Weights order locally edited entries.</string>
+    <string name="dictionary_word">Word</string>
+    <string name="dictionary_reading">Pinyin (separate syllables with spaces)</string>
+    <string name="dictionary_weight">Weight (0–2147483647)</string>
+    <string name="dictionary_undo_entry">Undo local change to this entry</string>
+    <string name="dictionary_invalid_entry">Enter a valid word, pinyin and nonnegative integer weight</string>
+    <string name="dictionary_delete_entry_confirm">Delete this entry? You can undo it under Local changes only.</string>
+    <string name="dictionary_required">Base characters · Always enabled</string>
+    <string name="dictionary_deleted">Deleted · Offline restore available</string>
+    <string name="dictionary_enabled">Enabled</string>
+    <string name="dictionary_disabled">Disabled</string>
+    <string name="dictionary_row">%1$s · %2$s</string>
+    <string name="dictionary_builtin_details">Source: %1$s\nVersion: %2$s · %3$d KB</string>
+    <string name="dictionary_rename">Rename</string>
+    <string name="dictionary_redownload">Download again</string>
+    <string name="dictionary_offline_restore">Restore bundled dictionary offline</string>
+    <string name="dictionary_restore_original">Restore original and clear changes</string>
+    <string name="dictionary_restore_original_confirm">This clears the local name, entry and weight changes for this dictionary. A bundled dictionary will be re-enabled. This cannot be undone.</string>
+    <string name="dictionary_remove_notice">Delete and disable this dictionary? Local changes are kept for reinstallation. Bundled originals remain in the app and can be restored offline. Reclaimable deployment copies are cleaned after switching dictionaries.</string>
+    <string name="dictionary_name">Dictionary name</string>
+    <string name="dictionary_redownload_confirm">Download the public original again, keeping local changes and enabled state? Bundled dictionaries use a reviewed fixed version.</string>
+    <string name="dictionary_management_notice">Select a dictionary to edit entries, rename, disable, delete or download again. Local changes are encrypted and retained when downloading again.</string>
+    <string-array name="dictionary_builtin_names">
+        <item>Base characters</item>
+        <item>Core vocabulary</item>
+        <item>Associations</item>
+        <item>Alternative readings</item>
+        <item>Multiple readings</item>
+        <item>Poetry</item>
+        <item>Places</item>
+        <item>Medicine</item>
+        <item>Chemistry</item>
+        <item>Drugs</item>
+        <item>Notable people</item>
+        <item>Performers</item>
+        <item>Species</item>
+        <item>Personal names</item>
+        <item>Typhoons</item>
+        <item>Dialects</item>
+    </string-array>
+    <string name="dictionary_result_count">Entries %1$d–%2$d</string>
+    <string name="dictionary_delete_added_confirm">Delete this added entry? This cannot be undone.</string>
+</resources>

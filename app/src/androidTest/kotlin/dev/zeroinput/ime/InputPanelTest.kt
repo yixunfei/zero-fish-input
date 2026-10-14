@@ -92,8 +92,7 @@ class InputPanelTest {
         measure(panel, 320)
         assertTrue("Expanding candidates must preserve keyboard height", panel.height == height)
         assertFalse(visible(panel).any { it is KeyboardPanel })
-        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.next_candidates)).performClick()
-        assertTrue(pageRequests == 1)
+        assertFalse(visible(panel).any { it.contentDescription == "下一页候选" || it.contentDescription == "上一页候选" })
         visible(panel).last { it.contentDescription == panel.context.getString(dev.zeroinput.ime.ui.R.string.candidate_description, "你好") }.performClick()
         assertTrue(selection >= 0)
         var interactions = 0
@@ -102,7 +101,9 @@ class InputPanelTest {
         assertTrue("Automatic return to keyboard must preserve the recent word", interactions == 0)
         var reopened = false
         panel.onReconvertRequested = { reopened = true }
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_tools)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.reconvert_last_word)).performClick()
+        panel.navigateBack()
         assertTrue(reopened)
         assertTrue(visible(panel).any { it is KeyboardPanel })
         assertFalse(visible(panel).any { it.contentDescription == panel.context.getString(dev.zeroinput.ime.ui.R.string.candidate_description, "你好") })
@@ -237,6 +238,7 @@ class InputPanelTest {
         var interactions = 0
         panel.onUserInteraction = { interactions++ }
         measure(panel, 320)
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_tools)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)).performClick()
         panel.renderSecureClipboard(false, emptyList())
         measure(panel, 320)
@@ -253,6 +255,7 @@ class InputPanelTest {
         measure(panel, 320)
         val searchHeight = panel.measuredHeight
         // Leaving a search clears its local input session; a new search restores the same geometry.
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_tools)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.expression_smileys)).performClick()
         assertFalse(panel.isSearchEditing)
@@ -266,6 +269,7 @@ class InputPanelTest {
     fun secureClipboardManagementUsesACompactActionTarget() = onMain {
         val panel = panel(false)
         measure(panel, 320)
+        button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_tools)).performClick()
         button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)).performClick()
         panel.renderSecureClipboard(false, emptyList())
         measure(panel, 320)
@@ -289,6 +293,7 @@ class InputPanelTest {
             panel.onHandwritingCandidateSelected = { accept }
             panel.onKeyboardAction = { if (it == KeyboardAction.Space) spaceActions++ }
             measure(panel, width, if (landscape) 320 else 600)
+            button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_tools)).performClick()
             button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_open)).performClick()
             measure(panel, width, if (landscape) 320 else 600)
             val canvas = button(panel, panel.context.getString(dev.zeroinput.ime.ui.R.string.handwriting_canvas))

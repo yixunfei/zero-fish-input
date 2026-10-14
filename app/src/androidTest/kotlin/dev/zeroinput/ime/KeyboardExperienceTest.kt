@@ -31,8 +31,8 @@ class KeyboardExperienceTest {
         val keyboard = views(panel).filterIsInstance<KeyboardPanel>().single()
         val point = top(panel, keyboard)
         val height = panel.height
-        assertEquals(dp(panel, 72), point)
-        assertEquals(dp(panel, 72) + 4 * dp(panel, 52), height)
+        assertEquals(dp(panel, 96), point)
+        assertEquals(dp(panel, 96) + 4 * dp(panel, 52), height)
         assertFalse(views(panel).filterIsInstance<CandidateStripView>().single().isShown)
         panel.renderSession(InputSessionState(snapshot = EngineSnapshot("nihao", "ni hao", listOf(Candidate("fixture", "你好")))))
         measure(panel)
@@ -61,7 +61,7 @@ class KeyboardExperienceTest {
                 val panel = ZeroInputView(context).apply { setKeyboardHeight(height) }
                 measure(panel, width, if (width == 800) 320 else 1000)
                 val keyboard = views(panel).filterIsInstance<KeyboardPanel>().single()
-                assertTrue("$theme $height $width: ${panel.height}", panel.height <= dp(panel, if (width == 800) 300 else 340))
+                assertTrue("$theme $height $width: ${panel.height}", panel.height <= dp(panel, if (width == 800) 300 else 364))
                 for (i in 0 until keyboard.childCount) assertTrue(keyboard.getChildAt(i).height >= dp(panel, 48))
                 val foreground = color(context, com.google.android.material.R.attr.colorOnSurface)
                 for (background in listOf(com.google.android.material.R.attr.colorSurface, com.google.android.material.R.attr.colorPrimaryContainer)) {

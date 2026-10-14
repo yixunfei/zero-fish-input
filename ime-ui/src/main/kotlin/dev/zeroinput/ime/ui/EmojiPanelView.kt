@@ -11,7 +11,6 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
-import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -234,14 +233,16 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
         filterTask?.cancel(false)
         (filterTask as? Runnable)?.let { filterWorker?.remove(it) }
         filterTask = null
-        val privateCategory = state.category in setOf(EmojiCategory.RECENT, EmojiCategory.FAVORITES, EmojiCategory.CUSTOM)
+        val privateCategory = state.category == EmojiCategory.RECENT ||
+            state.category == EmojiCategory.FAVORITES || state.category == EmojiCategory.CUSTOM
         if (!state.personalizationAllowed && privateCategory) {
             adapter.submit(emptyList(), emptySet(), false)
             emptyLabel.visibility = VISIBLE
             updateEmptyLabel()
             return
         }
-        if (!EmojiCatalog.isReady && state.category !in setOf(EmojiCategory.KAOMOJI, EmojiCategory.CUSTOM)) {
+        if (!EmojiCatalog.isReady && state.category != EmojiCategory.KAOMOJI &&
+            state.category != EmojiCategory.CUSTOM) {
             adapter.submit(emptyList(), emptySet(), false)
             emptyLabel.visibility = VISIBLE
             emptyLabel.setText(if (preparationFailed) R.string.expression_unavailable else R.string.expression_loading)

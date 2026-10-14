@@ -58,7 +58,8 @@ class PublicDictionaryStore(context: Context) : PublicDictionarySource {
             require(temporary.length() <= 256L * 1024 * 1024)
             require(existing.filter { it.id != id }.sumOf { it.bytes } + temporary.length() <= 1024L * 1024 * 1024)
             val hash = sha256(temporary)
-            val item = InstalledPublicDictionary(id, title, source, version, hash, count, temporary.length(), true)
+            val item = InstalledPublicDictionary(id, title, source, version, hash, count, temporary.length(),
+                existing.firstOrNull { it.id == id }?.enabled ?: true)
             checkCancelled()
             val target = File(root, "$hash.dict.yaml")
             if (target.exists()) require(sha256(target) == hash) else check(temporary.renameTo(target))
@@ -86,6 +87,14 @@ class PublicDictionaryStore(context: Context) : PublicDictionarySource {
         val entries = readState()
         writeState(entries.filter { it.id != id })
         cleanUnusedBlobs()
+    }
+
+    /** Public content only, protected against removal for the duration of a settings search. */
+    fun <T> withDictionaryInput(id: String, consume: (InputStream) -> T): T = synchronized(lock) {
+        val item = readState().single { it.id == id }
+        val file = File(root, "${item.sha256}.dict.yaml")
+        require(file.isFile && file.length() == item.bytes && sha256(file) == item.sha256)
+        file.inputStream().use(consume)
     }
 
     private fun cleanUnusedBlobs() {

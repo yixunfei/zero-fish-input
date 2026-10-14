@@ -120,3 +120,13 @@ page references remain transient; individual history selection and encrypted cha
 renaming do not change stored formats. The current content review Activity is
 nonexported; earlier external SEND/PROCESS_TEXT publication descriptions do not
 match the current manifest and that route is not enabled by this amendment.
+
+## Explicit protocol amendment (2026-10-14)
+
+[ADR 0024](0024-ai-provider-protocols.md) extends the existing transport to explicit
+Chat Completions, Responses and Anthropic Messages formats, including user-selected
+streaming. It supersedes the Chat-only routing and 16-token probe statements above:
+the probe now allows 512 output tokens, with the same 30-second deadline and public
+prompt. The user chose an old-configuration reset for format 5, not migration;
+conversation storage remains unchanged. No automatic fallback, redirect, new data
+source, permission or runtime network adapter is approved by this amendment.

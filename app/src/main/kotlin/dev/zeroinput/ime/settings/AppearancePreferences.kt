@@ -7,6 +7,9 @@ import dev.zeroinput.ime.ui.KeyboardBackground
 import dev.zeroinput.ime.ui.KeyboardHeight
 import dev.zeroinput.ime.ui.KeyboardMaterial
 import dev.zeroinput.ime.ui.KeyboardTheme
+import dev.zeroinput.ime.ui.ExpandedCandidateAppearance
+import dev.zeroinput.ime.ui.ExpandedCandidateDensity
+import dev.zeroinput.ime.ui.ExpandedCandidateLayout
 
 /** Nonsensitive appearance identifiers; image bytes never enter preferences. */
 internal class AppearancePreferences(private val preferences: SharedPreferences) {
@@ -20,6 +23,12 @@ internal class AppearancePreferences(private val preferences: SharedPreferences)
         backgroundColor = if (preferences.contains("keyboard.background-color")) number("background-color", 0) else null,
         backgroundOpacity = number("opacity", 100), backgroundDim = number("dim", 15),
         backgroundBlur = number("blur", 0), imageRevision = preferences.getString("keyboard.image", "").orEmpty(),
+        expandedCandidates = ExpandedCandidateAppearance(
+            layout = enumValue("candidates.layout", ExpandedCandidateLayout.ADAPTIVE),
+            density = enumValue("candidates.density", ExpandedCandidateDensity.SPACIOUS),
+            textSize = number("candidates.text-size", 18),
+            separators = preferences.getBoolean("keyboard.candidates.separators", true),
+        ),
     ).sanitized()
 
     fun write(appearance: KeyboardAppearance) {
@@ -37,6 +46,10 @@ internal class AppearancePreferences(private val preferences: SharedPreferences)
             putInt("keyboard.dim", value.backgroundDim)
             putInt("keyboard.blur", value.backgroundBlur)
             putString("keyboard.image", value.imageRevision)
+            putString("keyboard.candidates.layout", value.expandedCandidates.layout.name)
+            putString("keyboard.candidates.density", value.expandedCandidates.density.name)
+            putInt("keyboard.candidates.text-size", value.expandedCandidates.textSize)
+            putBoolean("keyboard.candidates.separators", value.expandedCandidates.separators)
         }
     }
 

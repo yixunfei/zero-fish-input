@@ -6,7 +6,6 @@
     <string name="expression_search_input">Enter an expression search term</string>
     <string name="key_semicolon">Semicolon, Microsoft double pinyin ing</string>
     <!-- Hexadecimal editor flags are identifiers, not plural quantities. -->
-    <string name="input_diagnostics_format" tools:ignore="PluralsCandidate">DBG pkg=%1$s type=0x%2$08X cls=%3$s var=0x%4$04X ime=0x%5$08X subtype=%6$s privacy=%7$s lang=%8$s engine=%9$s rime=%10$s</string>
     <string name="related_candidate">%1$s · Similar</string>
     <string name="reconvert_last_word">Reselect last word</string>
     <string name="undo_segment">Undo segment selection</string>
@@ -19,8 +18,8 @@
     <string name="candidate_description">Candidate %1$s</string>
     <string name="expand_candidates">Expand candidates</string>
     <string name="collapse_candidates">Collapse candidates</string>
-    <string name="previous_candidates">Previous page</string>
-    <string name="next_candidates">Next page</string>
+    <string name="key_segment">Split</string>
+    <string name="pinyin_edit_description">Pinyin %1$s. Tap to move the cursor; hold and drag to select.</string>
     <string name="retry_engine">Retry Chinese input</string>
     <string name="engine_preparing">Preparing Chinese</string>
     <string name="engine_preparing_basic">Preparing Chinese · Basic input available</string>

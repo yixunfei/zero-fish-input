@@ -15,6 +15,63 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class PublicDictionaryPlatformTest {
+    @Test fun replacementUsesOriginalTableIdentityAndOfflineRestoreDiscardsItsCopy() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val graph = (context.applicationContext as ZeroInputApplication).graph
+        graph.engineExecutor.submit {
+            check(graph.publicDictionaries.list().none { it.id == "builtin_jichu" })
+            graph.rime.close()
+            try {
+                graph.publicDictionaries.install("builtin_jichu", "Public fixture", "WANXIANG", "fixture",
+                    "---\nname: fixture\n...\n公开词库测试\tgong kai ci ku ce shi\t2000000000\n".byteInputStream(),
+                    dev.zeroinput.engine.dictionary.importer.RimeTextDictionaryParser())
+                graph.rime.runtime.prepareDictionariesIfIdle()
+                assertTrue(graph.rime.runtime.initializationError?.toString(), graph.rime.runtime.isReady)
+                requireNotNull(graph.rime.createNativeOrNull()).use { engine ->
+                    engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
+                    "gongkaicikuceshi".forEach { engine.handle(EngineKey.Character(it.toString())) }
+                    assertTrue(engine.snapshot.candidates.any { it.text == "公开词库测试" })
+                }
+            } finally {
+                graph.rime.close()
+                graph.builtInDictionaries.restore("jichu")
+                graph.rime.runtime.prepareDictionariesIfIdle()
+                assertTrue(graph.rime.runtime.isReady)
+                assertFalse(graph.publicDictionaries.list().any { it.id == "builtin_jichu" })
+            }
+        }.get(600, TimeUnit.SECONDS)
+    }
+
+    @Test fun optionalBuiltInTablesCanBeRemovedAndRestoredWhileBaseConversionRemainsAvailable() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val graph = (context.applicationContext as ZeroInputApplication).graph
+        graph.engineExecutor.submit {
+            val prior = graph.builtInDictionaries.list()
+            check(prior.all { it.enabled && it.replacement == null }) { "Requires default test dictionary selection" }
+            graph.rime.close()
+            try {
+                prior.filterNot { it.required }.forEach { graph.builtInDictionaries.remove(it.table) }
+                graph.rime.runtime.prepareDictionariesIfIdle()
+                assertTrue(graph.rime.runtime.initializationError?.toString(), graph.rime.runtime.isReady)
+                requireNotNull(graph.rime.createNativeOrNull()).use { engine ->
+                    engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
+                    "ni".forEach { engine.handle(EngineKey.Character(it.toString())) }
+                    val index = engine.snapshot.candidates.indexOfFirst { it.text == "你" }
+                    assertTrue(index >= 0)
+                    assertEquals("你", engine.selectCandidate(index).committedText)
+                }
+                val root = java.io.File(context.noBackupFilesDir, "rime")
+                val generation = java.io.File(root, "verified-generation").readText()
+                assertFalse(java.io.File(root, "shared-$generation/dicts/jichu.dict.yaml").exists())
+            } finally {
+                graph.rime.close()
+                graph.builtInDictionaries.restoreAll()
+                graph.rime.runtime.prepareDictionariesIfIdle()
+                assertTrue(graph.rime.runtime.isReady)
+            }
+        }.get(600, TimeUnit.SECONDS)
+    }
+
     @Test fun installedPublicWordsEnterNativeCandidatesAndCanBeRemoved() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val graph = (context.applicationContext as ZeroInputApplication).graph
@@ -55,7 +112,7 @@ class PublicDictionaryPlatformTest {
                 ChineseInputOptions(doublePinyinScheme = DoublePinyinScheme.ZIRANMA) to "nihk",
             )) {
                 val engine = graph.rime.createNativeOrNull(options)
-                assertNotNull(engine)
+                assertNotNull("${options.keyboardLayout}/${options.doublePinyinScheme}: ${graph.rime.runtime.initializationError}", engine)
                 requireNotNull(engine).use {
                     it.start(EditorContext(InputLanguage.CHINESE, false, false, null))
                     code.forEach { char -> it.handle(EngineKey.Character(char.toString())) }

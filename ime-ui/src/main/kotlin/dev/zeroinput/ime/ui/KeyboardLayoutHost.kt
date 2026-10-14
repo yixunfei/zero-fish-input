@@ -27,6 +27,7 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
     private var gesturePlacement = placement
     private var gestureBounds = Rect()
     private val safeInsets = Rect()
+    private val windowHeightCache = KeyboardWindowHeightCache()
     private val controls = KeyboardPlacementControls(context)
     private var menu: PopupMenu? = null
     private val restore = TextView(context).apply {
@@ -83,6 +84,7 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             if (safeInsets != Rect(bars.left, bars.top, bars.right, bars.bottom)) {
                 safeInsets.set(bars.left, bars.top, bars.right, bars.bottom)
+                windowHeightCache.invalidate()
                 requestLayout()
             }
             insets
@@ -171,10 +173,11 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         val availableHeight = (offered - top - bottom).coerceAtLeast(0)
         // A WRAP_CONTENT IME can be remeasured against its previous collapsed
         // height. Use window bounds for responsive policy, not that feedback.
-        val windowHeight = if (!isAttachedToWindow) offered
-            else if (Build.VERSION.SDK_INT >= 30) context.getSystemService(WindowManager::class.java)
+        val windowHeight = windowHeightCache.resolve(isAttachedToWindow, offered) {
+            if (Build.VERSION.SDK_INT >= 30) context.getSystemService(WindowManager::class.java)
                 .currentWindowMetrics.bounds.height()
             else dp(resources.configuration.screenHeightDp)
+        }
         keyboard.setHostViewportHeight((windowHeight - safeInsets.top - safeInsets.bottom).coerceAtLeast(0))
         val panelWidth = if (minimized) minOf(dp(56), availableWidth)
             else if (keyboard.isPanelExpanded) availableWidth
@@ -197,7 +200,27 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         onBoundsChanged()
     }
 
-    override fun onDetachedFromWindow() { menu?.dismiss(); menu = null; super.onDetachedFromWindow() }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        windowHeightCache.invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w != oldw || h != oldh) windowHeightCache.invalidate()
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        windowHeightCache.invalidate()
+    }
+
+    override fun onDetachedFromWindow() {
+        menu?.dismiss()
+        menu = null
+        windowHeightCache.invalidate()
+        super.onDetachedFromWindow()
+    }
     fun release() {
         menu?.dismiss(); menu = null
         onPlacementChanged = {}; onInteraction = {}; onBoundsChanged = {}
@@ -208,5 +231,19 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
 
     private companion object {
         const val NATURAL_IME_VIEWPORT_DP = 420
+    }
+}
+
+/** Caches the expensive window metrics lookup for one stable attached layout. */
+internal class KeyboardWindowHeightCache {
+    private var cachedHeight: Int? = null
+
+    fun resolve(attached: Boolean, offeredHeight: Int, readWindowHeight: () -> Int): Int {
+        if (!attached) return offeredHeight
+        return cachedHeight ?: readWindowHeight().also { cachedHeight = it }
+    }
+
+    fun invalidate() {
+        cachedHeight = null
     }
 }

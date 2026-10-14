@@ -113,7 +113,8 @@ class AiLiveSettingsFlowTest {
         selectText(choices.first { it != model })
         tap(R.string.ai_models_apply)
         onMain { assertEquals(0, graph.aiConfigurationSnapshot()?.providers?.size) }
-        onMain { top().filterIsInstance<android.widget.Spinner>().single().performClick() }
+        onMain { top().filterIsInstance<android.widget.Spinner>().single {
+            it.contentDescription == it.context.getString(R.string.ai_choose_model) }.performClick() }
         selectText(model)
         tap(R.string.ai_test_draft)
         await(35_000) { texts().any { it.text == it.context.getString(R.string.ai_test_available) } }

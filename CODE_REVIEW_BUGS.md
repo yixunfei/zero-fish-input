@@ -22,8 +22,6 @@ M1 的不可交付结果会立即关闭 Prepared 引擎，并在可用的 Handle
 
 ---
 
----
-
 ## 性能与结构观察（不构成缺陷）
 
 - **P1 · 语言包前缀索引内存放大**：`LanguagePackEngine.buildPrefixIndex`（`:132-144`）为每个 shortcut 每个前缀建 bucket，受 MAX_ENTRIES=50_000/MAX_TOTAL_TEXT_BYTES=32MB/shortcut≤64 约束有界。补充：`bucket.size >= MAX_CANDIDATES(8)` 提前 break 按字典文件行序截断（`:138-139`），前 8 个词条永久占满该前缀，后续更高频词条被丢弃——候选质量非最优但功能正确。扩大词典上限前需重新评估（限制索引前缀长度 + 排序依据）。
@@ -39,7 +37,10 @@ M1 的不可交付结果会立即关闭 Prepared 引擎，并在可用的 Handle
 
 ## 建议处理优先级
 
-1. **M1**（一行修复：`!canDeliver` 时关闭 Prepared）→ 2. **M2**（资产 identity 未变时跳过 native 重初始化）→ 3. **L5**（vault.add 补 CharArray 重载）→ 4. **L6**（8.x 时间戳惰性捕获）→ 5. **L8**（固定 torch 版本）→ L1/L2/L3/L4/L7/L9/L10 与 P1–P8 视后续演进再议。
+当前无高/中/低危缺陷。P1–P8 均为不构成缺陷的性能/结构观察项，视后续演进再议：
+
+- **优先**：P4（onMeasure 每键 binder 开销，缓存 windowHeight）、P7（onStateChanged 每键冗余渲染链，视图侧加等价短路）。
+- 其余（P1/P2/P3/P5/P6/P8）有界、低频或已有短路，仅在上限扩大或相关代码演进时重新评估。
 
 ---
 

@@ -28,6 +28,42 @@ import dev.zeroinput.ime.ui.R as UiR
 class KeyboardEditorIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun pinyinCursorEditsCommitExactlyOnceToTheSameEditor() {
+        val original = shell("settings get secure default_input_method").trim()
+        val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
+        var activity: InputFixtureActivity? = null
+        try {
+            shell("ime enable $method")
+            shell("ime set $method")
+            activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
+            await { findKey(UiR.string.key_shift) != null && views(panel()).any { it.isShown && it is TextView && it.text.toString() == "c" } }
+            onMain {
+                val language = checkNotNull(findKey(UiR.string.key_language)) as TextView
+                if (language.text.toString() == "En") language.performClick()
+            }
+            await { (findKey(UiR.string.key_language) as? TextView)?.text.toString() == "中" }
+            onMain { for (letter in "chaxun") key(panel(), letter.toString()).performClick() }
+            await { views(panel()).any { it.isShown && it.contentDescription == it.context.getString(UiR.string.select_single_syllable) } }
+            onMain {
+                val composition = views(panel()).filterIsInstance<TextView>().single { it.javaClass.simpleName == "CompositionEditorView" }
+                assertTrue(composition.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_SELECTION,
+                    android.os.Bundle().apply {
+                        putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 1)
+                        putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, 3)
+                    }))
+                key(panel(), "e").performClick()
+                assertEquals("cexun", composition.text.toString())
+                checkNotNull(findKey(UiR.string.key_enter)).performClick()
+            }
+            await { activity.editor.text.toString() == "cexun" }
+            onMain { assertEquals(5, activity.editor.selectionStart); assertEquals(5, activity.editor.selectionEnd) }
+        } finally {
+            activity?.let { onMain { it.finish() } }
+            if (original.isNotBlank() && original != "null") shell("ime set $original")
+        }
+    }
+
     @Test fun numericInputAndEditorActionFollowRestartedEditorConfiguration() {
         val original = shell("settings get secure default_input_method").trim()
         val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"

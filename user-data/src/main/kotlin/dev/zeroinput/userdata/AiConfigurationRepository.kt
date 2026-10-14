@@ -2,6 +2,7 @@ package dev.zeroinput.userdata
 
 import android.content.Context
 import dev.zeroinput.ai.api.AiLimits
+import dev.zeroinput.ai.api.AiProtocol
 import dev.zeroinput.security.EncryptedFileStore
 import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.security.SecurityAliases
@@ -33,6 +34,8 @@ data class AiProviderProfile(
     val selectedModel: String,
     val imageModels: Set<String> = emptySet(),
     val audioModels: Set<String> = emptySet(),
+    val protocol: AiProtocol = AiProtocol.CHAT_COMPLETIONS,
+    val streaming: Boolean = true,
 ) {
     val supportsImages: Boolean get() = selectedModel in imageModels
     val supportsAudio: Boolean get() = selectedModel in audioModels
@@ -72,6 +75,8 @@ class AiConfigurationRepository(
                     put("selectedModel", profile.selectedModel)
                     put("imageModels", JSONArray(profile.imageModels.toList()))
                     put("audioModels", JSONArray(profile.audioModels.toList()))
+                    put("protocol", profile.protocol.name)
+                    put("streaming", profile.streaming)
                 })
             } })
         }
@@ -92,11 +97,9 @@ class AiConfigurationRepository(
         val bytes = store.read() ?: return AiConfiguration()
         return try {
             require(bytes.size <= MAX_CONFIG_BYTES)
-            val parsed = withJsonReader(bytes, ::readConfiguration)
-            when (parsed.legacyFormat) {
-                in 1..3 -> {
-                    // The pre-provider format contained a single endpoint/key. The
-                    // user explicitly chose to discard it instead of migrating it.
+            when (withJsonReader(bytes, ::readFormat)) {
+                in 1..4 -> {
+                    // Explicitly approved reset: discard old credentials, never guess a protocol.
                     try {
                         store.delete(deleteKey = true)
                     } catch (error: Exception) {
@@ -108,16 +111,25 @@ class AiConfigurationRepository(
                     return AiConfiguration()
                 }
             }
-            parsed.configuration.also(::validate)
+            withJsonReader(bytes, ::readConfiguration).also(::validate)
         } catch (_: Exception) {
             throw IllegalStateException("AI configuration is invalid")
         } finally { bytes.fill(0) }
     }
 
-    private class ParsedConfiguration(
-        val legacyFormat: Long,
-        val configuration: AiConfiguration,
-    )
+    private fun readFormat(reader: android.util.JsonReader): Long {
+        var format: Long? = null
+        val fields = HashSet<String>()
+        reader.beginObject()
+        while (reader.hasNext()) {
+            val name = reader.nextName()
+            require(fields.add(name))
+            if (name == "format") format = nextLong(reader) else reader.skipValue()
+        }
+        reader.endObject()
+        require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
+        return (format ?: invalid()).also { require(it in 1..FORMAT) }
+    }
 
     private fun invalid(): Nothing = throw IllegalArgumentException("invalid")
 
@@ -170,6 +182,8 @@ class AiConfigurationRepository(
             var selectedModel: String? = null
             var imageModels = emptySet<String>()
             var audioModels = emptySet<String>()
+            var protocol: AiProtocol? = null
+            var streaming: Boolean? = null
             val fields = HashSet<String>()
             reader.beginObject()
             while (reader.hasNext()) {
@@ -184,6 +198,8 @@ class AiConfigurationRepository(
                     "selectedModel" -> selectedModel = nextString(reader)
                     "imageModels" -> imageModels = readStringSet(reader)
                     "audioModels" -> audioModels = readStringSet(reader)
+                    "protocol" -> protocol = AiProtocol.valueOf(nextString(reader))
+                    "streaming" -> streaming = nextBoolean(reader)
                     else -> invalid()
                 }
             }
@@ -193,13 +209,14 @@ class AiConfigurationRepository(
                 endpoint = endpoint ?: invalid(), apiKey = apiKey ?: invalid(),
                 models = models ?: invalid(), selectedModel = selectedModel ?: invalid(),
                 imageModels = imageModels, audioModels = audioModels,
+                protocol = protocol ?: invalid(), streaming = streaming ?: invalid(),
             )
         }
         reader.endArray()
         return providers
     }
 
-    private fun readConfiguration(reader: android.util.JsonReader): ParsedConfiguration {
+    private fun readConfiguration(reader: android.util.JsonReader): AiConfiguration {
         var format: Long? = null
         var enabled = false
         var networkAllowed = false
@@ -226,19 +243,16 @@ class AiConfigurationRepository(
         reader.endObject()
         require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
         val version = format ?: invalid()
-        require(version == FORMAT.toLong() || version in 1..3)
-        if (version == FORMAT.toLong()) {
-            require(fields.containsAll(listOf("enabled", "networkAllowed", "timeoutMs", "saveConversations", "providers")))
-        }
-        val configuration = if (version == FORMAT.toLong()) AiConfiguration(
+        require(version == FORMAT.toLong())
+        require(fields.containsAll(listOf("enabled", "networkAllowed", "timeoutMs", "saveConversations", "providers")))
+        return AiConfiguration(
             enabled = enabled,
             networkAllowed = networkAllowed,
             timeoutMs = timeoutMs,
             saveConversations = saveConversations,
             providers = providers,
             selectedProviderId = selectedProviderId?.takeIf { it.isNotBlank() },
-        ) else AiConfiguration()
-        return ParsedConfiguration(version, configuration)
+        )
     }
 
     private fun validate(value: AiConfiguration) {
@@ -252,22 +266,23 @@ class AiConfigurationRepository(
             require(profile.models.all { it.isNotBlank() && it.length <= 128 && it.none(Char::isISOControl) })
             require(profile.selectedModel in profile.models)
             require(profile.imageModels.all { it in profile.models } && profile.audioModels.all { it in profile.models })
+            require(profile.protocol.supportsAudio || profile.audioModels.isEmpty())
             require(
                 profile.apiKey.isNotBlank() && profile.apiKey.length <= 512 &&
                     profile.apiKey.none { it.isWhitespace() || it.isISOControl() },
             )
-            validateEndpoint(profile.endpoint)
+            validateEndpoint(profile.endpoint, profile.protocol)
         }
         require(value.timeoutMs in 1_000L..AiLimits.MAX_TIMEOUT_MS)
     }
 
-    private fun validateEndpoint(raw: String) {
-        try { dev.zeroinput.ai.api.AiEndpoint.parse(raw) }
+    private fun validateEndpoint(raw: String, protocol: AiProtocol) {
+        try { dev.zeroinput.ai.api.AiEndpoint.parse(raw, protocol) }
         catch (_: Exception) { throw IllegalArgumentException("AI endpoint must use a valid HTTPS API address") }
     }
 
     private companion object {
-        const val FORMAT = 4
+        const val FORMAT = 5
         const val MAX_CONFIG_BYTES = 512 * 1024
     }
 }

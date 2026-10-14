@@ -10,20 +10,15 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.materialswitch.MaterialSwitch
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.concurrency.BoundedExecutors
-import dev.zeroinput.engine.dictionary.importer.CellDictionaryParser
-import dev.zeroinput.engine.dictionary.importer.RimeTextDictionaryParser
 import dev.zeroinput.languagepack.InstalledPublicDictionary
-import java.io.File
 import java.util.concurrent.Future
 import java.util.concurrent.RejectedExecutionException
-import java.security.MessageDigest
 
 /** Foreground native catalog UI. Leaving the page cancels its outstanding network/parse request. */
 class DictionaryManagerActivity : AppCompatActivity() {
@@ -31,6 +26,9 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private val worker = BoundedExecutors.singleThread("public-dictionaries", 1)
     private val transport = DictionaryDownloadTransport()
     private val catalog by lazy { DictionaryCatalog(cacheDir, transport) }
+    private val downloads by lazy { DictionaryDownloads(this, transport, catalog, graph.publicDictionaries, graph.builtInDictionaries) }
+    private val management by lazy { DictionaryManagementRows(this, graph, ::command,
+        { work, complete -> runTask(work) { complete() } }, { changed(); showInstalled() }, ::confirmRedownload) }
     private lateinit var content: LinearLayout
     private lateinit var status: TextView
     private lateinit var progress: ProgressBar
@@ -41,9 +39,12 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private var currentPage: String? = null
     private val history = java.util.ArrayDeque<Pair<DictionarySource, String?>>()
     private var refreshAfterStop = false
+    private var revocationObserver: AutoCloseable? = null
+    private var editEpoch = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         title = getString(R.string.public_dictionary_title)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -68,7 +69,11 @@ class DictionaryManagerActivity : AppCompatActivity() {
         controls.addView(button(R.string.public_dictionary_home) { showInstalled() })
         controls.addView(button(R.string.public_dictionary_cancel) { cancel(); status.setText(R.string.public_dictionary_cancelled) })
         root.addView(controls)
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 24) }
+        content = LinearLayout(this).apply {
+            isSaveEnabled = false
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+            if (android.os.Build.VERSION.SDK_INT >= 30) importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+            orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 24) }
         root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -86,10 +91,14 @@ class DictionaryManagerActivity : AppCompatActivity() {
         history.clear()
         currentSource = null
         currentPage = null
-        runTask({ graph.publicDictionaries.list() to graph.publicResources.list() }) { (installed, resources) ->
+        runTask({ InstalledView(graph.publicDictionaries.list(), graph.publicResources.list(),
+            graph.builtInDictionaries.list(), graph.dictionaryEdits.read().names) }) { snapshot ->
+            val installed = snapshot.downloaded
+            val resources = snapshot.resources
             content.removeAllViews()
             label(getString(R.string.public_dictionary_builtin))
-            label(getString(R.string.public_dictionary_builtin_detail))
+            label(getString(R.string.dictionary_management_notice))
+            snapshot.builtin.forEach { management.builtIn(it, snapshot.names) }
             ResourceSettingsRows(this, graph.publicResources, transport, content, ::command,
                 { work, complete -> runTask(work) { complete() } }, { changed(); showInstalled() },
                 ::downloadProgress).show(resources)
@@ -97,7 +106,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
                 MaterialAlertDialogBuilder(this).setMessage(R.string.public_dictionary_restore_confirm)
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
-                        runTask({ graph.publicDictionaries.disableAll() }) {
+                        runTask({ graph.publicDictionaries.disableAll(); graph.builtInDictionaries.restoreAll() }) {
                             changed(); showInstalled()
                         }
                     }.show()
@@ -107,29 +116,21 @@ class DictionaryManagerActivity : AppCompatActivity() {
                 command(sourceLabel(source)) { confirmBrowse(source) }
             }
             label(getString(R.string.public_dictionary_installed))
-            installed.forEach(::installedRow)
+            installed.filterNot { it.id.startsWith("builtin_") }.forEach { management.downloaded(it, snapshot.names) }
             status.setText(if (dirty) R.string.public_dictionary_pending else R.string.public_dictionary_offline)
         }
     }
 
-    private fun installedRow(item: InstalledPublicDictionary) {
-        label(getString(R.string.public_dictionary_item, item.title, item.source, item.entries,
-            item.bytes / 1024, item.version.take(12)))
-        content.addView(MaterialSwitch(this).apply {
-            setText(R.string.public_dictionary_enable)
-            isChecked = item.enabled
-            setOnCheckedChangeListener { _, enabled ->
-                runTask({ graph.publicDictionaries.setEnabled(item.id, enabled) }) { changed(); showInstalled() }
-            }
-        })
-        command(getString(R.string.public_dictionary_update)) { confirmBrowse(DictionarySource.valueOf(item.source)) }
-        command(getString(R.string.public_dictionary_remove)) {
-            MaterialAlertDialogBuilder(this).setMessage(getString(R.string.public_dictionary_remove_confirm, item.title))
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    runTask({ graph.publicDictionaries.remove(item.id) }) { changed(); showInstalled() }
-                }.show()
-        }
+    private fun confirmRedownload(table: String?, item: InstalledPublicDictionary?) {
+        MaterialAlertDialogBuilder(this).setMessage(R.string.dictionary_redownload_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.dictionary_redownload) { _, _ ->
+                val progress = downloadProgress()
+                runTask({
+                    if (table != null) downloads.redownloadBuiltIn(table, progress)
+                    else downloads.redownload(requireNotNull(item), progress)
+                }) { changed(); showInstalled() }
+            }.show()
     }
 
     private fun confirmBrowse(source: DictionarySource) {
@@ -166,24 +167,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
     }
 
     private fun install(source: DictionarySource, item: CatalogItem) {
-        val downloadProgress = downloadProgress()
-        runTask({
-            val address = catalog.resolve(source, item)
-            val file = File.createTempFile("public-download-", ".tmp", cacheDir)
-            try {
-                transport.download(address, file, 128L * 1024 * 1024, progress = downloadProgress)
-                val parser = when (item.format) {
-                    "qq" -> CellDictionaryParser(CellDictionaryParser.Source.QQ)
-                    "scel" -> CellDictionaryParser(CellDictionaryParser.Source.SOGOU)
-                    else -> RimeTextDictionaryParser()
-                }
-                val id = source.name.lowercase() + "_" + MessageDigest.getInstance("SHA-256")
-                    .digest(item.id.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
-                file.inputStream().use {
-                    graph.publicDictionaries.install(id, item.title, source.name, item.version, it, parser)
-                }
-            } finally { file.delete() }
-        }) { changed(); showInstalled() }
+        val progress = downloadProgress()
+        runTask({ downloads.install(source, item, progress) }) { changed(); showInstalled() }
     }
 
     private fun downloadProgress(): (Long, Long) -> Unit {
@@ -227,7 +212,10 @@ class DictionaryManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun cancel() { generation++; pending?.cancel(true); pending = null; progress.visibility = View.GONE }
+    private fun cancel() {
+        generation++; pending?.cancel(true); pending = null; progress.visibility = View.GONE
+        BoundedExecutors.purge(worker)
+    }
     private fun changed() { dirty = true }
     private fun label(text: String) { content.addView(TextView(this).apply { this.text = text; setPadding(0, 16, 0, 8) }) }
     private fun command(text: String, action: () -> Unit) {
@@ -254,10 +242,29 @@ class DictionaryManagerActivity : AppCompatActivity() {
         DictionarySource.SOGOU -> R.string.public_dictionary_sogou
     })
 
+    private data class InstalledView(
+        val downloaded: List<InstalledPublicDictionary>,
+        val resources: List<dev.zeroinput.languagepack.PublicResourceStatus>,
+        val builtin: List<dev.zeroinput.languagepack.BuiltInDictionary>,
+        val names: Map<String, String>,
+    )
+
     override fun onStart() {
         super.onStart()
+        editEpoch = graph.dictionaryEdits.generation()
+        revocationObserver = graph.addPersonalizationListener {
+            runOnUiThread {
+                if (revocationObserver != null && editEpoch != graph.dictionaryEdits.generation()) {
+                    editEpoch = graph.dictionaryEdits.generation()
+                    management.close(); content.removeAllViews(); showInstalled()
+                }
+            }
+        }
         if (refreshAfterStop) { refreshAfterStop = false; showInstalled() }
     }
-    override fun onStop() { refreshAfterStop = true; cancel(); super.onStop() }
+    override fun onStop() {
+        revocationObserver?.close(); revocationObserver = null
+        refreshAfterStop = true; cancel(); management.close(); content.removeAllViews(); super.onStop()
+    }
     override fun onDestroy() { worker.shutdownNow(); super.onDestroy() }
 }

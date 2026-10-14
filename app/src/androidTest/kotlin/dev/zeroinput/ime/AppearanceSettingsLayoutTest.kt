@@ -27,18 +27,30 @@ class AppearanceSettingsLayoutTest {
         val appearance = settings.keyboardAppearance
         val rotation = shell("settings get system user_rotation").trim()
         val auto = shell("settings get system accelerometer_rotation").trim()
+        val fixedRotation = shell("wm fixed-to-user-rotation").trim()
         try {
             onMain { settings.keyboardAppearance = KeyboardAppearance() }
             shell("settings put system accelerometer_rotation 0")
+            shell("wm fixed-to-user-rotation enabled")
             for (value in listOf(0, 1)) {
                 shell("settings put system user_rotation $value")
+                instrumentation.uiAutomation.setRotation(value)
                 SystemClock.sleep(700)
                 val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardAppearanceActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyboardAppearanceActivity
                 try {
                     instrumentation.waitForIdleSync()
                     onMain {
+                        descendants(activity.window.decorView)
+                            .filterIsInstance<com.google.android.material.switchmaterial.SwitchMaterial>()
+                            .single { it.text == activity.getString(dev.zeroinput.ime.ui.R.string.expanded_candidates_preview) }
+                            .isChecked = true
+                    }
+                    instrumentation.waitForIdleSync()
+                    onMain {
                         val root = activity.window.decorView
+                        assertEquals(if (value == 0) android.content.res.Configuration.ORIENTATION_PORTRAIT
+                            else android.content.res.Configuration.ORIENTATION_LANDSCAPE, activity.resources.configuration.orientation)
                         assertTrue(activity.window.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_SECURE != 0)
                         val keyboard = descendants(root).filterIsInstance<ZeroInputView>().single()
                         val scroll = descendants(root).filterIsInstance<ScrollView>().single { container ->
@@ -46,6 +58,8 @@ class AppearanceSettingsLayoutTest {
                         }
                         assertTrue(keyboard.width >= 240 * activity.resources.displayMetrics.density)
                         assertTrue(keyboard.height > 0)
+                        assertTrue(descendants(keyboard).filterIsInstance<androidx.recyclerview.widget.RecyclerView>()
+                            .any { it.isShown && it.childCount > 0 })
                         assertTrue(scroll.height >= 80 * activity.resources.displayMetrics.density)
                         val previewBounds = android.graphics.Rect()
                         assertTrue(keyboard.getGlobalVisibleRect(previewBounds))
@@ -69,6 +83,8 @@ class AppearanceSettingsLayoutTest {
                 } finally { onMain { activity.finish() } }
             }
         } finally {
+            instrumentation.uiAutomation.setRotation(android.app.UiAutomation.ROTATION_UNFREEZE)
+            shell("wm fixed-to-user-rotation $fixedRotation")
             shell("settings put system user_rotation $rotation")
             shell("settings put system accelerometer_rotation $auto")
             onMain { settings.keyboardAppearance = appearance }

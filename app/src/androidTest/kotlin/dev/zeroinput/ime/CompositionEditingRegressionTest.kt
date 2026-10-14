@@ -10,6 +10,55 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class CompositionEditingRegressionTest {
+    @Test fun splitAtTheCaretInsertsAnApostropheWithoutCommittingOrLosingTheSuffix() = withEngine { engine ->
+        val editing = engine as CompositionEditingEngine
+        editing.restoreComposition("ch")
+        (engine as CompositionCursorEngine).selectComposition(CompositionSelection(1))
+        val split = editing.selectSyllable()
+        assertEquals("c'h", split.snapshot.rawInput)
+        assertEquals(CompositionSelection(2), split.snapshot.selection)
+        assertTrue(split.committedText.isEmpty())
+        assertEquals("ch", engine.handle(EngineKey.Backspace).snapshot.rawInput)
+    }
+
+    @Test fun cursorInsertionRangeReplacementAndDeletionStayInTheComposition() = withEngine { engine ->
+        val editing = engine as CompositionEditingEngine
+        val cursor = engine as CompositionCursorEngine
+        editing.restoreComposition("chaxun")
+        cursor.selectComposition(CompositionSelection(1))
+        val inserted = engine.handle(EngineKey.Character("x"))
+        assertEquals("cxhaxun", inserted.snapshot.rawInput)
+        assertEquals(CompositionSelection(2), inserted.snapshot.selection)
+        assertTrue(inserted.committedText.isEmpty())
+        assertEquals("chaxun", engine.handle(EngineKey.Backspace).snapshot.rawInput)
+        cursor.selectComposition(CompositionSelection(3, 1))
+        assertEquals("cexun", engine.handle(EngineKey.Character("e")).snapshot.rawInput)
+        cursor.selectComposition(CompositionSelection(0))
+        val boundary = engine.handle(EngineKey.Backspace)
+        assertTrue(boundary.consumed)
+        assertEquals("cexun", boundary.snapshot.rawInput)
+        cursor.selectComposition(CompositionSelection(0, 5))
+        val empty = engine.handle(EngineKey.Backspace)
+        assertFalse(empty.snapshot.isComposing)
+        assertTrue(empty.committedText.isEmpty())
+    }
+
+    @Test fun cursorEditingSelectedSegmentsRestoresReadingAndCandidateBrowsingKeepsCursor() = withEngine { engine ->
+        val editing = engine as CompositionEditingEngine
+        val cursor = engine as CompositionCursorEngine
+        editing.restoreComposition("nihao")
+        editing.selectSyllable()
+        engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "你" })
+        assertTrue(engine.snapshot.canUndoSelection)
+        cursor.selectComposition(CompositionSelection(1))
+        assertEquals("nihao", engine.snapshot.rawInput)
+        assertFalse(engine.snapshot.canUndoSelection)
+        assertEquals("nihao", engine.snapshot.composition.filterNot { it == ' ' || it == '\'' })
+        engine.changePage(PageDirection.NEXT)
+        assertEquals(CompositionSelection(1), engine.snapshot.selection)
+        assertEquals("nxihao", engine.handle(EngineKey.Character("x")).snapshot.rawInput)
+    }
+
     @Test fun repeatedBackspaceAfterSyllableNavigationNeverFallsThroughToTheEditor() = withEngine { engine ->
         val editing = engine as CompositionEditingEngine
         editing.restoreComposition("nihaoshijie")

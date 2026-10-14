@@ -39,7 +39,7 @@ internal class QueuedPersonalizationStore(
     ) {
         override fun removeEldestEntry(
             eldest: MutableMap.MutableEntry<QueryKey, PersonalSuggestionPage>?,
-        ): Boolean = size > MAX_CACHED_QUERIES
+        ): Boolean = size > MAX_CACHED_QUERIES || values.sumOf { it.suppressedDictionaryTexts.size + it.suppressedDictionaryEntries.size } > 40000
     }
     private val pendingQueries = HashMap<QueryKey, QueryStamp>()
     private val frequencyCache = object : LinkedHashMap<FrequencyKey, Int>(
@@ -69,7 +69,8 @@ internal class QueuedPersonalizationStore(
         schedulePreload()
         // Unavailable/cleared data must erase the display immediately. Only a
         // cache miss within the same ready revision may preserve a visible page.
-        if (!ready) return PersonalSuggestionPage(revision = viewRevision.get())
+        if (!ready) return if (delegate is DictionaryPersonalizationStore && language == InputLanguage.CHINESE)
+            unavailablePage(viewRevision.get(), language) else PersonalSuggestionPage(revision = viewRevision.get())
 
         val key = QueryKey(normalized, language, offset)
         val (cached, revision) = synchronized(stateLock) { suggestionCache[key] to viewRevision.get() }
@@ -80,8 +81,14 @@ internal class QueuedPersonalizationStore(
         // touch encrypted storage or sort a large dictionary, so never call
         // it from the IME key path.
         scheduleSuggestionQuery(key, dataRevision.get())
-        return PersonalSuggestionPage(ready = false, revision = revision)
+        return unavailablePage(revision, language)
     }
+
+    private fun unavailablePage(revision: Long, language: InputLanguage) = PersonalSuggestionPage(
+        ready = false, revision = revision,
+        dictionaryEditsApplied = language == InputLanguage.CHINESE &&
+            (delegate as? DictionaryPersonalizationStore)?.requiresFiltering == true,
+    )
 
     /**
      * Answers from the prepared frequency cache only.  Misses schedule a
@@ -165,6 +172,7 @@ internal class QueuedPersonalizationStore(
         // clear() so that operation is discarded before it reaches the
         // encrypted delegate.
         generation.incrementAndGet()
+        (delegate as? DictionaryPersonalizationStore)?.invalidate()
         ready = false
         invalidateSuggestionCache(clearPending = true)
     }
@@ -366,10 +374,14 @@ internal class QueuedPersonalizationStore(
                                     MAX_SUGGESTION_LIMIT,
                                 ) else emptyList())
                             }
-                        }.getOrDefault(PersonalSuggestionPage())
+                        }.getOrDefault(unavailablePage(viewRevision.get(), key.language))
                         synchronized(stateLock) {
                             if (isQueryCurrent(queryGeneration, queryRevision)) {
                                 suggestionCache[key] = values
+                                while (suggestionCache.values.sumOf { it.suppressedDictionaryTexts.size + it.suppressedDictionaryEntries.size } > 40000) {
+                                    val oldest = suggestionCache.entries.iterator()
+                                    oldest.next(); oldest.remove()
+                                }
                                 notify = true
                             }
                         }

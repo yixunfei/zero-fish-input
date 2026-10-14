@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictionary_entries">词条管理</string>
+    <string name="dictionary_search_hint">搜索词语或拼音</string>
+    <string name="dictionary_search">搜索</string>
+    <string name="dictionary_add">新增词条</string>
+    <string name="dictionary_changes_only">仅显示本地修改</string>
+    <string name="dictionary_entry">%1$s · %2$s · 词频 %3$d</string>
+    <string name="dictionary_deleted_entry">已删除：%1$s · %2$s · 词频 %3$d</string>
+    <string name="dictionary_previous">上一页</string>
+    <string name="dictionary_next">下一页</string>
+    <string name="dictionary_no_entries">没有匹配的词条</string>
+    <string name="dictionary_edit_notice">点击词条进行编辑。隐身或关闭个性化时不使用本地修改。同音同文的重复候选会一并隐藏；词频决定本地修改词条之间的顺序。</string>
+    <string name="dictionary_word">词语</string>
+    <string name="dictionary_reading">拼音（音节用空格分隔）</string>
+    <string name="dictionary_weight">词频（0–2147483647）</string>
+    <string name="dictionary_undo_entry">撤销此词条的本地修改</string>
+    <string name="dictionary_invalid_entry">请填写有效词语、拼音和非负整数词频</string>
+    <string name="dictionary_delete_entry_confirm">删除此词条？可在“仅显示本地修改”中撤销。</string>
+    <string name="dictionary_required">基础字表 · 始终启用</string>
+    <string name="dictionary_deleted">已删除 · 可离线恢复</string>
+    <string name="dictionary_enabled">已启用</string>
+    <string name="dictionary_disabled">已停用</string>
+    <string name="dictionary_row">%1$s · %2$s</string>
+    <string name="dictionary_builtin_details">来源：%1$s\n版本：%2$s · %3$d KB</string>
+    <string name="dictionary_rename">修改名称</string>
+    <string name="dictionary_redownload">重新下载</string>
+    <string name="dictionary_offline_restore">离线恢复内置词库</string>
+    <string name="dictionary_restore_original">恢复原版并清除修改</string>
+    <string name="dictionary_restore_original_confirm">恢复原版将清除此词库的本地名称、词条和词频修改。内置词库会重新启用。此操作无法撤销。</string>
+    <string name="dictionary_remove_notice">删除词库并停用？本地修改会保留，以便重新安装后继续使用。内置资源仍在安装包中，可离线恢复；可回收的部署副本会在切换词库后清理。</string>
+    <string name="dictionary_name">词库名称</string>
+    <string name="dictionary_redownload_confirm">将联网重新下载公开原版，保留本地修改和启停状态。内置词库使用已审核的固定版本。是否继续？</string>
+    <string name="dictionary_management_notice">选择词库可编辑词条、修改名称、停用、删除或重新下载。本地修改加密保存；重新下载保留修改。</string>
+    <string-array name="dictionary_builtin_names">
+        <item>基础字表</item>
+        <item>基础词库</item>
+        <item>联想词库</item>
+        <item>错音词库</item>
+        <item>多音词库</item>
+        <item>诗词</item>
+        <item>地名</item>
+        <item>医学</item>
+        <item>化学</item>
+        <item>药品</item>
+        <item>名人</item>
+        <item>艺人</item>
+        <item>物种</item>
+        <item>人名</item>
+        <item>台风</item>
+        <item>方言</item>
+    </string-array>
+    <string name="dictionary_result_count">词条 %1$d–%2$d</string>
+    <string name="dictionary_delete_added_confirm">删除此新增词条？此操作无法撤销。</string>
+</resources>

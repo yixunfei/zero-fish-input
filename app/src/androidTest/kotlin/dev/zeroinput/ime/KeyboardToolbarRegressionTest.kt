@@ -24,7 +24,6 @@ class KeyboardToolbarRegressionTest {
     private val ready = InputSessionState(privacy = SessionPrivacy(false, true, true, PrivacyReason.NONE))
 
     @Test fun aiIsDirectWhenIdleAndFirstInToolsDuringComposition() = withPanel { panel ->
-        onMain { panel.renderDiagnostics("Public fixture diagnostic") }
         capturePublicPreview("ai-entry.png")
         DeviceTouch.tapVisible { checkNotNull(find(panel, UiR.string.ai_open)) }
         capturePublicPreview("ai-workbench.png")
@@ -52,7 +51,6 @@ class KeyboardToolbarRegressionTest {
 
     @Test fun privacyRevocationMarksAiUnavailableAndRejectsStaleClicks() = withPanel { panel ->
         onMain {
-            panel.renderDiagnostics("Public fixture diagnostic")
             val entry = checkNotNull(find(panel, UiR.string.ai_open))
             panel.renderSession(InputSessionState(privacy = SessionPrivacy(false, true, false, PrivacyReason.INCOGNITO_MODE)))
             assertNull(find(panel, UiR.string.ai_open))
@@ -67,7 +65,6 @@ class KeyboardToolbarRegressionTest {
 
     @Test fun privacyChangeDuringAiClickCannotOpenWorkbench() = withPanel { panel ->
         onMain {
-            panel.renderDiagnostics("Public fixture diagnostic")
             panel.onUserInteraction = {
                 panel.renderSession(InputSessionState(privacy = SessionPrivacy(false, true, false, PrivacyReason.INCOGNITO_MODE)))
             }
@@ -76,13 +73,11 @@ class KeyboardToolbarRegressionTest {
         onMain { assertFalse(panel.isAiOpen); assertNull(find(panel, UiR.string.ai_open)) }
     }
 
-    @Test fun toolsOpenAboveDiagnosticsAndRemainOpenAfterUnchangedRender() = withPanel { panel ->
-        onMain { panel.renderDiagnostics("Public fixture diagnostic") }
+    @Test fun toolsOpenAndRemainOpenAfterUnchangedRender() = withPanel { panel ->
         tap(panel, UiR.string.keyboard_tools)
         onMain {
-            assertNotNull("Tools must replace the diagnostic strip", find(panel, UiR.string.ai_open))
+            assertNotNull("Tools must expose the AI entry", find(panel, UiR.string.ai_open))
             panel.renderSession(ready)
-            panel.renderDiagnostics("Public fixture diagnostic")
             assertNotNull("An idle render must not close tools", find(panel, UiR.string.ai_open))
         }
         capturePublicPreview("ai-tools.png")
@@ -102,10 +97,9 @@ class KeyboardToolbarRegressionTest {
         onMain { assertFalse(panel.isAiOpen); assertNotNull(find(panel, UiR.string.keyboard_return)) }
     }
 
-    @Test fun diagnosticUpdatesDoNotHideSecondaryPanelControls() = withPanel { panel ->
+    @Test fun secondaryPanelControlsRemainVisible() = withPanel { panel ->
         tap(panel, UiR.string.expression_smileys)
         onMain {
-            panel.renderDiagnostics("Public fixture diagnostic")
             assertNotNull("Secondary panels keep their toolbar", find(panel, UiR.string.keyboard_return))
         }
         tap(panel, UiR.string.keyboard_return)

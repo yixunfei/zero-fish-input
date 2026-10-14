@@ -5,7 +5,8 @@ import java.io.OutputStream
 
 /** Injectable I/O boundary for deterministic transport tests; the provider owns its only implementation. */
 internal interface AiTransportExchange {
-    fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?)
+    fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?,
+        protocol: dev.zeroinput.ai.api.AiProtocol)
     fun timeout(timeoutMs: Int)
     fun connect()
     fun output(): OutputStream

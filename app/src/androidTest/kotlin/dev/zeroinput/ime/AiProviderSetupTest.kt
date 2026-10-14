@@ -22,6 +22,50 @@ import org.junit.runner.RunWith
 class AiProviderSetupTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun protocolSelectionPersistsExactRoutesAndStreamingPreference() {
+        for (protocol in dev.zeroinput.ai.api.AiProtocol.entries) withEditor { editor, saved ->
+            onMain { editor.show() }
+            tap(R.string.ai_add_provider)
+            onMain {
+                field(R.string.ai_provider_name).setText("Public fixture")
+                field(R.string.ai_endpoint_hint).setText("https://example.test/proxy/v1")
+                field(R.string.ai_key_hint).setText("public-key")
+                field(R.string.ai_models_hint).setText("model")
+                val root = WindowInspector.getGlobalWindowViews().last()
+                views(root).filterIsInstance<android.widget.Spinner>().single {
+                    it.contentDescription == it.context.getString(R.string.ai_protocol_label)
+                }.setSelection(protocol.ordinal)
+                texts().filterIsInstance<android.widget.CompoundButton>().single {
+                    it.text == it.context.getString(R.string.ai_protocol_streaming)
+                }.isChecked = false
+            }
+            instrumentation.waitForIdleSync()
+            onMain {
+                assertTrue(texts().any { it.text.contains("https://example.test/proxy/v1/${protocol.route}") })
+            }
+            tap(R.string.save)
+            onMain {
+                val profile = checkNotNull(saved.single().activeProvider())
+                assertEquals(protocol, profile.protocol)
+                assertFalse(profile.streaming)
+                assertEquals("https://example.test/proxy/v1", profile.endpoint)
+            }
+        }
+    }
+
+    @Test fun mismatchedFullRouteFailsBeforeSaving() = withEditor { editor, saved ->
+        onMain { editor.show() }
+        tap(R.string.ai_add_provider)
+        onMain {
+            field(R.string.ai_provider_name).setText("Public fixture")
+            field(R.string.ai_endpoint_hint).setText("https://example.test/v1/responses")
+            field(R.string.ai_key_hint).setText("public-key")
+            field(R.string.ai_models_hint).setText("model")
+        }
+        tap(R.string.save)
+        onMain { assertTrue(saved.isEmpty()); assertNotNull(field(R.string.ai_endpoint_hint).error) }
+    }
+
     @Test fun invalidDraftNeverReachesPersistenceOrRevokesWorkingNetworkSettings() = withEditor { editor, saved ->
         onMain { editor.show() }
         tap(R.string.ai_add_provider)

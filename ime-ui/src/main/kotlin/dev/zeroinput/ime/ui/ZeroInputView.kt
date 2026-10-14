@@ -129,7 +129,7 @@ class ZeroInputView @JvmOverloads constructor(
     var onReadingSelected: (Int) -> Unit = {}
     var onReconvertRequested: () -> Unit = {}
     var onUndoSelectionRequested: () -> Unit = {}
-    var onSyllableRequested: () -> Unit = {}
+    var onCompositionSelection: (dev.zeroinput.engine.api.CompositionSelection, String) -> Unit = { _, _ -> }
     var onHandwritingStrokesChanged: (List<FloatArray>) -> Unit = {}
     var onHandwritingCandidateSelected: (String) -> Boolean = { false }
     var onHandwritingVisibilityChanged: (Boolean) -> Unit = {}
@@ -156,9 +156,8 @@ class ZeroInputView @JvmOverloads constructor(
     private var lastViewport = -1
     private var viewportPlan = KeyboardViewportPolicy.resolve(0, 0, resources.displayMetrics.density, editing = false)
     private var engineStatus = InputEngineStatus.HIDDEN
-    /** Rendered session status, independent of the optional diagnostic text. */
+    /** Rendered session status. */
     val renderedEngineStatus: InputEngineStatus get() = engineStatus
-    private var diagnosticsVisible = false
     private val languageButton = toolbarButton("中", "切换中英文") {
         dispatchKeyboardAction(KeyboardAction.SwitchLanguage)
     }
@@ -182,9 +181,6 @@ class ZeroInputView @JvmOverloads constructor(
     }.apply { visibility = GONE }
     private val undoCandidateButton = panelIconButton(context, android.R.drawable.ic_menu_revert, R.string.undo_segment) {
         onUndoSelectionRequested()
-    }.apply { visibility = GONE }
-    private val syllableCandidateButton = panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.select_single_syllable) {
-        onSyllableRequested()
     }.apply { visibility = GONE }
     private val scriptButton = toolbarButton(context.getString(R.string.script_short_simplified), context.getString(R.string.switch_chinese_script)) {
         onScriptSwitchRequested()
@@ -336,13 +332,6 @@ class ZeroInputView @JvmOverloads constructor(
         refreshHeader()
     }
 
-    /** Renders a non-sensitive Debug diagnostic in the candidate header. */
-    fun renderDiagnostics(value: String?) {
-        diagnosticsVisible = !value.isNullOrBlank()
-        candidateStrip.renderDiagnostics(value)
-        refreshHeader()
-    }
-
     /** Announces text only after the editor confirms a successful commit. */
     fun announceCommittedText(value: String) {
         if (value.isNotBlank()) candidateStrip.announceForAccessibility(value)
@@ -362,6 +351,7 @@ class ZeroInputView @JvmOverloads constructor(
         if (released) return
         val value = appearance.sanitized()
         keyboard.applyAppearance(value)
+        expandedCandidates.applyAppearance(value.expandedCandidates)
         setKeyboardHeight(value.height)
         val surface = resolveColor(com.google.android.material.R.attr.colorSurface, Color.GRAY)
         // Arbitrary user photos/colors must not compromise candidate and toolbar contrast.
@@ -370,6 +360,12 @@ class ZeroInputView @JvmOverloads constructor(
         background = KeyboardBackgroundDrawable(value, surface,
             resolveColor(com.google.android.material.R.attr.colorPrimaryContainer, Color.GRAY),
             image, resources.displayMetrics.density)
+    }
+
+    fun setCandidatesExpanded(expanded: Boolean) {
+        if (released || isSearchEditing || mode == PanelMode.AI) return
+        if (expanded && currentSnapshot.candidates.isNotEmpty()) showMode(PanelMode.CANDIDATES)
+        else if (!expanded && mode == PanelMode.CANDIDATES) showMode(PanelMode.KEYBOARD)
     }
 
     fun setKeyboardHeight(height: KeyboardHeight) {
@@ -565,14 +561,12 @@ class ZeroInputView @JvmOverloads constructor(
         onReadingSelected = {}
         onReconvertRequested = {}
         onUndoSelectionRequested = {}
-        onSyllableRequested = {}
+        onCompositionSelection = { _, _ -> }
         onHandwritingStrokesChanged = {}
         onHandwritingCandidateSelected = { false }
         onHandwritingVisibilityChanged = {}
         currentSnapshot = EngineSnapshot.Empty
         candidateStrip.render(currentSnapshot)
-        diagnosticsVisible = false
-        candidateStrip.renderDiagnostics(null)
         expandedCandidates.clear()
         readings.render(currentSnapshot)
         emoji.clearSession()
@@ -702,7 +696,6 @@ class ZeroInputView @JvmOverloads constructor(
         })
         addView(reconvertButton, LayoutParams(dp(48), dp(48)))
         addView(undoCandidateButton, LayoutParams(dp(48), dp(48)))
-        addView(syllableCandidateButton, LayoutParams(dp(48), dp(48)))
         addView(scriptButton)
         addView(layoutButton)
         addView(fuzzyButton)
@@ -730,6 +723,7 @@ class ZeroInputView @JvmOverloads constructor(
             } else onClearCompositionRequested()
         }
         candidateStrip.onCandidateSelected = ::selectVisibleCandidate
+        candidateStrip.onCompositionSelection = { selection, input -> onCompositionSelection(selection, input) }
         candidateStrip.onExpandRequested = {
             if (isSearchEditing) setSearchCandidatesExpanded(!searchCandidatesExpanded)
             else if (mode == PanelMode.AI) setAiCandidatesExpanded(!aiCandidatesExpanded)
@@ -944,6 +938,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun refreshHeader() {
         backNavigation.refresh()
         expansionButton.visibility = if (mode == PanelMode.KEYBOARD) GONE else VISIBLE
+        expansionButton.setImageResource(if (mode == PanelMode.CANDIDATES) R.drawable.ic_handwriting_fullscreen else R.drawable.ic_panel_expand)
         expansionButton.rotation = if (isPanelExpanded) 180f else 0f
         expansionButton.contentDescription = context.getString(if (isPanelExpanded) R.string.panel_collapse else R.string.panel_expand)
         val margin = if (expansionButton.isVisible) dp(48) else 0
@@ -954,7 +949,7 @@ class ZeroInputView @JvmOverloads constructor(
         candidateStrip.renderReconversion(canReconvert && mode == PanelMode.KEYBOARD)
         val visibleSnapshot = visibleSnapshot()
         undoCandidateButton.visibility = if (manualTools && visibleSnapshot.canUndoSelection) VISIBLE else GONE
-        syllableCandidateButton.visibility = if (manualTools && visibleSnapshot.canSelectSyllable && !visibleSnapshot.canUndoSelection) VISIBLE else GONE
+        keyboard.setSyllableSelection(visibleSnapshot.selection != null && visibleSnapshot.canSelectSyllable)
         val hasCandidates = visibleSnapshot.isComposing || visibleSnapshot.candidates.isNotEmpty()
         // Keep the idle entry discoverable without reducing the four-candidate
         // capacity of a compact composing row. Tools retains its leading AI entry.
@@ -964,11 +959,10 @@ class ZeroInputView @JvmOverloads constructor(
         fuzzyButton.visibility = if (manualTools && mode == PanelMode.KEYBOARD && currentLanguage == InputLanguage.CHINESE &&
             currentPack == null && !sensitive && EngineCapability.FUZZY_PINYIN in capabilities &&
             editorOptions.layout == EditorLayout.TEXT) VISIBLE else GONE
-        // Explicit tool navigation takes priority over diagnostics and candidate
-        // refreshes. Secondary panels must keep their navigation controls.
+        // Explicit tool navigation takes priority over candidate refreshes.
         val showCandidates = !manualTools && when (mode) {
             PanelMode.AI -> ai.editing && hasCandidates
-            PanelMode.KEYBOARD, PanelMode.CANDIDATES -> diagnosticsVisible || hasCandidates || needsStatus
+            PanelMode.KEYBOARD, PanelMode.CANDIDATES -> hasCandidates || needsStatus
             PanelMode.EMOJI -> isSearchEditing && hasCandidates
             PanelMode.SECURE_CLIPBOARD, PanelMode.HANDWRITING -> false
         }

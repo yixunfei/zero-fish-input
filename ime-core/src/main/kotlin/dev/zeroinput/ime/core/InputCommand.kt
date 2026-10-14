@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.core
 
 import dev.zeroinput.engine.api.PageDirection
+import dev.zeroinput.engine.api.CompositionSelection
 
 sealed interface InputCommand {
     data class Text(val value: String) : InputCommand
@@ -21,6 +22,9 @@ sealed interface InputCommand {
 
     data object UndoSelection : InputCommand
     data object SelectSyllable : InputCommand
+
+    /** Rejects a gesture from a composition replaced since touch-down. */
+    data class SelectComposition(val selection: CompositionSelection, val expectedInput: String) : InputCommand
 
     data class SelectCandidate(val visibleIndex: Int, val candidateId: String? = null) : InputCommand
 

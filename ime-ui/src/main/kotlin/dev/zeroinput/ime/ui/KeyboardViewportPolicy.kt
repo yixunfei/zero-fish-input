@@ -53,5 +53,5 @@ internal object KeyboardViewportPolicy {
     private const val EDITING_COMPACT_HEIGHT_DP = 500f
     private const val WIDE_VIEWPORT_RATIO = 1.25f
     const val INLINE_HEADER_HEIGHT_DP = 48
-    const val STACKED_HEADER_HEIGHT_DP = 72
+    const val STACKED_HEADER_HEIGHT_DP = 96
 }

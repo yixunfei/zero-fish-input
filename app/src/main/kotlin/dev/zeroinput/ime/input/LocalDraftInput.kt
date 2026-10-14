@@ -70,6 +70,7 @@ internal class LocalDraftInput(
             is KeyboardAction.LiteralText -> input.handle(InputCommand.LiteralText(action.value))
             is KeyboardAction.PairedText -> input.handle(InputCommand.PairedText(action.opening, action.closing))
             KeyboardAction.Backspace -> input.handle(InputCommand.Backspace)
+            KeyboardAction.SelectSyllable -> input.handle(InputCommand.SelectSyllable)
             KeyboardAction.Space -> input.handle(InputCommand.Space)
             KeyboardAction.Enter -> input.handle(InputCommand.Enter)
             KeyboardAction.SwitchLanguage -> { input.switchLanguage(); prepare() }

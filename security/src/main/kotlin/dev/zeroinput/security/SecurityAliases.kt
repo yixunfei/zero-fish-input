@@ -2,6 +2,7 @@ package dev.zeroinput.security
 
 object SecurityAliases {
     const val USER_DATA = "zeroinput.user-data.v1"
+    const val DICTIONARY_EDITS = "zeroinput.dictionary-edits.v1"
     /** Dedicated key for user initiated dictionary exports. */
     const val USER_DATA_EXPORT = "zeroinput.user-data-export.v1"
     const val EMOJI_HISTORY = "zeroinput.emoji-history.v1"

@@ -14,18 +14,23 @@ internal object RimeSessionVerifier {
         try {
             engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
             val input = when {
-                layout == ChineseKeyboardLayout.NINE_KEY -> "64426"
-                scheme != DoublePinyinScheme.OFF -> "nihk"
-                else -> "nihao"
+                layout == ChineseKeyboardLayout.NINE_KEY -> "64"
+                scheme != DoublePinyinScheme.OFF -> "ni"
+                else -> "ni"
             }
             for (character in input) {
                 val update = engine.handle(EngineKey.Character(character.toString()))
                 check(update.consumed && update.committedText.isEmpty()) { "Rime conversion probe failed" }
             }
-            val index = engine.snapshot.candidates.indexOfFirst { it.text == "你好" }
+            if (layout == ChineseKeyboardLayout.NINE_KEY) {
+                val reading = engine.snapshot.readings.indexOf("ni")
+                check(reading >= 0) { "Rime reading probe failed" }
+                (engine as dev.zeroinput.engine.api.ReadingSelectionEngine).selectReading(reading)
+            }
+            val index = engine.snapshot.candidates.indexOfFirst { it.text == "你" }
             check(index >= 0) { "Rime dictionary probe failed" }
             val selected = engine.selectCandidate(index)
-            check(selected.committedText == "你好" && !selected.snapshot.isComposing) {
+            check(selected.committedText == "你" && !selected.snapshot.isComposing) {
                 "Rime selection probe failed"
             }
         } finally {

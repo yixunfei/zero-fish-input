@@ -9,6 +9,9 @@ interface InputEngine : AutoCloseable {
 
     fun handle(key: EngineKey): EngineUpdate
 
+    /** Whether a character can extend composition rather than commit it as punctuation. */
+    fun acceptsCompositionCharacter(character: Char): Boolean = character.isLetterOrDigit() || character == '\''
+
     fun selectCandidate(index: Int): EngineUpdate
 
     fun changePage(direction: PageDirection): EngineUpdate

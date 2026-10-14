@@ -16,6 +16,8 @@ import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.EngineCapability
 import dev.zeroinput.engine.api.ReadingSelectionEngine
 import dev.zeroinput.engine.api.CompositionEditingEngine
+import dev.zeroinput.engine.api.CompositionCursorEngine
+import dev.zeroinput.engine.api.CompositionSelection
 
 internal class RimeInputEngine(
     schemaId: String = "zeroinput_pinyin",
@@ -23,7 +25,7 @@ internal class RimeInputEngine(
     private val onNativeFailure: (Throwable) -> Unit = {},
     private val onClosed: () -> Unit = {},
     private val nineKeyReadings: NineKeyReadings? = null,
-) : InputEngine, CandidateTextNormalizer, ReadingSelectionEngine, CompositionEditingEngine {
+) : InputEngine, CandidateTextNormalizer, ReadingSelectionEngine, CompositionEditingEngine, CompositionCursorEngine {
     private var sessionId = NativeRimeBridge.nativeCreateSession(schemaId).also {
         check(it != 0L) { "Unable to create a Rime session" }
     }
@@ -51,7 +53,12 @@ internal class RimeInputEngine(
         currentSnapshot
     }
 
+    override fun acceptsCompositionCharacter(character: Char): Boolean =
+        character.isLetterOrDigit() || character == '\'' ||
+            character == ';' && options.effectiveDoublePinyinScheme == dev.zeroinput.engine.api.DoublePinyinScheme.MICROSOFT
+
     override fun handle(key: EngineKey): EngineUpdate = nativeCall {
+        editComposition(key)?.let { return it }
         if (key == EngineKey.Enter) {
             val raw = currentSnapshot.rawInput
             return if (raw.isEmpty()) EngineUpdate(currentSnapshot, consumed = false)
@@ -124,6 +131,31 @@ internal class RimeInputEngine(
         readUpdate(consumed)
     }
 
+    override fun selectComposition(selection: CompositionSelection): EngineUpdate = nativeCall {
+        if (currentSnapshot.selection == null || !selection.isValidFor(currentSnapshot.rawInput))
+            return EngineUpdate(currentSnapshot, consumed = false)
+        val input = currentSnapshot.rawInput
+        // set_input alone can retain Rime's confirmed segments when the reading is unchanged.
+        if (currentSnapshot.canUndoSelection) NativeRimeBridge.nativeClearComposition(sessionId)
+        val restored = restoreComposition(input)
+        if (!restored.consumed) return restored
+        currentSnapshot = restored.snapshot.copy(selection = selection)
+        EngineUpdate(currentSnapshot)
+    }
+
+    private fun editComposition(key: EngineKey): EngineUpdate? {
+        val edit = PinyinCompositionEdits.replacement(currentSnapshot, key,
+            options.effectiveDoublePinyinScheme == dev.zeroinput.engine.api.DoublePinyinScheme.MICROSOFT) ?: return null
+        if (edit.input == currentSnapshot.rawInput) {
+            currentSnapshot = currentSnapshot.copy(selection = CompositionSelection(edit.caret))
+            return EngineUpdate(currentSnapshot)
+        }
+        val update = if (edit.input.isEmpty()) EngineUpdate(reset()) else restoreComposition(edit.input)
+        currentSnapshot = update.snapshot.copy(selection = if (update.snapshot.isComposing)
+            CompositionSelection(edit.caret) else null)
+        return update.copy(snapshot = currentSnapshot, consumed = true)
+    }
+
     override fun undoSelection(): EngineUpdate = nativeCall {
         if (selectedIndices.isEmpty()) return EngineUpdate(currentSnapshot, consumed = false)
         selectedIndices.removeAt(selectedIndices.lastIndex)
@@ -147,6 +179,7 @@ internal class RimeInputEngine(
 
     override fun selectSyllable(): EngineUpdate = nativeCall {
         if (!currentSnapshot.isComposing) return EngineUpdate(currentSnapshot, consumed = false)
+        editComposition(EngineKey.Character("'"))?.let { return it }
         NativeRimeBridge.nativeProcessKey(sessionId, KEY_END, 0)
         val consumed = NativeRimeBridge.nativeProcessKey(sessionId, KEY_RIGHT, CONTROL_MASK)
         selectingSyllable = consumed
@@ -180,11 +213,14 @@ internal class RimeInputEngine(
     }
 
     override fun changePage(direction: PageDirection): EngineUpdate = nativeCall {
+        val selection = currentSnapshot.selection
         val consumed = NativeRimeBridge.nativeChangePage(
             sessionId,
             backwards = direction == PageDirection.PREVIOUS,
         )
-        readUpdate(consumed)
+        val update = readUpdate(consumed)
+        currentSnapshot = update.snapshot.copy(selection = selection)
+        update.copy(snapshot = currentSnapshot)
     }
 
     internal fun browsePage(page: Int): EngineUpdate = nativeCall {
@@ -252,6 +288,8 @@ internal class RimeInputEngine(
             readings = if (hasFixedSelection) emptyList() else nineKeyReadings?.choices(update.rawInput, update.comments).orEmpty(),
             canUndoSelection = selectedIndices.isNotEmpty(),
             canSelectSyllable = update.rawInput.isNotEmpty(),
+            selection = if (options.keyboardLayout == ChineseKeyboardLayout.FULL && update.rawInput.isNotEmpty())
+                CompositionSelection(update.rawInput.length) else null,
         )
         return EngineUpdate(currentSnapshot, update.committedText, consumed || update.committedText.isNotEmpty())
     }

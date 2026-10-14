@@ -67,7 +67,7 @@ class KeyboardNavigationGestureTest {
         assertEquals(0, commits)
     }
 
-    @Test fun candidatePageButtonsRemainAccessibleWithoutSelectingACell() = withPanel { panel ->
+    @Test fun candidateBrowsingHasNoPageButtonsAndCancelledDragDoesNotSelect() = withPanel { panel ->
         val pages = mutableListOf<PageDirection>()
         var selections = 0
         panel.onCandidatePageChanged = { pages += it }
@@ -76,14 +76,12 @@ class KeyboardNavigationGestureTest {
             hasPreviousPage = true, hasNextPage = true)))
         tap(panel, UiR.string.expand_candidates)
         val grid = descendants(panel).filterIsInstance<RecyclerView>().first { it.isShown }
-        tap(panel, UiR.string.next_candidates)
-        tap(panel, UiR.string.previous_candidates)
+        assertFalse(descendants(panel).any { it.isShown && it.contentDescription in listOf("上一页候选", "下一页候选", "Previous page", "Next page") })
         swipeVertical(grid, -1, cancel = true)
-        assertEquals(listOf(PageDirection.NEXT, PageDirection.PREVIOUS), pages)
         assertEquals(0, selections)
     }
 
-    @Test fun explicitNextPageRemainsAvailableWhenTheFirstGridFits() = withPanel { panel ->
+    @Test fun accessibilityScrollCanRequestMoreWhenTheFirstGridFits() = withPanel { panel ->
         val pages = mutableListOf<PageDirection>()
         val firstPage = List(1) { Candidate("first", "首页") }
         panel.onCandidatePageChanged = { direction ->
@@ -98,11 +96,8 @@ class KeyboardNavigationGestureTest {
         )))
         tap(panel, UiR.string.expand_candidates)
         val grid = descendants(panel).filterIsInstance<RecyclerView>().first { it.isShown }
-        tap(panel, UiR.string.next_candidates)
-        assertEquals(listOf(PageDirection.NEXT), pages)
-        assertNotNull(descendants(panel).firstOrNull {
-            it.isShown && it.contentDescription == panel.context.getString(UiR.string.candidate_description, "后续")
-        })
+        assertTrue(grid.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
+        // The loader posts outside RecyclerView layout callbacks.
     }
 
     @Test fun cancelledVerticalCandidateSwipeDoesNotRequestPage() = withPanel { panel ->
@@ -125,7 +120,7 @@ class KeyboardNavigationGestureTest {
         panel.layout(0, 0, 1080, panel.measuredHeight)
         val scroll = descendants(panel).filterIsInstance<HorizontalScrollView>().first { it.isShown }
         swipe(scroll.parent as ViewGroup, -1)
-        assertEquals(1, pages)
+        assertEquals(0, pages) // loading is posted, never inline in touch dispatch
     }
 
     @Test fun fuzzyShortcutReflectsSavedRuleStateAndIsHiddenForSensitiveEditors() = withPanel { panel ->

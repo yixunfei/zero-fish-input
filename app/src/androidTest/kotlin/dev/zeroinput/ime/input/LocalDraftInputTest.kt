@@ -28,7 +28,7 @@ class LocalDraftInputTest {
         assertTrue(entered.await(10, TimeUnit.SECONDS))
         val handler = Handler(Looper.getMainLooper())
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, handler::post, { _, next -> state = next }, maxChars = 64)
+        val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, next -> state = next }, maxChars = 64)
         try {
             onMain { draft.start(InputLanguage.CHINESE); typePinyin(draft, "nihao") }
             release.countDown()
@@ -54,7 +54,7 @@ class LocalDraftInputTest {
     @Test fun sendingChineseDraftConvertsCompositionAndPreservesEverySegment() = onMain {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, { false }, { _, next -> state = next }, maxChars = 64)
+        val draft = LocalDraftInput({ graph }, { false }, {}, { _, next -> state = next }, maxChars = 64)
         try {
             draft.start(InputLanguage.CHINESE)
             typePinyin(draft, "nihao")
@@ -74,7 +74,7 @@ class LocalDraftInputTest {
         var value = ""
         var renders = 0
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, { queued += it; true }, { text, next ->
+        val draft = LocalDraftInput({ graph }, { queued += it; true }, { queued.remove(it) }, { text, next ->
             value = text; state = next; renders++
         }, maxChars = 4, multiline = false)
         try {

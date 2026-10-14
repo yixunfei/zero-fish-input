@@ -56,6 +56,7 @@ internal class AiSseReader {
             if (choice.has("index")) require(choice.get("index") == 0)
             val finished = !choice.isNull("finish_reason")
             if (finished) {
+                if (choice.optString("finish_reason") == "length") throw AiProtocolResponse.outputLimit()
                 require(choice.get("finish_reason") == "stop")
             }
             val delta = choice.getJSONObject("delta")
@@ -66,6 +67,7 @@ internal class AiSseReader {
             }
             Chunk(text, finished)
         }
+    } catch (error: AiProviderError) { throw error
     } catch (_: Exception) { throw AiProviderError.Response("AI response is invalid") }
 
     private fun readLine(reader: BufferedReader, cancelled: () -> Boolean): String? {

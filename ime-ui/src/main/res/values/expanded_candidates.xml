@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="expanded_candidates_heading">展开候选</string>
+    <string name="expanded_candidates_layout">排版</string>
+    <string name="expanded_candidates_adaptive">自适应多列</string>
+    <string name="expanded_candidates_list">单列列表</string>
+    <string name="expanded_candidates_density">密度</string>
+    <string name="expanded_candidates_compact">紧凑</string>
+    <string name="expanded_candidates_standard">标准</string>
+    <string name="expanded_candidates_spacious">宽松</string>
+    <string name="expanded_candidates_text_size">字号：%1$d sp</string>
+    <string name="expanded_candidates_separators">显示分隔线</string>
+    <string name="expanded_candidates_preview">预览展开候选</string>
+    <string-array name="expanded_candidates_preview_words">
+        <item>你好</item><item>您好</item><item>你</item><item>呢</item><item>泥</item><item>拟</item>
+        <item>逆</item><item>一年四季</item><item>鸟语花香</item><item>海阔天空</item>
+        <item>今天天气很好</item><item>hello</item><item>good morning</item><item>一段较长的候选词示例</item>
+        <item>山</item><item>水</item><item>春暖花开</item><item>万事如意</item>
+    </string-array>
+</resources>

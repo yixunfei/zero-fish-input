@@ -31,6 +31,15 @@ class RimeDoublePinyinTest {
                     it.start(EditorContext(InputLanguage.CHINESE, false, false, null))
                     assertConversion(it, "nihk", "你好", scheme)
                     assertConversion(it, if (scheme == DoublePinyinScheme.MICROSOFT) "m;" else "my", "明", scheme)
+                    val editing = it as dev.zeroinput.engine.api.CompositionEditingEngine
+                    val cursor = it as dev.zeroinput.engine.api.CompositionCursorEngine
+                    val code = if (scheme == DoublePinyinScheme.MICROSOFT) "m;" else "my"
+                    assertTrue(editing.restoreComposition(code).consumed)
+                    cursor.selectComposition(dev.zeroinput.engine.api.CompositionSelection(1, 2))
+                    assertEquals(code, it.handle(EngineKey.Character(code.last().toString())).snapshot.rawInput)
+                    assertEquals(dev.zeroinput.engine.api.CompositionSelection(2), it.snapshot.selection)
+                    cursor.selectComposition(dev.zeroinput.engine.api.CompositionSelection(1))
+                    assertEquals("m" + "x" + code.last(), it.handle(EngineKey.Character("x")).snapshot.rawInput)
                 }
             }
         }.get(90, TimeUnit.SECONDS)

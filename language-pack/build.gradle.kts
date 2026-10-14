@@ -6,6 +6,7 @@ plugins {
 val resourceCatalogAssets = layout.buildDirectory.dir("generated/resourceCatalogAssets")
 val prepareResourceCatalog = tasks.register<Sync>("prepareResourceCatalog") {
     from(rootProject.file("tools/resources/catalog.json"))
+    from(rootProject.file("tools/dictionaries/sources.lock.json")) { rename { "bundled-dictionaries.json" } }
     into(resourceCatalogAssets.map { it.dir("public-resources") })
 }
 

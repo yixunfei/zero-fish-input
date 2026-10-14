@@ -176,7 +176,7 @@ class AiTransportProtocolTest {
         var disconnected = false
         var failure: java.io.IOException? = null
         val written = ByteArrayOutputStream()
-        override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?) {
+        override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?, protocol: AiProtocol) {
             this.method = method; this.key = key
             assertTrue(timeoutMs > 0)
             assertEquals(method == "POST", bodySize != null)

@@ -6,6 +6,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyboardViewportPolicyTest {
+    @Test fun windowHeightCacheReadsAttachedMetricsOnceUntilInvalidated() {
+        val cache = KeyboardWindowHeightCache()
+        var reads = 0
+        val read = { reads++; 900 }
+
+        assertEquals(420, cache.resolve(attached = false, offeredHeight = 420, readWindowHeight = read))
+        assertEquals(900, cache.resolve(attached = true, offeredHeight = 500, readWindowHeight = read))
+        assertEquals(900, cache.resolve(attached = true, offeredHeight = 600, readWindowHeight = read))
+        assertEquals(1, reads)
+
+        cache.invalidate()
+        assertEquals(900, cache.resolve(attached = true, offeredHeight = 600, readWindowHeight = read))
+        assertEquals(2, reads)
+    }
+
     @Test fun unmeasuredViewportKeepsTheBaselineLayoutUntilARealSizeArrives() {
         val plan = KeyboardViewportPolicy.resolve(widthPx = 0, heightPx = 0, density = 1f, editing = false)
 

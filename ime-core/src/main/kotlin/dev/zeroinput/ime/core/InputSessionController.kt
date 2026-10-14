@@ -16,6 +16,7 @@ import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.ReadingSelectionEngine
 import dev.zeroinput.engine.api.EngineDescriptor
 import dev.zeroinput.engine.api.CompositionEditingEngine
+import dev.zeroinput.engine.api.CompositionCursorEngine
 import dev.zeroinput.ime.core.privacy.EditorPrivacyPolicy
 import dev.zeroinput.ime.core.privacy.PrivacyConfiguration
 import dev.zeroinput.ime.core.privacy.SessionPrivacy
@@ -135,6 +136,9 @@ class InputSessionController(
     }
 
     fun handle(command: InputCommand) {
+        if (command is InputCommand.SelectComposition &&
+            (command.expectedInput != state.snapshot.rawInput ||
+                !command.selection.isValidFor(command.expectedInput))) return
         if (command is InputCommand.SelectCandidate && command.candidateId != null &&
             state.snapshot.candidates.getOrNull(command.visibleIndex)?.id != command.candidateId) return
         if (!associationsAllowed()) invalidateWordAssociations()
@@ -167,8 +171,13 @@ class InputSessionController(
                 is InputCommand.PairedText -> commitPaired(activeEngine, command.opening, command.closing)
                 InputCommand.Backspace -> handleKey(activeEngine, EngineKey.Backspace, fallbackBackspace = true)
                 InputCommand.Space -> {
+                    if (personalPaging.editsPending) return
+                    if (personalPaging.editsApplied && state.snapshot.isComposing && state.snapshot.candidates.isEmpty()) {
+                        handleEnter(activeEngine)
+                        return
+                    }
                     if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
-                        (candidateWindow.isBrowsing || personalPaging.isBrowsing || state.modelRanked)) {
+                        (candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied || state.modelRanked)) {
                         selectCandidate(activeEngine, state.snapshot.highlightedIndex)
                     } else handleKey(activeEngine, EngineKey.Space)
                 }
@@ -179,6 +188,10 @@ class InputSessionController(
                 }
                 InputCommand.SelectSyllable -> (activeEngine as? CompositionEditingEngine)?.let {
                     apply(it.selectSyllable())
+                }
+                is InputCommand.SelectComposition -> (activeEngine as? CompositionCursorEngine)?.let {
+                    personalPaging.clear()
+                    apply(it.selectComposition(command.selection))
                 }
                 is InputCommand.SelectCandidate -> {
                     if (command.candidateId == null ||
@@ -287,7 +300,7 @@ class InputSessionController(
 
     /** Main-thread-only handoff. A revision is consumed once and routes remain engine-owned. */
     fun applyModelWinner(revision: Long, candidateIndex: Int): Boolean {
-        if (revision != state.candidateRevision || candidateWindow.isBrowsing || personalPaging.isBrowsing) return false
+        if (revision != state.candidateRevision || candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied) return false
         val candidate = modelCandidates().getOrNull(candidateIndex) ?: return false
         val promoted = ModelRankingPolicy.promote(state.snapshot, candidate.id) ?: return false
         rebuildRoutes(promoted)
@@ -296,7 +309,7 @@ class InputSessionController(
         return true
     }
 
-    fun modelCandidates(): List<Candidate> = if (candidateWindow.isBrowsing || personalPaging.isBrowsing) emptyList()
+    fun modelCandidates(): List<Candidate> = if (candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied) emptyList()
         else ModelRankingPolicy.eligible(state)
 
     fun clearModelRanking() {
@@ -418,6 +431,7 @@ class InputSessionController(
         current?.descriptor?.isFallback == true &&
         current is CompositionEditingEngine &&
         !snapshot.canUndoSelection &&
+        (snapshot.selection?.isAtEnd(input) != false) &&
         input.length in 1..MAX_HANDOFF_PINYIN_LENGTH &&
         input.all(::isHandoffPinyinCharacter)
 
@@ -521,9 +535,10 @@ class InputSessionController(
     }
 
     private fun handleKey(activeEngine: InputEngine, key: EngineKey, fallbackBackspace: Boolean = false) {
-        if (state.modelRanked && key is EngineKey.Character &&
-            key.text.singleOrNull()?.let { !it.isLetterOrDigit() && it != '\'' } == true) {
-            selectCandidate(activeEngine, state.snapshot.highlightedIndex)
+        if ((state.modelRanked || personalPaging.editsApplied) && key is EngineKey.Character &&
+            key.text.singleOrNull()?.let { !activeEngine.acceptsCompositionCharacter(it) } == true) {
+            if (state.snapshot.candidates.isNotEmpty()) selectCandidate(activeEngine, state.snapshot.highlightedIndex)
+            else if (state.snapshot.isComposing) handleEnter(activeEngine)
         }
         // The published state is authoritative for the key's starting
         // point. Adapter properties may lag behind the EngineUpdate that was
@@ -725,6 +740,7 @@ class InputSessionController(
             InputCommand.ReconvertLast,
             InputCommand.UndoSelection,
             InputCommand.SelectSyllable,
+            is InputCommand.SelectComposition,
             -> Unit
         }
         publish(EngineSnapshot.Empty)

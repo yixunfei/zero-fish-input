@@ -45,6 +45,18 @@ The optional engine editing port keeps segment selection/undo in engines;
 canonical commit readings flow through the existing encrypted learning port.
 The core owns a six-page candidate window and one bounded recent-word draft.
 Only the Android adapter verifies and reopens an editor composing region.
+`CompositionCursorEngine` exposes an optional selection over bounded raw pinyin.
+The candidate header owns focus-free cursor/range gestures, without platform
+text menus or clipboard access. Commands carry the expected raw input; the core
+rejects stale input and invalid offsets. Editing selected segments restores the
+raw reading before replacement. Cursor movement never sets the external editor
+selection. Prepared engines wait while the cursor/range is away from the end.
+Shift becomes segment selection during full/double-pinyin composition.
+When the caret/range is positioned before the end, this action inserts an ASCII
+apostrophe through the engine's existing bounded replacement path instead of
+moving Rime's syllable cursor. The header renders the updated raw reading and
+caret immediately. At the end, the existing smaller-segment selection remains.
+Separate AI/search draft controllers receive the same commands only for their own input.
 Rime prepares a secondary shared-dictionary session for related full-keyboard
 readings; nine-key retains its original native flow. Personal query pages are
 prepared on the existing serial worker and never decrypt on key dispatch.
@@ -94,6 +106,15 @@ insets. Candidate viewports retain browsing width by moving secondary actions
 to the left tools entry, with a direct expand/collapse control on the right.
 Expanded candidates pack consecutive words by measured text width and share the
 remaining row width, while preserving the bounded window and scroll anchor.
+`ExpandedCandidateAppearance` in `ime-ui` owns adaptive/list layout, density,
+bounded text size and separator choices. `app/AppearancePreferences` stores only
+these nonsensitive values as additional appearance keys; missing values use
+spacious 18 sp defaults without replacing existing theme choices. The viewport
+uses density-specific minimum widths/heights and padding, wraps long candidates,
+and preserves the visible anchor when appearance changes. Its opaque themed
+surface keeps user background images from reducing candidate contrast. The
+appearance Activity previews resource-defined public candidates with no engine,
+editor or personalization callbacks.
 
 The complete Emoji 18.0 catalog and suffix trie are built on a bounded worker from
 hash-verified bundled data. UI category lookup uses immutable indexes; text searches
@@ -156,10 +177,17 @@ use RecyclerView's native vertical dragging and fling. Two rows before an edge,
 one posted page request extends the core window. Bounded list diffs append/remove
 rows without full refresh or resetting the viewport; eviction preserves a visible
 candidate and its pixel offset. Initial-page IDs stay stable when browsing begins.
+Prefetch follows the current direction after layout in both directions and uses
+actual packed rows for its edge distance. Drag/fling continuation survives window
+eviction, while idle filling stops at eviction. The horizontal strip yields page
+loading to the expanded viewport, preventing competing edge requests.
 Public engine pages and personal pages each retain at most six pages. Personal
 pages append after native exhaustion, clear on revision/privacy changes, and keep
-existing candidate identity/selection verification. Explicit page buttons remain
-available for accessibility.
+existing candidate identity/selection verification. Continuous native scrolling
+and accessibility scroll actions replace visible page buttons. The horizontal
+strip prefetches at its edge and retains candidate/pixel anchors without a
+separate edge-swipe gesture. The stacked header reserves a stable 48 dp pinyin
+editing row and 48 dp candidate row; short/wide windows retain a 48 dp header.
 
 Secondary panels have a fixed expand/collapse action outside the scrolling toolbar.
 Expanded content uses at least 65% of the current available window (or the larger
@@ -200,7 +228,7 @@ adapter, `OpenAiCompatibleProvider`; `user-data` owns separately encrypted AI co
 and optional conversation history. The provider accepts only HTTPS endpoints, disables redirects,
 uses bounded timeouts and response sizes, and sends data only after the user submits text from
 the keyboard AI panel or explicitly tests the selected model or fetches the model catalog in settings. The latter
-uses `AiProviderProbe`, a fixed public prompt, no history/attachments, a 16-token
+uses `AiProviderProbe`, a fixed public prompt, no history/attachments, a 512-token
 output cap and a 30-second timeout. It never reads editor context, selections, the system clipboard or the
 private clipboard vault.
 
@@ -276,12 +304,6 @@ immediate and worker-prepared engines. Built-in English and English language pac
 preserve typed composition but do not offer completions when it is false. Chinese
 conversion remains available. `IME_FLAG_NO_PERSONALIZED_LEARNING` alone still permits
 public completions; prediction permission is part of preparation identity.
-
-Debug builds expose a display-only editor diagnostic in `ime-ui`. It captures only the package
-name, input type/class/variation, IME options and subtype, then combines them with the current
-privacy, language, engine and Rime state. The line remains visible before composition, during
-composition and when no candidates exist. It is cleared at session end and never logged,
-persisted or sent off device; Release builds do not render it.
 
 Rime readiness requires a worker-only public `nihao` conversion and candidate
 commit probe, not just a nonzero native session handle. Each prepared primary
@@ -624,8 +646,8 @@ key. Insets affect decoration only, keeping continuous rectangular touch regions
 
 ## AI provider routing and discovery (2026-10-07)
 
-`ai-api/AiEndpoint` validates and resolves API bases and full Chat Completions
-addresses. `AiModelCatalog` is separate from the generation port. Its sole runtime
+`ai-api/AiEndpoint` validates and resolves API bases and full generation addresses
+for the explicitly selected `AiProtocol`. `AiModelCatalog` is separate from the generation port. Its sole runtime
 implementation is still `app/ai/OpenAiCompatibleProvider`; `AiTransportExchange`
 is an injectable I/O contract whose only production implementation lives inside
 that provider. `AiResponseReader` bounds catalog and non-streaming JSON responses.
@@ -634,7 +656,7 @@ No network dependency or permission is added.
 `AiModelDiscovery` owns a cancellable settings operation; `AiModelPicker` owns its
 protected, unsaved multi-selection. An explicit fetch uses the current edit's key
 and endpoint with the saved network policy. Saving continues to use the same
-configuration repository and format. Manual models and per-model capabilities
+configuration repository (format 5; prior formats reset by user choice). Manual models and per-model capabilities
 are preserved without treating catalog metadata as capability grants.
 
 Request configuration binds at enqueue time; execution rejects a changed snapshot.
@@ -652,10 +674,17 @@ changing configuration restores the saved default. New chat retains the transien
 model but discards the draft/context. Neither action sends a request or changes
 the stored configuration/conversation formats.
 
-SSE data lines are assembled per event within fixed limits. Completion requires a
+Chat Completions SSE data lines are assembled per event within fixed limits. Completion requires a
 single text choice ending with `stop`, followed by `[DONE]`. Missing stops,
 post-stop content, tool payloads, multiple choices and trailing JSON are rejected;
 usage-only events remain supported.
+
+`AiRequestEncoder`, `AiProtocolResponse`, `AiEventReader` and `AnthropicStreamReader`
+isolate wire schemas from the single transport's lifecycle. Responses and Messages
+have their own explicit terminal events and bounded text-only completion checks.
+The protected provider editor selects protocol/streaming and previews routes.
+Responses disables remote response storage. Audio remains Chat-only. HTTP errors
+retain operation and status without reading server bodies. See [ADR 0024](adr/0024-ai-provider-protocols.md).
 
 
 ## Explicit AI page references (2026-10-07)
@@ -762,3 +791,19 @@ and resolution and transport each revalidate them. Reduced runtime trust is root
 in `tools/onnxruntime/runtime.lock.json`; ONNX/XZ checks resolve the matching build
 variant. Public-resource publication builds Mini from pinned upstream inputs and
 compares against the reviewed catalog without fetching the Release being created.
+
+## Dictionary management
+
+ADR [0023](adr/0023-dictionary-management.md) extends public dictionaries with
+per-table selection, fixed-source replacement and encrypted local overrides.
+`BuiltInDictionaryStore` supplies a locked public snapshot to `RimeAssetInstaller`;
+the mandatory `zi` table survives all selection changes. `DictionaryEditRepository`
+owns the separate encrypted names/entries/tombstones. `DictionaryPersonalizationStore`
+composes only enabled dictionaries on `QueuedPersonalizationStore` workers, after
+privacy gating. `PersonalCandidatePaging` filters native rows without changing their
+selection routes. Settings search, original-file reads and archive work stay off
+the input thread. Restore-original and global deletion revoke stale edit writes.
+Entry search lists retained local changes before unmodified public rows, so an
+upstream removal cannot hide an active override from management. Editor forms
+capture the displayed data generation when opened; saving cannot adopt a newer
+generation after reset. Completion callbacks close only their submitting dialog.

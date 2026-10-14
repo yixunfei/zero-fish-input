@@ -39,6 +39,7 @@ data class KeyboardAppearance(
     val backgroundDim: Int = 15,
     val backgroundBlur: Int = 0,
     val imageRevision: String = "",
+    val expandedCandidates: ExpandedCandidateAppearance = ExpandedCandidateAppearance(),
 ) {
     fun sanitized(): KeyboardAppearance = copy(
         cornerRadius = cornerRadius.coerceIn(0, 20), keySpacing = keySpacing.coerceIn(0, 6),
@@ -46,5 +47,6 @@ data class KeyboardAppearance(
         backgroundBlur = backgroundBlur.coerceIn(0, 20),
         backgroundColor = backgroundColor?.let { it or 0xff000000.toInt() },
         imageRevision = imageRevision.takeIf { it.matches(Regex("[a-f0-9-]{36}")) }.orEmpty(),
+        expandedCandidates = expandedCandidates.sanitized(),
     )
 }

@@ -1,5 +1,11 @@
 # Security policy
 
+Pinyin cursor and range editing use only the current engine's bounded raw input.
+The focus-free composition view does not expose clipboard/text menus, save view
+text, or enable autofill/content capture. Stale input and invalid offsets are
+rejected; Backspace at offset zero cannot delete external editor text. Sensitive
+sessions expose no composition editing; AI/search drafts remain independent.
+
 Offline input additions retain the same boundary: glide uses only bounded current
 touches and public word lists, handwriting uses verified public stroke/OCR models,
 and complete Emoji data/artwork is bundled. No input trace or handwriting is
@@ -237,3 +243,22 @@ addresses receive the same validation as download destinations. Private clipboar
 index failures show a generic error without reading body text; repairs require
 authenticated management and retain deletion-generation checks. No stored format,
 permission or authentication boundary changes in these review fixes.
+
+Dictionary management keeps local names and entry edits in a dedicated encrypted
+store, never in public/native dictionary files. Private input bypasses the overlay.
+Restore-original and global personal-data deletion revoke old saves; global deletion
+also removes the dedicated key. Redownload keeps edits and uses only the approved
+public transport. Editor forms retain their original deletion generation, so a
+delayed UI revocation cannot let an old Save recreate reset changes. Bundled
+replacements require the reviewed archive hash. Logical built-in deletion retains
+APK originals and mandatory basic characters. See
+[ADR 0023](docs/adr/0023-dictionary-management.md).
+
+AI protocol selection is explicit (Chat Completions, Responses or Anthropic
+Messages) under the existing sole HTTPS transport. There is no automatic route
+retry, redirect or content-based protocol detection. Responses uses `store: false`;
+only selected local context is sent. Audio remains Chat-only. Partial/tool output
+cannot complete, and HTTP errors expose fixed categories/status without reading
+server bodies. The user-approved format-5 reset deletes old Provider credentials
+and their isolated key; saved conversations are unaffected. See
+[ADR 0024](docs/adr/0024-ai-provider-protocols.md).

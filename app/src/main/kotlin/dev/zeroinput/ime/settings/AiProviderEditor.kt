@@ -60,9 +60,17 @@ internal class AiProviderEditor(
     private val network = AiNetworkSettingsView(context, configuration, save)
     private var picker: AiModelPicker? = null
     private var saving = false
+    private val protocol: AiProtocolFields = AiProtocolFields(context, existing, { endpoint.text.toString() }) {
+        cancel()
+        if (!protocolSupportsAudio()) audioModels.clear()
+        renderCapabilities()
+    }
+
+    private fun protocolSupportsAudio(): Boolean = protocol.protocol.supportsAudio
 
     fun show() {
         fields.removeView(models)
+        protocol.attach(fields, 2)
         fields.addView(network)
         picker = AiModelPicker(context, models, { draft(false, false) }, discovery, { secure(it, {}) },
             validate = { validateConnection() }).also { it.attach(fields, endpoint, key) }
@@ -118,7 +126,7 @@ internal class AiProviderEditor(
             }
         }
         models.addTextChangedListener(watcher { refreshModels() })
-        listOf(endpoint, key).forEach { it.addTextChangedListener(watcher { cancelTest(); it.error = null }) }
+        listOf(endpoint, key).forEach { it.addTextChangedListener(watcher { cancelTest(); it.error = null; protocol.render() }) }
         refreshModels()
     }
 
@@ -141,14 +149,15 @@ internal class AiProviderEditor(
         audio.text = context.getString(R.string.ai_model_audio, label)
         images.isChecked = selectedModel in imageModels
         audio.isChecked = selectedModel in audioModels
-        images.isEnabled = selectedModel.isNotEmpty(); audio.isEnabled = selectedModel.isNotEmpty()
+        images.isEnabled = selectedModel.isNotEmpty(); audio.isEnabled = selectedModel.isNotEmpty() && protocolSupportsAudio()
+        audio.visibility = if (protocolSupportsAudio()) View.VISIBLE else View.GONE
         updatingModels = false
     }
 
     private fun validateConnection(): Boolean {
         endpoint.error = null; key.error = null
-        val validUrl = runCatching { AiEndpoint.parse(endpoint.text.toString().trim()) }.isSuccess
-        if (!validUrl) endpoint.error = context.getString(R.string.ai_endpoint_invalid)
+        val validUrl = runCatching { AiEndpoint.parse(endpoint.text.toString().trim(), protocol.protocol) }.isSuccess
+        if (!validUrl) endpoint.error = context.getString(R.string.ai_protocol_address_invalid)
         val credential = credential()
         val validKey = credential.isNotBlank() && credential.length <= 512 && credential.none { it.isWhitespace() || it.isISOControl() }
         if (!validKey) key.error = context.getString(R.string.ai_key_invalid)
@@ -169,7 +178,7 @@ internal class AiProviderEditor(
         val values = if (includeModels) AiModelPicker.modelNames(models) else emptyList()
         val profile = AiProviderProfile(id, name.text.toString().trim(), endpoint.text.toString().trim(), credential(),
             values, selectedModel.takeIf { it in values } ?: values.firstOrNull().orEmpty(),
-            imageModels intersect values.toSet(), audioModels intersect values.toSet())
+            imageModels intersect values.toSet(), audioModels intersect values.toSet(), protocol.protocol, protocol.streams)
         return current.copy(providers = (if (includeAll) current.providers.filterNot { it.id == id } else emptyList()) + profile,
             selectedProviderId = id)
     }

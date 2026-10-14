@@ -27,7 +27,7 @@ class EncryptedJsonBoundaryTest {
     }
 
     @Test fun incompleteCurrentConfigurationCannotSilentlyBecomeDefaults() {
-        val store = Store("""{"format":4}""")
+        val store = Store("""{"format":5}""")
         assertThrows(IllegalStateException::class.java) { AiConfigurationRepository(store).read() }
         store.assertUntouchedAndWiped()
     }

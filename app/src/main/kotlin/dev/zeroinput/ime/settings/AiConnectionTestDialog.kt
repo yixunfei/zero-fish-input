@@ -41,7 +41,12 @@ internal class AiConnectionTestDialog(
             cancel()
             val token = generation
             val value = configuration()
-            window.setMessage(context.getString(R.string.ai_test_notice, value.activeProvider()?.name.orEmpty(), value.activeModel()))
+            val profile = value.activeProvider()
+            val destination = profile?.let { runCatching {
+                dev.zeroinput.ai.api.AiEndpoint.parse(it.endpoint, it.protocol).generation.toString()
+            }.getOrNull() }.orEmpty()
+            window.setMessage(context.getString(R.string.ai_test_notice, profile?.name.orEmpty(), value.activeModel()) +
+                "\n" + destination)
             if (!value.enabled || !value.networkAllowed) {
                 label.setText(R.string.ai_setup_network_required)
                 return

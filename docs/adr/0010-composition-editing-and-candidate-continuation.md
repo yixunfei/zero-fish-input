@@ -2,6 +2,25 @@
 
 Status: accepted. Date: 2026-09-08.
 
+## Cursor editing amendment (2026-10-11)
+
+The user approved removing candidate page buttons and the tools entry for
+single-syllable selection. Shift becomes `Split` during full/double-pinyin
+composition. Candidate expansion/collapse and accessible scrolling remain.
+
+`CompositionCursorEngine` and immutable offsets refer to bounded raw engine
+input. Tap/drag moves the caret; long-press/drag selects a range. Typing replaces
+the range or inserts at the caret; Backspace removes the range or preceding
+character. Backspace at zero cannot delete external editor text. Editing a
+partially selected phrase restores its raw reading, discards segment choices,
+and recomputes candidates. Moving the cursor does not insert apostrophes.
+
+The view never takes editor focus, invokes platform text menus, or saves text
+in view state, autofill or content capture. Input/selection changes and detachment
+cancel gestures; core commands validate expected input and offsets. Paging keeps
+selection. Prepared native engines wait while a cursor/range is away from the
+end. Existing privacy rules remain; no persisted-format migration is needed.
+
 ## Context
 
 The user requires browsing beyond a fixed candidate count, completing unknown

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="expanded_candidates_heading">Expanded candidates</string>
+    <string name="expanded_candidates_layout">Layout</string>
+    <string name="expanded_candidates_adaptive">Adaptive columns</string>
+    <string name="expanded_candidates_list">Single-column list</string>
+    <string name="expanded_candidates_density">Density</string>
+    <string name="expanded_candidates_compact">Compact</string>
+    <string name="expanded_candidates_standard">Standard</string>
+    <string name="expanded_candidates_spacious">Spacious</string>
+    <string name="expanded_candidates_text_size">Text size: %1$d sp</string>
+    <string name="expanded_candidates_separators">Show separators</string>
+    <string name="expanded_candidates_preview">Preview expanded candidates</string>
+    <string-array name="expanded_candidates_preview_words">
+        <item>你好</item><item>您好</item><item>你</item><item>呢</item><item>泥</item><item>拟</item>
+        <item>逆</item><item>一年四季</item><item>鸟语花香</item><item>海阔天空</item>
+        <item>今天天气很好</item><item>hello</item><item>good morning</item><item>A longer candidate example</item>
+        <item>山</item><item>水</item><item>春暖花开</item><item>万事如意</item>
+    </string-array>
+</resources>
