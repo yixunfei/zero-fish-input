@@ -84,6 +84,7 @@ internal class RimeInputEngine(
             return EngineUpdate(currentSnapshot, consumed = false)
         }
         val reading = committedReading(currentSnapshot.highlightedIndex)
+        val learningInput = learningInput(input, currentSnapshot.highlightedIndex)
         if (key == EngineKey.Backspace && selectedIndices.isNotEmpty() && input == selectedInput) return undoSelection()
         if (key == EngineKey.Backspace) {
             val previous = readingHistory.lastOrNull()
@@ -101,7 +102,8 @@ internal class RimeInputEngine(
             EngineKey.Enter -> error("Enter is handled before native key dispatch")
         }
         val consumed = NativeRimeBridge.nativeProcessKey(sessionId, keyCode, modifiers)
-        readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty())
+        readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty(),
+            learningInput = learningInput)
     }
 
     override fun selectCandidate(index: Int): EngineUpdate = nativeCall {
@@ -109,6 +111,7 @@ internal class RimeInputEngine(
         val input = currentSnapshot.rawInput
         val absoluteIndex = pageNumber * options.candidatePageSize + index
         val reading = committedReading(index)
+        val learningInput = learningInput(input, index)
         val segment = SelectedSegment(absoluteIndex, caretPosition, canonicalReading(currentSnapshot.candidates[index].comment))
         val consumed = NativeRimeBridge.nativeSelectAbsoluteCandidate(sessionId, absoluteIndex)
         if (consumed) {
@@ -118,7 +121,8 @@ internal class RimeInputEngine(
             selectedInput = input
             if (selectedIndices.size < 64) selectedIndices += segment else clearSelectionHistory()
         }
-        readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty())
+        readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty(),
+            learningInput = learningInput)
     }
 
     override fun restoreComposition(input: String): EngineUpdate = nativeCall {
@@ -190,6 +194,12 @@ internal class RimeInputEngine(
         val suffix = currentSnapshot.candidates.getOrNull(index)?.comment?.let(::canonicalReading).orEmpty()
         if (suffix.isEmpty() || selectedIndices.any { it.reading.isEmpty() }) return ""
         return selectedIndices.joinToString("") { it.reading } + suffix
+    }
+
+    private fun learningInput(raw: String, index: Int): String {
+        val suffix = currentSnapshot.candidates.getOrNull(index)?.comment.orEmpty()
+        val reading = (selectedIndices.map { it.reading } + suffix).filter(String::isNotBlank).joinToString(" ")
+        return if (reading.isEmpty()) "" else RimeLearningInput.choose(raw, reading, options)
     }
 
     private fun canonicalReading(value: String): String = value.filterNot { it == ' ' || it == '\'' }

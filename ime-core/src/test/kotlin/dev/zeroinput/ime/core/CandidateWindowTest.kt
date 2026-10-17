@@ -5,6 +5,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CandidateWindowTest {
+    @Test fun `page dependent preedit separators do not reset browsing or selection`() {
+        val engine = Pages().apply { formatByPage = true }
+        val window = CandidateWindow()
+        var current = engine.snapshot
+        val first = window.snapshot(current).candidates.first()
+        repeat(4) {
+            current = window.changePage(engine, current, PageDirection.NEXT).snapshot
+            val visible = window.snapshot(current)
+            assertEquals("ni", visible.composition)
+            assertEquals(first, visible.candidates.first())
+            assertEquals((it + 2) * 4, visible.candidates.size)
+        }
+        assertEquals("entry0", window.select(engine, checkNotNull(window.route(first.id)), current).committedText)
+    }
+
+    @Test fun `a real input change during paging still clears the old window`() {
+        val engine = Pages()
+        val window = CandidateWindow()
+        val current = window.changePage(engine, engine.snapshot, PageDirection.NEXT).snapshot
+        engine.changedInput = true
+        val update = window.changePage(engine, current, PageDirection.NEXT)
+        assertFalse(window.isBrowsing)
+        assertEquals(update.snapshot, window.snapshot(update.snapshot))
+    }
+
     @Test fun `first append preserves existing candidate identities and selection routes`() {
         val engine = Pages()
         val window = CandidateWindow()
@@ -117,8 +142,11 @@ class CandidateWindowTest {
         private var page = 0
         var selections = 0
         var changed = false
+        var formatByPage = false
+        var changedInput = false
         override val descriptor = EngineDescriptor("fixture", "fixture", "1", setOf(InputLanguage.CHINESE))
-        override val snapshot get() = EngineSnapshot("ni", "ni", List(4) {
+        override val snapshot get() = EngineSnapshot(if (changedInput) "hao" else "ni",
+            if (formatByPage && page % 2 != 0) "n i" else "ni", List(4) {
             val id = page * 4 + it
             Candidate("entry$id", if (changed) "changed$id" else "entry$id")
         }, hasNextPage = page < 19, hasPreviousPage = page > 0)

@@ -150,7 +150,11 @@ AI 内容确认页当前为非导出内部入口；文件、图片、音频仅�
 Provider 可配置多组，图片与音频能力按模型声明；敏感编辑器仍拒绝 AI，附件不写入会话历史。
 只有工作台主动提交的文字、所选上下文、附件与会话会送至配置的服务商；服务商的数据保存政策不受本项目控制。
 关闭联网不影响离线输入与安全剪贴板。AI 草稿采用独立转换会话，不读取或学习个人数据；取消、
-截断和过期结果不可插入。API key 弹窗与 AI 面板使用屏幕保护，所有会话正文只作纯文本处理。
+截断和过期结果不可插入。API key 弹窗始终使用屏幕保护；键盘及 AI 面板仅在隐私模式开启时阻止截图和录屏，所有会话正文只作纯文本处理。
+
+页面上下文的截图入口必须由用户逐次触发，并受 AI、联网、会话和隐私策略共同约束。
+截图只在内存中交给本地 OCR，完成或取消后立即释放 Bitmap；不写文件、不上传、不后台重试。
+当前包没有可审核的整页 OCR 模型，因此截图 OCR 适配器保持不可用；单字手写模型不承担整页识别。
 
 Expression-search input is a bounded, memory-only local conversion draft with no
 personalization, learning, external-editor read or network port. Search/session
@@ -262,3 +266,8 @@ cannot complete, and HTTP errors expose fixed categories/status without reading
 server bodies. The user-approved format-5 reset deletes old Provider credentials
 and their isolated key; saved conversations are unaffected. See
 [ADR 0024](docs/adr/0024-ai-provider-protocols.md).
+
+Provider addresses reject invisible Unicode format characters before network I/O;
+they cannot disguise an additional route suffix or bidirectional path. New providers
+have no prefilled destination. These checks preserve configuration format 5 and do
+not clear saved credentials, retry routes or relax HTTPS and redirect restrictions.

@@ -1,7 +1,9 @@
 # AI page references and conversation management
 
-Date: 2026-10-07
-Status: approved by the user on 2026-10-07; implemented and verified on 2026-10-07.
+Date: 2026-10-07; screenshot/OCR amendment: 2026-10-16
+Status: accessibility-text route implemented. Screenshot/OCR boundary is designed
+and tested, but remains disabled until a verified full-page offline OCR model is
+added.
 Results and remaining device coverage: [validation report](ai-page-context-validation.md).
 
 ## Goal and observed state
@@ -40,7 +42,10 @@ implementation and documentation must be reconciled for the chosen import scope.
 This route needs an optional Android accessibility service. An ordinary input
 method has no general API for enumerating another application's entire page.
 Custom-drawn, inaccessible, protected or offscreen text may be unavailable. The
-first implementation does not add screenshots, OCR, automatic scrolling or gestures.
+accessibility-text route does not add automatic scrolling or gestures. A separate
+screenshot/OCR route is permitted by the 2026-10-16 amendment, but its broker stays
+disabled without a verified full-page model; the single-character handwriting model
+is not reused as page OCR.
 User-initiated text sharing is the lower-permission alternative, but cannot provide
 the requested page-wide checklist by itself.
 
@@ -148,8 +153,9 @@ alongside code. Do not weaken general network or clipboard checks.
 
 ## Plan review
 
-The recommendation matches the requested in-keyboard checklist without introducing
-an OCR dependency or changing stored formats. Its material trade-off is the broad
+The recommendation matches the requested in-keyboard checklist without changing
+stored formats. The screenshot amendment adds a separate memory-only broker and
+does not introduce an unverified OCR dependency. Its material trade-off is the broad
 platform capability granted to an accessibility service, despite narrowly scoped
 application behavior. OS/vendor restrictions and source accessibility quality limit
 coverage. A fixture-based proof of source-window binding and prompt cancellation is

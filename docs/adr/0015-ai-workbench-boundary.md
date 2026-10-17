@@ -130,3 +130,11 @@ the probe now allows 512 output tokens, with the same 30-second deadline and pub
 prompt. The user chose an old-configuration reset for format 5, not migration;
 conversation storage remains unchanged. No automatic fallback, redirect, new data
 source, permission or runtime network adapter is approved by this amendment.
+## User-controlled screen capture amendment (2026-10-16)
+
+The user explicitly requests screenshots and recordings of AI operations when
+incognito mode is off. Opening the AI workbench must not independently enable
+FLAG_SECURE on the IME window. The window follows incognito mode, including live
+setting changes. API-key dialogs and private-data Activities retain their own
+protection. User-created captures can disclose visible drafts and responses; this
+does not grant the application screenshot access or change page-reference consent.

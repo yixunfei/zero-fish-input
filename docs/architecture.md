@@ -177,6 +177,13 @@ use RecyclerView's native vertical dragging and fling. Two rows before an edge,
 one posted page request extends the core window. Bounded list diffs append/remove
 rows without full refresh or resetting the viewport; eviction preserves a visible
 candidate and its pixel offset. Initial-page IDs stay stable when browsing begins.
+Complete overlapping rows retain their packed widths when either edge changes,
+so an evicted partial row does not rearrange the visible grid. The viewport keeps
+one candidate/pixel anchor across multiple deliveries before the next layout;
+an identical snapshot does not cancel a queued edge request.
+Paging preserves the active preedit presentation when raw input is unchanged:
+engine highlight-dependent separator formatting is not a new composition. Actual
+input edits and candidate selection still publish their updated composition.
 Prefetch follows the current direction after layout in both directions and uses
 actual packed rows for its edge distance. Drag/fling continuation survives window
 eviction, while idle filling stops at eviction. The horizontal strip yields page
@@ -210,6 +217,11 @@ to 64 UTF-16 units. Keys, candidates, paging, language switching and composition
 clear all route to that draft while editing. Panel/session/view/settings/subtype
 and privacy changes close the search session and invalidate warm-up delivery.
 No external editor connection or personal lookup is passed into either draft.
+Draft warm-up results use the controller's validated fallback-composition handoff,
+including while plain pinyin is still being entered. Partially selected segments
+are not migrated; a rejected handoff is retried after that composition ends or is
+cleared. Session generations, language and privacy still gate engine adoption,
+and closed/replaced drafts cannot receive old prepared results.
 
 Rime's single-syllable candidate navigation uses a temporary internal caret;
 ordinary typing/deletion resumes at the composition end. An acknowledged external
@@ -292,6 +304,13 @@ Activity is temporarily stopped for an app switch. Saving is explicit; cancellat
 page finish or destruction dismisses the dialog and clears the editable fields.
 The draft is not copied into saved instance state or persistent storage and is
 not restored after Activity recreation or process death.
+
+Provider fields use persistent Material outline labels and noneditable protocol/model
+choices. An empty model list hides its selector and capabilities until models are
+explicitly entered or selected. A new provider has no prefilled destination; the
+user supplies the HTTPS address before discovery or generation. Address validation
+rejects Unicode format characters before transport so an invisible suffix cannot
+silently become part of the request route. Stored configuration remains format 5.
 
 librime 自身的用户词典被禁用。中文候选选择的拼音输入码和使用频率由 ZeroInput 的加密仓库
 统一保存，从而让全局关闭学习、隐私模式和编辑器的无个性化请求作用于所有引擎。
@@ -548,9 +567,13 @@ fuzzy and abbreviation rules into its own prism; the app does not implement a
 second pinyin parser. OpenCC text dictionaries come from the pinned source archive
 and are hash-checked during the build. No runtime downloads are involved.
 
-The input view shares one stable header between the toolbar and candidate strip:
-72dp in portrait (24dp composition/status plus 48dp candidates), 48dp in landscape.
-An explicit tools button opens the toolbar while composing without moving keys.
+The input view shares one header between tools and candidates. A toolbar-only
+state uses one 48dp row; portrait composition uses a 96dp header for the 48dp
+composition editor and 48dp candidate row, while short/wide windows keep a 48dp
+inline header. A fixed 48dp hide control remains at the trailing edge, outside
+the horizontally scrolling tools and candidate content. Hiding the IME preserves
+the current editor composition; the platform lifecycle still cancels pending
+authenticated panel actions.
 Compact candidate browsing reuses the keyboard's measured row geometry, including
 density rounding; the separate panel expansion action increases the viewport. Candidate views are reused, reject clicks whose binding changed during
 the gesture, and clear their text when retired. Held backspace clears a composition
@@ -722,6 +745,14 @@ uses the existing title field and serial storage worker; there is no format chan
 Internal imported text becomes removable references. `AiComposeActivity` remains
 nonexported: earlier external sharing descriptions are superseded by this entry.
 
+The screenshot amendment adds `PageScreenshotBroker` as a separate in-memory
+boundary. A future Android screenshot adapter may provide one explicitly requested
+frame to a verified local OCR implementation. The broker does not write pixels to
+disk, recycles the bitmap after OCR, bounds work to one queued task and rejects
+late delivery after generation, session or policy changes. Until a full-page OCR
+model is verified, the adapter remains unavailable; the single-character handwriting
+model is not treated as page OCR.
+
 
 ## Review hardening (2026-10-08, round 2)
 
@@ -767,7 +798,9 @@ share one runtime and all Wanxiang core dictionaries. `engine-api/PublicResource
 exposes worker-only resource leases; `language-pack/PublicResourceStore` validates,
 publishes and shares immutable data, while app dictionary settings own explicit
 GitHub requests. `engine-rime` and `model-scoring` receive the source by injection.
-LTS and handwriting are optional in lightweight builds. Native libraries stay
+Full bundles Mini only; LTS and handwriting are download-only in both APK
+bundles. Reviewed Emoji artwork remains bundled in mobile APKs alongside the
+catalog and text insertion path. Native libraries stay
 bundled. The bounded Chinese glide index is derived from Wanxiang at build time;
 legacy Luna/essay files are excluded from APKs.
 
@@ -776,7 +809,7 @@ legacy Luna/essay files are excluded from APKs.
 `engine-rime/XzDictionaryReader` bounds and validates XZ streams on the existing
 Rime worker before atomic generation activation. `model-scoring` consumes Mini
 resource leases; model resource revisions invalidate asynchronous rankings. Lite
-omits Mini/LTS/handwriting, while full bundles all three. The shared ONNX CPU
+omits Mini/LTS/handwriting, while full bundles Mini only. The shared ONNX CPU
 runtime is compiled for the reviewed graph/operator set into every APK; downloaded
 resources never introduce native code. See ADR 0022 and tools/onnxruntime/README.md.
 

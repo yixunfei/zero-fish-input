@@ -10,9 +10,10 @@ interface EditorConnection {
      * contents.  Android's [finishComposingText] alone makes the pre-edit
      * text permanent, which is not what an IME reset/cancel operation wants.
      */
-    fun clearComposingText() {
+    fun clearComposingText(): Boolean {
         setComposingText("")
         finishComposingText()
+        return true
     }
 
     /** True only when the currently bound editor accepts this commit. */

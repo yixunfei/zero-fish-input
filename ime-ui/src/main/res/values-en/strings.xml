@@ -89,6 +89,7 @@
     <string name="keyboard_tools">Keyboard tools</string>
     <string name="candidate_more_actions">More candidate actions</string>
     <string name="keyboard_return">Return to keyboard</string>
+    <string name="keyboard_hide">Hide keyboard</string>
     <string name="key_shift">Shift</string>
     <string name="key_caps_lock">Caps lock</string>
     <string name="key_lowercase">Lowercase</string>
@@ -130,6 +131,10 @@
     <string name="ai_submit">Send</string>
     <string name="ai_cancel">Stop</string>
     <string name="ai_insert">Insert</string>
+    <string name="ai_insert_thinking">Insert full reasoning</string>
+    <string name="ai_reasoning_default">Auto</string>
+    <string name="ai_reasoning_fast">Fast</string>
+    <string name="ai_reasoning_deep">Deep</string>
     <string name="ai_settings">Settings</string>
     <string name="ai_add_content">Add content</string>
     <string name="ai_import_content">Use selected content</string>

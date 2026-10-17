@@ -53,6 +53,7 @@ class ZeroInputView @JvmOverloads constructor(
     var onPasteConfirmed: () -> Unit = {}
     var onPasteCancelled: () -> Unit = {}
     var onSettingsRequested: () -> Unit = {}
+    var onHideKeyboardRequested: () -> Unit = {}
     var onToolsNavigation: () -> Unit = { onUserInteraction() }
     var onGlideStarted: () -> Unit = {}
     var onGlideRequested: (GlideRequest, GlideLetterCase) -> Unit = { _, _ -> }
@@ -76,7 +77,9 @@ class ZeroInputView @JvmOverloads constructor(
     var onSecureClipboardManagementRequested: () -> Unit = {}
     var onAiSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
     var onAiCancel: () -> Unit = {}
-    var onAiInsert: (String) -> Unit = {}
+    var onAiInsert: (String, Boolean) -> Unit = { _, _ -> }
+    var onAiThinkingModeChanged: (Boolean) -> Unit = {}
+    var onAiReasoningModeChanged: (dev.zeroinput.ai.api.AiReasoningMode) -> Unit = {}
     var onAiConversationsRequested: () -> Unit = {}
     var onAiConversationSelected: (String) -> Unit = {}
     var onAiConversationDeleted: (String) -> Unit = {}
@@ -227,6 +230,10 @@ class ZeroInputView @JvmOverloads constructor(
     private val expansionButton = panelIconButton(context, R.drawable.ic_panel_expand, R.string.panel_expand) {
         changePanelExpansion(if (isPanelExpanded) PanelExpansion.COMPACT else PanelExpansion.EXPANDED)
     }
+    private val hideKeyboardButton = panelIconButton(context, R.drawable.ic_keyboard_hide, R.string.keyboard_hide) {
+        onUserInteraction()
+        onHideKeyboardRequested()
+    }
     private val header = FrameLayout(context).apply {
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(KeyboardViewportPolicy.STACKED_HEADER_HEIGHT_DP))
         addView(toolbar, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48), Gravity.CENTER_VERTICAL))
@@ -234,6 +241,7 @@ class ZeroInputView @JvmOverloads constructor(
         addView(candidateStrip, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(glideSuggestions, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(expansionButton, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
+        addView(hideKeyboardButton, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL))
     }
     private val backNavigation = PanelBackNavigation(this, { canNavigateBack }) { navigateBack() }
 
@@ -518,6 +526,7 @@ class ZeroInputView @JvmOverloads constructor(
         onPasteConfirmed = {}
         onPasteCancelled = {}
         onSettingsRequested = {}
+        onHideKeyboardRequested = {}
         onToolsNavigation = {}
         onGlideStarted = {}
         onGlideRequested = { _, _ -> }
@@ -529,7 +538,9 @@ class ZeroInputView @JvmOverloads constructor(
         onSecureClipboardManagementRequested = {}
         onAiSubmit = { _, _, _ -> }
         onAiCancel = {}
-        onAiInsert = {}
+        onAiInsert = { _, _ -> }
+        onAiThinkingModeChanged = {}
+        onAiReasoningModeChanged = {}
         onAiConversationsRequested = {}
         onAiConversationSelected = {}
         onAiConversationDeleted = {}
@@ -769,7 +780,9 @@ class ZeroInputView @JvmOverloads constructor(
     private fun bindAiCallbacks() {
         ai.onSubmit = { action, input, target -> onAiSubmit(action, input, target) }
         ai.onCancel = { onAiCancel() }
-        ai.onInsert = { onAiInsert(it) }
+        ai.onInsert = { value, includeThinking -> onAiInsert(value, includeThinking) }
+        ai.onThinkingModeChanged = { onAiThinkingModeChanged(it) }
+        ai.onReasoningModeChanged = { onAiReasoningModeChanged(it) }
         ai.onConversationSelected = { onAiConversationSelected(it) }
         ai.onConversationDeleted = { onAiConversationDeleted(it) }
         ai.onNewConversation = { onAiNewConversation() }
@@ -941,9 +954,11 @@ class ZeroInputView @JvmOverloads constructor(
         expansionButton.setImageResource(if (mode == PanelMode.CANDIDATES) R.drawable.ic_handwriting_fullscreen else R.drawable.ic_panel_expand)
         expansionButton.rotation = if (isPanelExpanded) 180f else 0f
         expansionButton.contentDescription = context.getString(if (isPanelExpanded) R.string.panel_collapse else R.string.panel_expand)
-        val margin = if (expansionButton.isVisible) dp(48) else 0
-        updateHeaderMargin(toolbar, margin)
-        updateHeaderMargin(candidateStrip, margin)
+        hideKeyboardButton.visibility = if (mode == PanelMode.KEYBOARD) VISIBLE else GONE
+        val reservedEnd = dp(48)
+        updateHeaderMargin(toolbar, reservedEnd)
+        updateHeaderMargin(candidateStrip, reservedEnd)
+        updateHeaderMargin(glideSuggestions, reservedEnd)
         aiButton.renderAiEntryAvailability(aiAvailable)
         reconvertButton.visibility = if (manualTools && canReconvert && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         candidateStrip.renderReconversion(canReconvert && mode == PanelMode.KEYBOARD)
@@ -970,6 +985,7 @@ class ZeroInputView @JvmOverloads constructor(
         toolbar.visibility = if (showCandidates) GONE else VISIBLE
         glideSuggestions.visibility = if (glideSuggestionsActive && mode == PanelMode.KEYBOARD) VISIBLE else GONE
         if (glideSuggestions.isVisible) { candidateStrip.visibility = GONE; toolbar.visibility = GONE }
+        applyHeaderHeight()
         returnButton.visibility = if (toolbar.isVisible && canNavigateBack) VISIBLE else GONE
         val toolbarParams = toolbar.layoutParams as FrameLayout.LayoutParams
         val start = if (returnButton.isVisible) dp(48) else 0
@@ -1046,16 +1062,23 @@ class ZeroInputView @JvmOverloads constructor(
     private fun applyViewportPlan(plan: KeyboardViewportPlan) {
         if (viewportPlan == plan) return
         viewportPlan = plan
-        val params = header.layoutParams
-        val headerHeight = dp(plan.headerHeightDp)
-        if (params.height != headerHeight) {
-            params.height = headerHeight
-            header.layoutParams = params
-        }
+        applyHeaderHeight()
         candidateStrip.applyViewport(plan)
         keyboard.setViewportLayout(plan.compactKeyboard, plan.landscapeKeyboard)
         readings.layoutParams = LayoutParams(dp(60), keyboard.preferredHeight)
         updatePanelLayout()
+    }
+
+    private fun applyHeaderHeight() {
+        val singleRow = toolbar.isVisible || glideSuggestions.isVisible
+        val heightDp = if (singleRow) KeyboardViewportPolicy.INLINE_HEADER_HEIGHT_DP
+            else viewportPlan.headerHeightDp
+        val heightPx = dp(heightDp)
+        val params = header.layoutParams
+        if (params.height != heightPx) {
+            params.height = heightPx
+            header.layoutParams = params
+        }
     }
 
     private fun naturalViewportHeight(): Int = maxOf(

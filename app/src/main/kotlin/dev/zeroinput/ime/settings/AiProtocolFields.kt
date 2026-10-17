@@ -1,7 +1,6 @@
 package dev.zeroinput.ime.settings
 
 import android.content.Context
-import android.view.View
 import android.widget.*
 import com.google.android.material.materialswitch.MaterialSwitch
 import dev.zeroinput.ai.api.AiEndpoint
@@ -25,36 +24,28 @@ internal class AiProtocolFields(
     }
     val streams: Boolean get() = streaming.isChecked
     private val preview = TextView(context).apply { isSaveEnabled = false }
+    private val choices = AiProviderChoiceField(context, R.string.ai_protocol_label, R.string.ai_protocol_label) { position ->
+        val value = AiProtocol.entries[position]
+        if (protocol != value) { protocol = value; changed() }
+        render()
+    }
 
-    fun attach(parent: LinearLayout, index: Int) {
+    fun attach(parent: LinearLayout) {
         val group = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        group.addView(TextView(context).apply { setText(R.string.ai_protocol_label) })
-        group.addView(Spinner(context).apply {
-            contentDescription = context.getString(R.string.ai_protocol_label)
-            adapter = ArrayAdapter(context, android.R.layout.simple_spinner_item,
-                context.resources.getStringArray(R.array.ai_protocol_names).toList()).apply {
-                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            }
-            setSelection(protocol.ordinal)
-            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    val value = AiProtocol.entries[position]
-                    if (protocol != value) { protocol = value; changed() }
-                    render()
-                }
-            }
-        })
+        val names = context.resources.getStringArray(R.array.ai_protocol_names).toList()
+        choices.render(names, names[protocol.ordinal])
+        group.addView(choices)
         group.addView(streaming)
         group.addView(preview)
-        parent.addView(group, index)
+        parent.addView(group)
         render()
     }
 
     fun render() {
-        preview.text = try {
+        preview.text = if (address().isBlank()) "" else try {
             val endpoint = AiEndpoint.parse(address(), protocol)
             context.getString(R.string.ai_protocol_routes, endpoint.generation.toString(), endpoint.models.toString())
         } catch (_: Exception) { context.getString(R.string.ai_protocol_address_invalid) }
+        preview.visibility = if (preview.text.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
     }
 }

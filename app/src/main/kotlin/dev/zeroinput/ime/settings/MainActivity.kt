@@ -8,6 +8,8 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
@@ -156,6 +158,12 @@ class MainActivity : AppCompatActivity() {
         screen.onAiDataClearRequested = ::confirmClearAiData
         screen.onAiPageSettingsRequested = {
             startActivity(Intent(this, dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java))
+        }
+        screen.onInterfaceLanguageChanged = { tag ->
+            AppCompatDelegate.setApplicationLocales(
+                if (tag == "system") LocaleListCompat.getEmptyLocaleList()
+                else LocaleListCompat.forLanguageTags(tag),
+            )
         }
         screen.onAppearanceRequested = { startActivity(Intent(this, KeyboardAppearanceActivity::class.java)) }
         screen.onChineseOptionsChanged = { graph.settings.chineseInputOptions = it; render() }
@@ -413,6 +421,7 @@ class MainActivity : AppCompatActivity() {
                 aiProviderName = aiConfig.activeProvider()?.name.orEmpty(),
                 aiKeyConfigured = aiConfig.activeKey().isNotBlank(),
                 aiSaveConversations = aiConfig.saveConversations,
+                interfaceLanguageTag = AppCompatDelegate.getApplicationLocales().toLanguageTags(),
             ),
         )
         screen.setAiControlsEnabled(aiConfigReady)

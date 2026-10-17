@@ -16,8 +16,9 @@ decoder memory to 16 MiB. Trailing/concatenated streams, damage, interruption an
 limit violations fail the generation. No parsing or decompression runs on the
 IME main thread. Existing verified generations remain available on failure.
 
-Mini INT8 becomes the third supported public resource. Full bundles Mini, LTS and
-handwriting; lite bundles none of these optional data files. Explicit downloads,
+Mini INT8 becomes the third supported public resource. Full bundles Mini only;
+lite bundles none of Mini, LTS or handwriting. LTS and handwriting are explicit
+downloads; reviewed Emoji artwork remains bundled,
 licenses, fixed shapes, hashes, worker-owned leases, removal and offline use follow
 ADR 0021. Registry format remains unchanged; no personal data migration occurs.
 Mini stays default-off. Missing data preserves baseline candidates, and resource
@@ -55,5 +56,6 @@ runtime avoids custom-build maintenance but dominates package size. Reduced
 runtime artifacts deliberately fail the build when missing or stale rather than
 silently falling back to the larger upstream library.
 
-Emoji artwork and all core dictionaries are unchanged. Full remains an offline
-convenience package, so its grammar/model payload still dominates its size.
+Emoji catalog, artwork and insertion remain available offline in both packages. All core dictionaries
+remain bundled. Full keeps Mini as its sole optional model and no longer carries
+the 400 MB grammar or handwriting payload.

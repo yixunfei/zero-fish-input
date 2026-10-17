@@ -28,6 +28,47 @@ class AiImeInteractionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val graph get() = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
 
+    @Test fun typingBeforeDraftWarmupStillConvertsChineseAndLeavesTheHostUntouched() = withEditor { editor ->
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val blocker = graph.engineExecutor.submit { entered.countDown(); check(release.await(30, TimeUnit.SECONDS)) }
+        try {
+            assertTrue(entered.await(20, TimeUnit.SECONDS))
+            tap { labelled(UiR.string.ai_open) }
+            await { panel().isAiEditing }
+            onMain { assertTrue("AI draft must start in Chinese", views(panel()).filterIsInstance<TextView>().any {
+                it.isShown && it.text == it.context.getString(UiR.string.ai_draft_mode,
+                    it.context.getString(UiR.string.ai_input_chinese))
+            }) }
+            for ((index, letter) in "zhongguoren".withIndex()) {
+                tap { views(panel()).filterIsInstance<TextView>().first {
+                    it.isShown && it.text.toString() == letter.toString()
+                } }
+                onMain { assertEquals("Each physical key must reach the isolated draft",
+                    "zhongguoren".take(index + 1), draft().text.toString().filter { it in 'a'..'z' }) }
+            }
+            onMain { assertTrue(editor.editor.text.isEmpty()) }
+            release.countDown()
+            graph.engineExecutor.submit {}.get(20, TimeUnit.SECONDS)
+            instrumentation.waitForIdleSync()
+            SystemClock.sleep(600)
+            await { views(panel()).filterIsInstance<TextView>().any {
+                it.isShown && it.javaClass.simpleName == "CandidateItemView" && it.text.toString() == "中国人"
+            } }
+            tap { views(panel()).filterIsInstance<TextView>().first {
+                it.isShown && it.javaClass.simpleName == "CandidateItemView" && it.text.toString() == "中国人"
+            } }
+            await { draft().text.toString() == "中国人" }
+            onMain {
+                assertTrue(editor.editor.text.isEmpty())
+                for (letter in "nihao") panel().onAiDraftChanged(dev.zeroinput.ime.ui.KeyboardAction.Text(letter.toString()))
+                panel().onAiDraftChanged(dev.zeroinput.ime.ui.KeyboardAction.Space)
+            }
+            await { draft().text.toString() == "中国人你好" }
+            onMain { assertTrue(editor.editor.text.isEmpty()) }
+        } finally { release.countDown(); blocker.get(20, TimeUnit.SECONDS) }
+    }
+
     @Test fun realImeShowsAiOnFirstScreenWithoutOpeningOrScrollingTools() = withEditor { editor ->
         dev.zeroinput.ime.testing.DeviceTouch.tapVisible { labelled(UiR.string.ai_open) }
         await { panel().isAiOpen && panel().isAiEditing }
@@ -50,7 +91,8 @@ class AiImeInteractionTest {
         await { draft().text.isNotEmpty() }
         onMain { assertTrue("AI typing must not compose in the host editor", editor.editor.text.isEmpty()) }
         tap { textButton(UiR.string.ai_submit) }
-        await { !panel().isAiEditing }
+        await { !panel().isAiEditing && textButtonOrNull(UiR.string.ai_policy_unavailable) != null &&
+            textButtonOrNull(UiR.string.ai_insert) != null }
         onMain {
             assertNotNull(textButton(UiR.string.ai_policy_unavailable))
             assertFalse(textButton(UiR.string.ai_insert).isEnabled)
@@ -152,7 +194,8 @@ class AiImeInteractionTest {
             activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
             val fixture = activity
-            await { panels().isNotEmpty() }
+            await { fixture.hasWindowFocus() &&
+                fixture.getSystemService(InputMethodManager::class.java).isActive(fixture.editor) && panels().isNotEmpty() }
             onMain {
                 fixture.editor.imeOptions = 0
                 fixture.getSystemService(InputMethodManager::class.java).restartInput(fixture.editor)
@@ -192,9 +235,10 @@ class AiImeInteractionTest {
         it.isShown && it.contentDescription == it.context.getString(label)
     }
     private fun labelled(label: Int) = checkNotNull(labelledOrNull(label))
-    private fun textButton(label: Int) = views(panel()).filterIsInstance<TextView>().first {
+    private fun textButtonOrNull(label: Int) = views(panel()).filterIsInstance<TextView>().firstOrNull {
         it.isShown && it.text == it.context.getString(label)
     }
+    private fun textButton(label: Int) = checkNotNull(textButtonOrNull(label))
     private fun draft() = views(panel()).filterIsInstance<TextView>().single {
         it.isShown && it.hint == it.context.getString(UiR.string.ai_input_hint)
     }
@@ -204,10 +248,15 @@ class AiImeInteractionTest {
     private fun await(condition: () -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 10_000
         while (SystemClock.uptimeMillis() < deadline) {
-            if (onMain(condition)) return
+            if (onMain { panels().size == 1 && condition() }) return
             SystemClock.sleep(50)
         }
-        fail("AI editor fixture did not reach the expected state")
+        val state = onMain { panels().singleOrNull()?.let {
+            "open=${it.isAiOpen}, editing=${it.isAiEditing}, " +
+                "policy=${textButtonOrNull(UiR.string.ai_policy_unavailable) != null}, " +
+                "insert=${textButtonOrNull(UiR.string.ai_insert) != null}"
+        } ?: "no single visible IME" }
+        fail("AI editor fixture did not reach the expected state: $state")
     }
     private fun <T> onMain(action: () -> T): T {
         var value: Result<T>? = null

@@ -15,6 +15,8 @@ enum class AiAction(val promptInstruction: String) {
 
 enum class AiRole { SYSTEM, USER, ASSISTANT }
 
+enum class AiReasoningMode { DEFAULT, FAST, DEEP }
+
 data class AiMessage(
     val role: AiRole,
     val content: String,
@@ -56,6 +58,7 @@ data class AiRequest(
     /** Optional workbench choice, restricted to the bound provider's saved model list. */
     val model: String? = null,
     val references: List<AiReference> = emptyList(),
+    val reasoningMode: AiReasoningMode = AiReasoningMode.DEFAULT,
 ) {
     init {
         require(input.isNotBlank()) { "AI input must not be blank" }

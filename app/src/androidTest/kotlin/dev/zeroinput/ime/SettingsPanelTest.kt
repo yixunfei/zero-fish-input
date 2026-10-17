@@ -215,7 +215,7 @@ class SettingsPanelTest {
         association.performClick()
         assertTrue(!enabled)
         val groups = all.filterIsInstance<MaterialButtonToggleGroup>()
-        assertEquals(4, groups.size)
+        assertEquals(5, groups.size)
         for (group in groups) {
             val buttons = descendants(group).filterIsInstance<MaterialButton>()
             assertEquals(1, buttons.count { it.isChecked })
@@ -224,6 +224,12 @@ class SettingsPanelTest {
             assertTrue("Checked mode needs a distinct visual state", tint.getColorForState(
                 intArrayOf(android.R.attr.state_checked), 0) != tint.getColorForState(intArrayOf(), 0))
         }
+        val languageGroup = groups.single { group ->
+            descendants(group).filterIsInstance<MaterialButton>().any {
+                it.text == context.getString(R.string.language_follow_system)
+            }
+        }
+        assertEquals(1, descendants(languageGroup).filterIsInstance<MaterialButton>().count { it.isChecked })
         all.filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach {
             val available = it.width - it.compoundPaddingLeft - it.compoundPaddingRight
             val required = it.paint.measureText(it.text.toString())

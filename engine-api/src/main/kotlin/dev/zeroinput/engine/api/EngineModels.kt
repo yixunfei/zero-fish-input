@@ -60,6 +60,8 @@ data class EngineUpdate(
     val consumed: Boolean = true,
     val committedInput: String = "",
     val learnable: Boolean = true,
+    /** Engine-validated code used for learning; a corrected typo must not become a shortcut. */
+    val learningInput: String = "",
 )
 
 sealed interface EngineKey {

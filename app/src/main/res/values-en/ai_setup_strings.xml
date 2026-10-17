@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ai_endpoint_example">Enter the address supplied by your provider, e.g. https://example.com/v1.</string>
+    <string name="ai_key_new">Enter this provider’s API key.</string>
+    <string name="ai_key_keep">Leave blank to keep the saved key, or enter a replacement.</string>
+    <string name="ai_models_help">Fetch and select models, or enter model IDs separated by commas or new lines.</string>
+    <string name="ai_models_empty">No models selected. Fetch models or enter them above to choose a default.</string>
     <string name="ai_settings_saving">Saving settings…</string>
     <string name="ai_setup_network_required">Turn on Enable AI and Allow AI network requests before fetching models or testing the connection.</string>
     <string name="ai_setup_network_ready">Network access is allowed. Requests start only when you fetch models or test the connection.</string>

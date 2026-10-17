@@ -43,13 +43,9 @@ val prepareModelAssets = tasks.register("prepareModelAssets") {
         // These are obsolete generated duplicates, not source assets.
         target.resolve("inference.onnx").delete()
         target.resolve("characters.txt").delete()
-        val handwritingTarget = modelAssets.get().dir("handwriting").asFile
-        if (resourceBundle.get() == "full") {
-            handwritingTarget.mkdirs()
-            handwritingModel.copyTo(handwritingTarget.resolve("model.onnx"), overwrite = true)
-            handwritingCharacters.copyTo(handwritingTarget.resolve("characters.txt"), overwrite = true)
-            strokeModels.forEach { (source, _, _) -> source.copyTo(handwritingTarget.resolve(source.name), overwrite = true) }
-        } else delete(handwritingTarget)
+        // Handwriting stays an explicit public download. Keeping it out of both
+        // APK bundles is required for the mobile package size budget.
+        delete(modelAssets.get().dir("handwriting").asFile)
     }
 }
 

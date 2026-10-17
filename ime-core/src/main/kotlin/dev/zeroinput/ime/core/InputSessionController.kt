@@ -177,7 +177,8 @@ class InputSessionController(
                         return
                     }
                     if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
-                        (candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied || state.modelRanked)) {
+                        (candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied ||
+                            state.modelRanked || routes.getOrNull(state.snapshot.highlightedIndex) is CandidateRoute.Personal)) {
                         selectCandidate(activeEngine, state.snapshot.highlightedIndex)
                     } else handleKey(activeEngine, EngineKey.Space)
                 }
@@ -244,6 +245,22 @@ class InputSessionController(
             .onFailure { closeEngine() }
         connection.clearComposingText()
         publish(EngineSnapshot.Empty)
+    }
+
+    /** Transfers only this IME's unfinished preedit to a bounded local draft. */
+    fun handoffComposition(maxChars: Int, receive: (String) -> Boolean): Boolean {
+        if (privacy.isSensitive || !privacy.independentAiAllowed || maxChars < 1) return false
+        val snapshot = state.snapshot
+        if (!snapshot.isComposing) return true
+        val value = fallbackComposition(snapshot)
+        if (value.isEmpty() || value.length > maxChars || !receive(value)) return false
+        if (!connection.clearComposingText()) return false
+        associations.clear()
+        candidateWindow.clear()
+        invalidateReconversion(publishState = false)
+        runCatching { engine?.reset() }.onFailure { closeEngine() }
+        publish(EngineSnapshot.Empty)
+        return true
     }
 
     /** An external cursor move hands the visible preedit back to the editor, without learning. */
@@ -584,7 +601,7 @@ class InputSessionController(
                     val learnedValue = update.committedText.trimEnd(' ')
                     if (learnedValue.isEmpty()) return@runCatching
                     personalization.learn(
-                        shortcut = reading.ifBlank { learnedValue },
+                        shortcut = update.learningInput.ifBlank { reading.ifBlank { learnedValue } },
                         value = learnedValue,
                         language = language,
                         learningAllowed = privacy.learningAllowed,

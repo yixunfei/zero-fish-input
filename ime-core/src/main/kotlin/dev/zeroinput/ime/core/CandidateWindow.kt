@@ -78,6 +78,12 @@ internal class CandidateWindow {
             update = engine.changePage(direction)
             if (!update.consumed || update.committedText.isNotEmpty()) return update
             cursor += if (direction == PageDirection.NEXT) 1 else -1
+            // Some engines reformat preedit separators for the newly highlighted
+            // candidate. Browsing is not an edit: retain the composing presentation
+            // or the window/UI will treat every such page as a new input and reset.
+            if (update.snapshot.rawInput == current.rawInput) {
+                update = update.copy(snapshot = update.snapshot.copy(composition = current.composition))
+            } else return update
         }
         return update
     }

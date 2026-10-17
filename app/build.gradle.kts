@@ -48,6 +48,7 @@ android {
         viewBinding = true
     }
     androidResources { noCompress += "xz" }
+    testOptions.unitTests.isIncludeAndroidResources = true
 
     sourceSets["main"].assets.srcDir(licenseAssets)
     sourceSets["androidTest"].assets.srcDir(rootProject.file("tools/model-quality-fixtures"))

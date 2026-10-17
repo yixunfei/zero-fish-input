@@ -83,10 +83,14 @@ Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地�
 要求光标仍在该词后且没有继续编辑；不支持组合区间的应用会拒绝重选，原文字保留。
 
 日常输入时顶栏保留工具、数字、AI 和表情入口，设置、手写等次要操作收进工具中。
+没有组合输入时顶栏收紧为 48dp 单行；开始输入后显示拼音编辑与候选行。顶栏最右侧的收起按钮
+会隐藏键盘并保留当前输入内容。
 数字使用独立键盘，可直接切换符号；点 `ABC` 或固定返回按钮回到原语言，数字和符号可连续输入。
 中英文切换会先按原样上屏未完成的拼音或英文。候选刷新时保留当前浏览位置，新输入回到首候选；
 较长词句在候选栏限宽，在展开列表中完整换行显示。
 展开列表双向接续加载，顶部候选条不再同时触发加载；Debug 和 Release 均不显示测试用输入诊断框。
+AI 草稿在中文引擎后台就绪后继续转换正在输入的拼音；候选窗口接续加载时保留已有行和浏览位置。
+相关回归及验证边界见 [AI 中文输入与连续候选修复验证](docs/ai-input-scroll-validation-2026-10-16.md)。
 
 设置中的“防误触纠错（实验）”默认关闭，只作用于 Rime 全键盘。它提供临近键、错序、
 漏字母和重复字母的拼音候选，可能增加 CPU 开销和干扰候选，需要手动开启。横屏短窗口使用
@@ -197,14 +201,16 @@ Emoji 面板内使用随包图形，首次后台准备完成后可离线显示�
 最多两个附件，总计 1 MB；每份文本文件最多 16,384 字符。确认后两分钟内返回普通输入框，
 打开 AI 并点击 **更多操作 → 引入已选内容**。确认文字会加入独立引用区，保留当前草稿和会话，附件可单独移除。添加内容页属于内部入口，当前不对其他应用开放分享入口。
 内容只有点击提交才发送；附件不写入磁盘或会话历史，离开面板后须重新选择附件。
-PDF、Office 文档、自动截屏、录音及厂商专有接口不在当前支持范围。
+PDF、Office 文档、自动截屏、录音及厂商专有接口不在当前支持范围。逐次授权的
+截图与本地 OCR 已建立独立内存边界，但当前包尚未包含经过审核的整页 OCR 模型，入口保持关闭。
 本轮验证结果和未验证范围见 [Provider、内容导入与 AI 交互验证](docs/ai-provider-context-validation.md)。
 
 点击 **引用页面** 可按需设置页面引用：功能默认关闭，需单独开启并在 Android 无障碍设置中授权。
 返回原输入框后再次点击，才读取当前页面开放的可见文字；逐条勾选并点击 **加入引用**，不会自动发送。
 密码、可编辑输入框、平台标记敏感及被遮挡的文字不纳入；自绘界面、未公开文字或部分系统限制下可能无法读取。
 读取最多 512 个节点、128 段和 32,768 字符，未选快照 30 秒后清除。单条引用最多 4,096 字符、共 16 条，
-所选引用与历史合计不超过 16,384 字符。页面或授权改变会撤销引用，功能不截屏、不自动翻页。
+所选引用与历史合计不超过 16,384 字符。页面或授权改变会撤销引用，文字路径不截屏、不自动翻页。
+设置页可选择跟随系统、简体中文或 English 界面。
 
 **上下文** 中可逐条移除引用、勾选历史消息、选择最近历史、清空或预览将发送的内容。
 引用默认显示短预览；退出上下文或重置面板后，再看全文需要重新点击预览。
@@ -423,8 +429,8 @@ Android 9 及以上使用系统清空接口；Android 8.x 写入空文本，不�
   原图不会被修改或删除。可单独删除背景副本，或确认“恢复默认外观”同时清除图片。
 - 键盘随系统切换深浅模式。高度提供紧凑、标准、舒适三档，竖屏每行分别为 48、52、60dp，横屏为
   48、48、52dp。设置页固定显示预览，横屏采用并排布局。验收说明见 [外观验证](docs/appearance-validation.md)。
-- 工具栏与候选区共用顶部空间：竖屏从原来的 120dp 缩短到 72dp，横屏从 96dp 缩短到 48dp。
-  标准竖屏键盘内容约 280dp，不含系统导航栏和用户主动开启的剪贴板提醒。输入前后按键位置保持不变。
+- 工具栏独占顶部时使用 48dp 单行；竖屏组合输入时使用拼音与候选两行，横屏或短窗口使用 48dp 并排行。
+  收起按钮固定在顶栏右侧，点击隐藏键盘且保留编辑内容。标准竖屏键盘按键行及间距布局不变。
 - 输入时显示拼音与候选，候选左侧工具按钮可打开工具栏；返回键回到候选。候选展开沿用当前
   按键区高度，主题更换不会清除正在输入的拼音。
 - 点按 Shift 输入一个大写字母后恢复小写，长按锁定大写，再次点按解除。新输入框重置大小写和符号页。
@@ -688,7 +694,7 @@ AI 引用列表默认显示短预览，点击预览可核对完整发送上下�
 # Public dictionary preparation and management
 
 The default Chinese dictionary includes the complete Wanxiang core (16 tables)
-and simplified Chinese LTS grammar model. Settings provide installed dictionary
+and optional simplified Chinese LTS grammar model. Settings provide installed dictionary
 switches, removal, restore-to-built-in and explicit catalog/download entry points
 for Wanxiang, Rime Ice, zhwiki, QQ and Sogou. QQ/Sogou expose categories and page
 links directly; no URL entry is required. Installed dictionaries work offline.
@@ -702,11 +708,11 @@ python tools/dictionaries/verify.py
 ```
 
 Python 3.11+ is required. Gradle verifies the reviewed hashes and never fetches
-dictionary data. The grammar model is 398,309,420 bytes; allow several GiB for
-source caches, APK, deployment and compiled dictionaries. First preparation on
-the device can take minutes; typing uses the existing fallback until ready.
-The model ranks the current composition; cross-commit contextual suggestions and
-Rime's own user dictionary remain disabled.
+dictionary data. The reviewed LTS grammar is a download-only public resource;
+the APK keeps the 16 core tables and ordinary offline pinyin input. First
+preparation on the device can take minutes; typing uses the existing fallback
+until ready. The model ranks the current composition; cross-commit contextual
+suggestions and Rime's own user dictionary remain disabled.
 
 `.github/workflows/public-dictionaries.yml` checks weekly (Monday 02:17 UTC) and
 on manual dispatch, opening a PR for the source lock. Enable Actions permission
@@ -717,11 +723,12 @@ QQ/Sogou and other optional downloads do not become package assets.
 
 ## Full and lightweight packages
 
-Use `-PresourceBundle=full` (default) for all offline resources or
-`-PresourceBundle=lite` for all Wanxiang core dictionaries with optional LTS, Mini and
-handwriting downloads. In dictionary settings, check/download, enable/disable or
-remove these public resources. Downloads are explicit; installed features run
-offline. The reduced ONNX runtime remains bundled in both.
+Use `-PresourceBundle=full` (default) for all core dictionaries plus Mini INT8 or
+`-PresourceBundle=lite` for core dictionaries without bundled optional models.
+Mini, LTS and handwriting are explicit downloads in Lite. Emoji catalog/search/insertion
+and the reviewed WebP artwork stay offline in both builds. The
+reduced ONNX runtime remains bundled in both. Downloads are explicit; installed
+features run offline.
 Both APKs share one application ID and replace each other rather than installing
 side by side.
 
@@ -743,12 +750,12 @@ Measured sizes and verification limits are recorded in
 
 ### Additional package compression
 
-Full/lite builds now compress native libraries and losslessly package all 16
-Wanxiang tables as XZ. Lite additionally downloads Mini INT8 only on explicit
-request in dictionary settings; missing Mini preserves normal candidates. Full
-still includes all optional resources. Build the reduced ONNX runtime first using
-[the pinned build recipe](tools/onnxruntime/README.md). Native extraction and XZ
-deployment trade smaller APKs for installation space and first-run work.
+Full/lite builds compress native libraries and losslessly package all 16 Wanxiang
+tables as XZ. Full keeps only Mini INT8; LTS and handwriting remain explicit
+downloads, and missing Mini preserves normal candidates. Emoji WebP artwork remains
+bundled for offline display. Build the reduced ONNX runtime first
+using [the pinned build recipe](tools/onnxruntime/README.md). Native extraction
+and XZ deployment trade smaller APKs for installation space and first-run work.
 
 ### 词库管理
 
@@ -783,3 +790,15 @@ Chat Completions、Responses、Anthropic Messages 分别使用 `/chat/completion
 并主动开启 AI 与联网开关；已有加密会话记录不删除。协议与安全边界见
 [ADR 0024](docs/adr/0024-ai-provider-protocols.md)，验收见
 [本轮验证记录](docs/ai-provider-protocol-validation-2026-10-14.md)。
+
+新增 Provider 的地址需要填写服务商提供的 HTTPS API 地址；示例地址不会自动作为请求目标。
+地址、密钥和模型使用固定标签，新增与编辑的密钥说明分别显示。未选择模型时显示操作提示，
+选择后才出现默认模型下拉框与能力设置。地址中含零宽或双向格式字符会在联网前提示修正。
+2026-10-15 的审核、修复与验收范围见[审核记录](docs/ai-provider-audit-2026-10-15.md)。
+
+### AI 演示截图验收
+
+关闭隐私模式后，普通键盘、AI 提问编辑和 AI 操作面板允许系统截图及录屏。
+开启隐私模式后，键盘窗口恢复屏幕保护。API key 编辑、安全剪贴板等秘密内容窗口继续禁止捕获。
+验收时在普通文本框打开键盘，进入 AI 输入公开测试文本，再切换操作面板，分别尝试截图和录屏；
+不要使用真实凭据或私人对话做演示。

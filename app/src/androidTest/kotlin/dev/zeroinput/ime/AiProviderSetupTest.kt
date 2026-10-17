@@ -32,9 +32,12 @@ class AiProviderSetupTest {
                 field(R.string.ai_key_hint).setText("public-key")
                 field(R.string.ai_models_hint).setText("model")
                 val root = WindowInspector.getGlobalWindowViews().last()
-                views(root).filterIsInstance<android.widget.Spinner>().single {
+                views(root).filterIsInstance<android.widget.AutoCompleteTextView>().single {
                     it.contentDescription == it.context.getString(R.string.ai_protocol_label)
-                }.setSelection(protocol.ordinal)
+                }.let { choice ->
+                    choice.setText(choice.adapter.getItem(protocol.ordinal).toString(), false)
+                    choice.onItemClickListener?.onItemClick(null, null, protocol.ordinal, protocol.ordinal.toLong())
+                }
                 texts().filterIsInstance<android.widget.CompoundButton>().single {
                     it.text == it.context.getString(R.string.ai_protocol_streaming)
                 }.isChecked = false
@@ -63,7 +66,7 @@ class AiProviderSetupTest {
             field(R.string.ai_models_hint).setText("model")
         }
         tap(R.string.save)
-        onMain { assertTrue(saved.isEmpty()); assertNotNull(field(R.string.ai_endpoint_hint).error) }
+        onMain { assertTrue(saved.isEmpty()); assertNotNull(fieldError(R.string.ai_endpoint_hint)) }
     }
 
     @Test fun invalidDraftNeverReachesPersistenceOrRevokesWorkingNetworkSettings() = withEditor { editor, saved ->
@@ -78,7 +81,7 @@ class AiProviderSetupTest {
         tap(R.string.save)
         onMain {
             assertEquals("Invalid editor input must not reach storage", 0, saved.size)
-            assertNotNull(field(R.string.ai_endpoint_hint).error)
+            assertNotNull(fieldError(R.string.ai_endpoint_hint))
         }
     }
 
@@ -92,7 +95,7 @@ class AiProviderSetupTest {
         tap(R.string.save)
         onMain {
             assertTrue("A provider with no usable credential must not be saved", saved.isEmpty())
-            assertNotNull(field(R.string.ai_key_hint).error)
+            assertNotNull(fieldError(R.string.ai_key_hint))
         }
     }
 
@@ -107,6 +110,8 @@ class AiProviderSetupTest {
     }
 
     private fun field(id: Int) = texts().filterIsInstance<EditText>().single { it.hint == it.context.getString(id) }
+    private fun fieldError(id: Int) = generateSequence(field(id).parent) { it.parent }
+        .filterIsInstance<com.google.android.material.textfield.TextInputLayout>().first().error
     private fun texts() = WindowInspector.getGlobalWindowViews().last().let(::views).filterIsInstance<TextView>()
     private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup)
         (0 until root.childCount).flatMap { views(root.getChildAt(it)) } else emptyList()

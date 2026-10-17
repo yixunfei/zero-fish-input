@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ai_endpoint_example">填写服务商提供的地址，例如 https://example.com/v1。</string>
+    <string name="ai_key_new">填写此服务商的 API key。</string>
+    <string name="ai_key_keep">留空保留已保存的密钥；填写新值可替换。</string>
+    <string name="ai_models_help">获取后勾选模型，或手动填写模型 ID，用逗号或换行分隔。</string>
+    <string name="ai_models_empty">尚未选择模型。获取可用模型或在上方手动填写后，即可选择默认模型。</string>
     <string name="ai_settings_saving">正在保存设置…</string>
     <string name="ai_setup_network_required">请打开“启用 AI 功能”和“允许 AI 联网请求”后，再获取模型或测试连接。</string>
     <string name="ai_setup_network_ready">联网已允许。点击获取模型或测试连接后才会发送请求。</string>

@@ -48,6 +48,13 @@ internal class CandidateScrollView(context: Context) : HorizontalScrollView(cont
         return super.dispatchTouchEvent(event)
     }
 
+    fun resetToStart() {
+        scrollTo(0, 0)
+        // Replace the previous animation with a stationary scroll at the new origin.
+        // scrollTo alone leaves HorizontalScrollView's private scroller running.
+        smoothScrollBy(0, 0)
+    }
+
     fun checkEdge(direction: PageDirection) {
         if (!isShown || width == 0 || !canLoad(direction)) return
         val margin = (96 * resources.displayMetrics.density).toInt()

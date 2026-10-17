@@ -39,6 +39,7 @@ data class SettingsScreenState(
     val aiProviderName: String = "",
     val aiKeyConfigured: Boolean = false,
     val aiSaveConversations: Boolean = false,
+    val interfaceLanguageTag: String = "",
 )
 
 data class LanguagePackScreenState(
@@ -81,6 +82,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onAiSettingsRequested: () -> Unit = {}
     var onAiDataClearRequested: () -> Unit = {}
     var onAiPageSettingsRequested: () -> Unit = {}
+    var onInterfaceLanguageChanged: (String) -> Unit = {}
 
     private var suppressSwitchCallbacks = false
     private var aiControlsEnabled = true
@@ -88,6 +90,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(20), dp(18), dp(20), dp(32))
     }
+    private val sectionAnchors = mutableMapOf<String, View>()
     private val enabledStatus = valueText()
     private val currentStatus = valueText()
     private val engineStatus = valueText()
@@ -118,6 +121,19 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val aiEnabledSwitch = settingSwitch(context.getString(R.string.ai_enabled)) { onAiEnabledChanged(it) }
     private val aiNetworkSwitch = settingSwitch(context.getString(R.string.ai_network)) { onAiNetworkChanged(it) }
     private val aiStatus = valueText()
+    private val interfaceLanguage = com.google.android.material.button.MaterialButtonToggleGroup(context).apply {
+        isSingleSelection = true
+        isSelectionRequired = true
+        addView(languageChoice("system", R.string.language_follow_system))
+        addView(languageChoice("zh", R.string.language_simplified_chinese))
+        addView(languageChoice("en", R.string.language_english))
+        addOnButtonCheckedListener { _, checkedId, checked ->
+            if (checked && !suppressSwitchCallbacks) {
+                val value = findViewById<MaterialButton>(checkedId).tag as String
+                onInterfaceLanguageChanged(value)
+            }
+        }
+    }
 
     init {
         isFillViewport = true
@@ -145,6 +161,11 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         renderLanguagePacks(state.languagePacks)
         suppressSwitchCallbacks = true
         try {
+            val language = state.interfaceLanguageTag.ifBlank { "system" }
+            (0 until interfaceLanguage.childCount).asSequence()
+                .map(interfaceLanguage::getChildAt)
+                .filterIsInstance<MaterialButton>()
+                .firstOrNull { it.tag == language }?.let { interfaceLanguage.check(it.id) }
             updateSwitch(learningSwitch, state.learningEnabled)
             updateSwitch(modelSwitch, state.experimentalModelRanking)
             updateSwitch(incognitoSwitch, state.incognitoMode)
@@ -167,6 +188,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             textSize = 28f
             setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
         })
+        content.addView(quickNavigation())
         content.addView(TextView(context).apply {
             text = BuildConfig.VERSION_NAME
             textSize = 13f
@@ -177,6 +199,12 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         })
 
         section(context.getString(R.string.section_input_method))
+        content.addView(TextView(context).apply {
+            setText(R.string.interface_language)
+            textSize = 16f
+            setPadding(0, dp(8), 0, dp(4))
+        })
+        content.addView(interfaceLanguage)
         statusRow(context.getString(R.string.setting_system_status), enabledStatus)
         statusRow(context.getString(R.string.setting_current_keyboard), currentStatus)
         commandRow(
@@ -229,7 +257,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     }
 
     private fun section(title: String) {
-        content.addView(TextView(context).apply {
+        val header = TextView(context).apply {
             text = title
             textSize = 14f
             setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary, 0xff087f68.toInt()))
@@ -237,8 +265,41 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
                 topMargin = dp(22)
                 bottomMargin = dp(6)
             }
-        })
+            isClickable = true
+            setOnClickListener { post { smoothScrollTo(0, top) } }
+        }
+        sectionAnchors[title] = header
+        content.addView(header)
         content.addView(divider())
+    }
+
+    private fun quickNavigation(): View = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(52))
+        val entries = listOf(
+            R.string.section_input to R.string.section_input,
+            R.string.section_privacy to R.string.section_privacy,
+            R.string.ai_title to R.string.settings_nav_ai,
+            R.string.section_data to R.string.section_data,
+        )
+        entries.forEach { (key, label) ->
+            addView(MaterialButton(context).apply {
+                id = View.generateViewId()
+                setText(label)
+                isAllCaps = false
+                minHeight = dp(44)
+                textSize = 13f
+                layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                    marginEnd = dp(4)
+                }
+                setOnClickListener {
+                    sectionAnchors[context.getString(key)]?.let { target ->
+                        post { smoothScrollTo(0, target.top) }
+                    }
+                }
+            })
+        }
     }
 
     private fun statusRow(label: String, value: TextView) {
@@ -289,6 +350,15 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             marginStart = dp(8)
         }
         setOnClickListener { callback() }
+    }
+
+    private fun languageChoice(tag: String, label: Int) = MaterialButton(context).apply {
+        id = View.generateViewId()
+        this.tag = tag
+        setText(label)
+        isAllCaps = false
+        minHeight = dp(48)
+        layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
     }
 
     private fun renderLanguagePacks(packs: List<LanguagePackScreenState>) {

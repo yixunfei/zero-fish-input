@@ -330,6 +330,36 @@ class InputSessionControllerTest {
     }
 
     @Test
+    fun `space commits the highlighted personal shortcut before the native default`() {
+        val connection = RecordingConnection()
+        val store = RecordingPersonalization(listOf(PersonalSuggestion("learned", "测试", 3, "cs")))
+        val controller = controller(connection, store)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("cs"))
+        assertEquals("测试", controller.state.snapshot.candidates.first().text)
+        assertEquals(0, controller.state.snapshot.highlightedIndex)
+        controller.handle(InputCommand.Space)
+        assertEquals(listOf("测试"), connection.commits)
+        assertEquals(listOf("learned"), store.usedIds)
+        controller.close()
+    }
+
+    @Test
+    fun `AI draft handoff removes only unfinished composition without committing it`() {
+        val connection = ComposingRecordingConnection()
+        val controller = controller(connection, RecordingPersonalization())
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("cs"))
+        var draft = ""
+        assertTrue(controller.handoffComposition(16) { draft = it; true })
+        assertEquals("cs", draft)
+        assertEquals("", connection.composing)
+        assertTrue(connection.commits.isEmpty())
+        assertFalse(controller.state.snapshot.isComposing)
+        controller.close()
+    }
+
+    @Test
     fun `committing a candidate replaces the composing preedit`() {
         val connection = ComposingRecordingConnection()
         val controller = controller(connection, RecordingPersonalization())
@@ -410,7 +440,7 @@ class InputSessionControllerTest {
     }
 
     @Test
-    fun `personal candidate records the exact entry and offsets engine highlight`() {
+    fun `personal candidate records the exact entry and becomes the highlighted default`() {
         val connection = RecordingConnection()
         val personalization = RecordingPersonalization(
             suggestions = listOf(PersonalSuggestion("term-id", "你号", 9)),
@@ -422,7 +452,7 @@ class InputSessionControllerTest {
         controller.handle(InputCommand.Text("i"))
 
         assertEquals(listOf("你号", "你好"), controller.state.snapshot.candidates.map(Candidate::text))
-        assertEquals(1, controller.state.snapshot.highlightedIndex)
+        assertEquals(0, controller.state.snapshot.highlightedIndex)
         controller.handle(InputCommand.SelectCandidate(0))
         assertEquals(listOf("你号"), connection.commits)
         assertEquals(listOf("term-id"), personalization.usedIds)

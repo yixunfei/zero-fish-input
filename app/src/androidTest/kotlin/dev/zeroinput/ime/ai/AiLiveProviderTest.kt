@@ -42,6 +42,9 @@ class AiLiveProviderTest {
             val models = (catalogResult as? AiModelCatalogEvent.Completed)?.models.orEmpty()
             val catalogFailure = (catalogResult as? AiModelCatalogEvent.Failed)?.error
             report("Live catalog: " + (catalogFailure?.let(::safeFailure) ?: "completed (${models.size})"))
+            assertTrue("Model discovery failed: " + (catalogFailure?.let(::safeFailure) ?: "cancelled"),
+                catalogResult is AiModelCatalogEvent.Completed)
+            assertTrue("Requested model is absent from the catalog", model in models)
 
             val probed = CountDownLatch(1)
             val probeState = AtomicReference<AiProbeState>()

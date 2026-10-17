@@ -4,6 +4,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AiEndpointTest {
+    @Test fun invisibleFormattingCannotSilentlyChangeTheRequestRoute() {
+        for (character in listOf('\u200b', '\ufeff', '\u2060', '\u202e')) {
+            assertThrows(AiProviderError.Configuration::class.java) {
+                AiEndpoint.parse("https://example.test/v1$character")
+            }
+        }
+    }
+
     @Test fun protocolsKeepProxyPrefixesAndNeverAppendToAnotherProtocolsRoute() {
         for (protocol in AiProtocol.entries) {
             for (address in listOf("https://example.test/proxy/v1", "https://example.test/proxy/v1/${protocol.route}/")) {

@@ -656,6 +656,13 @@ incognito and learning-disabled sessions are rejected alongside sensitive inputs
 Only ordinary NO_SUGGESTIONS text editors may use independent AI drafts; every
 combined restriction is evaluated before granting this exception. Public conversion
 does not enable personal reads or learning. UI and request checks share the policy.
+Prepared public engines can restore a draft's unfinished plain pinyin only through
+the controller's language/privacy and composition checks. Partially selected
+segments reject migration and retry after clearing or finishing. Closed or replaced
+drafts revoke delivery ownership; old callbacks cannot restore text or change the
+new draft's language. These handoffs retain the empty personal-data port and never
+read or write the host editor. Regression fixtures cover delayed preparation,
+partial selection, close/restart and public Chinese conversion.
 The always-discoverable AI icon is only an explanation action in those contexts:
 it displays a fixed, localized restriction message without opening the workbench,
 loading AI history, reading editor/clipboard content or creating a request. The
@@ -693,8 +700,11 @@ stale/empty responses and combined editor restrictions.
 The bounded encrypted history file is temporarily decoded when listing; only
 summaries leave that operation. Selecting a chat loads messages, without a global
 plaintext cache. The active chat and draft are released on panel/session changes.
-AI and API-key windows use FLAG_SECURE and disable saved drafts/autofill/content
-capture. Results are plain text and never execute tools, render HTML or fetch URLs.
+API-key windows always use FLAG_SECURE. The IME window, including the AI
+workbench, uses FLAG_SECURE only in incognito mode, as explicitly requested for
+user-controlled screenshots and recordings. Captures made outside incognito mode
+can contain the visible AI draft, context and response. Saved drafts, autofill and
+content capture remain disabled. Results are plain text and never execute tools, render HTML or fetch URLs.
 Provider configuration fields may remain in their protected dialog while the user
 temporarily switches apps to obtain configuration details. This bounded draft
 stays only in the live Activity's views; it is neither automatically persisted
@@ -787,7 +797,10 @@ noneditable accessibility labels only after an explicit action in an eligible IM
 session. The separate default-off preference and platform accessibility grant are
 both required, as are AI/network enablement and existing editor privacy gates.
 The system-bound service has no network, file storage, clipboard or editor-write
-port. It has no gesture, screenshot, key-filter or scrolling capability.
+port. Node collection has no gesture, key-filter or scrolling capability. The
+separately authorized screenshot amendment permits one user-triggered frame only;
+the frame remains in memory, is passed to local OCR and is recycled after the OCR
+callback. There is no automatic capture, upload or persistent image cache.
 
 Protected assets include unselected page labels, transient selected references,
 source window identity and the user's question. Malicious source applications may
@@ -838,6 +851,9 @@ from the main APK. Unit tests cover bounds, cancellation, unchecked data, contex
 roles, stale revisions, failed rename and clear/delete races. Platform verification
 covers actual node filtering, opt-in/disconnection, keyboard layout and draft
 isolation. Validation outcomes are recorded in `ai-page-context-validation.md`.
+Screenshot broker tests cover disabled policy, detached sources and generation
+invalidation; full-page OCR accuracy remains unverified until a fixed public model
+and its licence/hash are added.
 
 
 ## Second-round review controls (2026-10-08)
@@ -894,7 +910,8 @@ transaction. Source-repository compromise remains a supply-chain risk requiring
 review and fixed content versions. Models execute only through bundled readers;
 no remote code/native libraries are accepted. Public-resource leases protect active
 readers from deletion. Handwriting generations reject results after a resource
-change; Rime switches only without live editor engines. These operations cannot
+change; Rime switches only without live editor engines. Reviewed Emoji artwork is
+bundled and hash-checked with the catalog. These operations cannot
 read private input, clipboard or learned vocabulary. Network tests and corrupted
 archive/cancellation/removal tests cover the boundary.
 
@@ -984,3 +1001,21 @@ unknown protocols, missing required fields and unknown formats fail closed.
 Negative tests cover reset failure, protocol switching, schema mismatch, truncation,
 redirect rejection, oversized events, cancellation and separate catalog/generation
 404 status. See [ADR 0024](adr/0024-ai-provider-protocols.md).
+
+### Provider form and invisible routes (2026-10-15)
+
+Pasted zero-width or bidirectional format characters can make a route look like
+`/v1` while requesting a different path. `AiEndpoint` rejects Unicode format
+characters before I/O, in addition to control characters and encoded path
+ambiguity. It does not silently remove hidden characters or retry another route.
+Leading/trailing ordinary whitespace, including a nonbreaking space, retains its
+existing normalization. New providers require an explicitly entered destination;
+credentials are never sent to a prefilled default service.
+
+Material field labels and errors are separate from password text. Fields and
+choice values remain excluded from saved state, autofill and content capture by
+the protected form owner. No plaintext persistence, new permission or configuration
+reset is introduced. Negative regressions cover invisible paths, catalog 404,
+edited credentials, protocol changes and stale results. Live catalog acceptance
+now requires a successful parsed list containing the requested model separately
+from successful generation; a passing generation cannot conceal failed discovery.

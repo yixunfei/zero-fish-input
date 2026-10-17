@@ -2,10 +2,12 @@
 
 Two APK contents are supported with the same application ID and runtime:
 
-- `-PresourceBundle=full` (default): all Wanxiang core tables, LTS grammar, Mini INT8 and Chinese handwriting.
-- `-PresourceBundle=lite`: all Wanxiang core tables; LTS, Mini and handwriting download on explicit user request.
+- `-PresourceBundle=full` (default): all Wanxiang core tables and Mini INT8.
+- `-PresourceBundle=lite`: all Wanxiang core tables; Mini, LTS and handwriting download on explicit user request.
 
-The reduced ONNX runtime remains bundled in both; only model data is optional.
+LTS grammar and handwriting download only after explicit user request. Reviewed Emoji
+WebP artwork remains bundled for offline display. The reduced ONNX runtime remains
+bundled in both; only reviewed public data is optional.
 No native library, script or executable is downloaded. All installed features run offline.
 
 ## Prepare and publish

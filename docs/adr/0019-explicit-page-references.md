@@ -1,6 +1,6 @@
 # ADR 0019: Explicit page references and selected conversation context
 
-Status: accepted by the user on 2026-10-07
+Status: accepted by the user on 2026-10-07; screenshot/OCR amendment accepted on 2026-10-16
 
 ## Context
 
@@ -82,9 +82,14 @@ contain secrets; the user must inspect the checklist. The feature cannot promise
 complete page extraction or semantic detection of sensitive information.
 
 Manual sharing has a smaller permission surface but does not provide an in-keyboard
-page checklist. Screenshot/OCR would add image capture, processing and dependencies;
-it is excluded. Automatic collection would violate the approved boundary. Missing
-or unsupported page text fails visibly without any broader fallback.
+page checklist. The 2026-10-16 amendment permits one explicitly requested display
+frame for a separate local OCR adapter. The frame is memory-only, recycled after
+OCR, and invalidated by session, window, policy, cancellation or timeout changes.
+It is never uploaded, persisted or retried in the background. The existing
+single-character handwriting CTC model is not a page OCR implementation; until a
+verified full-page OCR model and fixed licence/hash are added, this adapter remains
+disabled. Automatic collection would violate the approved boundary. Missing or
+unsupported page text fails visibly without any broader fallback.
 
 The original clipboard, editor privacy, personal-data isolation, encrypted history,
 offline input and sole-network-provider boundaries remain mandatory. Negative tests

@@ -43,7 +43,9 @@ val packageDictionaryAssets = tasks.register<Sync>("packageDictionaryAssets") {
     from(publicDictionaryAssets) { exclude("rime/dicts/**") }
     from(compressedDictionaryAssets)
     into(packagedDictionaryAssets)
-    if (resourceBundle.get() == "lite") exclude("**/*.gram")
+    // The LTS grammar is a large optional download in both mobile bundles.
+    // Core Wanxiang tables remain bundled and provide offline pinyin input.
+    exclude("**/*.gram")
 }
 val verifyPublicDictionaryAssets = tasks.register("verifyPublicDictionaryAssets") {
     doLast {

@@ -20,7 +20,9 @@ import dev.zeroinput.ai.api.*
 class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
     var onCancel: () -> Unit = {}
-    var onInsert: (String) -> Unit = {}
+    var onInsert: (String, Boolean) -> Unit = { _, _ -> }
+    var onThinkingModeChanged: (Boolean) -> Unit = {}
+    var onReasoningModeChanged: (AiReasoningMode) -> Unit = {}
     var onConversationSelected: (String) -> Unit = {}
     var onConversationDeleted: (String) -> Unit = {}
     var onNewConversation: () -> Unit = {}
@@ -43,6 +45,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private var action = AiAction.ASK
     private var languageIndex = 0
     private var streaming = false
+    private var showThinking = false
+    private var reasoningMode = AiReasoningMode.DEFAULT
     private var inputLanguage = InputLanguage.CHINESE
     var editing = false
         private set
@@ -107,13 +111,21 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
     private val detail = ScrollView(context).apply { addView(detailContent); isFillViewport = true }
     private val target = button(R.string.ai_target_language_hint) { cycleLanguage() }
+    private val reasoning = button(R.string.ai_reasoning_default) { cycleReasoningMode() }
     private val edit = button(R.string.ai_edit) {
         if (detailMode == DetailMode.PAGE) { onPageCancelled(); clearPage() }
         else setEditing(!editing)
     }
     private val submit = button(R.string.ai_submit) { submit() }
     private val cancel = button(R.string.ai_cancel) { onCancel() }
-    private val insert = button(R.string.ai_insert) { onInsert(result.text.toString()) }
+    private val insert = button(R.string.ai_insert) { onInsert(result.text.toString(), showThinking) }
+    private val thinking = com.google.android.material.materialswitch.MaterialSwitch(context).apply {
+        setText(R.string.ai_insert_thinking)
+        // The IME theme does not supply SwitchCompat's optional on/off labels.
+        showText = false
+        isChecked = false
+        setOnCheckedChangeListener { _, checked -> showThinking = checked; onThinkingModeChanged(checked) }
+    }
     private val settings = button(R.string.ai_settings) { onSettings() }
     private val addContent = button(R.string.ai_add_content) { onAddContent() }
     private val importContent = button(R.string.ai_import_content) { onImportContent() }
@@ -138,7 +150,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             addView(newConversation, LayoutParams(dp((88 * resources.configuration.fontScale.coerceAtLeast(1f)).toInt()), dp(48)))
         }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(scrollRow(listOf(pageButton, contextButton, conversationsButton, answerButton, renameCancel) +
-            actions.values + target), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+            actions.values + target + reasoning), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(inputStatus, LayoutParams(LayoutParams.MATCH_PARENT, dp(32)))
         addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(HorizontalScrollView(context).apply { addView(attachmentRow) })
@@ -148,6 +160,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             listOf(submit, edit, insert).forEach { addView(it, LayoutParams(0, dp(48), 1f)) }
             addView(more, LayoutParams(dp(48), dp(48)))
         }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        detailContent.addView(thinking, 0)
         cancel.visibility = GONE
         detailContent.addView(cancel, 0)
         importContent.visibility = GONE
@@ -343,6 +356,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         draft.text = ""
         transcript.text = ""
         languageIndex = 0
+        reasoningMode = AiReasoningMode.DEFAULT
+        reasoning.setText(R.string.ai_reasoning_default)
         action = AiAction.ASK
         updateActionStyles()
         renderConversations(emptyList())
@@ -377,6 +392,20 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         val languages = resources.getStringArray(R.array.ai_target_languages)
         languageIndex = (languageIndex + 1) % languages.size
         updateActionStyles()
+    }
+
+    private fun cycleReasoningMode() {
+        reasoningMode = when (reasoningMode) {
+            AiReasoningMode.DEFAULT -> AiReasoningMode.FAST
+            AiReasoningMode.FAST -> AiReasoningMode.DEEP
+            AiReasoningMode.DEEP -> AiReasoningMode.DEFAULT
+        }
+        reasoning.setText(when (reasoningMode) {
+            AiReasoningMode.DEFAULT -> R.string.ai_reasoning_default
+            AiReasoningMode.FAST -> R.string.ai_reasoning_fast
+            AiReasoningMode.DEEP -> R.string.ai_reasoning_deep
+        })
+        onReasoningModeChanged(reasoningMode)
     }
 
     private fun updateActionStyles() {

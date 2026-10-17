@@ -124,7 +124,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             button.visibility = if (candidate == null) View.GONE else View.VISIBLE
             if (candidate != null) button.bind(candidate, index, index == snapshot.highlightedIndex) else button.clear()
         }
-        if (changedInput) restoreScroll(0)
+        if (changedInput) {
+            restoringScroll = true
+            try { scroll.resetToStart() } finally { restoringScroll = false }
+        }
         if (changedInput && snapshot.candidates.isNotEmpty()) {
             val announcement = snapshot.candidates.first().text
             if (announcement != lastAnnouncedCandidate) {

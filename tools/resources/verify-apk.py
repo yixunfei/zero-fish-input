@@ -36,16 +36,19 @@ def verify(path, bundle):
                 if entry.filename.endswith('/libonnxruntime4j_jni.so'):
                     abi = entry.filename.split('/')[1]
                     assert hashlib.sha256(archive.read(entry)).hexdigest() == runtime['jni'][abi], 'Unverified JNI binding'
+        bundled_packs = {'mini-int8'} if bundle == 'full' else set()
         for pack in catalog['packs']:
             for spec in pack['files']:
                 name = 'assets/' + spec['name']
-                assert (name in names) == (bundle == 'full'), 'Incorrect optional resource contents'
-                if bundle == 'full':
+                assert (name in names) == (pack['id'] in bundled_packs), 'Incorrect optional resource contents'
+                if pack['id'] in bundled_packs:
                     assert archive.getinfo(name).file_size == spec['bytes']
         assert 'assets/rime/luna_pinyin.dict.yaml' not in names
         assert 'assets/rime/essay.txt' not in names
         assert 'assets/glide-zh.tsv' in names
         assert ('assets/mini-int8/model.onnx' in names) == (bundle == 'full')
+        emoji_images = [name for name in names if name.startswith('assets/emoji/18.0/images/')]
+        assert len(emoji_images) == 3972, 'Emoji artwork set is incomplete'
         payload = sum(entry.compress_size for entry in entries)
         assert path.stat().st_size - payload < 8 * 1024 * 1024, 'APK retains obsolete ZIP space; rebuild packaging'
     print(f'{bundle}: {path.name}: {path.stat().st_size} bytes; contents verified')

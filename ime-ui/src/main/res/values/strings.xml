@@ -33,6 +33,10 @@
     <string name="ai_submit">发送</string>
     <string name="ai_cancel">停止</string>
     <string name="ai_insert">插入</string>
+    <string name="ai_insert_thinking">插入完整思考过程</string>
+    <string name="ai_reasoning_default">自动</string>
+    <string name="ai_reasoning_fast">快速</string>
+    <string name="ai_reasoning_deep">深度</string>
     <string name="ai_settings">设置</string>
     <string name="ai_add_content">添加内容</string>
     <string name="ai_import_content">引入已选内容</string>
@@ -124,6 +128,7 @@
     <string name="keyboard_tools">键盘工具</string>
     <string name="candidate_more_actions">更多候选操作</string>
     <string name="keyboard_return">返回键盘</string>
+    <string name="keyboard_hide">收起键盘</string>
     <string name="key_shift">切换大写</string>
     <string name="key_caps_lock">锁定大写</string>
     <string name="key_lowercase">小写</string>

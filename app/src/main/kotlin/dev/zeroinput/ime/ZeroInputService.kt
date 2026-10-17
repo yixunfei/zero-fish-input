@@ -336,6 +336,7 @@ class ZeroInputService : InputMethodService() {
             // requiring an editor/session recreation.
             inputView?.configureSoundEffects(configuredSoundEffects)
             inputView?.configurePairedSymbols(configuredPairedSymbols)
+            updateScreenCapturePolicy()
             val session = activeSession ?: return@post
             syncSessionPrivacy()
             reconcileChineseOptions()
@@ -366,7 +367,7 @@ class ZeroInputService : InputMethodService() {
         view.configureGlide(graph.settings.glideTypingEnabled)
         currentInputEditorInfo?.let { view.startEditor(dev.zeroinput.ime.core.EditorInputOptions.from(it)) }
         inputView = view
-        updatePrivatePanelWindowFlag()
+        updateScreenCapturePolicy()
         bindView(view)
         renderLocalPanels(view)
         controller?.state?.let(view::renderSession)
@@ -737,7 +738,7 @@ class ZeroInputService : InputMethodService() {
                 modelRanking.invalidate()
                 controller?.finishCompositionForCursorMove()
             }
-            updatePrivatePanelWindowFlag()
+            updateScreenCapturePolicy()
         }
     }
 
@@ -757,6 +758,7 @@ class ZeroInputService : InputMethodService() {
             syncSessionPrivacy()
         }
         view.onKeyboardAction = ::handleKeyboardAction
+        view.onHideKeyboardRequested = { if (view === inputView && inputViewActive) requestHideSelf(0) }
         view.onClearCompositionRequested = clearComposition@{
             if (view.isSearchEditing) return@clearComposition searchDraft.clearComposition()
             if (view.isAiOpen) return@clearComposition aiDraft.clearComposition()
@@ -844,7 +846,8 @@ class ZeroInputService : InputMethodService() {
         }
         bindAiContextView(view)
         view.onAiCancel = ::cancelAiRequest
-        view.onAiInsert = { insertAiResult(it) }
+        view.onAiInsert = { value, includeThinking -> insertAiResult(value, includeThinking) }
+        view.onAiReasoningModeChanged = aiWorkbench::setReasoningMode
         view.onAiConversationsRequested = { aiWorkbench.refreshConversations() }
         view.onAiConversationSelected = {
             aiNameEditor.reset(); aiPages.invalidate()
@@ -884,14 +887,25 @@ class ZeroInputService : InputMethodService() {
                 renderAiContent()
             }
         }
-        view.onAiVisibilityChanged = { open ->
+        view.onAiVisibilityChanged = aiVisibility@{ open ->
             if (open) {
+                syncSessionPrivacy()
+                if (!aiAllowed()) {
+                    view.returnToKeyboard()
+                    return@aiVisibility
+                }
                 aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE)
+                if (activeSession?.controller?.handoffComposition(dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
+                        aiDraft::appendImported) != true) {
+                    aiDraft.clear()
+                    view.returnToKeyboard()
+                    return@aiVisibility
+                }
                 aiWorkbench.refreshModels()
                 renderAiContent()
             }
             else { aiDraft.close(); invalidateAiRequest() }
-            updatePrivatePanelWindowFlag()
+            updateScreenCapturePolicy()
         }
     }
 
@@ -919,9 +933,14 @@ class ZeroInputService : InputMethodService() {
         view.onAiRenameCancelled = aiNameEditor::cancel
     }
 
-    private fun updatePrivatePanelWindowFlag() {
+    private fun updateScreenCapturePolicy() {
         window?.window?.let { imeWindow ->
-            if (inputView?.isAiOpen == true || inputView?.isHandwritingOpen == true) {
+            // The ordinary AI and handwriting panels contain only user-visible
+            // drafts/results and must remain demonstrable. Secret surfaces
+            // protect their own Activity/Dialog windows; the IME window is
+            // protected globally only while the user explicitly enables
+            // incognito mode.
+            if (graph.settings.incognitoMode) {
                 imeWindow.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
             } else imeWindow.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
@@ -1016,11 +1035,11 @@ class ZeroInputService : InputMethodService() {
         renderAiContent()
     }
 
-    private fun insertAiResult(displayedResult: String) {
+    private fun insertAiResult(displayedResult: String, includeThinking: Boolean) {
         syncSessionPrivacy()
         if (!aiAllowed()) return
         if (!aiPages.ensureCurrent()) return
-        val text = aiWorkbench.consumeResult()?.takeIf { it == displayedResult } ?: return
+        val text = aiWorkbench.consumeResult(includeThinking, displayedResult) ?: return
         val session = activeSession ?: return
         val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
         registerInteraction()

@@ -7,18 +7,17 @@ are installable development builds; Release packages are unsigned.
 
 | ARM64 contents | Debug bytes | Unsigned Release bytes |
 | --- | ---: | ---: |
-| Full | 466,906,429 | 456,662,634 |
-| Lite | 52,325,694 | 45,015,435 |
+| Full (Mini-only) | 64,693,446 | 57,112,683 |
+| Lite (no optional model) | 52,479,589 | 45,092,650 |
 
-Compared with the previous ARM64 packages, the current Lite Release is 50.1%
-smaller and the Full Release is 6.8% smaller. Full includes approximately
-352.3 MB of compressed LTS, 42.1 MB of compressed handwriting data and 11.97 MB
-of compressed Mini data. Both retain all 16 Wanxiang tables and the reduced CPU
-runtime; Lite omits those three optional data packs.
+The optimized Full package keeps Mini INT8 as its only bundled public model.
+LTS grammar and handwriting remain explicit downloads. Emoji keeps its complete
+catalog, text insertion path and 128 px WebP artwork in both packages. Both packages retain all 16 Wanxiang tables
+and the reduced CPU runtime.
 
-`tools/resources/verify-apk.py` verified Debug full/lite and all three ABI Release
-full/lite packages: exact table set, optional resource inclusion/exclusion, old
-Luna/essay exclusion, shared glide index, Mini model and bounded ZIP overhead.
+`tools/resources/verify-apk.py` verifies Debug full/lite and ARM64 Release
+packages: exact table set, Mini-only optional resource inclusion, old Luna/essay
+exclusion, shared glide index, complete Emoji artwork and bounded ZIP overhead.
 Switching resource contents with Android incremental packaging initially retained
 removed ZIP bytes. The delivery script now recreates packaging state and checks
 physical size, so a nominally lite archive cannot retain that unused space.
@@ -27,7 +26,7 @@ physical size, so a nominally lite archive cannot retain that unused space.
 
 - 542 Android-module Debug JVM tests and 57 pure-JVM tests passed.
 - `privacyCheck`, app Debug Lint, full/lite builds with `-PrequireRime=true`, and
-  all three ABI unsigned Release builds passed.
+  ARM64 unsigned Full/Lite Release builds passed.
 - x86_64 instrumentation verified real, hash-pinned LTS and handwriting ZIP
   installation, native grammar initialization, handwriting recognition and
   continued Chinese input after both resources were removed.
@@ -73,12 +72,12 @@ Weekly source updates open review PRs and never automatically merge.
 
 ## Further compression assessment
 
-The Lite ARM64 Release payload is approximately 19.3 MB of XZ Wanxiang tables,
-4.8 MB of compressed native libraries, 15.9 MB of Emoji assets, 4.2 MB of
-code/resources and 0.78 MB of ZIP overhead. The Full package's remaining size is dominated
-by the LTS grammar and handwriting stroke data, not duplicate core dictionaries.
-Removing those data from Full would make it equivalent to Lite and would lose
-the offline convenience that distinguishes Full.
+The previous Lite ARM64 Release payload was approximately 19.3 MB of XZ
+Wanxiang tables, 4.8 MB of compressed native libraries, 15.9 MB of Emoji
+assets, 4.2 MB of code/resources and 0.78 MB of ZIP overhead. The optimized
+Full removes the large LTS/handwriting payloads while adding only Mini; Emoji
+artwork remains bundled for offline display. Both packages retain ordinary
+offline Chinese input and complete Emoji insertion.
 
 The next lossless opportunities are below the measurement noise for the APK:
 the XZ tables are stored without a second ZIP compression pass, native libraries

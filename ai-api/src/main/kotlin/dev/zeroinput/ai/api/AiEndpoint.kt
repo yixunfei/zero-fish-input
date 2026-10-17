@@ -7,7 +7,9 @@ class AiEndpoint private constructor(val generation: URI, val models: URI) {
     companion object {
         fun parse(raw: String, protocol: AiProtocol = AiProtocol.CHAT_COMPLETIONS): AiEndpoint {
             try {
-                require(raw.length in 1..512 && raw.none(Char::isISOControl))
+                require(raw.length in 1..512 && raw.none {
+                    it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt()
+                })
                 val uri = URI(raw.trim())
                 require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank())
                 require(uri.userInfo == null && uri.query == null && uri.fragment == null)

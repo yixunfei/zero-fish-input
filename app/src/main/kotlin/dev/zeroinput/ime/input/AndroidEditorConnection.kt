@@ -42,6 +42,22 @@ class AndroidEditorConnection(
         current()?.finishComposingText()
     }
 
+    override fun clearComposingText(): Boolean {
+        val connection = current() ?: return false
+        committedConnection = null
+        selection.replaced(0, composing = true)
+        if (connection.setComposingText("", 1) != true) {
+            selection.unknown()
+            onContextInvalidated()
+            return false
+        }
+        selection.finishComposition()
+        if (connection.finishComposingText() == true) return true
+        selection.unknown()
+        onContextInvalidated()
+        return false
+    }
+
     override fun commitText(text: String): Boolean {
         val connection = current()
         committedConnection = null

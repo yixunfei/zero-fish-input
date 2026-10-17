@@ -5,8 +5,9 @@ Status: accepted (user confirmation, 2026-10-09)
 ## Decision
 
 Both APK contents retain all 16 Wanxiang core dictionaries and offline Chinese
-input. `resourceBundle=full` includes the LTS grammar and Chinese handwriting;
-`resourceBundle=lite` omits those optional data files. Both use the same package
+input. `resourceBundle=full` includes only the reviewed Mini INT8 model;
+`resourceBundle=lite` omits Mini as well. LTS grammar and handwriting are
+download-only public data; reviewed Emoji artwork remains bundled. Both use the same package
 identity, code and settings. Installing one replaces the other through Android's
 normal package update rules. ADR 0022 extends the same delivery scheme to the Mini short-word model.
 
@@ -34,11 +35,10 @@ only with no active editor engine. Handwriting resource revisions cancel stale
 results and recreate the recognizer on its worker. No resource I/O is added to
 the key event path, and no downloaded data enters private user stores.
 
-The full APK supplies the same resource contracts through its assets. A bundled
+The full APK supplies the Mini resource contract through its assets. A bundled
 resource and identical downloaded resource share the same extracted content.
-Rime references the resource-store grammar file rather than extracting another
-400 MB copy. Disabling a bundled feature does not reclaim bytes inside an APK;
-users choose the lightweight APK to reclaim packaged resources.
+The resource store verifies all download-only data before publication. Emoji
+catalog/search/insertion and reviewed artwork remain available offline.
 
 ## Shared dictionary data
 
@@ -68,9 +68,10 @@ workflow. Older immutable resources remain available.
 
 ## Consequences
 
-The light APK loses immediate handwriting and LTS ranking until the user installs
-those resources, but normal dictionary-based Chinese input remains available.
-The full APK retains first-install offline features. Downloads need temporary
+The light APK loses immediate Mini ranking, handwriting and LTS ranking until the
+user installs those resources, but normal dictionary-based Chinese input and
+complete Emoji insertion remain available. The full APK retains Mini ranking.
+Downloads need temporary
 space for the archive and verified output. Online availability depends on GitHub;
 failed downloads leave installed data unchanged. New resource formats require a
 new app-supported contract and cannot be enabled just by changing a remote URL.

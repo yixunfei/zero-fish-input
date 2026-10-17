@@ -8,6 +8,6 @@
     <string name="ai_protocol_label">API 协议格式</string>
     <string name="ai_protocol_streaming">流式返回</string>
     <string name="ai_protocol_routes">生成请求：%1$s\n模型列表：%2$s</string>
-    <string name="ai_protocol_address_invalid">请填写 HTTPS API 基础地址或与所选协议匹配的完整生成地址。不要填写模型列表地址、查询参数或片段。</string>
+    <string name="ai_protocol_address_invalid">请填写 HTTPS API 基础地址或与所选协议匹配的完整生成地址。不要包含模型列表路径、查询参数、片段或隐藏字符。</string>
     <string name="ai_catalog_unavailable">模型列表接口不可用（HTTP %1$d）。可以手动填写模型名称，再测试生成；列表失败不代表模型不可用。</string>
 </resources>

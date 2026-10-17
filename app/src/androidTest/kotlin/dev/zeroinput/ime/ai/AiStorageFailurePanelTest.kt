@@ -90,7 +90,7 @@ class AiStorageFailurePanelTest {
         init {
             panel.renderDraft("public question")
             panel.onConversationsRequested = { controller.refreshConversations() }
-            panel.onInsert = { displayed ->
+            panel.onInsert = { displayed, _ ->
                 inserted = controller.consumeResult()?.takeIf { it == displayed }
             }
         }

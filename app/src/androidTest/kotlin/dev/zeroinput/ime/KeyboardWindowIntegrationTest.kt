@@ -22,6 +22,49 @@ import org.junit.runner.RunWith
 class KeyboardWindowIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun toolbarHideControlDismissesImeAndKeepsTheActiveComposition() {
+        val original = shell("settings get secure default_input_method").trim()
+        var activity: InputFixtureActivity? = null
+        try {
+            val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
+            shell("ime enable $method"); shell("ime set $method")
+            activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
+            await { host() != null }
+            onMain {
+                val keyboard = requireNotNull(host()).keyboard
+                views(keyboard).filterIsInstance<android.widget.TextView>()
+                    .first { it.isShown && it.text.toString() == "n" }.performClick()
+            }
+            await { activity.editor.text.toString() == "n" }
+            onMain {
+                val keyboard = requireNotNull(host()).keyboard
+                assertNotNull(views(keyboard).firstOrNull {
+                    it.isShown && it.contentDescription == keyboard.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_hide)
+                })
+                views(keyboard).first {
+                    it.isShown && it.contentDescription == keyboard.context.getString(dev.zeroinput.ime.ui.R.string.keyboard_hide)
+                }.performClick()
+            }
+            await { host() == null }
+            onMain { assertEquals("n", activity.editor.text.toString()) }
+
+            onMain { activity.editor.post {
+                activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                    .showSoftInput(activity.editor, 0)
+            } }
+            await { host() != null }
+            onMain {
+                assertEquals("n", activity.editor.text.toString())
+                assertTrue("The hidden composition remains visible after reopening", views(requireNotNull(host()).keyboard)
+                    .any { it.isShown && it.contentDescription == "n" })
+            }
+        } finally {
+            activity?.let { onMain { it.finish() } }
+            if (original.isNotBlank() && original != "null") shell("ime set $original")
+        }
+    }
+
     @Test fun floatingWindowPassesOutsideTouchesAndAllModesRemainUsable() {
         val original = shell("settings get secure default_input_method").trim()
         val settings = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph.settings

@@ -17,7 +17,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalDraftInputTest {
-    @Test fun preparedNativeEngineWaitsForCompositionThenConvertsTheWholeNextPhrase() {
+    @Test fun preparedNativeEngineRestoresTheDraftWhilePinyinIsStillComposing() {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         val deadline = SystemClock.uptimeMillis() + 60_000
         while (!graph.rime.runtime.isReady && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(50)
@@ -30,20 +30,35 @@ class LocalDraftInputTest {
         var state = InputSessionState()
         val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, next -> state = next }, maxChars = 64)
         try {
-            onMain { draft.start(InputLanguage.CHINESE); typePinyin(draft, "nihao") }
+            onMain {
+                draft.start(InputLanguage.CHINESE)
+                typePinyin(draft, "zhongguoren")
+                assertTrue(state.engineDescriptor?.isFallback == true)
+            }
             release.countDown()
             graph.engineExecutor.submit {}.get(20, TimeUnit.SECONDS)
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            // READY can post another preparation after the worker barrier. Wait
+            // for adoption, not merely for the first worker task to complete.
+            awaitOnMain { state.engineDescriptor?.id == graph.rime.descriptor.id }
             onMain {
                 assertTrue(state.snapshot.isComposing)
-                assertNotEquals(graph.rime.descriptor.id, state.engineDescriptor?.id)
-                assertEquals("你好", draft.submittedText())
+                assertEquals(graph.rime.descriptor.id, state.engineDescriptor?.id)
+                assertEquals("zhongguoren", state.snapshot.rawInput)
+                assertEquals("中国人", state.snapshot.candidates.first().text)
+                val composition = state.snapshot.composition
+                repeat(3) {
+                    draft.command(dev.zeroinput.ime.core.InputCommand.ChangeCandidatePage(dev.zeroinput.engine.api.PageDirection.NEXT))
+                    assertEquals("Browsing must keep the active composition", composition, state.snapshot.composition)
+                    assertTrue("Browsing must retain the first candidate", state.snapshot.candidates.any { it.text == "中国人" })
+                }
+                draft.handle(KeyboardAction.Space)
+                assertEquals("中国人", draft.submittedText())
             }
-            awaitOnMain { state.engineDescriptor?.id == graph.rime.descriptor.id }
             onMain {
                 assertEquals(graph.rime.descriptor.id, state.engineDescriptor?.id)
                 typePinyin(draft, "zhongguoren")
-                assertEquals("你好中国人", draft.submittedText())
+                assertEquals("中国人中国人", draft.submittedText())
                 assertFalse(state.snapshot.isComposing)
                 assertFalse(state.privacy.learningAllowed)
                 assertFalse(state.privacy.personalizationAllowed)
@@ -66,6 +81,65 @@ class LocalDraftInputTest {
             assertFalse(state.snapshot.isComposing)
             assertFalse(state.privacy.personalizationAllowed)
         } finally { draft.close() }
+    }
+
+    @Test fun partialSelectionRejectsLossyHandoffAndRetriesAfterClearingComposition() {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val handler = Handler(Looper.getMainLooper())
+        var state = InputSessionState()
+        val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, next -> state = next }, maxChars = 64)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val blocker = graph.engineExecutor.submit { entered.countDown(); check(release.await(30, TimeUnit.SECONDS)) }
+        try {
+            assertTrue(entered.await(60, TimeUnit.SECONDS))
+            assertTrue(graph.rime.runtime.isReady)
+            onMain {
+                draft.start(InputLanguage.CHINESE)
+                typePinyin(draft, "zhongguoren")
+                draft.command(dev.zeroinput.ime.core.InputCommand.SelectCandidate(0))
+                assertTrue(state.snapshot.canUndoSelection)
+            }
+            release.countDown()
+            graph.engineExecutor.submit {}.get(20, TimeUnit.SECONDS)
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            onMain {
+                assertTrue(state.engineDescriptor?.isFallback == true)
+                assertTrue(state.snapshot.canUndoSelection)
+                assertTrue(draft.clearComposition())
+            }
+            awaitOnMain { state.engineDescriptor?.id == graph.rime.descriptor.id }
+            onMain {
+                assertEquals("", draft.submittedText())
+                typePinyin(draft, "zhongguoren")
+                assertEquals("中国人", draft.submittedText())
+                assertFalse(state.privacy.personalizationAllowed)
+            }
+        } finally { release.countDown(); onMain { draft.close() }; blocker.get(20, TimeUnit.SECONDS) }
+    }
+
+    @Test fun queuedNativeResultCannotReviveAClosedOrReplacedDraft() {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val callbacks = java.util.concurrent.ConcurrentLinkedQueue<Runnable>()
+        var state = InputSessionState()
+        var rendered = ""
+        val draft = LocalDraftInput({ graph }, { callbacks.add(it); true }, { callbacks.remove(it) },
+            { text, next -> rendered = text; state = next }, maxChars = 64)
+        try {
+            onMain { draft.start(InputLanguage.CHINESE); typePinyin(draft, "zhongguoren") }
+            graph.engineExecutor.submit {}.get(60, TimeUnit.SECONDS)
+            val stale = callbacks.toList()
+            assertTrue(stale.isNotEmpty())
+            onMain {
+                draft.close()
+                draft.start(InputLanguage.ENGLISH)
+                draft.handle(KeyboardAction.LiteralText("public draft"))
+                stale.forEach(Runnable::run)
+                assertEquals(InputLanguage.ENGLISH, state.language)
+                assertEquals("public draft", rendered)
+                assertFalse(state.privacy.personalizationAllowed)
+            }
+        } finally { onMain { draft.close() } }
     }
 
     @Test fun boundedDraftDisablesPersonalizationAndClearsOnCloseOrRestart() = onMain {

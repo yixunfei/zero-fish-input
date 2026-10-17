@@ -6,6 +6,7 @@ plugins {
 }
 
 val expressionSources = layout.buildDirectory.dir("generated/expressionSources")
+val includeEmojiArtwork = providers.gradleProperty("includeEmojiArtwork").map(String::toBoolean).orElse(true)
 val prepareExpressionSources = tasks.register<Sync>("prepareExpressionSources") {
     val upstream = file("src/main/assets/expressions/rime-kaomoji-source.txt")
     inputs.file(upstream)
@@ -52,10 +53,20 @@ val verifyEmojiAssets = tasks.register("verifyEmojiAssets") {
     }
 }
 
+val packagedAssets = layout.buildDirectory.dir("generated/packagedAssets")
+val preparePackagedAssets = tasks.register<Sync>("preparePackagedAssets") {
+    dependsOn(prepareExpressionSources, verifyEmojiAssets)
+    from("src/main/assets") {
+        if (!includeEmojiArtwork.get()) exclude("emoji/18.0/images/**")
+    }
+    from(expressionSources)
+    into(packagedAssets)
+}
+
 android {
     namespace = "dev.zeroinput.ime.ui"
     compileSdk = 36
-    sourceSets["main"].assets.srcDir(expressionSources)
+    sourceSets["main"].assets.setSrcDirs(listOf(packagedAssets))
 
     defaultConfig {
         minSdk = 26
@@ -80,7 +91,7 @@ android {
     }
 }
 
-tasks.named("preBuild").configure { dependsOn(prepareExpressionSources, verifyEmojiAssets) }
+tasks.named("preBuild").configure { dependsOn(preparePackagedAssets) }
 
 dependencies {
     api(project(":engine-api"))

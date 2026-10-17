@@ -7,26 +7,25 @@ debug-signed APKs. Release artifacts have no signing key and remain unsigned.
 
 | Variant | Previous | Current | Reduction |
 | --- | ---: | ---: | ---: |
-| ARM64 lite Release | 90,295,023 | 45,015,435 | 50.1% |
-| ARM64 full Release | 489,922,193 | 456,662,634 | 6.8% |
-| ARM64 lite Debug | 103,821,582 | 52,325,694 | 49.6% |
-| ARM64 full Debug | 506,188,460 | 466,906,429 | 7.8% |
+| ARM64 lite Release | 90,295,023 | 45,092,650 | 45,202,373 (50.1%) |
+| ARM64 full Release | 489,922,193 | 57,112,683 | 432,809,510 (88.3%) |
+| ARM64 lite Debug | 103,821,582 | 52,479,589 | 51,341,993 (49.5%) |
+| ARM64 full Debug | 506,188,460 | 64,693,446 | 441,495,014 (87.2%) |
 
-Lite Release is 44,354,091 bytes for ARMv7 and 45,231,895 for x86_64.
-Full Release is 456,001,290 bytes for ARMv7 and 456,879,094 for x86_64.
-Deliveries and SHA-256 receipts are in `build/delivery/`.
+The ARM64 Full Release may exceed 50,000,000 bytes because the reviewed Emoji
+WebP artwork remains bundled for offline display. Deliveries and SHA-256 receipts
+are in `build/delivery/`.
 
-For the ARM64 Lite Release, compressed ZIP payloads are approximately 19.3 MB
-of XZ Wanxiang tables, 4.8 MB of native libraries, 15.9 MB of Emoji assets and
-4.2 MB of code/resources/overhead. The Full Release adds 352.3 MB of LTS,
-42.1 MB of handwriting and 12.0 MB of Mini data. This makes optional-resource
-delivery the dominant remaining size lever; further lossless compression would
-not materially change the Full package.
+The optimized packages keep approximately 19.3 MB of XZ Wanxiang tables,
+4.8 MB of native libraries and 4.2 MB of code/resources/overhead. Full adds
+Mini only; LTS and handwriting are no longer packaged, while Emoji WebP artwork
+remains bundled.
 
 All 16 tables retain exact original bytes and weights. XZ payload totals
 19,319,192 bytes versus 26,465,499 bytes in the previous Release ZIP. Reduced
 ARM64 ONNX is 10,142,032 bytes uncompressed (previously 27,408,600), approximately
-3.5 MB with DEFLATE. Mini data is omitted only from lite. Emoji assets are unchanged.
+3.5 MB with DEFLATE. Mini data is omitted only from lite. Emoji catalog and
+artwork bytes remain bundled in both APKs.
 
 ## Implementation and tests
 
@@ -35,8 +34,8 @@ ARM64 ONNX is 10,142,032 bytes uncompressed (previously 27,408,600), approximate
   with directly mapped libraries. Release stays non-debuggable and backup-disabled.
 - The APK verifier checks every decompressed table hash, no duplicate entries,
   full/lite resource sets, no double-compressed XZ, physical ZIP overhead and the
-  exact reduced runtime/JNI hashes. All six Release and two ARM64 Debug deliveries
-  passed; both Debug signatures passed verification.
+  exact reduced runtime/JNI hashes. Both ARM64 Release and both ARM64 Debug
+  deliveries passed verification; the Debug signatures passed verification.
 - 542 Android-module JVM tests and 57 pure JVM tests passed, including XZ
   corruption, truncation, excess memory/output, trailing data and cancellation;
   Mini graph restrictions; resource-change retry and stale ranking rejection.

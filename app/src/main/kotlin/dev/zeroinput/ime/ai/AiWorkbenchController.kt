@@ -30,12 +30,18 @@ internal class AiWorkbenchController(
     private val generation = AtomicLong()
     private var selected: AiConversation? = null
     private var result: String? = null
+    private var fullResult: String? = null
     private var handle: AiRequestHandle? = null
     private var delivery: AiStreamDelivery? = null
     private var resultDataGeneration = -1L
     private var boundConfiguration = configuration()
     private var selectedModel: String? = null
     private var outputNeedsReset = false
+    private var reasoningMode = AiReasoningMode.DEFAULT
+
+    fun setReasoningMode(value: AiReasoningMode) {
+        if (reasoningMode != value) { stop(); reasoningMode = value }
+    }
 
     fun invalidate() {
         stop()
@@ -56,6 +62,7 @@ internal class AiWorkbenchController(
         handle?.cancel()
         handle = null
         result = null
+        fullResult = null
         if (outputNeedsReset) renderOutput(AiStreamEvent.Cancelled)
     }
 
@@ -198,7 +205,7 @@ internal class AiWorkbenchController(
         val request = try {
             copyRequest(AiRequest(previous?.id, action, input, target,
                 context.history(), attachments, model = selectedModel ?: config.activeModel(),
-                references = context.state.references.toList()))
+                references = context.state.references.toList(), reasoningMode = reasoningMode))
         } catch (_: IllegalArgumentException) {
             fail()
             return
@@ -214,17 +221,20 @@ internal class AiWorkbenchController(
                     // without going through the bounded SSE reader. Reject
                     // malformed/empty output before exposing it as a usable
                     // result or persisting it.
-                    if (event.text.isBlank() || event.text.length > AiLimits.MAX_OUTPUT_CHARS) {
+                    val answer = AiThinkingText.answer(event.text)
+                    if (event.text.isBlank() || event.text.length > AiLimits.MAX_OUTPUT_CHARS || answer.isBlank()) {
                         result = null
+                        fullResult = null
                         renderOutput(AiStreamEvent.Failed(AiProviderError.Response("AI response is invalid")))
                     } else {
-                        complete(request, previous, event.text, token, data, config.saveConversations)
-                        renderOutput(event)
+                        complete(request, previous, answer, event.text, token, data, config.saveConversations)
+                        renderOutput(event.copy(text = answer))
                     }
                 }
                 is AiStreamEvent.Failed, AiStreamEvent.Cancelled -> {
                     renderOutput(event)
                     result = null
+                    fullResult = null
                 }
                 else -> renderOutput(event)
             }
@@ -239,14 +249,19 @@ internal class AiWorkbenchController(
     }
 
     /** The UI cannot supply arbitrary text or revive a result from an older editor. */
-    fun consumeResult(): String? {
+    fun consumeResult(includeThinking: Boolean = false, displayedResult: String? = null): String? {
         reconcilePersistence()
         if (!allowed() || !contextCurrent() || !dataGeneration.isCurrent(resultDataGeneration)) return null
-        return result.also { result = null }
+        if (displayedResult != null && displayedResult != result) return null
+        return (if (includeThinking) fullResult else result).also { result = null; fullResult = null }
     }
 
-    private fun complete(request: AiRequest, previous: AiConversation?, text: String, token: Long, data: Long, save: Boolean) {
+    fun splitResult(value: String): AiThinkingText.Split = AiThinkingText.split(value)
+
+    private fun complete(request: AiRequest, previous: AiConversation?, text: String, full: String,
+        token: Long, data: Long, save: Boolean) {
         result = text
+        fullResult = full
         resultDataGeneration = data
         // Network context has a smaller budget than stored conversation history.
         // Appending to that projection would silently discard earlier messages.
@@ -319,6 +334,7 @@ internal class AiWorkbenchController(
 
     private fun fail(error: AiProviderError = AiProviderError.Policy("AI operation unavailable")) {
         result = null
+        fullResult = null
         renderOutput(AiStreamEvent.Failed(error))
     }
 

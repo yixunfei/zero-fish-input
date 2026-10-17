@@ -68,7 +68,7 @@ class AiSettingsFailureTest {
         assertEquals(original, graph.aiConfiguration.read())
         openSettings(screen)
         onMain {
-            assertEquals("https://api.openai.com/v1", field(R.string.ai_endpoint_hint).text.toString())
+            assertTrue(field(R.string.ai_endpoint_hint).text.isNullOrEmpty())
             assertTrue(field(R.string.ai_models_hint).text.isNullOrEmpty())
             assertTrue(field(R.string.ai_key_hint).text.isNullOrEmpty())
         }
@@ -130,7 +130,10 @@ class AiSettingsFailureTest {
                 field(R.string.ai_endpoint_hint).setText("http://invalid.example/fixture")
                 dialogSave().performClick()
             }
-            await { fieldOrNull(R.string.ai_endpoint_hint)?.error != null }
+            await { fieldOrNull(R.string.ai_endpoint_hint)?.let { input ->
+                generateSequence(input.parent) { it.parent }
+                    .filterIsInstance<com.google.android.material.textfield.TextInputLayout>().firstOrNull()?.error
+            } != null }
             assertEquals(fixture, graph.aiConfigurationSnapshot())
             onMain {
                 field(R.string.ai_endpoint_hint).setText(profile.endpoint)

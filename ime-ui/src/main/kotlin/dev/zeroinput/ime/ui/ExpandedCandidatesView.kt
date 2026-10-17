@@ -24,11 +24,20 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
     var onPageChanged: (PageDirection) -> Unit = {}
     private var appearance = ExpandedCandidateAppearance()
     private val separators = CandidateSeparators()
+    private val rowContinuity = CandidateRowContinuity()
     private var candidateSpans: List<Int> = emptyList()
     private val textPaint = TextPaint().apply {
         textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 18f, resources.displayMetrics)
     }
-    private val layout = GridLayoutManager(context, 1).apply {
+    private var resetPending = false
+    private var pendingAnchor: Pair<String, Int>? = null
+    private val layout = object : GridLayoutManager(context, 1) {
+        override fun onLayoutCompleted(state: RecyclerView.State?) {
+            super.onLayoutCompleted(state)
+            resetPending = false
+            pendingAnchor = null
+        }
+    }.apply {
         spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int = candidateSpans.getOrNull(position) ?: spanCount
         }
@@ -111,7 +120,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         textPaint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
             updated.textSize.toFloat(), resources.displayMetrics)
         separators.enabled = updated.separators
-        updatePacking()
+        updatePacking(preserve = false)
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
         if (position >= 0) layout.scrollToPositionWithOffset(position, offset)
         scroll.invalidateItemDecorations()
@@ -125,29 +134,36 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
     }
 
     fun render(snapshot: EngineSnapshot) {
+        // An unchanged personalization/status delivery must not cancel an edge
+        // request already posted by the current drag or fling.
+        if (snapshot == lastSnapshot) return
         dispatchTask?.let(::removeCallbacks)
         dispatchTask = null
         val request = pending
         pending = null
-        if (snapshot == lastSnapshot) return
         val position = layout.findFirstVisibleItemPosition()
-        val anchor = adapter.items.getOrNull(position)?.id
-        val offset = layout.findViewByPosition(position)?.top ?: 0
         val old = adapter.items
         val sameInput = snapshot.rawInput == lastSnapshot.rawInput && snapshot.composition == lastSnapshot.composition
+        pendingAnchor = if (sameInput && !resetPending) pendingAnchor ?: old.getOrNull(position)?.let {
+            it.id to (layout.findViewByPosition(position)?.top ?: 0)
+        } else null
         val removedHead = old.firstOrNull()?.id?.let { id -> snapshot.candidates.none { it.id == id } } == true
         val removedTail = old.lastOrNull()?.id?.let { id -> snapshot.candidates.none { it.id == id } } == true
         lastSnapshot = snapshot
         revision++
-        adapter.replace(snapshot.candidates, snapshot.highlightedIndex)
-        val preserved = if (sameInput) snapshot.candidates.indexOfFirst { it.id == anchor } else -1
+        adapter.replace(snapshot.candidates, snapshot.highlightedIndex, preserveRows = sameInput)
+        val preserved = pendingAnchor?.let { anchor -> snapshot.candidates.indexOfFirst { it.id == anchor.first } } ?: -1
         when {
-            !sameInput -> {
+            !sameInput || resetPending -> {
                 browseDirection = PageDirection.NEXT
                 scroll.stopScroll()
+                // Until layout completes, attached children still describe the old input.
+                // A second delivery must not restore an anchor captured from those children.
+                resetPending = true
                 layout.scrollToPositionWithOffset(0, 0)
             }
-            preserved >= 0 && preserved != position -> layout.scrollToPositionWithOffset(preserved, offset)
+            preserved >= 0 && preserved != position ->
+                layout.scrollToPositionWithOffset(preserved, checkNotNull(pendingAnchor).second)
         }
         if (sameInput && request != null) browseDirection = request
         // Both directions continue during drag/fling. Idle filling stops at
@@ -161,15 +177,15 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         postOnAnimation(prefetch)
     }
 
-    private fun updatePacking(width: Int = scroll.width) {
+    private fun updatePacking(width: Int = scroll.width, preserve: Boolean = true) {
         val available = width.coerceAtLeast(1)
-        candidateSpans = CandidateRowPacking.spans(adapter.items.map { candidate ->
+        candidateSpans = rowContinuity.pack(adapter.items.map { it.id }, adapter.items.map { candidate ->
             val label = if (candidate.kind == CandidateKind.RELATED_READING)
                 context.getString(R.string.related_candidate, candidate.text) else candidate.text
             if (appearance.layout == ExpandedCandidateLayout.LIST) available else
                 (kotlin.math.ceil(textPaint.measureText(label)).toInt() + dp(appearance.density.horizontalPadding * 2))
                     .coerceAtLeast(dp(appearance.density.minimumWidth))
-        }, available)
+        }, available, preserve)
         layout.spanCount = available
         layout.spanSizeLookup.invalidateSpanIndexCache()
         layout.spanSizeLookup.invalidateSpanGroupIndexCache()
@@ -213,6 +229,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         scroll.stopScroll()
         revision++
         pending = null
+        pendingAnchor = null
         attempted = null
         render(EngineSnapshot.Empty)
         for (index in 0 until scroll.childCount) (scroll.getChildAt(index) as? CandidateItemView)?.clear()
@@ -223,6 +240,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         dispatchTask?.let(::removeCallbacks)
         dispatchTask = null
         pending = null
+        pendingAnchor = null
         attempted = null
         revision++
         super.onDetachedFromWindow()
@@ -233,7 +251,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
             private set
         private var highlighted = 0
 
-        fun replace(values: List<Candidate>, selected: Int) {
+        fun replace(values: List<Candidate>, selected: Int, preserveRows: Boolean) {
             val old = items
             val oldHighlight = highlighted
             // The core bounds both lists. Page insertion/eviction needs no moves.
@@ -246,7 +264,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
             }, false)
             items = values
             highlighted = selected
-            updatePacking()
+            updatePacking(preserve = preserveRows)
             changes.dispatchUpdatesTo(this)
         }
 

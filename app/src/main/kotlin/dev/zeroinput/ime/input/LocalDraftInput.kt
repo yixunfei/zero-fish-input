@@ -31,6 +31,7 @@ internal class LocalDraftInput(
     private var delivery: EngineWarmupResultDelivery? = null
     private var runtimeObserver: AutoCloseable? = null
     private var generation = 0L
+    private var retryWhenIdle = false
 
     init { require(maxChars in 1..65_536) }
 
@@ -47,10 +48,13 @@ internal class LocalDraftInput(
         controller = input
         input.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, language,
             PrivacyConfiguration(learningEnabled = false))
-        val handoff = EngineWarmupResultDelivery(post, ready = { !input.state.snapshot.isComposing },
-            removePosted = removePosted) { result ->
+        val handoff = EngineWarmupResultDelivery(post, removePosted = removePosted) { result ->
             if (session == generation && result is EngineWarmupResult.Prepared) {
-                input.adoptPreparedEngine(result.engine)
+                // The controller can restore plain fallback pinyin without committing
+                // it. An idle-only delivery gate discards the prepared engine forever
+                // when the user starts typing before the worker finishes.
+                val adopted = input.adoptPreparedEngine(result.engine)
+                retryWhenIdle = !adopted && input.state.engineDescriptor?.isFallback == true
             }
         }
         delivery = handoff
@@ -79,19 +83,19 @@ internal class LocalDraftInput(
         // Editor fallbacks (notably deleting committed text) run after the
         // controller publishes its engine snapshot. Publish the final draft too.
         render(text.toString() + composition, input.state)
-        delivery?.resume()
+        resumePreparation()
     }
 
     fun command(command: InputCommand) {
         controller?.handle(command)
-        delivery?.resume()
+        resumePreparation()
     }
 
     fun clearComposition(): Boolean {
         val input = controller ?: return false
         val composing = input.state.snapshot.isComposing
         if (composing) input.reset()
-        delivery?.resume()
+        resumePreparation()
         return composing
     }
 
@@ -100,7 +104,7 @@ internal class LocalDraftInput(
         wipeText()
         composition = ""
         controller?.state?.let { render("", it) }
-        delivery?.resume()
+        resumePreparation()
     }
 
     fun submittedText(): String {
@@ -117,7 +121,7 @@ internal class LocalDraftInput(
                 break
             }
         }
-        delivery?.resume()
+        resumePreparation()
         return text.toString()
     }
 
@@ -126,17 +130,24 @@ internal class LocalDraftInput(
         controller?.reset()
         text.append(value)
         controller?.state?.let { render(text.toString(), it) }
-        delivery?.resume()
+        resumePreparation()
         return true
     }
 
     private fun prepare() {
         val state = controller?.state ?: return
+        retryWhenIdle = false
         warmup?.request(EngineWarmupRequest(generation, state.language, null, null, state.privacy))
+    }
+
+    private fun resumePreparation() {
+        delivery?.resume()
+        if (retryWhenIdle && controller?.state?.snapshot?.isComposing == false) prepare()
     }
 
     override fun close() {
         generation++
+        retryWhenIdle = false
         runtimeObserver?.close()
         runtimeObserver = null
         warmup?.close()

@@ -3,6 +3,8 @@ package dev.zeroinput.ime
 import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.HorizontalScrollView
+import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.Candidate
@@ -22,6 +24,43 @@ import dev.zeroinput.ime.ui.R as UiR
 class KeyboardToolbarRegressionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val ready = InputSessionState(privacy = SessionPrivacy(false, true, true, PrivacyReason.NONE))
+
+    @Test fun idleToolbarUsesOneRowWhileCompositionKeepsItsCandidateHeader() = withPanel { panel ->
+        val header = onMain { toolbarHeader(panel) }
+        onMain {
+            assertEquals(dp(panel, 48), header.height)
+            assertEquals(dp(panel, 48), checkNotNull(find(panel, UiR.string.keyboard_tools)).height)
+        }
+        onMain {
+            panel.renderSession(ready.copy(snapshot = EngineSnapshot("ni", "ni", listOf(Candidate("public:0", "你")))))
+        }
+        instrumentation.waitForIdleSync()
+        onMain { assertEquals(dp(panel, 96), header.height) }
+        onMain { panel.renderSession(ready) }
+        instrumentation.waitForIdleSync()
+        onMain { assertEquals(dp(panel, 48), header.height) }
+    }
+
+    @Test fun hideControlStaysAtTheRightAndRequestsHideWithoutChangingComposition() = withPanel { panel ->
+        var requests = 0
+        onMain {
+            panel.onHideKeyboardRequested = { requests++ }
+            val hide = checkNotNull(find(panel, UiR.string.keyboard_hide))
+            assertEquals(dp(panel, 48), hide.width)
+            assertEquals((hide.parent as View).width, hide.right)
+            hide.performClick()
+            assertEquals(1, requests)
+            panel.renderSession(ready.copy(snapshot = EngineSnapshot("ni", "ni", listOf(Candidate("public:0", "你")))))
+        }
+        instrumentation.waitForIdleSync()
+        onMain {
+            val hide = checkNotNull(find(panel, UiR.string.keyboard_hide))
+            assertEquals((hide.parent as View).width, hide.right)
+            hide.performClick()
+            assertEquals(2, requests)
+            assertTrue(visible(panel).filterIsInstance<TextView>().any { it.text.toString() == "你" })
+        }
+    }
 
     @Test fun aiIsDirectWhenIdleAndFirstInToolsDuringComposition() = withPanel { panel ->
         capturePublicPreview("ai-entry.png")
@@ -135,6 +174,12 @@ class KeyboardToolbarRegressionTest {
     private fun find(root: View, label: Int): View? = visible(root).firstOrNull {
         it.contentDescription == it.context.getString(label)
     }
+    private fun toolbarHeader(panel: ZeroInputView): View {
+        val tool = checkNotNull(find(panel, UiR.string.keyboard_tools))
+        val scroll = (tool.parent as View).parent as HorizontalScrollView
+        return scroll.parent as View
+    }
+    private fun dp(view: View, value: Int) = (value * view.resources.displayMetrics.density).toInt()
     private fun visible(root: View): List<View> = if (!root.isShown) emptyList() else
         listOf(root) + if (root is ViewGroup) (0 until root.childCount).flatMap { visible(root.getChildAt(it)) } else emptyList()
     private fun <T> onMain(action: () -> T): T {

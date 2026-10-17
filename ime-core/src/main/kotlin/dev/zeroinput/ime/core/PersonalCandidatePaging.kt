@@ -114,7 +114,8 @@ internal class PersonalCandidatePaging {
         // while the native first page is still cached the previous edge
         // belongs to the engine.
         val hasPrevious = pages.isNotEmpty() && pages.firstKey() > 0
-        return native.copy(candidates = items, highlightedIndex = if (offset > 0 || editsApplied) 0 else
+        return native.copy(candidates = items, highlightedIndex = if (items.firstOrNull()?.id?.startsWith("personal:") == true ||
+            offset > 0 || editsApplied) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
             hasPreviousPage = hasPrevious || includesNative && native.hasPreviousPage,
             hasNextPage = if (isBrowsing) pages.lastEntry()?.value?.hasMore == true else native.hasNextPage || first.hasMore)

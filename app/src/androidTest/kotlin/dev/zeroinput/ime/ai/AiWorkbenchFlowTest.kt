@@ -115,7 +115,7 @@ class AiWorkbenchFlowTest {
             panel.renderSession(ready)
             panel.onAiSubmit = controller::submit
             panel.onAiCancel = controller::stop
-            panel.onAiInsert = {
+            panel.onAiInsert = { _, _ ->
                 controller.consumeResult()?.let(inserted::add)
                 panel.returnToKeyboard()
             }

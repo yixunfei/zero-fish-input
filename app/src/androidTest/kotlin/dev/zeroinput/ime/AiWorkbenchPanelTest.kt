@@ -137,7 +137,7 @@ class AiWorkbenchPanelTest {
         var requests = 0
         var inserted = ""
         panel.onSubmit = { _, _, _ -> requests++ }
-        panel.onInsert = { inserted = it }
+        panel.onInsert = { value, _ -> inserted = value }
         panel.renderDraft("public fixture")
         visible(panel).filterIsInstance<TextView>().first {
             it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_action_translate)
@@ -171,7 +171,7 @@ class AiWorkbenchPanelTest {
             assertTrue(panel.isAiEditing)
             val workbench = visible(panel).filterIsInstance<AiWorkbenchPanelView>().single()
             var inserts = 0
-            panel.onAiInsert = { inserts++ }
+            panel.onAiInsert = { _, _ -> inserts++ }
             panel.renderAiDraft("public fixture", InputSessionState())
             panel.renderAiModels(listOf("public-long-model-name", "public-other"), "public-long-model-name")
             captureAndCheck(panel, configuration, night, "draft")

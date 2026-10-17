@@ -5,6 +5,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalCandidatePagingTest {
+    @Test fun `personal first candidate becomes the highlighted default`() {
+        val paging = PersonalCandidatePaging()
+        val native = EngineSnapshot("cs", "cs", listOf(Candidate("native", "产生")), highlightedIndex = 0)
+        val store = object : PagedPersonalizationStore {
+            override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int) =
+                PersonalSuggestionPage(listOf(PersonalSuggestion("learned", "测试", 4, "cs")))
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                suggestionPage(prefix, language, 0, limit).items
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val visible = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        assertEquals(listOf("测试", "产生"), visible.candidates.map { it.text })
+        assertEquals(0, visible.highlightedIndex)
+    }
+
     @Test fun `native previous pages stay reachable when personal first page is cached`() {
         val paging = PersonalCandidatePaging()
         val native = EngineSnapshot("ni", "ni", listOf(Candidate("native", "你")), hasPreviousPage = true)
