@@ -641,8 +641,8 @@ class ZeroInputView @JvmOverloads constructor(
         if (mode == PanelMode.AI) showMode(PanelMode.KEYBOARD, userInitiated = false)
     }
 
-    fun renderAiDraft(text: String, state: InputSessionState) {
-        ai.renderDraft(text, state.language)
+    fun renderAiDraft(text: String, state: InputSessionState, preedit: String = "") {
+        ai.renderDraft(text, state.language, preedit)
         aiSnapshot = state.snapshot
         if (mode == PanelMode.AI) {
             candidateStrip.render(state.snapshot)

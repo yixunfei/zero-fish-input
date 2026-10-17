@@ -135,12 +135,14 @@ class ZeroInputService : InputMethodService() {
     private var nativeRetryRequested = false
     private val aiDraft = dev.zeroinput.ime.input.LocalDraftInput(
         graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
-        render = { text, state -> inputView?.renderAiDraft(text, state) },
+        render = { text, preedit, state -> inputView?.renderAiDraft(text, state, preedit) },
         maxChars = dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
     )
     private val searchDraft = dev.zeroinput.ime.input.LocalDraftInput(
         graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
-        render = { text, state -> inputView?.renderSearchDraft(text, state) },
+        // The emoji search matches live against everything typed, including the
+        // unfinished pre-edit, so the query keeps the engine's formatted string.
+        render = { text, _, state -> inputView?.renderSearchDraft(text + state.snapshot.composition, state) },
         maxChars = 64, multiline = false,
     )
     private var aiObserver: AutoCloseable? = null
@@ -896,7 +898,7 @@ class ZeroInputService : InputMethodService() {
                 }
                 aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE)
                 if (activeSession?.controller?.handoffComposition(dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
-                        aiDraft::appendImported) != true) {
+                        aiDraft::appendPreedit) != true) {
                     aiDraft.clear()
                     view.returnToKeyboard()
                     return@aiVisibility

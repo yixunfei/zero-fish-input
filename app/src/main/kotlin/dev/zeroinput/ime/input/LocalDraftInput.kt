@@ -20,18 +20,18 @@ internal class LocalDraftInput(
     private val graph: () -> AppGraph,
     private val post: (Runnable) -> Boolean,
     private val removePosted: (Runnable) -> Unit,
-    private val render: (String, InputSessionState) -> Unit,
+    private val render: (committed: String, preedit: String, state: InputSessionState) -> Unit,
     private val maxChars: Int,
     private val multiline: Boolean = true,
 ) : AutoCloseable {
     private val text = StringBuilder()
-    private var composition = ""
     private var controller: InputSessionController? = null
     private var warmup: EngineWarmupCoordinator? = null
     private var delivery: EngineWarmupResultDelivery? = null
     private var runtimeObserver: AutoCloseable? = null
     private var generation = 0L
     private var retryWhenIdle = false
+    private var idleRetries = 0
 
     init { require(maxChars in 1..65_536) }
 
@@ -43,19 +43,13 @@ internal class LocalDraftInput(
             connection = DraftConnection(), engineProvider = owner::createDraftEngine,
             personalization = NoPersonalization,
             deferHeavyEngineCreation = true,
-            onStateChanged = { render(text.toString() + composition, it) },
+            onStateChanged = ::emit,
         )
         controller = input
         input.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, language,
             PrivacyConfiguration(learningEnabled = false))
         val handoff = EngineWarmupResultDelivery(post, removePosted = removePosted) { result ->
-            if (session == generation && result is EngineWarmupResult.Prepared) {
-                // The controller can restore plain fallback pinyin without committing
-                // it. An idle-only delivery gate discards the prepared engine forever
-                // when the user starts typing before the worker finishes.
-                val adopted = input.adoptPreparedEngine(result.engine)
-                retryWhenIdle = !adopted && input.state.engineDescriptor?.isFallback == true
-            }
+            if (session == generation) handleWarmupResult(input, result)
         }
         delivery = handoff
         warmup = EngineWarmupCoordinator(owner.engineExecutor, owner::prepareEngine, handoff::offer)
@@ -82,7 +76,7 @@ internal class LocalDraftInput(
         }
         // Editor fallbacks (notably deleting committed text) run after the
         // controller publishes its engine snapshot. Publish the final draft too.
-        render(text.toString() + composition, input.state)
+        emit(input.state)
         resumePreparation()
     }
 
@@ -102,8 +96,7 @@ internal class LocalDraftInput(
     fun clear() {
         controller?.reset()
         wipeText()
-        composition = ""
-        controller?.state?.let { render("", it) }
+        controller?.state?.let(::emit)
         resumePreparation()
     }
 
@@ -129,15 +122,74 @@ internal class LocalDraftInput(
         if (value.length + text.length > maxChars || controller == null) return false
         controller?.reset()
         text.append(value)
-        controller?.state?.let { render(text.toString(), it) }
+        controller?.state?.let(::emit)
         resumePreparation()
         return true
     }
 
+    /**
+     * Re-enters an interrupted pre-edit as a composition instead of as text.
+     *
+     * Opening the AI panel hands over the raw pinyin of a composition that was
+     * still open in the editor. Appending that reading as text leaves
+     * unreadable letters in the draft; feeding it back as key events lets the
+     * draft engine convert it exactly like fresh typing.  Converted text (a
+     * selected segment) has no reading left to convert and stays literal.
+     */
+    fun appendPreedit(value: String): Boolean {
+        val input = controller ?: return false
+        if (value.isEmpty() || value.any { it !in 'a'..'z' && it != '\'' }) return appendImported(value)
+        if (value.length + text.length > maxChars) return false
+        val accepted = runCatching {
+            value.forEach { input.handle(InputCommand.Text(it.toString())) }
+            emit(input.state)
+            true
+        }.getOrDefault(false)
+        resumePreparation()
+        return accepted
+    }
+
+    /** Committed text only; the unfinished code is a separate pre-edit. */
+    private fun emit(state: InputSessionState) {
+        render(text.toString(), preeditOf(state), state)
+    }
+
+    private fun preeditOf(state: InputSessionState): String =
+        // Not EngineSnapshot.composition: Rime formats a multi-syllable
+        // pre-edit as "ni hao", which reads as committed words inside the
+        // draft. The typed code is what the user is still entering.
+        if (state.snapshot.isComposing) state.snapshot.rawInput else ""
+
     private fun prepare() {
         val state = controller?.state ?: return
         retryWhenIdle = false
-        warmup?.request(EngineWarmupRequest(generation, state.language, null, null, state.privacy))
+        // A retry must also re-attempt native runtime initialization; without
+        // it an unavailable engine can never come back during this session.
+        warmup?.request(EngineWarmupRequest(generation, state.language, null, null, state.privacy,
+            retryInitialization = idleRetries > 0))
+    }
+
+    private fun handleWarmupResult(input: InputSessionController, result: EngineWarmupResult) {
+        when (result) {
+            // A rejected or failed preparation used to be dropped, leaving the
+            // draft on the small built-in table for the rest of the session.
+            is EngineWarmupResult.Unavailable -> schedulePrepareRetry()
+            is EngineWarmupResult.Prepared -> {
+                // The controller can restore plain fallback pinyin without
+                // committing it. An idle-only delivery gate discards the
+                // prepared engine forever when the user starts typing before
+                // the worker finishes.
+                if (input.adoptPreparedEngine(result.engine)) idleRetries = 0
+                else if (input.state.engineDescriptor?.isFallback == true) schedulePrepareRetry()
+            }
+        }
+    }
+
+    /** Keeps a runtime that stays unavailable from retrying on every idle key. */
+    private fun schedulePrepareRetry() {
+        if (idleRetries >= MAX_PREPARE_RETRIES) return
+        idleRetries++
+        retryWhenIdle = true
     }
 
     private fun resumePreparation() {
@@ -148,6 +200,7 @@ internal class LocalDraftInput(
     override fun close() {
         generation++
         retryWhenIdle = false
+        idleRetries = 0
         runtimeObserver?.close()
         runtimeObserver = null
         warmup?.close()
@@ -157,14 +210,14 @@ internal class LocalDraftInput(
         controller?.close()
         controller = null
         wipeText()
-        composition = ""
     }
 
     private inner class DraftConnection : EditorConnection {
-        override fun setComposingText(text: String) { composition = text.take(maxChars - this@LocalDraftInput.text.length) }
-        override fun finishComposingText() { composition = "" }
+        // The draft has no editor-owned composing span; the pre-edit is
+        // published from the engine snapshot instead.
+        override fun setComposingText(text: String) = Unit
+        override fun finishComposingText() = Unit
         override fun commitText(text: String): Boolean {
-            composition = ""
             if (this@LocalDraftInput.text.length + text.length > maxChars) return false
             this@LocalDraftInput.text.append(text)
             return true
@@ -184,6 +237,11 @@ internal class LocalDraftInput(
     private fun wipeText() {
         for (index in 0 until text.length) text.setCharAt(index, '\u0000')
         text.setLength(0)
+    }
+
+    private companion object {
+        /** Recovery attempts per session before the draft accepts the fallback. */
+        const val MAX_PREPARE_RETRIES = 3
     }
 
     private object NoPersonalization : PersonalizationStore {

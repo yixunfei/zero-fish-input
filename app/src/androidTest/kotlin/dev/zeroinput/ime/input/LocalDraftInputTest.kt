@@ -28,7 +28,7 @@ class LocalDraftInputTest {
         assertTrue(entered.await(10, TimeUnit.SECONDS))
         val handler = Handler(Looper.getMainLooper())
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, next -> state = next }, maxChars = 64)
+        val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, _, next -> state = next }, maxChars = 64)
         try {
             onMain {
                 draft.start(InputLanguage.CHINESE)
@@ -69,7 +69,7 @@ class LocalDraftInputTest {
     @Test fun sendingChineseDraftConvertsCompositionAndPreservesEverySegment() = onMain {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, { false }, {}, { _, next -> state = next }, maxChars = 64)
+        val draft = LocalDraftInput({ graph }, { false }, {}, { _, _, next -> state = next }, maxChars = 64)
         try {
             draft.start(InputLanguage.CHINESE)
             typePinyin(draft, "nihao")
@@ -87,7 +87,7 @@ class LocalDraftInputTest {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         val handler = Handler(Looper.getMainLooper())
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, next -> state = next }, maxChars = 64)
+        val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks, { _, _, next -> state = next }, maxChars = 64)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val blocker = graph.engineExecutor.submit { entered.countDown(); check(release.await(30, TimeUnit.SECONDS)) }
@@ -124,7 +124,7 @@ class LocalDraftInputTest {
         var state = InputSessionState()
         var rendered = ""
         val draft = LocalDraftInput({ graph }, { callbacks.add(it); true }, { callbacks.remove(it) },
-            { text, next -> rendered = text; state = next }, maxChars = 64)
+            { text, _, next -> rendered = text; state = next }, maxChars = 64)
         try {
             onMain { draft.start(InputLanguage.CHINESE); typePinyin(draft, "zhongguoren") }
             graph.engineExecutor.submit {}.get(60, TimeUnit.SECONDS)
@@ -148,7 +148,7 @@ class LocalDraftInputTest {
         var value = ""
         var renders = 0
         var state = InputSessionState()
-        val draft = LocalDraftInput({ graph }, { queued += it; true }, { queued.remove(it) }, { text, next ->
+        val draft = LocalDraftInput({ graph }, { queued += it; true }, { queued.remove(it) }, { text, _, next ->
             value = text; state = next; renders++
         }, maxChars = 4, multiline = false)
         try {
@@ -175,6 +175,39 @@ class LocalDraftInputTest {
             assertEquals(closedRenders, renders)
             draft.start(InputLanguage.ENGLISH)
             assertEquals("", value)
+        } finally { draft.close() }
+    }
+
+    @Test fun draftRendersCommittedTextAndPreeditSeparately() = onMain {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        var committed = ""
+        var preedit = ""
+        val draft = LocalDraftInput({ graph }, { false }, {}, { text, code, _ ->
+            committed = text; preedit = code
+        }, maxChars = 64)
+        try {
+            draft.start(InputLanguage.CHINESE)
+            typePinyin(draft, "nih")
+            // The unfinished code must stay out of the committed text; Rime
+            // would even format it per syllable ("ni h").
+            assertEquals("", committed)
+            assertEquals("nih", preedit)
+        } finally { draft.close() }
+    }
+
+    @Test fun handedOffReadingBecomesACompositionInsteadOfLetters() = onMain {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        var committed = ""
+        var preedit = ""
+        val draft = LocalDraftInput({ graph }, { false }, {}, { text, code, _ ->
+            committed = text; preedit = code
+        }, maxChars = 64)
+        try {
+            draft.start(InputLanguage.CHINESE)
+            assertTrue(draft.appendPreedit("hao"))
+            assertEquals("", committed)
+            assertEquals("hao", preedit)
+            assertEquals("好", draft.submittedText())
         } finally { draft.close() }
     }
 

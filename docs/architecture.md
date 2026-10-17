@@ -141,6 +141,8 @@ units only for the user's explicit Backspace action and retains no context histo
   related-reading secondary 会话也只在首次请求关联读音扩展时由同一有界执行器创建，并由
   会话代次和运行时锁保证过期任务不会留下 native 句柄。
 3. 引擎返回不可变 `EngineUpdate`，控制器负责通过 `InputConnection` 提交或组合文本。
+   状态发布先写入控制器自身状态，再通知观察者；观察者（界面渲染）异常不进入引擎失败恢复，
+   否则一次纯显示故障就会把未完成的组合提交为字面文本，并在本次会话内把后续按键全部按字面提交。
 4. `PersonalizationStore` 是学习数据端口；加密实现位于 `user-data`，`ime-core` 不依赖具体仓库。
    应用层适配器负责在获得允许后按需后台预热和串行学习写入，输入主线程只读取内存缓存。
    会话或隐私策略变化以及清除个性化数据时都会提升队列代次，使此前排队但尚未执行的学习写入
@@ -285,10 +287,15 @@ Repeated draft edits revoke queued work each time but only render cancellation
 when output actually needs clearing.
 
 `LocalDraftInput` retains at most one prepared engine until its current composition
-ends, resumes delivery after draft commands, and retries preparation on Rime readiness.
-Submission resolves the highlighted conversion candidate and remaining segments in
-the authoritative local buffer. Action selection does not submit; fixed primary
-commands and a draft-language indicator distinguish editing from result browsing.
+ends, resumes delivery after draft commands, and retries preparation on Rime readiness
+or after an unavailable preparation (bounded per session, so a runtime that stays
+unavailable cannot retry on every key). Submission resolves the highlighted conversion
+candidate and remaining segments in the authoritative local buffer. The draft publishes
+committed text and the unfinished code separately: the pre-edit is never rendered as
+draft text and shows the typed code rather than the engine's per-syllable format, and a
+composition handed over from the editor is re-entered as a composition instead of being
+committed as its raw reading. Action selection does not submit; fixed primary commands
+and a draft-language indicator distinguish editing from result browsing.
 
 `AiConfigurationState` publishes loaded configuration and revokes it under the same
 short lock. Its revision is independent of editor/data generations: an editor

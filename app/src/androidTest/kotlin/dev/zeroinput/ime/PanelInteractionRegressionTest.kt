@@ -51,6 +51,8 @@ class PanelInteractionRegressionTest {
             val host = KeyboardLayoutHost(context, panel)
             host.applyPlacement(KeyboardPlacement(mode))
             measure(host)
+            // Handwriting is a secondary tool: the tools row must be opened first.
+            click(panel, UiR.string.keyboard_tools)
             click(panel, UiR.string.handwriting_open)
             measure(host)
             val compact = panel.height

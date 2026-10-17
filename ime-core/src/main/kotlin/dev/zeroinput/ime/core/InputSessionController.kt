@@ -783,7 +783,12 @@ class InputSessionController(
         state = InputSessionState(language, privacy, visibleSnapshot, languagePackKey, engine?.descriptor,
             canReconvert = recentComposition.available && !visibleSnapshot.isComposing,
             candidateRevision = state.candidateRevision + 1)
-        onStateChanged(state)
+        // State is authoritative before the notification runs, and a rendering
+        // observer is not part of the conversion path.  Letting it throw out of
+        // handle() reaches recoverFromEngineFailure, which commits the pre-edit
+        // as literal text and then commits every later key unmodified, so a
+        // display-only fault would disable conversion for the whole session.
+        runCatching { onStateChanged(state) }
     }
 
     private fun withKaomoji(snapshot: EngineSnapshot): EngineSnapshot {

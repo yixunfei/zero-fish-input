@@ -4,6 +4,9 @@ import android.content.Context
 import android.graphics.Color
 import android.content.res.ColorStateList
 import android.os.Build
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.UnderlineSpan
 import android.view.Gravity
 import android.view.View
 import android.widget.HorizontalScrollView
@@ -170,9 +173,17 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         updateDetailVisibility()
     }
 
-    fun renderDraft(value: String, language: InputLanguage = inputLanguage) {
-        draft.text = value
+    fun renderDraft(value: String, language: InputLanguage = inputLanguage, preedit: String = "") {
         draft.error = null
+        // Unconverted code stays visually distinct: without the underline a
+        // half-typed pinyin reading looks like committed draft text.
+        if (preedit.isEmpty()) {
+            draft.text = value
+        } else {
+            val composing = SpannableStringBuilder(value).append(preedit)
+            composing.setSpan(UnderlineSpan(), value.length, composing.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            draft.setText(composing, TextView.BufferType.SPANNABLE)
+        }
         inputLanguage = language
         renderInputStatus()
         refreshCommands()

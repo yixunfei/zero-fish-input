@@ -24,6 +24,20 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AiWorkbenchPanelTest {
+    @Test fun draftShowsUnconvertedCodeAsAnUnderlinedComposition() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        panel.renderDraft("你好", language = dev.zeroinput.engine.api.InputLanguage.CHINESE, preedit = "nihao")
+        val draft = panel.findViewById<TextView>(dev.zeroinput.ime.ui.R.id.ai_draft_text)
+        assertEquals("你好nihao", draft.text.toString())
+        val composing = draft.text as android.text.Spanned
+        val spans = composing.getSpans(2, composing.length, android.text.style.UnderlineSpan::class.java)
+        assertEquals("Unconverted code must not look like committed draft text", 1, spans.size)
+        assertEquals(2, composing.getSpanStart(spans.single()))
+        panel.renderDraft("你好世界", language = dev.zeroinput.engine.api.InputLanguage.CHINESE)
+        assertEquals("你好世界", draft.text.toString())
+    }
+
     @Test fun resetClosesFullPreviewBeforeReusingThePanel() = onMain {
         val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
         val panel = AiWorkbenchPanelView(context)

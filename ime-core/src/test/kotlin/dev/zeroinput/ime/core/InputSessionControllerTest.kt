@@ -39,6 +39,26 @@ class InputSessionControllerTest {
         controller.close()
     }
 
+    @Test fun `failing state observer never converts the session to literal input`() {
+        val connection = RecordingConnection()
+        var renders = 0
+        val controller = InputSessionController(
+            connection, { TestEngine() }, RecordingPersonalization(),
+            // A rendering fault must stay a display fault. Recovery used to run
+            // from it, committing the pre-edit and then every later key as
+            // literal text for the rest of the session.
+            onStateChanged = { renders += 1; if (renders > 1) error("renderer failed") },
+        )
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("n"))
+        controller.handle(InputCommand.Text("i"))
+        controller.handle(InputCommand.Text("h"))
+        assertEquals("nih", controller.state.snapshot.rawInput)
+        assertTrue(controller.state.snapshot.isComposing)
+        assertEquals(emptyList<String>(), connection.commits)
+        controller.close()
+    }
+
     @Test fun `privacy tightening before language switch never commits old input`() {
         val connection = RecordingConnection()
         val store = RecordingPersonalization()
