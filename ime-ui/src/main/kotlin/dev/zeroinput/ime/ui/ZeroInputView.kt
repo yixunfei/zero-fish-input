@@ -96,12 +96,16 @@ class ZeroInputView @JvmOverloads constructor(
     var onAiModelSelected: (String) -> Unit = {}
     var onAiVisibilityChanged: (Boolean) -> Unit = {}
     var onAiDraftChanged: (KeyboardAction) -> Unit = {}
+    var onAiDeviceAgentDraftChanged: (KeyboardAction) -> Unit = {}
+    var onAiDeviceAgentTaskSubmitted: (String) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
+    var onAiDeviceAgentRequested: () -> Unit = {}
     var onAiAddContentRequested: () -> Unit = {}
     var onAiImportContentRequested: () -> Unit = {}
     var onAiRemoveAttachment: (Int) -> Unit = {}
     val isAiOpen: Boolean get() = mode == PanelMode.AI
     val isAiEditing: Boolean get() = mode == PanelMode.AI && ai.editing
+    val isAiDeviceAgentMode: Boolean get() = mode == PanelMode.AI && ai.isDeviceAgentMode
     private var aiSnapshot = EngineSnapshot.Empty
     private var aiCandidatesExpanded = false
     /**
@@ -577,6 +581,7 @@ class ZeroInputView @JvmOverloads constructor(
         onAiVisibilityChanged = {}
         onAiDraftChanged = {}
         onAiSettingsRequested = {}
+        onAiDeviceAgentRequested = {}
         onAiAddContentRequested = {}
         onAiImportContentRequested = {}
         onAiRemoveAttachment = {}
@@ -676,6 +681,28 @@ class ZeroInputView @JvmOverloads constructor(
                 if (state.snapshot.candidates.isEmpty()) setAiCandidatesExpanded(false)
                 else expandedCandidates.render(state.snapshot)
             }
+            keyboard.setComposing(state.snapshot.isComposing)
+            renderDraftLanguage(state.language)
+            readings.render(state.snapshot)
+            updateKeyboardLayout()
+            updatePanelLayout()
+            refreshHeader()
+        }
+    }
+
+    fun setAiDeviceAgentMode(value: Boolean) {
+        if (mode == PanelMode.AI) ai.setDeviceAgentMode(value)
+    }
+
+    fun renderAiDeviceAgentDraft(text: String, state: InputSessionState, preedit: String = "",
+        options: ChineseInputOptions = ChineseInputOptions()) {
+        aiChineseOptions = options
+        aiLanguage = state.language
+        aiCapabilities = state.engineDescriptor?.capabilities.orEmpty()
+        ai.renderDraft(text, state.language, preedit)
+        aiSnapshot = state.snapshot
+        ai.renderCandidates(state.snapshot)
+        if (mode == PanelMode.AI) {
             keyboard.setComposing(state.snapshot.isComposing)
             renderDraftLanguage(state.language)
             readings.render(state.snapshot)
@@ -811,6 +838,8 @@ class ZeroInputView @JvmOverloads constructor(
     private fun bindAiCallbacks() {
         ai.onSubmit = { action, input, target -> onAiSubmit(action, input, target) }
         ai.onCancel = { onAiCancel() }
+        ai.onDeviceAgentDraftChanged = { onAiDeviceAgentDraftChanged(it) }
+        ai.onDeviceAgentTaskSubmitted = { onAiDeviceAgentTaskSubmitted(it) }
         ai.onInsert = { value, includeThinking, sections -> onAiInsert(value, includeThinking, sections) }
         ai.onUseDraftSelection = { source, start, end ->
             onAiUseDraftSelection(source, start, end)
@@ -832,6 +861,7 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onRenameCancelled = { onAiRenameCancelled() }
         ai.onModelSelected = { onAiModelSelected(it) }
         ai.onSettings = { onAiSettingsRequested() }
+        ai.onDeviceAgent = { onAiDeviceAgentRequested() }
         ai.onAddContent = { onAiAddContentRequested() }
         ai.onImportContent = { onAiImportContentRequested() }
         ai.onRemoveAttachment = { onAiRemoveAttachment(it) }
@@ -852,7 +882,7 @@ class ZeroInputView @JvmOverloads constructor(
         if (mode == PanelMode.EMOJI && emoji.isSearchActive) {
             onSearchAction(action)
         } else if (mode == PanelMode.AI && ai.editing) {
-            onAiDraftChanged(action)
+            if (ai.isDeviceAgentMode) onAiDeviceAgentDraftChanged(action) else onAiDraftChanged(action)
         } else if (mode == PanelMode.AI) {
             onUserInteraction()
         } else {

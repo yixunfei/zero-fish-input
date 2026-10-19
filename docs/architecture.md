@@ -888,4 +888,54 @@ hits require identical device/inode, size, mtime and ctime and the same pinned
 digest; unsupported identity metadata falls back to full hashing. No trusted
 metadata ticket is persisted, and cold acquisitions retain full verification on
 the worker. UI header/options and unchanged list models skip redundant rendering;
-these changes do not establish measured frame-time or cold-start improvements.
+ these changes do not establish measured frame-time or cold-start improvements.
+
+## AI device agent (2026-10-19)
+
+The device agent is a separate operation-capable path from the ordinary AI
+workbench and from the read-only page-reference service. Platform-free request,
+snapshot, policy, action, result and provider contracts live in `ai-api`. The
+`app/ai/device` package owns Android lifecycle orchestration, policy evaluation,
+protocol decoding, redaction, the bounded coordinator and the action dispatcher.
+`DeviceAgentAccessibilityService` is the only class that owns accessibility nodes,
+gestures, global navigation and the in-task accessibility overlay. It is protected
+by `BIND_ACCESSIBILITY_SERVICE`; the broker exposes immutable values and never
+retains an `Activity`, `View`, `InputConnection` or node object.
+
+The dependency and data path is:
+
+```text
+AI panel device draft
+  -> DeviceAgentCoordinator
+  -> DeviceAgentProvider (OpenAiCompatibleProvider / sole HTTPS transport)
+  -> bounded DeviceScreenSnapshot
+  -> static DeviceActionCatalog + DeviceAgentPolicyEvaluator
+  -> DeviceAgentAccessibilityBroker
+  -> DeviceAgentAccessibilityService
+```
+
+Tasks are bound to session generation, target package, window ID and snapshot
+ID. The broker invalidates that generation on service interruption, lock-screen
+events, accessibility window changes and task cancellation. The coordinator
+also enforces bounded model rounds, action count, tool results and five-minute
+wall time. Unknown tools, unknown/duplicate arguments, stale snapshots and
+sensitive editable nodes fail closed before an Android action is attempted.
+
+The initial action catalog contains only bounded navigation, pointer, waiting and
+non-sensitive text-editor operations. It has no clipboard, notification, message,
+call, contact, calendar, file, payment, install, permission-grant, shell, root or
+ADB port. `open_app` is constrained to the explicitly selected target package.
+The full-support setting therefore means the complete local catalog, not full
+device authority.
+
+Screenshot consent is represented by a settings capability gate plus a fresh
+per-task confirmation in `AiDeviceAgentActivity`. On API 30 and above the
+adapter captures one bounded JPEG only while the task token, target window and
+unlock checks remain valid; the provider codec sends it as a native image part
+when present, and task/snapshot invalidation clears the bytes. Unsupported,
+oversized or expired captures fail closed. Device-agent history is memory-only by
+default. The user surface includes the isolated `AiWorkbenchPanelView` mode and
+the standalone `AiDeviceAgentActivity`; the latter renders the bounded in-memory
+action timeline and reattaches after rotation without starting another task. It may
+remain behind the selected target app while that app stays foreground; leaving
+that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.md).

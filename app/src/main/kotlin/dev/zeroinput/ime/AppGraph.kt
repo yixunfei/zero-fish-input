@@ -27,6 +27,11 @@ import java.util.concurrent.ExecutorService
 import dev.zeroinput.ime.ai.AiCoordinator
 import dev.zeroinput.ime.ai.AiDataGeneration
 import dev.zeroinput.ime.ai.OpenAiCompatibleProvider
+import dev.zeroinput.ai.api.DeviceAgentPolicy
+import dev.zeroinput.ai.api.DeviceApprovalMode
+import dev.zeroinput.ai.api.DeviceCapabilityScope
+import dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityBroker
+import dev.zeroinput.ime.ai.device.DeviceAgentCoordinator
 
 class AppGraph(context: Context) : AutoCloseable {
     private val applicationContext = context.applicationContext
@@ -68,6 +73,14 @@ class AppGraph(context: Context) : AutoCloseable {
         name = "zeroinput-ai-storage",
         queueCapacity = 2,
     )
+    internal val deviceAgentExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-device-agent",
+        queueCapacity = 4,
+    )
+    internal val deviceAgentScreenshotExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-device-agent-screenshot",
+        queueCapacity = 1,
+    )
 
     val settings = SettingsRepository(applicationContext)
     internal val keyboardBackgrounds = dev.zeroinput.ime.settings.KeyboardBackgroundStore(applicationContext, settings)
@@ -107,9 +120,48 @@ class AppGraph(context: Context) : AutoCloseable {
         enabled = { settings.aiPageReferencesEnabled && settings.learningEnabled && !settings.incognitoMode &&
             aiConfigurationSnapshot()?.let { it.enabled && it.networkAllowed } == true },
     )
+    internal val deviceAgentBroker = DeviceAgentAccessibilityBroker(
+        executor = deviceAgentExecutor,
+        post = { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
+        runtimeAllowed = { policy -> settings.learningEnabled && !settings.incognitoMode &&
+            aiConfigurationSnapshot()?.let { it.enabled && it.networkAllowed } == true &&
+            policy.isWithin(deviceAgentPolicySnapshot()) },
+    )
+    internal val deviceAgentCoordinator = DeviceAgentCoordinator(
+        provider = OpenAiCompatibleProvider(
+            { aiConfigurationSnapshot() ?: AiConfiguration() },
+            deviceAgentExecutor,
+            aiCancellationExecutor,
+        ),
+        broker = deviceAgentBroker,
+        executor = deviceAgentExecutor,
+        post = { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
+        schedule = { delay, action ->
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            val callback = Runnable(action)
+            handler.postDelayed(callback, delay)
+            AutoCloseable { handler.removeCallbacks(callback) }
+        },
+        text = dev.zeroinput.ime.ai.device.DeviceAgentDescriptions(applicationContext),
+    )
     private val aiImportSettingsObserver = settings.addChangeListener {
         aiContentInbox.clear()
         pageReferences.invalidate()
+        deviceAgentCoordinator.stop()
+        deviceAgentBroker.invalidate()
+    }
+
+    fun deviceAgentPolicySnapshot(): DeviceAgentPolicy {
+        val scope = settings.deviceAgentScope
+        return DeviceAgentPolicy(
+        enabled = settings.deviceAgentEnabled && scope != DeviceCapabilityScope.DISABLED,
+        disclosureAccepted = settings.deviceAgentDisclosureAccepted,
+        scope = scope,
+        approvalMode = settings.deviceAgentApprovalMode,
+        allowScreenshots = settings.deviceAgentAllowScreenshots,
+        allowedPackages = settings.deviceAgentAllowedPackages,
+        allowedCategories = settings.deviceAgentAllowedCategories,
+        )
     }
 
     fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
@@ -415,6 +467,8 @@ class AppGraph(context: Context) : AutoCloseable {
         engineMaintenanceExecutor.shutdownNow()
         aiConfigurationListeners.clear()
         aiCoordinator.close()
+        deviceAgentCoordinator.close()
+        deviceAgentBroker.close()
         aiContentInbox.clear()
         aiExecutor.shutdownNow()
         aiProbeExecutor.shutdownNow()
@@ -422,6 +476,8 @@ class AppGraph(context: Context) : AutoCloseable {
         aiImportSettingsObserver.close()
         aiCancellationExecutor.shutdown()
         aiPersistenceExecutor.shutdownNow()
+        deviceAgentExecutor.shutdownNow()
+        deviceAgentScreenshotExecutor.shutdownNow()
         queuedPersonalization.close()
         dictionaryScriptObserver.close()
         languagePackSnapshot = emptyList()

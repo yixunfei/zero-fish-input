@@ -131,9 +131,29 @@
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/page_reference_service" />
         </service>
 
+        <service
+            android:name=".ai.device.DeviceAgentAccessibilityService"
+            android:label="@string/ai_device_agent_title"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/device_agent_service" />
+        </service>
+
         <activity android:name=".ai.page.PageReferenceSettingsActivity"
             android:exported="false" android:excludeFromRecents="true"
             android:theme="@style/Theme.ZeroInput.PrivateImport" />
+
+        <activity android:name=".ai.device.DeviceAgentSettingsActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:theme="@style/Theme.ZeroInput.PrivateImport" />
+
+        <activity android:name=".ai.device.AiDeviceAgentActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:theme="@style/Theme.ZeroInput.PrivateImport"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".ZeroInputService"

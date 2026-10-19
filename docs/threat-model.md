@@ -1067,3 +1067,52 @@ reset is introduced. Negative regressions cover invisible paths, catalog 404,
 edited credentials, protocol changes and stale results. Live catalog acceptance
 now requires a successful parsed list containing the requested model separately
 from successful generation; a passing generation cannot conceal failed discovery.
+
+## AI device agent boundary (2026-10-19)
+
+The device agent is an explicit side-load/private-distribution capability. It is
+disabled by default and requires an in-app disclosure, a selected target package,
+an application policy, and Android accessibility authorization. Authorization
+alone does not capture a screen or run an action. The operation service is
+separate from the read-only page-reference service and is protected by
+`BIND_ACCESSIBILITY_SERVICE`.
+
+The model sees only the independent device-task draft, a bounded snapshot of the
+current focused window, and redacted action results. The snapshot is limited to
+512 nodes, 32 levels and 512 characters per element text; the task, model rounds,
+actions, tool results and wall time are bounded. Snapshot/package/window/session
+generation checks run before every action. Events, lock screen, service loss,
+foreground-app changes, setting changes, cancellation and timeout revoke pending
+work. Accessibility cache is disabled where supported and nodes are recycled
+inside the service boundary.
+
+The static catalog has only waiting, navigation, pointer, and non-sensitive text
+editor actions. The local evaluator blocks the ZeroInput package, Android/system
+settings, permission controller and package installer, even in full-support scope.
+Input text requires an editable, enabled, visible element and rejects password,
+platform-sensitive and conservative label matches such as password, PIN, payment,
+OTP and verification code. The service rechecks the live node before performing
+the action. Unknown tools, unknown arguments, missing arguments, duplicate call
+IDs and stale snapshots are rejected by the protocol/policy layer.
+
+The provider reuses the sole existing HTTPS transport and supports only the
+already selected Chat Completions, Responses, or Anthropic Messages protocol.
+There is no new WebView, MCP endpoint, telemetry, shell, root, ADB, Shizuku,
+clipboard, notification, message, call, contact, calendar, file, payment,
+install, or permission-grant path. Device-agent history is not persisted by
+default. The screenshot switch is a separately stored capability gate, and the
+standalone device-task page requires a fresh per-task confirmation. On API 30
+and above the service may capture one bounded JPEG while the task token, target
+window and unlock checks remain valid; the provider codec sends it only as a
+native image part, never stores it, and clears the bytes when the snapshot or
+task is invalidated. Unsupported, oversized or expired captures fail closed.
+
+The AI panel and standalone Activity use separate task drafts. The Activity owns
+only rendering and reattaches to the coordinator's bounded in-memory timeline
+after recreation. It may remain behind the selected target app while that app
+stays foreground; changing away from the target app revokes the task. Android 16
+emulator tests exercise the public fixture, snapshot redaction, screenshot bounds,
+one-use approval/click, screen-off, foreground switching and service revocation.
+Physical-device behavior, Activity recreation and live-provider acceptance remain
+separate and are not implied by unit, privacy or lint checks. See [ADR 0025](adr/0025-ai-device-agent-boundary.md)
+and [the implementation plan](ai-device-agent-plan.md).

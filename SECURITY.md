@@ -217,6 +217,48 @@ AI conversation-storage failures preserve a completed answer only within its exi
 valid session. Editor, context, settings and data revocation still reject insertion
 and stale storage feedback. Page-reference settings guidance shares the broker's
 enablement policy and never bypasses the editor privacy check.
+## AI device agent
+
+The AI device agent is an opt-in side-load/private-distribution feature. It is
+disabled by default and requires an in-app disclosure, an exact target package,
+an approval policy and Android accessibility authorization. The service is
+protected by `BIND_ACCESSIBILITY_SERVICE`; authorization alone does not start a
+task. The feature is separate from the read-only page-reference service.
+
+Only the fixed catalog of `wait`, `back`, `home`, `scroll`, `click`, `long_click`,
+`swipe`, `input_text`, `ime_action` and `open_app` is available. `open_app` is
+restricted to the selected target package. There is no device-agent path to
+clipboard contents, notifications, messages, calls, contacts, calendars, files,
+payments, installation, permission grants, shell, root, ADB or Shizuku. Full
+support means the complete local catalog and cannot bypass system security.
+
+The model receives an independent task draft, a bounded current-window
+accessibility snapshot and redacted action results. It never receives host editor
+text, selections, system/private clipboard data, personal dictionaries or emoji
+history. Package/window/snapshot/session-generation checks run before every
+action. Password, PIN, email, URI, payment, OTP, verification-code and
+platform-sensitive fields are rejected for observation and text input, even when
+the node otherwise looks editable. Android text input variations for email and
+URI are treated as sensitive when the source application does not provide a useful
+label.
+Unknown tools and arguments, duplicate call IDs, stale snapshots, lock screen,
+service loss, app switching, cancellation and timeout fail closed.
+
+The screenshot setting is separately stored and defaults off. The standalone
+device-task page requires a fresh per-task confirmation; on API 30 and above a
+single bounded JPEG may be captured while the target window and task token are
+valid, encoded as a native image part for the configured provider, and cleared
+when the snapshot or task ends. Unsupported, oversized or expired captures are
+discarded. Device-agent history is memory-only by default; task text, node text,
+action arguments and tool results are not logged. The AI panel and standalone
+Activity use independent task drafts, and Activity recreation reattaches to the
+in-memory coordinator timeline without starting a second task. The task may
+continue while that Activity is behind the selected target app; changing away
+from the target app revokes it. Android 16 emulator coverage exercises public
+fixture capture/redaction, JPEG limits, one-use approval/click, foreground change,
+screen-off and service revocation. Physical-device and live-provider acceptance
+remain separate. See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
+
 # Public dictionaries
 
 Foreground dictionary settings have a separately approved HTTPS download boundary

@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.ai
 
 import dev.zeroinput.ai.api.*
+import dev.zeroinput.ime.ai.device.DeviceAgentProtocolCodec
 import dev.zeroinput.userdata.AiConfiguration
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -23,7 +24,7 @@ class OpenAiCompatibleProvider internal constructor(
     private val exchangeFactory: (URI) -> AiTransportExchange = { PlatformExchange(it) },
     private val nanoTime: () -> Long = System::nanoTime,
     private val scheduleTimeout: (Long, () -> Unit) -> AutoCloseable = AiRequestTimeouts::schedule,
-) : AiProvider, AiModelCatalog {
+) : AiProvider, AiModelCatalog, DeviceAgentProvider {
     override fun stream(request: AiRequest, listener: (AiStreamEvent) -> Unit): AiRequestHandle =
         launch(request, { listener(AiStreamEvent.Started) },
             { listener(AiStreamEvent.Failed(it)) }, { listener(AiStreamEvent.Cancelled) }) { config, operation ->
@@ -50,6 +51,35 @@ class OpenAiCompatibleProvider internal constructor(
                 operation.complete { listener(AiStreamEvent.Completed(output)) }
             } finally { body.fill(0) }
         }
+
+    override fun request(
+        request: DeviceAgentModelRequest,
+        listener: (DeviceAgentProviderEvent) -> Unit,
+    ): AiRequestHandle = launch(null, { listener(DeviceAgentProviderEvent.Started) },
+        { listener(DeviceAgentProviderEvent.Failed(it)) }, { listener(DeviceAgentProviderEvent.Cancelled) }) { config, operation ->
+        val profile = checkNotNull(config.activeProvider())
+        val model = request.model ?: config.activeModel()
+        validateAgentConfiguration(config, model, request.snapshot.hasScreenshot)
+        val body = DeviceAgentProtocolCodec.encode(request, model, profile.protocol)
+            .toByteArray(StandardCharsets.UTF_8)
+        try {
+            require(body.size <= DeviceAgentLimits.MAX_REQUEST_BYTES)
+            val response = exchange(config, AiEndpoint.parse(profile.endpoint, profile.protocol).generation, body, operation) { http ->
+                val type = http.contentType()?.substringBefore(';')?.trim()?.lowercase()
+                if (type != "application/json") throw AiProviderError.Response("Device agent protocol is invalid")
+                http.input().use { input ->
+                    val decoder = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    InputStreamReader(input, decoder).buffered().use { reader ->
+                        AiResponseReader.parse(reader, operation::stopped, AiLimits.MAX_STREAM_CHARS) { root ->
+                            DeviceAgentProtocolCodec.decode(root, profile.protocol)
+                        }
+                    }
+                }
+            }
+            operation.complete { listener(DeviceAgentProviderEvent.Completed(response)) }
+        } finally { body.fill(0) }
+    }
 
     override fun fetchModels(listener: (AiModelCatalogEvent) -> Unit): AiRequestHandle =
         launch(null, { listener(AiModelCatalogEvent.Started) },
@@ -249,6 +279,17 @@ class OpenAiCompatibleProvider internal constructor(
         if (request.attachments.any { it.mimeType.startsWith("image/") } && model !in profile.imageModels ||
             request.attachments.any { it.mimeType.startsWith("audio/") } && model !in profile.audioModels)
             throw AiProviderError.Configuration("Selected model does not support the attachment")
+    }
+
+    private fun validateAgentConfiguration(config: AiConfiguration, model: String, hasScreenshot: Boolean) {
+        val profile = config.activeProvider() ?: throw AiProviderError.Configuration("AI provider is missing")
+        AiEndpoint.parse(profile.endpoint, profile.protocol)
+        if (model.isBlank() || model.length > 128 || model.any(Char::isISOControl) || model !in profile.models) {
+            throw AiProviderError.Configuration("AI model is invalid")
+        }
+        if (hasScreenshot && model !in profile.imageModels) {
+            throw AiProviderError.Configuration("Selected model does not support device screenshots")
+        }
     }
 
     private fun Throwable.asProviderError(): AiProviderError = when (this) {

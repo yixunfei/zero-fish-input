@@ -137,6 +137,13 @@ class ZeroInputService : InputMethodService() {
         render = { text, preedit, state -> inputView?.renderAiDraft(text, state, preedit, sessionChineseOptions) },
         maxChars = dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
     )
+    /** Device tasks use a fresh draft and never inherit editor composition or AI context. */
+    private val deviceAgentDraft = dev.zeroinput.ime.input.LocalDraftInput(
+        graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
+        render = { text, preedit, state -> inputView?.renderAiDeviceAgentDraft(text, state, preedit, sessionChineseOptions) },
+        maxChars = dev.zeroinput.ai.api.DeviceAgentLimits.MAX_TASK_CHARS,
+    )
+    private var deviceAgentRequestHandle: dev.zeroinput.ai.api.AiRequestHandle? = null
     private val searchDraft = dev.zeroinput.ime.input.LocalDraftInput(
         graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
         // The emoji search matches live against everything typed, including the
@@ -498,6 +505,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        cancelDeviceAgentTask()
         appearanceBinding.close()
         glideInput?.invalidate()
         handwritingCoordinator?.invalidate()
@@ -509,6 +517,8 @@ class ZeroInputService : InputMethodService() {
         inputView?.cancelPendingGestures()
         inputViewActive = false
         aiDraft.close()
+        deviceAgentDraft.close()
+        inputView?.setAiDeviceAgentMode(false)
         cancelSecureClipboardRequest()
         invalidateAiRequest()
         graph.securePaste.leaveEditor()
@@ -530,6 +540,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        cancelDeviceAgentTask()
         if (aiPageBinding.isInitialized()) aiPages.close()
         appearanceBinding.close()
         searchDraft.close()
@@ -539,6 +550,7 @@ class ZeroInputService : InputMethodService() {
         aiObserver?.close()
         aiObserver = null
         aiDraft.close()
+        deviceAgentDraft.close()
         pasteConsentObserver?.close()
         pasteConsentObserver = null
         graph.securePaste.leaveEditor()
@@ -846,17 +858,26 @@ class ZeroInputService : InputMethodService() {
             useSelectedAiDraftText(source, start, end)
         }
         view.onAiCandidateSelected = { index, id ->
-            handleControllerCommand(InputCommand.SelectCandidate(index, id))
+            if (view.isAiDeviceAgentMode) deviceAgentDraft.command(InputCommand.SelectCandidate(index, id))
+            else handleControllerCommand(InputCommand.SelectCandidate(index, id))
         }
         view.onAiCandidatePageChanged = { direction ->
-            handleControllerCommand(InputCommand.ChangeCandidatePage(direction))
+            if (view.isAiDeviceAgentMode) deviceAgentDraft.command(InputCommand.ChangeCandidatePage(direction))
+            else handleControllerCommand(InputCommand.ChangeCandidatePage(direction))
         }
         view.onAiDraftChanged = {
             syncSessionPrivacy()
             if (inputView?.isAiEditing == true && aiAllowed()) { aiWorkbench.stop(); aiDraft.handle(it) }
         }
         bindAiContextView(view)
-        view.onAiCancel = ::cancelAiRequest
+        view.onAiCancel = {
+            if (view.isAiDeviceAgentMode) exitDeviceAgentTaskMode() else cancelAiRequest()
+        }
+        view.onAiDeviceAgentDraftChanged = { action ->
+            syncSessionPrivacy()
+            if (view.isAiDeviceAgentMode && aiAllowed()) deviceAgentDraft.handle(action)
+        }
+        view.onAiDeviceAgentTaskSubmitted = ::startDeviceAgentTask
         view.onAiInsert = { value, includeThinking, sections -> insertAiResult(value, includeThinking, sections) }
         view.onAiReasoningModeChanged = aiWorkbench::setReasoningMode
         view.onAiConversationsRequested = { aiWorkbench.refreshConversations() }
@@ -881,6 +902,11 @@ class ZeroInputService : InputMethodService() {
             }
         }
         view.onAiSettingsRequested = { launchActivity(MainActivity::class.java) }
+        view.onAiDeviceAgentRequested = {
+            syncSessionPrivacy()
+            if (view.isAiDeviceAgentMode) exitDeviceAgentTaskMode()
+            else if (aiAllowed()) enterDeviceAgentTaskMode()
+        }
         view.onAiAddContentRequested = {
             syncSessionPrivacy()
             if (aiAllowed()) {
@@ -905,6 +931,8 @@ class ZeroInputService : InputMethodService() {
                     view.returnToKeyboard()
                     return@aiVisibility
                 }
+                deviceAgentDraft.close()
+                view.setAiDeviceAgentMode(false)
                 aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions)
                 if (activeSession?.controller?.handoffComposition(dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
                         aiDraft::appendPreedit) != true) {
@@ -915,7 +943,12 @@ class ZeroInputService : InputMethodService() {
                 aiWorkbench.refreshModels()
                 renderAiContent()
             }
-            else { aiDraft.close(); invalidateAiRequest() }
+            else {
+                deviceAgentDraft.close()
+                view.setAiDeviceAgentMode(false)
+                aiDraft.close()
+                invalidateAiRequest()
+            }
             updateScreenCapturePolicy()
         }
     }
@@ -1004,6 +1037,81 @@ class ZeroInputService : InputMethodService() {
         aiWorkbench.submit(action, submitted, targetLanguage, aiAttachments)
     }
 
+    private fun enterDeviceAgentTaskMode() {
+        val target = currentInputEditorInfo?.packageName?.takeIf { it.isNotBlank() }
+        if (target == null || target == packageName) {
+            showAiFeedback(dev.zeroinput.ime.R.string.ai_device_agent_not_authorized)
+            return
+        }
+        val policy = graph.deviceAgentPolicySnapshot()
+        if (!policy.enabled || !policy.disclosureAccepted) {
+            launchActivity(dev.zeroinput.ime.ai.device.DeviceAgentSettingsActivity::class.java)
+            return
+        }
+        aiWorkbench.stop()
+        // Clear the ordinary AI draft before switching modes. It may contain a
+        // composition handed off from the editor and must never become a device task.
+        aiDraft.close()
+        deviceAgentDraft.start(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions)
+        inputView?.setAiDeviceAgentMode(true)
+    }
+
+    private fun exitDeviceAgentTaskMode() {
+        cancelDeviceAgentTask()
+        deviceAgentDraft.close()
+        inputView?.setAiDeviceAgentMode(false)
+        if (inputView?.isAiOpen == true && aiAllowed()) {
+            aiDraft.start(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions)
+        }
+    }
+
+    private fun startDeviceAgentTask(@Suppress("UNUSED_PARAMETER") submittedByView: String) {
+        syncSessionPrivacy()
+        if (!aiAllowed()) return
+        val value = deviceAgentDraft.submittedText().trim()
+        if (value.isBlank()) {
+            showAiFeedback(dev.zeroinput.ime.R.string.ai_device_agent_task_hint)
+            return
+        }
+        val target = currentInputEditorInfo?.packageName?.takeIf { it.isNotBlank() }
+        if (target == null || target == packageName) {
+            showAiFeedback(dev.zeroinput.ime.R.string.ai_device_agent_not_authorized)
+            return
+        }
+        val policy = graph.deviceAgentPolicySnapshot()
+        if (!policy.enabled || !policy.disclosureAccepted) {
+            launchActivity(dev.zeroinput.ime.ai.device.DeviceAgentSettingsActivity::class.java)
+            return
+        }
+        // The keyboard task surface has no separate screenshot confirmation;
+        // keep its request strictly structural. The standalone task activity
+        // provides the explicit per-task screenshot opt-in.
+        deviceAgentRequestHandle = graph.deviceAgentCoordinator.start(value, target, policy.copy(allowScreenshots = false)) { event ->
+            when (event) {
+                is dev.zeroinput.ai.api.DeviceAgentEvent.Completed -> finishDeviceAgentUi(
+                    dev.zeroinput.ime.R.string.ai_device_agent_task_completed, event.message,
+                )
+                is dev.zeroinput.ai.api.DeviceAgentEvent.Failed -> finishDeviceAgentUi(
+                    dev.zeroinput.ime.R.string.ai_device_agent_task_failed, event.message,
+                )
+                else -> Unit
+            }
+        }
+        showAiFeedback(dev.zeroinput.ime.R.string.ai_device_agent_task_started)
+    }
+
+    private fun finishDeviceAgentUi(message: Int, detail: String) {
+        deviceAgentRequestHandle = null
+        android.widget.Toast.makeText(this, getString(message, detail), android.widget.Toast.LENGTH_LONG).show()
+        exitDeviceAgentTaskMode()
+    }
+
+    private fun cancelDeviceAgentTask() {
+        val handle = deviceAgentRequestHandle
+        deviceAgentRequestHandle = null
+        handle?.cancel()
+    }
+
     private fun useSelectedAiDraftText(source: String, start: Int, end: Int) {
         syncSessionPrivacy()
         if (!aiAllowed() || aiNameEditor.active || !aiPages.ensureCurrent()) return
@@ -1055,6 +1163,7 @@ class ZeroInputService : InputMethodService() {
         aiWorkbench.invalidate()
         inputView?.clearAiSession()
         aiDraft.close()
+        deviceAgentDraft.close()
     }
 
     private fun clearAiAttachments() {
@@ -1617,10 +1726,13 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun endInputSession(reset: Boolean) {
+        cancelDeviceAgentTask()
         searchDraft.close()
         handwritingCoordinator?.invalidate()
         inputView?.closeHandwriting()
         aiDraft.close()
+        deviceAgentDraft.close()
+        inputView?.setAiDeviceAgentMode(false)
         inputView?.cancelPendingGestures()
         registerInteraction(preservePasteConsent = true)
         graph.securePaste.leaveEditor()

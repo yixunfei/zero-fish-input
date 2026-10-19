@@ -43,6 +43,7 @@ ZeroInput 是一个面向 Android 的开源输入法，应用 ID 为 `dev.zeroin
 - 用户于 2026-10-09 批准词库设置中的显式公开分类浏览和下载，详见 `docs/adr/0020-public-dictionaries.md`。独立适配器仅为 `app/dictionaries/DictionaryDownloadTransport`，不接触输入、个人数据或 AI 凭据；每次重定向校验 HTTPS 来源白名单，限制体积、超时及格式。完整万象核心与当前简体语法模型只从审核后的固定版本与哈希进入包体；每周更新 PR 不自动合并。下载后核心使用仍完全离线。
 - 用户于 2026-10-09 进一步批准完整包／轻量包及本仓库 GitHub Releases 的万象 LTS、Mini INT8、手写公开资源按需下载，详见 `docs/adr/0021-optional-public-resources.md`。仅接受审核清单中固定名称、版本、哈希、大小和格式的数据；保留原联网适配器与主动确认边界，不下载执行代码或 native 库。每周 PR 审核后显式发布资源，不自动合并；轻量包仍内置完整万象词表并支持离线输入。
 - 用户于 2026-10-07 批准一次性页面引用例外，详见 `docs/adr/0019-explicit-page-references.md`。独立默认关闭，仅在合格 IME 会话主动点击后由 `app/ai/page/PageReferenceService` 获取源应用当前可见、非编辑、非敏感的无障碍文字；勾选和预览后仅显式发送所选内容。禁止后台正文采集、截图、OCR、手势、自动滚动、输入框/剪贴板读取，服务只读取事件元信息以撤销旧请求。窗口绑定、超时及会话/授权/设置/锁屏失效校验不可省略。
+- 用户已确认侧载/自有分发并批准阶段 0–5 的设备代理闭环，详见 `docs/adr/0025-ai-device-agent-boundary.md`。`app/ai/device/DeviceAgentAccessibilityService` 是独立的操作型无障碍服务，默认关闭；必须经过独立声明、目标包绑定、能力范围和审批策略后才可启动任务。只允许固定的等待、导航、滚动、点击、长按、滑动、非敏感文本输入、输入框动作和指定目标应用打开动作；完整支持范围不等于 root、ADB、Shell、Shizuku 或系统安全绕过。模型只能收到独立设备草稿、当前前台窗口的有界节点快照和脱敏动作结果，不得读取编辑器、剪贴板、通知、通信、联系人、日历、文件或个人数据。截图开关默认关闭，独立任务每次需再次明确同意；获准时只捕获当前任务的一帧，不落盘，并随快照/任务失效清零。代理历史默认不保存。服务断开、锁屏、前台包/窗口变化、设置变化、取消或超时必须提升代次并撤销动作。
 - 普通输入、候选、词频、应用包名、剪贴板内容、诊断信息和使用行为不得离开设备。AI 不得读取外部编辑器正文或选区、系统剪贴板、安全剪贴板、个人词库或 emoji 历史；AI 草稿使用独立转换会话，不读取或学习个人数据。
 - 密码、PIN、未知、邮箱、URI、无个性化、隐身及关闭学习会话拒绝 AI。仅禁用预测建议的普通文本框允许独立 AI 草稿，但仍禁止个人数据读取与学习，且不得覆盖其他组合隐私限制；结果必须显式点击插入且重新校验会话。会话、面板、设置与数据清除使旧异步结果失效。
 - 核心输入、学习、emoji、安全剪贴板和语言包保持完全离线可用。该例外不得扩展到上述功能，其他可选或 Debug 功能也不得绕过边界。
@@ -152,7 +153,7 @@ language-pack -> security
 ## 7. Android 组件与界面规范
 
 - 所有新增 Activity、Service、Receiver、Provider 默认 `android:exported="false"`。
-- 已批准的系统入口为启动 Activity、受 `android.permission.BIND_INPUT_METHOD` 保护的 IME Service，以及仅接收 `ACTION_PROCESS_TEXT` / `ACTION_SEND` 纯文本的剪贴板导入 Activity。已批准的页面引用无障碍服务仅由 `android.permission.BIND_ACCESSIBILITY_SERVICE` 保护，能力限一次性文字读取。其他新增导出组件必须先更新威胁模型并获得明确确认。
+- 已批准的系统入口为启动 Activity、受 `android.permission.BIND_INPUT_METHOD` 保护的 IME Service，以及仅接收 `ACTION_PROCESS_TEXT` / `ACTION_SEND` 纯文本的剪贴板导入 Activity。已批准的页面引用无障碍服务仅由 `android.permission.BIND_ACCESSIBILITY_SERVICE` 保护，能力限一次性文字读取；设备代理无障碍服务同样只接受系统绑定，且仅在用户主动启动的任务期间运行。其他新增导出组件必须先更新威胁模型并获得明确确认。
 - 不申请存储、位置、联系人等与离线输入无关的权限。已批准的 `POST_NOTIFICATIONS` 仅用于用户主动开启的系统剪贴板变化提醒，运行时按需申请且通知不得含正文、标签或来源。其他新增权限须说明必要性并同步更新 `privacyCheck` 白名单；白名单不得为了让构建通过而放宽。
 - 已批准的 `SYSTEM_ALERT_WINDOW` 仅用于独立、默认关闭的剪贴板通用状态悬浮提醒；首次开启和再次请求授权前必须先展示原因及限制，用户确认后才能打开系统授权页。悬浮窗不读取页面或选中文字，不抢输入焦点，不直接清理；锁屏、关闭、撤权、旧请求失效或进入本应用页面时移除。测试 APK 可包含仅用于公开固定文字跨应用验收的源 Activity，该组件不得进入 Debug/Release 主 APK。
 - 使用现有 Android Views、ViewBinding、Material 与资源体系。可见字符串放入资源，不硬编码；触控目标、无障碍描述、横竖屏、深浅主题和小屏布局均需可用。

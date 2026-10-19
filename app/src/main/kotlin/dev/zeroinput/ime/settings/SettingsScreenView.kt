@@ -82,6 +82,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onAiSettingsRequested: () -> Unit = {}
     var onAiDataClearRequested: () -> Unit = {}
     var onAiPageSettingsRequested: () -> Unit = {}
+    var onAiDeviceAgentSettingsRequested: () -> Unit = {}
     var onInterfaceLanguageChanged: (String) -> Unit = {}
 
     private var suppressSwitchCallbacks = false
@@ -225,6 +226,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         statusRow(context.getString(R.string.ai_configuration), aiStatus)
         command(context.getString(R.string.ai_settings)) { onAiSettingsRequested() }
         command(context.getString(R.string.ai_page_access_title)) { onAiPageSettingsRequested() }
+        command(context.getString(R.string.ai_device_agent_settings)) { onAiDeviceAgentSettingsRequested() }
         command(context.getString(R.string.ai_clear_data)) { onAiDataClearRequested() }
 
         section(context.getString(R.string.section_data))
