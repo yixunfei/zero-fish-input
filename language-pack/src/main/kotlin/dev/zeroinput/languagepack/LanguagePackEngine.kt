@@ -20,7 +20,9 @@ import java.security.MessageDigest
 class LanguagePackEngineFactory(
     val pack: InstalledLanguagePack,
 ) : InputEngineFactory {
-    private val entries by lazy { LanguagePackDictionaryLoader.load(pack) }
+    private val dictionary by lazy {
+        PackPrefixCandidates(LanguagePackDictionaryLoader.load(pack).map { it.shortcut to it.value })
+    }
     private val baseLanguage = LanguagePackLanguage.fromTag(pack.manifest.languageTag)
 
     val packKey: String
@@ -33,19 +35,15 @@ class LanguagePackEngineFactory(
         languages = setOfNotNull(baseLanguage),
     )
 
-    override fun isAvailable(): Boolean = pack.enabled && baseLanguage != null && entries.isNotEmpty()
+    override fun isAvailable(): Boolean = pack.enabled && baseLanguage != null && !dictionary.isEmpty
 
-    override fun create(): InputEngine = LanguagePackInputEngine(descriptor, entries)
+    override fun create(): InputEngine = LanguagePackInputEngine(descriptor, dictionary)
 }
 
 private class LanguagePackInputEngine(
     override val descriptor: EngineDescriptor,
-    entries: List<PackDictionaryEntry>,
+    private val dictionary: PackPrefixCandidates,
 ) : InputEngine {
-    private val entries = entries.groupBy { it.shortcut }.mapValues { (_, values) ->
-        values.map(PackDictionaryEntry::value).distinct()
-    }
-    private val prefixIndex = buildPrefixIndex(this.entries)
     private var input = ""
     private var currentSnapshot = EngineSnapshot.Empty
     private var candidatesAllowed = true
@@ -120,34 +118,16 @@ private class LanguagePackInputEngine(
     private fun createSnapshot(): EngineSnapshot {
         if (input.isEmpty()) return EngineSnapshot.Empty
         if (!candidatesAllowed) return EngineSnapshot(rawInput = input, composition = input)
-        val candidates = prefixIndex[input.lowercase()]
-            .orEmpty()
-            .distinct()
-            .take(MAX_CANDIDATES)
+        val candidates = dictionary.find(input.lowercase())
             .mapIndexed { index, value -> Candidate("pack:$index:$value", value) }
             .toList()
         return EngineSnapshot(input, input, candidates)
-    }
-
-    private fun buildPrefixIndex(source: Map<String, List<String>>): Map<String, List<String>> {
-        val index = HashMap<String, LinkedHashSet<String>>()
-        source.forEach { (shortcut, values) ->
-            for (length in 1..shortcut.length) {
-                val bucket = index.getOrPut(shortcut.substring(0, length)) { LinkedHashSet() }
-                for (value in values) {
-                    if (bucket.size >= MAX_CANDIDATES) break
-                    bucket += value
-                }
-            }
-        }
-        return index.mapValues { (_, values) -> values.toList() }
     }
 
     private fun isShortcutCharacter(value: Char): Boolean =
         value.isLetterOrDigit() || value == '\'' || value == '_' || value == '-'
 
     private companion object {
-        const val MAX_CANDIDATES = 8
         const val MAX_INPUT = 128
     }
 }

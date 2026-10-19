@@ -22,6 +22,7 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
     private val root = File(context.noBackupFilesDir, "public-resources")
     private val monitor = Any()
     private val leases = mutableMapOf<String, Int>()
+    private val verifier = ResourceFileVerifier(::digest)
     private val counter = AtomicLong()
     override val revision: Long get() = counter.get()
     var onPublished: () -> Unit = {}
@@ -75,7 +76,8 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
 
     fun install(pack: PublicResourcePack, archive: File) = synchronized(monitor) {
         PublicResourceCatalog.pack(pack.json())
-        require(valid(archive, ResourceFileSpec("archive", pack.bytes, pack.sha256)))
+        require(archive.isFile && archive.length() == pack.bytes &&
+            archive.inputStream().use { digest(it) } == pack.sha256)
         val staging = java.nio.file.Files.createTempDirectory(directory().toPath(), "install-").toFile()
         try {
             try { unpack(pack, archive, staging) }
@@ -131,7 +133,7 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
                 ?.files?.forEach { keep += it.sha256 }
         }
         root.listFiles().orEmpty().filter { it.name.matches(Regex("[a-f0-9]{64}")) && it.name !in keep }
-            .forEach(File::delete)
+            .forEach { file -> verifier.invalidate(file); file.delete() }
     }
 
     private fun isBundled(pack: PublicResourcePack): Boolean = pack.files.all { spec ->
@@ -156,17 +158,18 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
 
     private fun published() { counter.incrementAndGet(); onPublished() }
     private fun publishBlob(source: File, destination: File) {
-        if (destination.isFile && destination.inputStream().use { digest(it) } == destination.name) {
+        val spec = ResourceFileSpec("blob", source.length(), destination.name)
+        if (verifier.valid(destination, spec)) {
             check(source.delete())
             return
         }
         check((leases[destination.name] ?: 0) == 0) { "Resource is in use" }
+        verifier.invalidate(destination)
         if (destination.exists()) check(destination.delete())
         check(source.renameTo(destination))
     }
 
-    private fun valid(file: File, spec: ResourceFileSpec): Boolean = file.isFile && file.length() == spec.bytes &&
-        file.inputStream().use { digest(it) } == spec.sha256
+    private fun valid(file: File, spec: ResourceFileSpec): Boolean = verifier.valid(file, spec)
 
     private fun copyVerified(input: InputStream, output: File, spec: ResourceFileSpec) {
         val hash = MessageDigest.getInstance("SHA-256")

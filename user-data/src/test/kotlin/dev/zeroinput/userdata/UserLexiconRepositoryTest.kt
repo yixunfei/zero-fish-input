@@ -65,6 +65,17 @@ class UserLexiconRepositoryTest {
         assertTrue(repository.list().isEmpty())
     }
 
+    @Test fun `export key query failure makes clear fail closed until explicit retry`() {
+        val cipher = TrackingExportCipher().apply { failQuery = true }
+        val repository = UserLexiconRepository(MemoryStore(), cipher)
+        assertThrows(IOException::class.java) { repository.clear() }
+        assertThrows(IllegalStateException::class.java) { repository.list() }
+        cipher.failQuery = false
+        repository.clear()
+        assertEquals(1, cipher.deleteAttempts)
+        assertTrue(repository.list().isEmpty())
+    }
+
     private class MemoryStore : EncryptedStore {
         var bytes: ByteArray? = null
         var failWrite = false
@@ -84,6 +95,11 @@ class UserLexiconRepositoryTest {
 
     private class TrackingExportCipher : EncryptedExportCipher {
         var deleteAttempts = 0
+        var failQuery = false
+        override fun hasKey(): Boolean {
+            if (failQuery) throw IOException("Fixture provider unavailable")
+            return true
+        }
         override fun encrypt(plaintext: ByteArray, associatedData: ByteArray): ByteArray = plaintext.copyOf()
         override fun decrypt(payload: ByteArray, associatedData: ByteArray): ByteArray = payload.copyOf()
         override fun deleteKey() { deleteAttempts += 1 }

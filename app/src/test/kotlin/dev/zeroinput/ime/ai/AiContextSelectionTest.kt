@@ -36,6 +36,19 @@ class AiContextSelectionTest {
         assertEquals(2, selection.state.messages.size)
     }
 
+    @Test fun explicitlyOpenedConversationSelectsOnlyItsBoundedRecentSuffix() {
+        val selection = AiContextSelection()
+        val messages = List(AiLimits.MAX_HISTORY_MESSAGES) { index ->
+            AiMessage(if (index % 2 == 0) AiRole.USER else AiRole.ASSISTANT, "turn $index")
+        }
+
+        selection.reset(messages, includeRecent = true)
+
+        assertEquals(messages.takeLast(AiReference.MAX_CONTEXT_MESSAGES).map { it.content },
+            selection.history().map { it.content })
+        assertEquals(messages.size, selection.state.messages.size)
+    }
+
     @Test fun staleCheckboxCannotChangeAnotherConversation() {
         val selection = AiContextSelection()
         selection.reset(listOf(AiMessage(AiRole.USER, "first")))

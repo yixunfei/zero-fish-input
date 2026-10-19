@@ -11,11 +11,11 @@ import org.junit.Test
 class PersonalExpressionRepositoryTest {
     @Test fun customTextAndFavoritesSurviveReloadWithoutChangingSpacesOrUnicode() {
         val store = MemoryStore()
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         val value = "( ^_^ ) " + "\uD83D\uDC4D\uD83C\uDFFD"
         val entry = repo.save(null, value, "Greeting", "hello nihao", "greetings")
         repo.favorite(value, true)
-        val loaded = PersonalExpressionRepository(store).read()
+        val loaded = PersonalExpressionRepository(store, TestExportCipher()).read()
         assertEquals(entry, loaded.custom.single())
         assertEquals(setOf(value), loaded.favorites)
         assertTrue(checkNotNull(store.lastWrite).all { it == 0.toByte() })
@@ -55,7 +55,7 @@ class PersonalExpressionRepositoryTest {
 
     @Test fun failedWritesKeepThePreviouslyPersistedStateAndClearTemporaryBytes() {
         val store = MemoryStore()
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         val old = repo.save(null, "(^_^)", "Happy", "", "happy")
         store.failWrite = true
         failure(ExpressionFailure.STORAGE) { repo.favorite(old.value, true) }
@@ -66,7 +66,7 @@ class PersonalExpressionRepositoryTest {
 
     @Test fun clearDeletesTheDedicatedKeyAndRejectsPreviouslyQueuedOperations() {
         val store = MemoryStore()
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         val generation = repo.generation()
         repo.favorite("(^_^)", true)
         repo.clear()
@@ -78,7 +78,7 @@ class PersonalExpressionRepositoryTest {
 
     @Test fun failedDeletionBlocksReadsAndUpdatesUntilClearSucceeds() {
         val store = MemoryStore()
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         repo.favorite("(^_^)", true)
         store.failDelete = true
         failure(ExpressionFailure.STORAGE) { repo.clear() }
@@ -91,7 +91,7 @@ class PersonalExpressionRepositoryTest {
 
     @Test fun cancellationDuringReadIsRecheckedBeforeEncryptedWrite() {
         val store = MemoryStore()
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         var current = true
         store.onRead = { current = false }
         failure(ExpressionFailure.CANCELLED) { repo.favorite("(^_^)", true, isCurrent = { current }) }
@@ -100,7 +100,7 @@ class PersonalExpressionRepositoryTest {
 
     @Test fun clearDuringAnActiveWriteErasesTheResultAndRejectsOldWaitingWrites() {
         val store = MemoryStore()
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val old = repo.generation()
@@ -121,13 +121,13 @@ class PersonalExpressionRepositoryTest {
 
     @Test fun corruptVersionsTruncationAndTrailingDataAreNeverOverwritten() {
         val store = MemoryStore()
-        PersonalExpressionRepository(store).favorite("(^_^)", true)
+        PersonalExpressionRepository(store, TestExportCipher()).favorite("(^_^)", true)
         val original = checkNotNull(store.bytes)
         val malformed = listOf(original.copyOf(5), original + byteArrayOf(0),
             original.copyOf().apply { this[7] = 2 }, original.copyOf().apply { this[11] = 127 })
         for (bytes in malformed) {
             store.bytes = bytes
-            val repo = PersonalExpressionRepository(store)
+            val repo = PersonalExpressionRepository(store, TestExportCipher())
             failure(ExpressionFailure.CORRUPT) { repo.read() }
             failure(ExpressionFailure.CORRUPT) { repo.favorite("extra", true) }
             assertArrayEquals(bytes, store.bytes)
@@ -138,7 +138,7 @@ class PersonalExpressionRepositoryTest {
         val store = MemoryStore()
         store.bytes = PersonalExpressionFormat.encode(PersonalExpressions(
             favorites = (0 until ExpressionLimits.FAVORITES).map { "fixture-$it" }.toSet()))
-        val repo = PersonalExpressionRepository(store)
+        val repo = PersonalExpressionRepository(store, TestExportCipher())
         repo.favorite("fixture-0", true)
         failure(ExpressionFailure.CAPACITY) { repo.favorite("extra", true) }
         assertEquals(ExpressionLimits.FAVORITES, repo.read().favorites.size)

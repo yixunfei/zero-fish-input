@@ -5,6 +5,8 @@ import dev.zeroinput.security.EncryptedStore
 import dev.zeroinput.userdata.AiConfiguration
 import dev.zeroinput.userdata.AiConversationRepository
 import dev.zeroinput.userdata.AiProviderProfile
+import dev.zeroinput.ime.core.privacy.SessionPrivacy
+import dev.zeroinput.ime.core.privacy.PrivacyReason
 import java.util.concurrent.Executor
 import org.junit.Assert.*
 import org.junit.Test
@@ -15,6 +17,30 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun realEditorPrivacyRejectsSubmissionEvenWhenUiEligibilityAllowsIt() {
+        val restrictions = PrivacyReason.entries.filter { it != PrivacyReason.NONE }.map {
+            SessionPrivacy(false, true, false, it)
+        } + listOf(null, SessionPrivacy(true, true, true, PrivacyReason.PASSWORD_FIELD),
+            SessionPrivacy(false, false, true, PrivacyReason.EDITOR_REQUEST))
+        for (privacy in restrictions) {
+            val f = Fixture()
+            f.privacy = privacy
+            f.controller.submit(AiAction.ASK, "public question", null)
+            f.flush()
+            assertTrue(f.provider.requests.isEmpty())
+            assertTrue((f.events.last() as AiStreamEvent.Failed).error is AiProviderError.Policy)
+        }
+    }
+
+    @Test fun independentNoSuggestionsDraftReachesProviderWithoutPersonalization() {
+        val f = Fixture()
+        f.privacy = SessionPrivacy(false, true, false, PrivacyReason.EDITOR_REQUEST,
+            predictionsAllowed = false, independentAiAllowed = true)
+        f.controller.submit(AiAction.ASK, "public question", null)
+        assertEquals(1, f.provider.requests.size)
+        assertFalse(checkNotNull(f.privacy).personalizationAllowed)
+    }
+
     @Test fun lateStorageFailureCannotNotifyOrReviveARevokedResult() {
         for (revocation in 0..4) {
             val f = Fixture()
@@ -294,6 +320,53 @@ class AiWorkbenchControllerTest {
         assertNull(f.controller.consumeResult())
     }
 
+    @Test fun loadedConversationContinuesWithRecentHistoryWithoutAnExtraContextAction() {
+        val f = Fixture()
+        f.repository.upsert(AiConversation(id = "saved", title = "fixture", messages = listOf(
+            AiMessage(AiRole.USER, "earlier question"), AiMessage(AiRole.ASSISTANT, "earlier answer"),
+        )))
+        f.controller.selectConversation("saved")
+        f.flush()
+
+        f.controller.submit(AiAction.ASK, "follow up", null)
+
+        assertEquals("saved", f.provider.requests.last().conversationId)
+        assertEquals(listOf("earlier question", "earlier answer"),
+            f.provider.requests.last().history.map { it.content })
+    }
+
+    @Test fun failedDeleteKeepsTheSelectedConversationAvailable() {
+        val f = Fixture()
+        val conversation = AiConversation(id = "saved", title = "fixture", messages = listOf(
+            AiMessage(AiRole.USER, "question"), AiMessage(AiRole.ASSISTANT, "answer"),
+        ))
+        f.repository.upsert(conversation)
+        f.controller.selectConversation(conversation.id)
+        f.flush()
+        f.store.failWrite = true
+
+        f.controller.deleteConversation(conversation.id)
+        f.flush()
+        f.controller.submit(AiAction.ASK, "follow up", null)
+
+        assertEquals(listOf(conversation), f.repository.list())
+        assertEquals(conversation.id, f.provider.requests.last().conversationId)
+        assertEquals(listOf("question", "answer"), f.provider.requests.last().history.map { it.content })
+    }
+
+    @Test fun selectedResponseSectionsAreValidatedAndConsumedOnce() {
+        val f = Fixture()
+        f.controller.submit(AiAction.ASK, "question", null)
+        f.provider.emit(AiStreamEvent.Completed("first\n\nsecond\n\nthird"))
+        f.flush()
+        val response = "first\n\nsecond\n\nthird"
+
+        assertNull(f.controller.consumeResult(displayedResult = response, selectedSections = listOf(0, 3)))
+        assertEquals("first\n\nthird",
+            f.controller.consumeResult(displayedResult = response, selectedSections = listOf(2, 0, 2)))
+        assertNull(f.controller.consumeResult(displayedResult = response, selectedSections = listOf(0)))
+    }
+
     @Test fun clearingDataBeforeQueuedSaveCannotResurrectAConversation() {
         val f = Fixture()
         f.controller.submit(AiAction.PLAN, "goal", null)
@@ -422,18 +495,17 @@ class AiWorkbenchControllerTest {
         assertEquals("answer", f.controller.consumeResult())
     }
 
-    @Test fun savedHistoryRequiresSelectionAndPageReferencesNeverBecomeSavedMessages() {
+    @Test fun loadedConversationContinuesWithRecentHistoryAndPageReferencesStayTransient() {
         val f = Fixture()
         f.repository.upsert(AiConversation(id = "saved", title = "name", messages = listOf(
             AiMessage(AiRole.USER, "old question"), AiMessage(AiRole.ASSISTANT, "old answer"))))
         f.controller.selectConversation("saved")
         f.flush()
-        assertTrue(f.controller.contextState.selectedHistory.isEmpty())
-        f.controller.includeHistory(f.controller.contextState.revision, 1, true)
+        assertEquals(setOf(0, 1), f.controller.contextState.selectedHistory)
         f.controller.addReferences(f.controller.contextState.revision, listOf(AiReference("selected public page")))
         f.controller.submit(AiAction.ASK, "new question", null)
         val sent = f.provider.requests.last()
-        assertEquals(listOf("old answer"), sent.history.map { it.content })
+        assertEquals(listOf("old question", "old answer"), sent.history.map { it.content })
         assertEquals(listOf("selected public page"), sent.references.map { it.text })
         f.provider.emit(AiStreamEvent.Completed("new answer"))
         f.flush()
@@ -507,6 +579,7 @@ class AiWorkbenchControllerTest {
         val store = MemoryStore()
         val repository = AiConversationRepository(store)
         var allowed = true
+        var privacy: SessionPrivacy? = SessionPrivacy(false, true, true, PrivacyReason.NONE)
         var contextCurrent = true
         var persistenceEnabled = save
         val events = mutableListOf<AiStreamEvent>()
@@ -533,6 +606,7 @@ class AiWorkbenchControllerTest {
                 )
             },
             generation, { ui.execute(it); true }, { allowed }, events::add, { summaries = it }, {},
+            editorPrivacy = { privacy },
             renderHistoryStatus = { _, loading, failed -> historyLoading += loading; historyFailed += failed },
             contextCurrent = { contextCurrent }, storageFailed = { storageFailures++ })
         fun flush() { repeat(3) { ui.drain(); worker.drain() }; ui.drain() }

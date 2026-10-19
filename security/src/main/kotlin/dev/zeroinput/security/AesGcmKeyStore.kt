@@ -24,8 +24,8 @@ class AesGcmKeyStore(
         if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
     }
 
-    /** Used by data-clear paths to avoid touching the provider when no key was created. */
-    fun hasKey(): Boolean = runCatching { loadKeyStore().containsAlias(alias) }.getOrDefault(false)
+    /** Provider failures must remain distinguishable from an absent key during data deletion. */
+    fun hasKey(): Boolean = loadKeyStore().containsAlias(alias)
 
     private fun getOrCreateKey(): SecretKey {
         val keyStore = loadKeyStore()

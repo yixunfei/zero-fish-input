@@ -12,6 +12,52 @@ import java.net.URI
 import java.util.concurrent.*
 
 class AiTransportProtocolTest {
+    @Test fun workerErrorsDeliverOneSafeTerminalFailureAndReleaseRequestBytes() {
+        Fixture().use { f ->
+            f.exchange.failure = StackOverflowError("secret response")
+            val attachment = AiAttachment("text/plain", "public fixture".toByteArray(), "note.txt")
+            val events = f.stream(AiRequest(null, AiAction.ASK, "fixture", attachments = listOf(attachment)))
+            val failures = events.filterIsInstance<AiStreamEvent.Failed>()
+            assertEquals(1, failures.size)
+            assertTrue(failures.single().error is AiProviderError.Response)
+            assertFalse(failures.single().error.toString().contains("secret"))
+            assertNull(failures.single().error.cause)
+            assertTrue(attachment.bytes.all { it == 0.toByte() })
+            assertTrue(f.exchange.disconnected)
+        }
+    }
+
+    @Test fun exhaustedDeadlineOrWorkerCapacityIsDistinctAndReleasesAttachments() {
+        for (timerRejected in listOf(true, false)) Fixture().use { f ->
+            var timerClosed = false
+            val provider = OpenAiCompatibleProvider({ f.config }, f.executor,
+                exchangeFactory = { error("Rejected work must not access the transport") },
+                scheduleTimeout = { _, _ ->
+                    if (timerRejected) throw RejectedExecutionException()
+                    AutoCloseable { timerClosed = true }
+                })
+            if (!timerRejected) f.executor.shutdown()
+            val attachment = AiAttachment("text/plain", "public fixture".toByteArray(), "note.txt")
+            val events = mutableListOf<AiStreamEvent>()
+            provider.stream(AiRequest(null, AiAction.ASK, "fixture", attachments = listOf(attachment)), events::add)
+            val error = (events.single() as AiStreamEvent.Failed).error as AiProviderError.Network
+            assertEquals(AiNetworkFailure.CAPACITY, error.reason)
+            assertTrue(attachment.bytes.all { it == 0.toByte() })
+            assertEquals(!timerRejected, timerClosed)
+        }
+    }
+
+    @Test fun deeplyNestedNonStreamingResponseEndsAsFailure() {
+        Fixture().use { f ->
+            f.exchange.type = "application/json"
+            f.exchange.response = "{\"unknown\":" + "[".repeat(10_000) + "0" + "]".repeat(10_000) + "}"
+            val events = f.stream()
+            assertEquals(1, events.filterIsInstance<AiStreamEvent.Failed>().size)
+            assertTrue(events.last() is AiStreamEvent.Failed)
+            assertTrue(f.exchange.disconnected)
+        }
+    }
+
     @Test fun dnsAndTlsFailuresHaveSafeDistinctReasons() {
         for ((failure, reason) in listOf(
             java.net.UnknownHostException("secret-host") to AiNetworkFailure.DNS,
@@ -174,7 +220,7 @@ class AiTransportProtocolTest {
         var key = ""
         var reads = 0
         var disconnected = false
-        var failure: java.io.IOException? = null
+        var failure: Throwable? = null
         val written = ByteArrayOutputStream()
         override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?, protocol: AiProtocol) {
             this.method = method; this.key = key

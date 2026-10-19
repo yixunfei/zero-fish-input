@@ -7,7 +7,10 @@ import android.os.Build
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.UnderlineSpan
+import android.view.ActionMode
 import android.view.Gravity
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -23,7 +26,11 @@ import dev.zeroinput.ai.api.*
 class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
     var onCancel: () -> Unit = {}
-    var onInsert: (String, Boolean) -> Unit = { _, _ -> }
+    var onInsert: (String, Boolean, List<Int>?) -> Unit = { _, _, _ -> }
+    var onUseDraftSelection: (String, Int, Int) -> Unit = { _, _, _ -> }
+    var onCandidateSelected: (Int, String) -> Unit = { _, _ -> }
+    var onCandidatePageChanged: (dev.zeroinput.engine.api.PageDirection) -> Unit = {}
+    var onCandidatesExpanded: () -> Unit = {}
     var onThinkingModeChanged: (Boolean) -> Unit = {}
     var onReasoningModeChanged: (AiReasoningMode) -> Unit = {}
     var onConversationSelected: (String) -> Unit = {}
@@ -48,12 +55,19 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private var action = AiAction.ASK
     private var languageIndex = 0
     private var streaming = false
+    private var completedResult = false
+    private var hasDisplayedResult = false
+    private var transcriptExpanded = false
+    private var hasTranscript = false
+    private var hasCandidates = false
+    private var committedDraftLength = 0
     private var showThinking = false
     private var reasoningMode = AiReasoningMode.DEFAULT
     private var inputLanguage = InputLanguage.CHINESE
     var editing = false
         private set
-    val editingHeightDp: Int get() = if (attachmentRow.isNotEmpty()) 272 else 224
+    val editingHeightDp: Int get() = 248 + (if (attachmentRow.isNotEmpty()) 48 else 0) +
+        (if (hasCandidates) 48 else 0)
 
     private val inputStatus = textView().apply { textSize = 12f; gravity = Gravity.CENTER_VERTICAL }
     private val model: MaterialButton = button(R.string.ai_switch_model) { modelMenu.show() }.apply {
@@ -67,8 +81,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     private val draft = textView().apply {
         id = R.id.ai_draft_text
-        maxLines = 2
-        minHeight = dp(48)
+        maxLines = Int.MAX_VALUE
+        minHeight = dp(72)
         hint = context.getString(R.string.ai_input_hint)
         isClickable = true
         isFocusable = true
@@ -80,8 +94,24 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutline, Color.GRAY))
         }
     }
+    private val draftViewport = ScrollView(context).apply {
+        isFillViewport = true
+        isVerticalScrollBarEnabled = true
+        overScrollMode = View.OVER_SCROLL_NEVER
+        background = draft.background
+        draft.background = null
+        addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+    }
+    private val candidates = AiCandidateSuggestionsView(context).apply {
+        onCandidateSelected = { index, id -> this@AiWorkbenchPanelView.onCandidateSelected(index, id) }
+        onPageChanged = { this@AiWorkbenchPanelView.onCandidatePageChanged(it) }
+        onExpandRequested = { this@AiWorkbenchPanelView.onCandidatesExpanded() }
+    }
     private val transcript = textView()
     private val result = textView().apply { id = R.id.ai_result_text }
+    private val resultSections = AiResultSelectionView(context).apply {
+        onSelectionChanged = { refreshInsertEnabled() }
+    }
     private val conversationRows = AiConversationListView(context).apply {
         onSelect = { onConversationSelected(it); showDetail(DetailMode.RESULT) }
         onDelete = { onConversationDeleted(it) }
@@ -98,6 +128,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         onSelectionChanged = { selected -> if (detailMode == DetailMode.PAGE) submit.isEnabled = selected }
     }
     private val answerButton = button(R.string.ai_show_result) { showDetail(DetailMode.RESULT) }
+    private val transcriptToggle = button(R.string.ai_show_history) {
+        transcriptExpanded = !transcriptExpanded
+        updateTranscriptVisibility()
+    }
     private val contextButton = button(R.string.ai_context_title) { showDetail(DetailMode.CONTEXT) }
     private val pageButton = button(R.string.ai_page_reference) { onPageRequested() }
     private val conversationsButton = button(R.string.ai_conversations_title) {
@@ -109,8 +143,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         addView(conversationRows)
         addView(contextRows)
         addView(pageRows)
+        addView(transcriptToggle)
         addView(transcript)
         addView(result)
+        addView(resultSections)
     }
     private val detail = ScrollView(context).apply { addView(detailContent); isFillViewport = true }
     private val target = button(R.string.ai_target_language_hint) { cycleLanguage() }
@@ -121,13 +157,20 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     }
     private val submit = button(R.string.ai_submit) { submit() }
     private val cancel = button(R.string.ai_cancel) { onCancel() }
-    private val insert = button(R.string.ai_insert) { onInsert(result.text.toString(), showThinking) }
+    private val insert = button(R.string.ai_insert) {
+        onInsert(result.text.toString(), showThinking, if (showThinking) null else resultSections.selection)
+    }
     private val thinking = com.google.android.material.materialswitch.MaterialSwitch(context).apply {
         setText(R.string.ai_insert_thinking)
         // The IME theme does not supply SwitchCompat's optional on/off labels.
         showText = false
         isChecked = false
-        setOnCheckedChangeListener { _, checked -> showThinking = checked; onThinkingModeChanged(checked) }
+        setOnCheckedChangeListener { _, checked ->
+            showThinking = checked
+            updateResultPresentation()
+            refreshInsertEnabled()
+            onThinkingModeChanged(checked)
+        }
     }
     private val settings = button(R.string.ai_settings) { onSettings() }
     private val addContent = button(R.string.ai_add_content) { onAddContent() }
@@ -155,7 +198,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         addView(scrollRow(listOf(pageButton, contextButton, conversationsButton, answerButton, renameCancel) +
             actions.values + target + reasoning), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(inputStatus, LayoutParams(LayoutParams.MATCH_PARENT, dp(32)))
-        addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        addView(draftViewport, LayoutParams(LayoutParams.MATCH_PARENT, dp(72)))
+        addView(candidates, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(HorizontalScrollView(context).apply { addView(attachmentRow) })
         addView(detail, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(LinearLayout(context).apply {
@@ -167,6 +211,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         cancel.visibility = GONE
         detailContent.addView(cancel, 0)
         importContent.visibility = GONE
+        configureDraftSelection()
         renderConversations(emptyList())
         updateActionStyles()
         render(AiStreamEvent.Cancelled)
@@ -175,6 +220,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     fun renderDraft(value: String, language: InputLanguage = inputLanguage, preedit: String = "") {
         draft.error = null
+        committedDraftLength = value.length
         // Unconverted code stays visually distinct: without the underline a
         // half-typed pinyin reading looks like committed draft text.
         if (preedit.isEmpty()) {
@@ -184,17 +230,29 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             composing.setSpan(UnderlineSpan(), value.length, composing.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             draft.setText(composing, TextView.BufferType.SPANNABLE)
         }
+        draftViewport.post { draftViewport.scrollTo(0, draft.height) }
         inputLanguage = language
         renderInputStatus()
         refreshCommands()
     }
 
+    fun renderCandidates(value: dev.zeroinput.engine.api.EngineSnapshot) {
+        candidates.render(value)
+        hasCandidates = value.candidates.isNotEmpty()
+        candidates.visibility = if (editing && hasCandidates) VISIBLE else GONE
+    }
+
+    fun setCandidatesExpanded(value: Boolean) = candidates.setExpanded(value)
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         // Short landscape panels must leave a scrollable reading area below the controls.
         val compactReading = !editing && (detailMode != DetailMode.RESULT ||
             MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED && MeasureSpec.getSize(heightMeasureSpec) < dp(320))
-        draft.visibility = if (compactReading) GONE else VISIBLE
-        inputStatus.visibility = if (compactReading) GONE else VISIBLE
+        val compactEditing = editing && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED &&
+            MeasureSpec.getSize(heightMeasureSpec) < dp(editingHeightDp)
+        draftViewport.visibility = if (compactReading) GONE else VISIBLE
+        inputStatus.visibility = if (compactReading || compactEditing) GONE else VISIBLE
+        draftViewport.layoutParams.height = if (compactEditing) dp(32) else dp(72)
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
@@ -217,6 +275,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             updateDetailVisibility()
         }
         editing = value
+        candidates.visibility = if (value && hasCandidates) VISIBLE else GONE
         detail.visibility = if (value) GONE else VISIBLE
         refreshCommands()
         renderInputStatus()
@@ -273,8 +332,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         conversationRows.visibility = if (detailMode == DetailMode.CONVERSATIONS) VISIBLE else GONE
         contextRows.visibility = if (detailMode == DetailMode.CONTEXT) VISIBLE else GONE
         pageRows.visibility = if (detailMode == DetailMode.PAGE) VISIBLE else GONE
-        transcript.visibility = if (detailMode == DetailMode.RESULT) VISIBLE else GONE
-        result.visibility = if (detailMode == DetailMode.RESULT) VISIBLE else GONE
+        // Previous turns are reviewed explicitly through the collapsed context entry.
+        transcript.visibility = GONE
+        updateTranscriptVisibility()
+        updateResultPresentation()
         refreshCommands()
         requestLayout()
     }
@@ -284,11 +345,19 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         val messages = value?.messages.orEmpty()
         val latest = messages.lastOrNull()?.takeIf { it.role == AiRole.ASSISTANT }
         result.text = latest?.content.orEmpty()
+        completedResult = false
+        hasDisplayedResult = latest != null
+        resultSections.clear()
         insert.isEnabled = false
-        transcript.text = (if (latest == null) messages else messages.dropLast(1)).joinToString("\n\n") { message ->
+        val history = if (latest == null) messages else messages.dropLast(1)
+        transcript.text = history.joinToString("\n\n") { message ->
             context.getString(if (message.role == AiRole.USER) R.string.ai_user_message else R.string.ai_assistant_message,
                 message.content)
         }
+        hasTranscript = history.isNotEmpty()
+        transcriptExpanded = false
+        updateTranscriptVisibility()
+        updateResultPresentation()
     }
 
     fun renderModels(models: List<String>, selected: String?) { modelMenu.render(models, selected) }
@@ -297,7 +366,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         when (event) {
             AiStreamEvent.Started -> {
                 streaming = true
+                completedResult = false
+                hasDisplayedResult = false
                 result.text = ""
+                resultSections.clear()
                 showDetail(DetailMode.RESULT)
                 submit.isEnabled = false
                 cancel.isEnabled = true
@@ -305,10 +377,13 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
                 inputStatus.setText(R.string.ai_generating)
                 insert.isEnabled = false
             }
-            is AiStreamEvent.Delta -> result.append(event.text)
+            is AiStreamEvent.Delta -> { hasDisplayedResult = true; result.append(event.text) }
             is AiStreamEvent.Completed -> {
                 streaming = false
                 result.text = event.text
+                completedResult = event.text.isNotBlank()
+                hasDisplayedResult = event.text.isNotBlank()
+                resultSections.render(event.text)
                 submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false
                 cancel.visibility = GONE
@@ -317,6 +392,9 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             }
             is AiStreamEvent.Failed -> {
                 streaming = false
+                completedResult = false
+                hasDisplayedResult = true
+                resultSections.clear()
                 showDetail(DetailMode.RESULT)
                 result.setText(aiErrorMessage(event.error))
                 submit.isEnabled = draft.text.isNotBlank()
@@ -327,6 +405,9 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             }
             AiStreamEvent.Cancelled -> {
                 streaming = false
+                completedResult = false
+                hasDisplayedResult = false
+                resultSections.clear()
                 result.text = ""
                 submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false
@@ -335,6 +416,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
                 insert.isEnabled = false
             }
         }
+        updateResultPresentation()
         refreshCommands()
     }
 
@@ -365,7 +447,12 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         modelMenu.render(emptyList(), null)
         renderImportedContent(false, emptyList())
         draft.text = ""
+        hasCandidates = false
+        candidates.clear()
         transcript.text = ""
+        hasTranscript = false
+        transcriptExpanded = false
+        hasDisplayedResult = false
         languageIndex = 0
         reasoningMode = AiReasoningMode.DEFAULT
         reasoning.setText(R.string.ai_reasoning_default)
@@ -387,6 +474,50 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         edit.setText(when { selecting -> R.string.ai_page_cancel; editing -> R.string.ai_read; else -> R.string.ai_edit })
         insert.visibility = if (selecting) GONE else VISIBLE
         submit.isEnabled = if (selecting) pageRows.selection.isNotEmpty() else !streaming && draft.text.isNotBlank()
+        refreshInsertEnabled()
+    }
+
+    private fun refreshInsertEnabled() {
+        insert.isEnabled = completedResult && !streaming && (showThinking || resultSections.selection.isNotEmpty())
+    }
+
+    private fun updateResultPresentation() {
+        val showingResult = detailMode == DetailMode.RESULT
+        result.visibility = if (showingResult && hasDisplayedResult && (!completedResult || showThinking)) VISIBLE else GONE
+        resultSections.visibility = if (showingResult && completedResult && !showThinking) VISIBLE else GONE
+        thinking.visibility = if (showingResult && completedResult) VISIBLE else GONE
+    }
+
+    private fun updateTranscriptVisibility() {
+        transcriptToggle.visibility = if (detailMode == DetailMode.RESULT && hasTranscript) VISIBLE else GONE
+        transcript.visibility = if (detailMode == DetailMode.RESULT && hasTranscript && transcriptExpanded) VISIBLE else GONE
+        transcriptToggle.setText(if (transcriptExpanded) R.string.ai_hide_history else R.string.ai_show_history)
+    }
+
+    private fun configureDraftSelection() {
+        draft.setTextIsSelectable(true)
+        draft.customSelectionActionModeCallback = object : ActionMode.Callback {
+            private fun populate(menu: Menu) {
+                menu.clear()
+                menu.add(Menu.NONE, SELECTION_ACTION_ID, Menu.NONE, R.string.ai_use_selection).apply {
+                    isEnabled = !streaming && !renaming
+                    setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+                }
+            }
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean { populate(menu); return true }
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean { populate(menu); return true }
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                if (item.itemId != SELECTION_ACTION_ID || streaming || renaming) return false
+                val start = minOf(draft.selectionStart, draft.selectionEnd)
+                val end = maxOf(draft.selectionStart, draft.selectionEnd)
+                if (start < 0 || end <= start || end > committedDraftLength) return false
+                val source = draft.text.subSequence(0, committedDraftLength).toString()
+                mode.finish()
+                if (source.substring(start, end).isNotBlank()) onUseDraftSelection(source, start, end)
+                return true
+            }
+            override fun onDestroyActionMode(mode: ActionMode) = Unit
+        }
     }
 
     private fun submit() {
@@ -460,7 +591,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         setPadding(dp(8), paddingTop, dp(8), paddingBottom)
         maxLines = 1
         ellipsize = android.text.TextUtils.TruncateAt.END
-        setOnClickListener { action() }
+        setOnClickListener { if (isEnabled) action() }
         layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(48))
     }
 
@@ -477,4 +608,6 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         return values.getColor(0, fallback).also { values.recycle() }
     }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private companion object { const val SELECTION_ACTION_ID = 1 }
 }

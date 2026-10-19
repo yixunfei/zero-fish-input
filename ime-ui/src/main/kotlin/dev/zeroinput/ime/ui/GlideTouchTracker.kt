@@ -23,6 +23,7 @@ internal class GlideTouchTracker(
     var onStarted: () -> Unit = {}
     var onRecognize: (GlideRequest) -> Unit = {}
     private val points = ArrayList<GlidePoint>()
+    private val path = Path()
     private var keys = emptyList<GlideKey>()
     private var startedAt = 0L
     private var originalKey: GlideKey? = null
@@ -88,8 +89,10 @@ internal class GlideTouchTracker(
     private fun move(event: MotionEvent) {
         if (event.eventTime - startedAt > GlidePoint.MAX_DURATION_MILLIS ||
             event.x !in 0f..host.width.toFloat() || event.y !in 0f..host.height.toFloat()) {
+            val wasVisible = active
             swallowing = active
-            eligible = false; active = false; points.clear(); host.invalidate()
+            eligible = false; active = false; points.clear()
+            if (wasVisible) host.invalidate()
             return
         }
         val first = points.firstOrNull() ?: return
@@ -130,7 +133,7 @@ internal class GlideTouchTracker(
 
     fun draw(canvas: Canvas) {
         if (!active || points.isEmpty()) return
-        val path = Path()
+        path.rewind()
         points.forEachIndexed { index, point ->
             if (index == 0) path.moveTo(point.x * host.width, point.y * host.height)
             else path.lineTo(point.x * host.width, point.y * host.height)
@@ -139,8 +142,9 @@ internal class GlideTouchTracker(
     }
 
     fun cancel() {
+        val wasVisible = active && points.isNotEmpty()
         active = false; eligible = false; swallowing = false
         points.clear(); keys = emptyList(); originalKey = null
-        host.invalidate()
+        if (wasVisible) host.invalidate()
     }
 }

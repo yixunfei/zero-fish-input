@@ -2,8 +2,6 @@ package dev.zeroinput.ime.ai
 
 import dev.zeroinput.ai.api.AiLimits
 import dev.zeroinput.ai.api.AiProviderError
-import org.json.JSONObject
-import org.json.JSONTokener
 import java.io.BufferedReader
 
 /** Bounded SSE parser; an interrupted or truncated answer is never a completed result. */
@@ -46,9 +44,8 @@ internal class AiSseReader {
     private data class Chunk(val text: String, val finished: Boolean)
 
     private fun parse(data: String): Chunk? = try {
-        val tokens = JSONTokener(data)
-        val root = tokens.nextValue() as? JSONObject ?: throw IllegalArgumentException()
-        require(tokens.nextClean() == '\u0000' && !root.has("error"))
+        val root = AiJsonResponse.objectValue(data)
+        require(!root.has("error"))
         val choices = root.getJSONArray("choices")
         if (choices.length() == 0) null else {
             require(choices.length() == 1)

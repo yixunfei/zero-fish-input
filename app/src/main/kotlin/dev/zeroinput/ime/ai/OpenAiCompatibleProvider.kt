@@ -99,7 +99,7 @@ class OpenAiCompatibleProvider internal constructor(
                     validateConfiguration(config, request)
                     operation.deliver(started)
                     work(config, operation)
-                } catch (error: Exception) {
+                } catch (error: Throwable) {
                     if (error is InterruptedException || Thread.currentThread().isInterrupted) operation.cancel()
                     else operation.fail(error.asProviderError())
                 } finally { operation.finish() }
@@ -113,7 +113,7 @@ class OpenAiCompatibleProvider internal constructor(
             })
             executor.execute(task)
         } catch (_: RejectedExecutionException) {
-            operation.fail(AiProviderError.Network("AI request could not be queued"))
+            operation.fail(AiProviderError.Network("AI request capacity is exhausted", reason = AiNetworkFailure.CAPACITY))
             operation.abort()
         }
         return operation
@@ -196,7 +196,14 @@ class OpenAiCompatibleProvider internal constructor(
             // Cancellation belongs to this operation, never unrelated queued model tests.
             dev.zeroinput.ime.concurrency.BoundedExecutors.purge(executor)
         }
-        fun finish() { timer.getAndSet(null)?.close(); resources.finish() }
+        fun finish() {
+            try {
+                fail(AiProviderError.Response("AI request ended without a result"))
+            } finally {
+                timer.getAndSet(null)?.close()
+                resources.finish()
+            }
+        }
     }
 
     private class PlatformExchange(uri: URI) : AiTransportExchange {

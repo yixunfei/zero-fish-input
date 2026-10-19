@@ -50,6 +50,13 @@ macOS implementation and permissions are not copied into the Android input metho
   UI first receives bounded summaries; selecting a row loads its history. Selection,
   deletion, editor changes, settings changes, service destruction and data clearing
   revoke request and persistence generations.
+- Selecting a saved conversation is an explicit request to continue it: the bounded
+  recent turns are selected as context by default, with per-message review available
+  before a request. Transcript/context views start collapsed. A failed delete keeps
+  the active conversation displayed until durable deletion succeeds. AI response
+  insertion is section-selectable from the bounded plain-text output, and the only
+  selectable input source is the separate AI draft itself; no host editor selection
+  or clipboard read is introduced.
 - The provider does not log endpoint credentials, request text, response text or
   conversation content. Configuration and history are separate encrypted stores.
 - An explicit settings model test reuses the sole transport with the selected

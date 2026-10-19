@@ -23,7 +23,8 @@ object DictionaryEditReading {
             }.distinct()
             val next = HashSet<Int>()
             for (start in positions) for (code in codes) {
-                if (code.startsWith(raw.substring(start))) return true
+                val remaining = raw.length - start
+                if (remaining <= code.length && code.regionMatches(0, raw, start, remaining)) return true
                 if (raw.startsWith(code, start)) next += start + code.length
             }
             positions = next

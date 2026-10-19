@@ -171,7 +171,12 @@ class InputSessionController(
                 is InputCommand.PairedText -> commitPaired(activeEngine, command.opening, command.closing)
                 InputCommand.Backspace -> handleKey(activeEngine, EngineKey.Backspace, fallbackBackspace = true)
                 InputCommand.Space -> {
-                    if (personalPaging.editsPending) return
+                    if (personalPaging.editsPending) {
+                        // Do not select an engine candidate before dictionary edits
+                        // have been checked, but never discard an explicit space.
+                        handleEnter(activeEngine)
+                        return
+                    }
                     if (personalPaging.editsApplied && state.snapshot.isComposing && state.snapshot.candidates.isEmpty()) {
                         handleEnter(activeEngine)
                         return
@@ -450,7 +455,7 @@ class InputSessionController(
         !snapshot.canUndoSelection &&
         (snapshot.selection?.isAtEnd(input) != false) &&
         input.length in 1..MAX_HANDOFF_PINYIN_LENGTH &&
-        input.all(::isHandoffPinyinCharacter)
+        ChinesePreeditCode.accepts(input)
 
     private fun isRestoredComposition(update: EngineUpdate?, input: String): Boolean =
         update != null && update.consumed && update.committedText.isEmpty() &&
@@ -547,8 +552,6 @@ class InputSessionController(
     private companion object {
         const val MAX_HANDOFF_PINYIN_LENGTH = 128
 
-        fun isHandoffPinyinCharacter(value: Char): Boolean =
-            value in 'a'..'z' || value in '2'..'9' || value == '\'' || value == ';'
     }
 
     private fun handleKey(activeEngine: InputEngine, key: EngineKey, fallbackBackspace: Boolean = false) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.zeroinput.ime.concurrency.BoundedExecutors
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -148,6 +149,23 @@ class ClipboardGuardRuntimeTest {
     }
 
     @Test
+    fun closeReservesCleanupWhenItsWorkerQueueIsFull() = withFixture { fixture ->
+        fixture.start(ClipboardClearMode.CONFIRM)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        fixture.worker.execute { entered.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
+        assertTrue(entered.await(5, TimeUnit.SECONDS))
+        val staleTaskRan = AtomicBoolean()
+        fixture.worker.execute { staleTaskRan.set(true) }
+        try {
+            fixture.runtime.close()
+            assertTrue(fixture.worker.isShutdown)
+        } finally { release.countDown() }
+        await { fixture.port.listener.get() == null }
+        assertFalse(staleTaskRan.get())
+    }
+
+    @Test
     fun foregroundInspectionWithoutAnImeServiceTargetsExistingContentWithoutAutomaticCleanup() = withFixture { fixture ->
         fixture.port.stamp = 42
         fixture.configure(ClipboardGuardOptions(listening = true, clearMode = ClipboardClearMode.AUTOMATIC))
@@ -221,8 +239,10 @@ class ClipboardGuardRuntimeTest {
         val selected = AtomicBoolean(true)
         val created = AtomicInteger()
         val failCreation = AtomicBoolean()
+        val worker = BoundedExecutors.singleThread("guard-runtime-test", 1)
         val runtime = ClipboardGuardRuntime(instrumentation.targetContext, preferences,
-            createClipboard = { check(!failCreation.get()); created.incrementAndGet(); port }, isDefaultIme = selected::get)
+            createClipboard = { check(!failCreation.get()); created.incrementAndGet(); port }, isDefaultIme = selected::get,
+            worker = worker)
 
         fun configure(options: ClipboardGuardOptions) {
             instrumentation.runOnMainSync { preferences.options = options }

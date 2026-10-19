@@ -85,7 +85,8 @@ class PageReferenceBindingTest {
                 error("No network expected")
         }
         val controller = AiWorkbenchController(AiCoordinator(provider), AiConversationRepository(store),
-            { it.run() }, { null }, AiDataGeneration(), { it(); true }, { allowed }, {}, {}, {})
+            { it.run() }, { null }, AiDataGeneration(), { it(); true }, { allowed }, {}, {}, {},
+            editorPrivacy = { null })
         val binding = AiPageReferenceBinding(broker, Handler(Looper.getMainLooper()), controller,
             { allowed }, { "public.fixture" }, { view }, { settingsOpened++ }, {})
 

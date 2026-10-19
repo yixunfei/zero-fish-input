@@ -4,10 +4,7 @@ import android.util.JsonReader
 import android.util.JsonToken
 import dev.zeroinput.engine.api.InputLanguage
 import java.io.IOException
-import java.io.StringReader
 import java.io.InterruptedIOException
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import org.json.JSONArray
@@ -24,15 +21,7 @@ internal object UserLexiconFormat {
 
     fun parse(bytes: ByteArray): List<UserTerm> {
         try {
-            val decoder = StandardCharsets.UTF_8.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-            val characters = decoder.decode(ByteBuffer.wrap(bytes))
-            try {
-                return JsonReader(StringReader(characters.toString().removePrefix("\uFEFF"))).use(::readDocument)
-            } finally {
-                if (characters.hasArray()) characters.array().fill('\u0000')
-            }
+            return withJsonReader(bytes, ::readDocument)
         } catch (error: InterruptedIOException) {
             throw error
         } catch (_: IOException) {
@@ -114,6 +103,8 @@ internal object UserLexiconFormat {
         return reader.nextString().toLong()
     }
 
+    // Callers convert this JSON model directly to owned bytes. The serializer's
+    // temporary String is not retained; token Strings also remain JVM-managed.
     fun serialize(values: List<UserTerm>): JSONObject = JSONObject().apply {
         put("format", FORMAT_VERSION)
         put("terms", JSONArray().apply {

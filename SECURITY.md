@@ -21,7 +21,7 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
 [GitHub 私密漏洞报告](https://github.com/yixunfei/zero-fish-input/security/advisories/new)。
 请提供使用构造数据的复现步骤、影响版本和预期边界，勿附带真实输入、词库、片段或密钥。
 
-当前 `v0.4.0` 为 Debug 签名测试预发布，优先修复主分支与最新预发布中的安全问题，尚无长期支持版本。
+当前 `v0.6.0` 为 Debug 签名测试预发布，优先修复主分支与最新预发布中的安全问题，尚无长期支持版本。
 下载 APK 为 Debug 签名且可调试，仅适合测试；维护者正式签名与真机认证验收尚未完成。
 
 ## 支持边界
@@ -271,3 +271,20 @@ Provider addresses reject invisible Unicode format characters before network I/O
 they cannot disguise an additional route suffix or bidirectional path. New providers
 have no prefilled destination. These checks preserve configuration format 5 and do
 not clear saved credentials, retry routes or relax HTTPS and redirect restrictions.
+
+Review hardening (2026-10-18) adds precommit rollback for clipboard mutations,
+explicit capacity failures, bounded AI JSON nesting and actual editor-policy
+checks. Clipboard metadata is cleared when management authentication is cancelled.
+The body remains authoritative: process termination between index and body writes
+can require authenticated index reconciliation; this is not a crash-atomic two-file
+transaction. JVM model strings cannot be reliably wiped, although whole-file
+plaintext String decoding was removed. Settings deletion completion survives page
+recreation within a process, not process death.
+
+Public blob hashes may be reused only within the process after complete verification
+and unchanged dev/ino/size/mtime/ctime identity. Unsupported filesystems retain full
+hash checks; no persistent metadata-only trust is introduced. Privacy gates cover
+merged manifests, qualified resource overrides and accessibility key filtering.
+Resource publication uses hash-pinned wheels, reviewed main ancestry, and separate
+read-only build/write publication jobs. See [threat model](docs/threat-model.md) and
+the [review resolution](CODE_REVIEW_RESOLUTION_2026-10-17.md) for verification limits.

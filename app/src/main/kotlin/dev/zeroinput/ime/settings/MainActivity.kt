@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private var runtimeObserver: AutoCloseable? = null
     private var languagePackObserver: AutoCloseable? = null
     private var lexiconFailureObserver: AutoCloseable? = null
+    private var deletionObserver: AutoCloseable? = null
     private var clipboardAuthGeneration = 0L
     private var clipboardAuthRequest: AuthenticationBroker.RequestHandle? = null
     private var aiConfig = AiConfiguration()
@@ -91,6 +92,25 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        deletionObserver?.close()
+        deletionObserver = graph.settingsDeletions.observe({ !isFinishing && !isDestroyed }) { result ->
+            if (!isFinishing && !isDestroyed) {
+                val message = if (!result.success) R.string.operation_failed else when (result.kind) {
+                    SettingsDeletion.PERSONALIZATION -> R.string.personal_data_cleared
+                    SettingsDeletion.SECURE_CLIPBOARD -> R.string.secure_clipboard_cleared
+                    SettingsDeletion.AI -> R.string.ai_data_cleared
+                }
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                if (result.kind == SettingsDeletion.AI) reloadAiConfiguration()
+                render()
+            }
+        }
+        reloadAiConfiguration()
+        operations.execute({ graph.refreshLanguagePacks() }) { render() }
+        render()
+    }
+
+    private fun reloadAiConfiguration() {
         val token = ++aiReadGeneration
         graph.readAiConfiguration { result -> runOnUiThread {
             if (!isFinishing && !isDestroyed && token == aiReadGeneration) {
@@ -99,8 +119,6 @@ class MainActivity : AppCompatActivity() {
                 render()
             }
         } }
-        operations.execute({ graph.refreshLanguagePacks() }) { render() }
-        render()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -114,6 +132,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        deletionObserver?.close()
+        deletionObserver = null
         aiDialog?.dismiss()
         aiDialog = null
         operations.close()
@@ -254,10 +274,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage(R.string.clear_personal_data_message)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
-                operations.execute({ graph.clearPersonalizationData() }) {
-                    Toast.makeText(this, R.string.personal_data_cleared, Toast.LENGTH_SHORT).show()
-                    render()
-                }
+                graph.settingsDeletions.submit(SettingsDeletion.PERSONALIZATION)
             }
             .show()
     }
@@ -270,10 +287,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton(R.string.delete) { _, _ ->
                 if (isFinishing || isDestroyed) return@setPositiveButton
                 graph.securePaste.cancel()
-                operations.execute({ graph.secureClipboard.purge() }) {
-                    Toast.makeText(this, R.string.secure_clipboard_cleared, Toast.LENGTH_SHORT).show()
-                    render()
-                }
+                graph.settingsDeletions.submit(SettingsDeletion.SECURE_CLIPBOARD)
             }.create()
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).filterTouchesWhenObscured = true
@@ -347,6 +361,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        deletionObserver?.close()
+        deletionObserver = null
         aiDialog?.cancelTests()
         // Keep the bounded draft in this protected window while the user visits
         // another app. Explicit dismissal or destruction clears its fields.
@@ -363,13 +379,7 @@ class MainActivity : AppCompatActivity() {
                 aiReadGeneration++
                 aiConfigReady = false
                 screen.setAiControlsEnabled(false)
-                graph.clearAiData { success -> runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
-                    aiConfig = AiConfiguration()
-                    aiConfigReady = true
-                    render()
-                    Toast.makeText(this, if (success) R.string.ai_data_cleared else R.string.operation_failed, Toast.LENGTH_SHORT).show()
-                } }
+                graph.settingsDeletions.submit(SettingsDeletion.AI)
             }
             .show()
     }

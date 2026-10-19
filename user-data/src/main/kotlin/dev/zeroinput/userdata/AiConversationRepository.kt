@@ -41,7 +41,7 @@ class AiConversationRepository(private val store: EncryptedStore) {
         checkCurrent(current)
         val values = list().filterNot { it.id == conversation.id }.plus(conversation)
             .sortedByDescending { it.updatedAtEpochMillis }
-            .take(AiLimits.MAX_CONVERSATIONS)
+        check(values.size <= AiLimits.MAX_CONVERSATIONS) { "AI conversation storage is full" }
         checkCurrent(current)
         persist(values)
     }

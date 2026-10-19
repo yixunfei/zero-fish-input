@@ -252,6 +252,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
         private var highlighted = 0
 
         fun replace(values: List<Candidate>, selected: Int, preserveRows: Boolean) {
+            if (items == values && highlighted == selected) return
             val old = items
             val oldHighlight = highlighted
             // The core bounds both lists. Page insertion/eviction needs no moves.
@@ -264,7 +265,7 @@ internal class ExpandedCandidatesView(context: Context) : LinearLayout(context) 
             }, false)
             items = values
             highlighted = selected
-            updatePacking(preserve = preserveRows)
+            if (old != values) updatePacking(preserve = preserveRows)
             changes.dispatchUpdatesTo(this)
         }
 

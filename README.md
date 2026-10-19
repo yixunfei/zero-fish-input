@@ -6,19 +6,19 @@
 
 **以离线输入为核心、可选联网 AI 工作台的中文与英文输入法，面向 Android 8.0 及以上设备。**
 
-[下载 v0.5.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.5.0) ·
+[下载 v0.6.0 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.6.0) ·
 [提交问题](https://github.com/yixunfei/zero-fish-input/issues) ·
 [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [Apache-2.0](LICENSE)
 
 zero fish input（原工程名 ZeroInput）以隐私、安全、离线和可扩展性为核心。当前版本为
-`v0.5.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
+`v0.6.0` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
 以及需要系统身份认证的安全剪贴板。另提供默认关闭的本地 AI 短词候选排序实验和可选联网
   AI 工作台；本地排序使用 UER RoBERTa-Mini WWM INT8 模型，全程在设备端运行。
 
 An offline Android keyboard for Chinese Pinyin and English, with encrypted local
 personalization, a private authenticated snippet vault, and optional offline
 RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI workbench. Android 8.0+;
- Apache-2.0 project code. Version 0.5.0 is a debug-signed testing prerelease.
+ Apache-2.0 project code. Version 0.6.0 is a debug-signed testing prerelease.
 
 项目展示及应用显示名称使用 `zero fish input`。Logo 保留所提供原图，图中文字为
 `ZERO FISH INPUT`；Android 启动图标使用该图的主体裁切。内部包名和数据标识保留 `zeroinput`。
@@ -28,19 +28,19 @@ RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI
 
 ## 安装与启用
 
-v0.5.0 包含多协议 AI Provider、词库本地编辑与撤销、拼音组合光标编辑、候选连续浏览和 full/lite 公开资源包。
-完整变化见 [发布说明](docs/releases/v0.5.0.md)。
+v0.6.0 包含多协议 AI Provider、词库本地编辑与撤销、拼音组合光标编辑、候选连续浏览和 full/lite 公开资源包，
+并补充了本轮审查后的隐私、并发、错误处理和中文草稿转换修复。完整变化见 [发布说明](docs/releases/v0.6.0.md)。
 也可按下方构建说明运行 `./tools/package-test-apk.ps1` 自行生成测试包。
 当前代码审查与测试记录见 [2026-10-07 审查](docs/code-audit-2026-10-07.md)。
 AI 仓库及控制器的 JVM 测试使用 Robolectric 4.16.1 的 Android API 28 环境；
 首次运行需下载主机测试依赖，缓存后可离线运行，不进入测试 APK 或应用运行时。
 
-1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.5.0)
-   下载 `zero-fish-input-0.5.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
+1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.6.0)
+   下载 `zero-fish-input-0.6.0-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
    `x86_64` 三种架构，要求 Android 8.0（API 26）或更新版本。
-   存储空间有限时可下载同页的 `zero-fish-input-0.5.0-debug-universal-lite.apk`，其余公开资源可在设置中按需下载。
+   存储空间有限时可下载同页的 `zero-fish-input-0.6.0-debug-universal-lite.apk`，其余公开资源可在设置中按需下载。
 2. 对照同页 `SHA256SUMS.txt` 校验下载；Windows 可运行
-   `Get-FileHash .\zero-fish-input-0.5.0-debug-universal.apk -Algorithm SHA256`。
+   `Get-FileHash .\zero-fish-input-0.6.0-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，在系统输入法设置中启用，然后选择为当前键盘。
    Android 会显示针对所有第三方输入法的系统提醒；项目的隐私边界见下文。
 4. 在普通输入框中输入 `nihao` 并选取“你好”，通过语言切换键切换英文。
@@ -49,7 +49,7 @@ AI 仓库及控制器的 JVM 测试使用 Robolectric 4.16.1 的 Android API 28 
    `nihao` 选取“你好”。准备失败会显示“中文加载失败”，可重试；仅在验证中文转换和选词
    可用后才切换到 Rime。普通输入框请求禁止预测建议时保留中文转换、关闭英文预测，且不读取或学习个人数据。
 
-本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.5.0-debug`，
+本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.6.0-debug`，
 可调试，仅用于体验和反馈。尚未配置维护者正式发布签名，不建议用此测试包保存真实秘密。
 Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地数据彼此独立。
 不同开发环境的 Debug 签名可能不同；遇到签名冲突不要直接卸载，以免丢失本地数据。
@@ -90,6 +90,9 @@ Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地�
 较长词句在候选栏限宽，在展开列表中完整换行显示。
 展开列表双向接续加载，顶部候选条不再同时触发加载；Debug 和 Release 均不显示测试用输入诊断框。
 AI 草稿在中文引擎后台就绪后继续转换正在输入的拼音；候选窗口接续加载时保留已有行和浏览位置。
+AI 草稿保留当前九键／双拼布局和未完成输入；中文引擎运行中失败时显示失败状态并提供重试。
+已保存 AI 会话达到容量上限时会提示，需主动删除后再保存。设置页清除操作的结果可在同一进程内
+返回页面后查看。全部审查处置及验证限制见 [2026-10-17 反馈处置记录](CODE_REVIEW_RESOLUTION_2026-10-17.md)。
 相关回归及验证边界见 [AI 中文输入与连续候选修复验证](docs/ai-input-scroll-validation-2026-10-16.md)。
 
 设置中的“防误触纠错（实验）”默认关闭，只作用于 Rime 全键盘。它提供临近键、错序、
@@ -108,10 +111,10 @@ v0.2.0 已修复 Android 16 设备回归中输入法未绑定导致的剪贴板�
 测试文字导致的原生选字菜单不稳定；补充取消确认、关闭监听和服务未绑定的负向测试。
 详细结果见[模型与剪贴板验证](docs/model-integration-validation.md)和
 [v0.2.0 发布验证](docs/releases/v0.2.0-validation.md)。本次验证见
-[v0.5.0 发布验证](docs/releases/v0.5.0-validation.md)。
+[v0.6.0 发布验证](docs/releases/v0.6.0-validation.md)。
 
 当前源码还补充了键盘内选中文字复制、自动处理已有系统当前项，以及“认证后返回再确认粘贴”，
-并修复等待内容库期间继续编辑仍可能收到迟到粘贴的问题。这些修复已纳入 v0.5.0；
+并修复等待内容库期间继续编辑仍可能收到迟到粘贴的问题。这些修复已纳入 v0.6.0；
 相关验证记录见[剪贴板修复验证](docs/clipboard-device-validation.md#product-repair-and-authenticated-return-2026-09-09)。
 其中 iQOO 历史剪贴板删除仍未实现，不能把当前项清理成功当作历史已清空。
 
@@ -193,8 +196,10 @@ Emoji 面板内使用随包图形，首次后台准备完成后可离线显示�
 仅禁用预测建议的普通聊天框仍允许独立 AI 草稿；其他组合隐私限制继续生效。
 在独立草稿中输入中文或英文，选择提问、规划、润色、
 改写或翻译。选择操作后点击 **发送** 才发送，目标语言按钮可切换中、英、日、韩、法、德、西、阿语。
-草稿区域标明当前中文拼音或英文模式；发送前完成当前候选转换。发送、编辑和插入保持固定位置。
-生成内容先留在面板，点击 **插入** 才会写入当前输入框。
+草稿区域标明当前中文拼音或英文模式；发送前完成当前候选转换，候选行显示在草稿下方。
+长按 AI 草稿可选择其中一段并替换本地草稿，仍需点击发送才会提交请求；不会读取宿主编辑器选区或系统剪贴板。
+生成内容按段、列表项和代码块显示为默认不选中的复选框，可多选后按原顺序插入，也可全选或清空选择。
+发送、编辑和插入保持固定位置；至少勾选一个结果区段后才可插入。
 
 点击 **更多操作 → 添加内容**，
 可预览和编辑导入文本，并通过系统文件选择器添加 UTF-8 TXT、JPEG/PNG/WebP、WAV/MP3。
@@ -214,7 +219,8 @@ PDF、Office 文档、自动截屏、录音及厂商专有接口不在当前支�
 
 **上下文** 中可逐条移除引用、勾选历史消息、选择最近历史、清空或预览将发送的内容。
 引用默认显示短预览；退出上下文或重置面板后，再看全文需要重新点击预览。
-打开保存的会话不会自动选择历史；本次连续对话的新一轮在额度允许时加入可见选择，可随时取消。
+已保存会话需在会话列表中主动加载；加载后默认选取预算内最近历史以继续对话，可在上下文中逐条调整。
+会话正文和上下文默认折叠显示；保存开关默认关闭，开启后使用独立加密存储，可跨重启加载或删除。
 **会话** 中可新建、打开、重命名和确认删除；改名使用键盘草稿，保存或取消后恢复原提问。
 点击 **查看回答** 返回结果，点击 **编辑** 继续输入；中文转换支持候选展开。
 会话保存默认关闭，临时会话退出后清除；开启后在本地加密保存提问和回答，原始页面引用和附件不保存。
@@ -510,7 +516,7 @@ APK、第三方许可证、手写模型对应源码压缩包及 SHA-256 清单�
 ```powershell
 ./tools/test-test-apk-artifact.ps1
 ./tools/test-input-experience.ps1 -Serial emulator-5554 `
-  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.5.0-debug-universal.apk' `
+  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.6.0-debug-universal.apk' `
   -TestClass 'dev.zeroinput.ime.AiProviderManagementTest,dev.zeroinput.ime.AiSettingsFailureTest,dev.zeroinput.ime.AiImeInteractionTest'
 ```
 

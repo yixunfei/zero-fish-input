@@ -144,20 +144,31 @@ class DictionaryManagerActivity : AppCompatActivity() {
         currentSource = source
         currentPage = page
         runTask({ catalog.list(source, page) }) { rows ->
-            content.removeAllViews()
-            label(sourceLabel(source))
-            label(getString(when (source) {
-                DictionarySource.WANXIANG -> R.string.public_dictionary_license_wanxiang
-                DictionarySource.ICE -> R.string.public_dictionary_license_ice
-                DictionarySource.ZHWIKI -> R.string.public_dictionary_license_wiki
-                else -> R.string.public_dictionary_license_website
-            }))
-            command(getString(R.string.public_dictionary_categories)) { history.clear(); browse(source, null, false) }
-            rows.forEach { item -> command(item.title) {
-                if (item.category) browse(source, item.address) else confirmInstall(source, item)
-            } }
-            status.setText(R.string.public_dictionary_choose)
+            renderCatalog(source, rows, 0)
         }
+    }
+
+    private fun renderCatalog(source: DictionarySource, rows: List<CatalogItem>, offset: Int) {
+        content.removeAllViews()
+        label(sourceLabel(source))
+        label(getString(when (source) {
+            DictionarySource.WANXIANG -> R.string.public_dictionary_license_wanxiang
+            DictionarySource.ICE -> R.string.public_dictionary_license_ice
+            DictionarySource.ZHWIKI -> R.string.public_dictionary_license_wiki
+            else -> R.string.public_dictionary_license_website
+        }))
+        command(getString(R.string.public_dictionary_categories)) { history.clear(); browse(source, null, false) }
+        if (offset > 0) command(getString(R.string.public_dictionary_previous_page)) {
+            renderCatalog(source, rows, offset - CATALOG_PAGE_SIZE)
+        }
+        rows.subList(offset, minOf(offset + CATALOG_PAGE_SIZE, rows.size)).forEach { item -> command(item.title) {
+            if (item.category) browse(source, item.address) else confirmInstall(source, item)
+        } }
+        if (offset + CATALOG_PAGE_SIZE < rows.size) command(getString(R.string.public_dictionary_next_page)) {
+            renderCatalog(source, rows, offset + CATALOG_PAGE_SIZE)
+        }
+        (content.parent as ScrollView).scrollTo(0, 0)
+        status.setText(R.string.public_dictionary_choose)
     }
 
     private fun confirmInstall(source: DictionarySource, item: CatalogItem) {
@@ -267,4 +278,6 @@ class DictionaryManagerActivity : AppCompatActivity() {
         refreshAfterStop = true; cancel(); management.close(); content.removeAllViews(); super.onStop()
     }
     override fun onDestroy() { worker.shutdownNow(); super.onDestroy() }
+
+    private companion object { const val CATALOG_PAGE_SIZE = 64 }
 }

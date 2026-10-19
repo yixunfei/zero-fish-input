@@ -22,8 +22,8 @@ python tools/resources/publish.py
 
 Preparation verifies source files and writes deterministic ZIP files under ignored
 `build/public-resources/`. Review and commit `tools/resources/catalog.json` before
-publishing. The publisher uses `GH_TOKEN`, `GITHUB_TOKEN` or the Git credential
-helper without displaying credentials. It uploads immutable content-versioned
+publishing. The publisher uses explicitly supplied `GH_TOKEN` or `GITHUB_TOKEN`
+without displaying credentials. It uploads immutable content-versioned
 Releases, verifies the server digest and never overwrites existing assets.
 It does not commit, merge, push code or publish an APK.
 
@@ -31,7 +31,10 @@ For first publication, `prepare-mini.py` downloads only the pinned UER source in
 exports/quantizes with the reviewed host tools, and checks the resulting graph and
 vocabulary against the already-reviewed catalog. It does not read a resource Release.
 Use Python 3.11+ with CPU PyTorch 2.12.0, ONNX 1.19.0, ONNX Runtime 1.26.0,
-ml_dtypes 0.5.3 and NumPy 2.2.6 (see the publishing workflow for installation).
+ml_dtypes 0.5.3 and NumPy 2.2.6. The publication workflow uses CPython 3.11 on
+Linux x86_64 in a fresh virtual environment, with every direct/transitive wheel
+pinned in `tools/resources/requirements-linux-cpu.txt` and `pip --require-hashes
+--only-binary=:all:`. Source distributions and unpinned dependencies are rejected.
 Prepare dictionary and handwriting inputs with their existing scripts first.
 An altered export or ZIP must fail comparison; review the model and catalog together
 before dispatching publication. `fetch-mini.py` is only a convenience for restoring
@@ -40,8 +43,16 @@ an already-published resource into a developer checkout, never a publication pre
 The application checks the catalog from this repository's `main` branch only when
 requested. Every supported resource has a fixed data contract, version, license,
 archive byte length/hash and per-file length/hash. Unsupported file sets fail closed.
-Publish resource assets before promoting an updated catalog to `main`.
 Keep older releases available for previously installed versions.
+
+Manual publication accepts a full reviewed commit SHA already reachable from
+`main`; moving branches/tags and unrelated commits are rejected. A read-only job
+rebuilds and verifies data using the pinned host environment, then uploads data
+artifacts. A separate fresh job with repository write permission checks the
+commit ancestry again and publishes those hash-verified assets using only the
+standard-library publisher. Neither checkout persists Git credentials. Merge a
+reviewed catalog before dispatching publication; until assets are available,
+download failure leaves the currently installed offline resources unchanged.
 
 ## Source attribution and redistribution
 

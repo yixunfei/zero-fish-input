@@ -6,11 +6,11 @@ import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 
 enum class AiAction(val promptInstruction: String) {
-    ASK("回答用户的问题"),
-    PLAN("把目标拆解成可执行的步骤"),
-    POLISH("在不改变原意的前提下润色文字"),
-    REWRITE("改写文字，使表达更清晰自然"),
-    TRANSLATE("翻译文字"),
+    ASK("回答当前用户的问题；先给直接答案，必要时简要说明假设或不确定之处"),
+    PLAN("把当前用户的目标拆成有顺序、可执行且结果明确的步骤"),
+    POLISH("在保留事实、原意和适当语气的前提下润色用户文字"),
+    REWRITE("在保留事实和核心意思的前提下重写用户文字，使其更清楚自然"),
+    TRANSLATE("忠实翻译用户提供的原文"),
 }
 
 enum class AiRole { SYSTEM, USER, ASSISTANT }
@@ -125,7 +125,7 @@ sealed class AiProviderError(message: String, cause: Throwable? = null) : Except
     class Storage : AiProviderError("AI conversation storage operation failed")
 }
 
-enum class AiNetworkFailure { CONNECTION, DNS, TLS, REDIRECT, TIMEOUT, AUTHENTICATION, MODEL_OR_ENDPOINT, RATE_LIMIT, SERVICE, REQUEST }
+enum class AiNetworkFailure { CONNECTION, DNS, TLS, REDIRECT, TIMEOUT, AUTHENTICATION, MODEL_OR_ENDPOINT, RATE_LIMIT, SERVICE, REQUEST, CAPACITY }
 enum class AiNetworkOperation { GENERATION, MODELS }
 enum class AiResponseFailure { INVALID, OUTPUT_LIMIT, EMPTY }
 
@@ -135,11 +135,13 @@ data class AiGenerationPolicy(
     val sensitiveEditor: Boolean,
     val personalizationAllowed: Boolean = true,
     val suggestionsAllowed: Boolean = true,
+    /** Explicit independent-draft permission; never grants personal-data access. */
+    val independentAiAllowed: Boolean = personalizationAllowed && suggestionsAllowed,
 ) {
     fun check(request: AiRequest) {
         if (!enabled || !networkAllowed) throw AiProviderError.Policy("AI is disabled")
         if (sensitiveEditor) throw AiProviderError.Policy("AI is unavailable in sensitive input")
-        if (!personalizationAllowed || !suggestionsAllowed) {
+        if (!independentAiAllowed || !suggestionsAllowed) {
             throw AiProviderError.Policy("AI is unavailable in this input")
         }
         require(request.input.length <= AiLimits.MAX_INPUT_CHARS) { "AI input is too large" }

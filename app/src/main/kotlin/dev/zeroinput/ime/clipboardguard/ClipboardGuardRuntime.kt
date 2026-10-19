@@ -11,6 +11,7 @@ import dev.zeroinput.ime.concurrency.BoundedExecutors
 import dev.zeroinput.security.AuthenticationGrant
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -22,8 +23,9 @@ internal class ClipboardGuardRuntime(
     private val preferences: ClipboardGuardPreferences,
     private val createClipboard: () -> SystemClipboardPort = { AndroidSystemClipboard(context) },
     private val isDefaultIme: () -> Boolean = { isSelectedIme(context) },
+    private val worker: ExecutorService = BoundedExecutors.singleThread("zeroinput-clipboard-guard", 8),
 ) : AutoCloseable {
-    private val worker = BoundedExecutors.singleThread("zeroinput-clipboard-guard", 8)
+    private val submissionLock = Any()
     private val main = Handler(Looper.getMainLooper())
     private val revision = AtomicLong()
     private val imeAttached = AtomicBoolean()
@@ -258,21 +260,24 @@ internal class ClipboardGuardRuntime(
         }
     }
 
-    private fun enqueue(action: () -> Unit): Boolean = try {
-        worker.execute {
-            try {
-                action()
-            } catch (_: RuntimeException) {
-                lease = revision.incrementAndGet()
-                detachPlatform()
-                session = null
-                publish(ClipboardGuardState(options, ClipboardGuardStatus.FAILED))
+    private fun enqueue(action: () -> Unit): Boolean = synchronized(submissionLock) {
+        if (closed.get()) return@synchronized false
+        try {
+            worker.execute {
+                try {
+                    action()
+                } catch (_: RuntimeException) {
+                    lease = revision.incrementAndGet()
+                    detachPlatform()
+                    session = null
+                    publish(ClipboardGuardState(options, ClipboardGuardStatus.FAILED))
+                }
             }
+            true
+        } catch (_: RejectedExecutionException) {
+            revision.incrementAndGet()
+            false
         }
-        true
-    } catch (_: RejectedExecutionException) {
-        revision.incrementAndGet()
-        false
     }
 
     override fun close() {
@@ -282,8 +287,14 @@ internal class ClipboardGuardRuntime(
         settingsObserver.close()
         listeners.clear()
         main.post { overlay.close() }
-        enqueue { detachPlatform(); notifications.cancel() }
-        worker.shutdown()
+        synchronized(submissionLock) {
+            // This runtime owns the worker. Closed prevents further submissions;
+            // remove obsolete queued work to reserve a slot for mandatory cleanup.
+            // Cleanup still follows the running task, including late registrations.
+            BoundedExecutors.cancelQueued(worker)
+            worker.execute { try { detachPlatform() } finally { notifications.cancel() } }
+            worker.shutdown()
+        }
     }
 
     private companion object {

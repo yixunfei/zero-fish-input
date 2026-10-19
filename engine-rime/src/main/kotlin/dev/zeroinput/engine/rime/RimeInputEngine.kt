@@ -83,8 +83,6 @@ internal class RimeInputEngine(
         }) {
             return EngineUpdate(currentSnapshot, consumed = false)
         }
-        val reading = committedReading(currentSnapshot.highlightedIndex)
-        val learningInput = learningInput(input, currentSnapshot.highlightedIndex)
         if (key == EngineKey.Backspace && selectedIndices.isNotEmpty() && input == selectedInput) return undoSelection()
         if (key == EngineKey.Backspace) {
             val previous = readingHistory.lastOrNull()
@@ -102,8 +100,7 @@ internal class RimeInputEngine(
             EngineKey.Enter -> error("Enter is handled before native key dispatch")
         }
         val consumed = NativeRimeBridge.nativeProcessKey(sessionId, keyCode, modifiers)
-        readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty(),
-            learningInput = learningInput)
+        readUpdate(consumed, learningRawInput = input)
     }
 
     override fun selectCandidate(index: Int): EngineUpdate = nativeCall {
@@ -275,8 +272,12 @@ internal class RimeInputEngine(
         NativeRimeBridge.nativeConvertText(text, options.script == ChineseScript.SIMPLIFIED)
     }
 
-    private fun readUpdate(consumed: Boolean): EngineUpdate {
+    private fun readUpdate(consumed: Boolean, learningRawInput: String? = null): EngineUpdate {
         val update = NativeRimeBridge.nativeReadUpdate(sessionId)
+        // Capture the old selection only on commit, before replacing it.
+        val committed = learningRawInput != null && update.committedText.isNotEmpty()
+        val reading = if (committed) committedReading(currentSnapshot.highlightedIndex) else ""
+        val learning = if (committed) learningInput(learningRawInput.orEmpty(), currentSnapshot.highlightedIndex) else ""
         pageNumber = update.pageNumber
         caretPosition = update.caretPosition
         if (update.rawInput.isEmpty()) {
@@ -301,7 +302,9 @@ internal class RimeInputEngine(
             selection = if (options.keyboardLayout == ChineseKeyboardLayout.FULL && update.rawInput.isNotEmpty())
                 CompositionSelection(update.rawInput.length) else null,
         )
-        return EngineUpdate(currentSnapshot, update.committedText, consumed || update.committedText.isNotEmpty())
+        return EngineUpdate(currentSnapshot, update.committedText, consumed || update.committedText.isNotEmpty(),
+            committedInput = if (committed) reading.ifBlank { learningRawInput.orEmpty() } else "",
+            learnable = !committed || reading.isNotEmpty(), learningInput = learning)
     }
 
     private inline fun <T> nativeCall(block: () -> T): T = try {

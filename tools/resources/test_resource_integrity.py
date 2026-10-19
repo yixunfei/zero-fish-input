@@ -42,6 +42,8 @@ class RuntimeIntegrityTest(unittest.TestCase):
         path = self.root / 'fixture.apk'
         with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as archive:
             archive.writestr('assets/glide-zh.tsv', b'public fixture')
+            for index in range(3972):
+                archive.writestr(f'assets/emoji/18.0/images/{index}.webp', b'public artwork fixture')
             if runtime is not None:
                 archive.writestr(f'lib/{abi}/libonnxruntime.so', runtime)
             if jni is not None:

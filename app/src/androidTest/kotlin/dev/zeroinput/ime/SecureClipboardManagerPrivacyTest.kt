@@ -1,6 +1,8 @@
 package dev.zeroinput.ime
 
 import android.content.Intent
+import android.app.Activity
+import android.app.Instrumentation
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
@@ -11,6 +13,10 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.ime.settings.SecureClipboardManagerActivity
 import dev.zeroinput.ime.settings.SecureClipboardManagerView
+import dev.zeroinput.ime.auth.AuthenticationBroker
+import dev.zeroinput.ime.auth.SecureClipboardUnlockActivity
+import dev.zeroinput.security.AuthenticationGrant
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -69,6 +75,59 @@ class SecureClipboardManagerPrivacyTest {
             if (!detached) android.os.SystemClock.sleep(20)
         }
         assertTrue("Private dialog must leave the window with its Activity", detached)
+    }
+
+    @Test fun cancelledAdditionalAuthenticationClosesThePageAndNeverRestoresItsLabels() {
+        val entry = graph.secureClipboard.add("public cancellation fixture", "public fixture",
+            AuthenticationGrant.afterSuccessfulSystemAuthentication())
+        try {
+            withActivity { activity ->
+                val requestId = AtomicReference<String>()
+                val monitor = object : Instrumentation.ActivityMonitor() {
+                    override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                        if (intent.component?.className != SecureClipboardUnlockActivity::class.java.name) return null
+                        requestId.set(intent.getStringExtra(SecureClipboardUnlockActivity.EXTRA_REQUEST_ID))
+                        return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+                    }
+                }
+                instrumentation.addMonitor(monitor)
+                try {
+                    lateinit var screen: SecureClipboardManagerView
+                    onMain {
+                        screen = views(activity.window.decorView).filterIsInstance<SecureClipboardManagerView>().single()
+                        screen.onEnableRequested()
+                        AuthenticationBroker.complete(checkNotNull(requestId.getAndSet(null)),
+                            AuthenticationGrant.afterSuccessfulSystemAuthentication())
+                    }
+                    awaitOnMain { views(screen).filterIsInstance<android.widget.TextView>().any { it.text == entry.label } }
+                    onMain {
+                        screen.onDeleteRequested(entry)
+                        val dialog = WindowInspector.getGlobalWindowViews().single {
+                            it.findViewById<View>(android.R.id.button1) != null
+                        }
+                        dialog.findViewById<View>(android.R.id.button1).performClick()
+                        instrumentation.callActivityOnStop(activity)
+                        AuthenticationBroker.complete(checkNotNull(requestId.get()), null)
+                    }
+                    awaitOnMain { activity.isFinishing }
+                    onMain {
+                        assertFalse(views(screen).filterIsInstance<android.widget.TextView>().any { it.text == entry.label })
+                    }
+                } finally { instrumentation.removeMonitor(monitor) }
+            }
+        } finally {
+            graph.secureClipboard.remove(entry.id, AuthenticationGrant.afterSuccessfulSystemAuthentication())
+        }
+    }
+
+    private fun awaitOnMain(condition: () -> Boolean) {
+        val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+        var complete = false
+        while (!complete && android.os.SystemClock.uptimeMillis() < deadline) {
+            onMain { complete = condition() }
+            if (!complete) android.os.SystemClock.sleep(20)
+        }
+        assertTrue("Manager state did not settle", complete)
     }
 
     private fun withActivity(test: (SecureClipboardManagerActivity) -> Unit) {

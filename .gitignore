@@ -1,4 +1,6 @@
 .gradle/
+.gradle-user/
+.tmp-evidence/
 .kotlin/
 __pycache__/
 *.py[cod]

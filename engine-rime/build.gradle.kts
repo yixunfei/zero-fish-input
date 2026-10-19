@@ -112,6 +112,7 @@ val openCcHashes = mapOf(
     "STPhrases.txt" to "1411418f98dd7666a4ee673619654ed1e0518ec97953315cc10656c30c7015bb",
 )
 val verifyOpenCcAssets = tasks.register("verifyOpenCcAssets") {
+    onlyIf { hasNativeRime }
     doLast {
         openCcHashes.forEach { (name, expected) ->
             val file = openCcDictionaryRoot.resolve(name)

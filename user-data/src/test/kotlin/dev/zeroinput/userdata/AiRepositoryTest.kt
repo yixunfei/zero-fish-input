@@ -258,6 +258,27 @@ class AiRepositoryTest {
     }
 
     @Test
+    fun conversationCapacityRejectsNewIdsAndAllowsUpdatingExistingHistory() {
+        val store = MemoryStore()
+        val repository = AiConversationRepository(store)
+        repeat(AiLimits.MAX_CONVERSATIONS) { index ->
+            repository.upsert(AiConversation(id = "fixture-$index", title = "Fixture $index",
+                updatedAtEpochMillis = index.toLong()))
+        }
+        val original = checkNotNull(store.bytes).copyOf()
+
+        assertThrows(IllegalStateException::class.java) {
+            repository.upsert(AiConversation(id = "overflow", title = "Overflow"))
+        }
+
+        assertArrayEquals(original, store.bytes)
+        assertEquals(AiLimits.MAX_CONVERSATIONS, repository.list().size)
+        repository.upsert(AiConversation(id = "fixture-0", title = "Updated"))
+        assertEquals("Updated", repository.find("fixture-0")?.title)
+        assertEquals(AiLimits.MAX_CONVERSATIONS, repository.list().size)
+    }
+
+    @Test
     fun failedConversationWriteDoesNotPublishTheNewCache() {
         val store = MemoryStore()
         val repository = AiConversationRepository(store)

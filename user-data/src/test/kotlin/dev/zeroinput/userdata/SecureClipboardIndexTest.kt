@@ -66,8 +66,8 @@ class SecureClipboardIndexTest {
         assertThrows(IOException::class.java) { vault.summaries() }
         assertThrows(IOException::class.java) { vault.metadata(grant()) }
         index.failWrite = false
-        assertTrue(vault.metadata(grant()).isEmpty())
-        assertTrue(vault.summaries().isEmpty())
+        assertEquals(item.id, vault.metadata(grant()).single().id)
+        assertEquals(item.id, vault.summaries().single().id)
     }
 
     @Test fun clearDuringIndexCheckCannotRecreateDeletedData() {

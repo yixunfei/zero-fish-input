@@ -24,6 +24,15 @@ internal class AiContentInbox(private val now: () -> Long = { System.nanoTime() 
         return pending.also { pending = null }
     }
 
+    /** Rejection retains ownership and the original deadline; acceptance transfers ownership. */
+    @Synchronized fun claimIfAccepted(accept: (AiImportedContent) -> Boolean): Boolean? {
+        expire()
+        val content = pending ?: return null
+        if (!accept(content)) return false
+        pending = null
+        return true
+    }
+
     @Synchronized fun expire() {
         if (now() >= expiresAt) clear()
     }

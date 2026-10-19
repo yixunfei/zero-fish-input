@@ -275,4 +275,6 @@
     <string name="ai_models_failed">%1$s\nYou can still enter and test models manually.</string>
     <string name="ai_models_select">Select models to keep (up to 32)</string>
     <string name="ai_models_apply">Apply to draft</string>
+    <string name="public_dictionary_previous_page">Previous page</string>
+    <string name="public_dictionary_next_page">Next page</string>
 </resources>

@@ -280,6 +280,19 @@ editor, settings, service or stored AI data changes. Conversation persistence is
 default, exposes summaries before selection, and uses a dedicated Keystore alias under
 `noBackupFilesDir`.
 
+The AI candidate row is attached directly below the AI draft and routes candidate selection and
+page changes to that draft's controller, never the host editor controller. The draft text offers
+one contextual command to replace the AI draft with a range selected inside that draft; the service
+revalidates the exact source and range against the current committed draft before replacement. This local
+edit sends nothing; the user must still explicitly submit the draft to send a request.
+The host editor selection and both system/private clipboard contents have no read path. Completed
+answers are split into bounded plain-text sections (paragraphs, headings/list items and fenced
+code blocks); users may check several sections, clear/select all, and insert them in original
+order. Selecting every section preserves the exact response. Saved conversations load only after
+an explicit history-row tap, then select the bounded recent turns as continuation context by
+default; the context/history display is collapsed until opened. Deleting the active conversation
+clears it only after encrypted deletion succeeds, preserving the current transcript on failure.
+
 Conversation-storage failures use a separate feedback callback or the history-list
 error state; they cannot replace a completed answer or cancel an active stream.
 Result insertion still checks the live editor, reference and data generations.
@@ -847,3 +860,32 @@ Entry search lists retained local changes before unmodified public rows, so an
 upstream removal cannot hide an active override from management. Editor forms
 capture the displayed data generation when opened; saving cannot adopt a newer
 generation after reset. Completion callbacks close only their submitting dialog.
+
+## Review hardening (2026-10-18)
+
+Secure clipboard mutations stage the body-free index before writing the body.
+The atomic body write is the commit point; cancellation is checked before that
+point, and a completed save is not subsequently reported as cancelled. Precommit
+failures restore the prior state under the vault lock and deletion generation.
+A failed body rollback blocks further access. This is not a crash-atomic two-file
+transaction: process termination may leave stale index IDs/timestamps, reconciled
+against the authoritative body only after authentication. Formats and keys stay
+unchanged. Settings deletion is application-owned and bounded, retaining completion
+results across Activity recreation within the current process; it is not a durable
+receipt across process death.
+
+AI submission receives the current editor privacy policy. The isolated local draft
+captures Chinese layout options and shares preedit validation with the editor
+session, retaining nine-key digits and double-pinyin codes during engine handoff.
+It continues to bypass personalization. Pending dictionary filtering hides unsafe
+native candidates while Space commits raw input. A missing runtime engine exposes
+failure and allows explicit preparation retry within the session.
+
+Language-pack factories share a linear-space prefix candidate index rather than
+allocating a bucket for every shortcut prefix on each session. Public resource
+verification retains at most 64 process-local entries after full hashing. Cache
+hits require identical device/inode, size, mtime and ctime and the same pinned
+digest; unsupported identity metadata falls back to full hashing. No trusted
+metadata ticket is persisted, and cold acquisitions retain full verification on
+the worker. UI header/options and unchanged list models skip redundant rendering;
+these changes do not establish measured frame-time or cold-start improvements.

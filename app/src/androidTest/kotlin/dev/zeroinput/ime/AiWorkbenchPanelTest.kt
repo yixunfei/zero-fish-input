@@ -151,8 +151,9 @@ class AiWorkbenchPanelTest {
         var requests = 0
         var inserted = ""
         panel.onSubmit = { _, _, _ -> requests++ }
-        panel.onInsert = { value, _ -> inserted = value }
+        panel.onInsert = { value, _, _ -> inserted = value }
         panel.renderDraft("public fixture")
+        panel.setEditing(false)
         visible(panel).filterIsInstance<TextView>().first {
             it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_action_translate)
         }.performClick()
@@ -160,6 +161,15 @@ class AiWorkbenchPanelTest {
         panel.render(AiStreamEvent.Started)
         panel.renderConversation(dev.zeroinput.ai.api.AiConversation(title = "public fixture"))
         panel.render(AiStreamEvent.Completed("public response"))
+        val insertButton = visible(panel).filterIsInstance<TextView>().first {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+        }
+        assertFalse(insertButton.isEnabled)
+        insertButton.performClick()
+        assertEquals("No response section is selected yet", "", inserted)
+        visible(panel).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>().first {
+            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_select_all)
+        }.performClick()
         visible(panel).filterIsInstance<TextView>().first {
             it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
         }.performClick()
@@ -185,7 +195,7 @@ class AiWorkbenchPanelTest {
             assertTrue(panel.isAiEditing)
             val workbench = visible(panel).filterIsInstance<AiWorkbenchPanelView>().single()
             var inserts = 0
-            panel.onAiInsert = { _, _ -> inserts++ }
+            panel.onAiInsert = { _, _, _ -> inserts++ }
             panel.renderAiDraft("public fixture", InputSessionState())
             panel.renderAiModels(listOf("public-long-model-name", "public-other"), "public-long-model-name")
             captureAndCheck(panel, configuration, night, "draft")
@@ -195,17 +205,30 @@ class AiWorkbenchPanelTest {
                 listOf(dev.zeroinput.ai.api.AiReference("public selected reference"))))
             panel.clearAiPage()
             captureAndCheck(panel, configuration, night, "context")
+            visible(workbench).filterIsInstance<TextView>().first {
+                it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_show_result)
+            }.performClick()
             panel.renderAi(AiStreamEvent.Started)
             panel.renderAi(AiStreamEvent.Completed("public response"))
             assertEquals(0, inserts)
             measure(panel, configuration.screenWidthDp, configuration.screenHeightDp)
             captureAndCheck(panel, configuration, night, "result")
-            val response = visible(workbench).filterIsInstance<TextView>().single {
-                it.id == dev.zeroinput.ime.ui.R.id.ai_result_text }
-            val viewport = response.parent.parent as android.widget.ScrollView
+            val response = visible(workbench).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>().single {
+                it.text == "public response"
+            }
+            val viewport = response.parent.parent.parent.parent as android.widget.ScrollView
             assertTrue("Answer must have a readable viewport", viewport.height >= 48 * context.resources.displayMetrics.density)
             assertTrue(workbench.height > 0)
             assertTrue(panel.measuredHeight <= (configuration.screenHeightDp * context.resources.displayMetrics.density).toInt())
+            val insertButton = visible(workbench).filterIsInstance<TextView>().first {
+                it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+            }
+            assertFalse(insertButton.isEnabled)
+            insertButton.performClick()
+            assertEquals("Insertion requires explicit section selection", 0, inserts)
+            visible(workbench).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>().first {
+                it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_select_all)
+            }.performClick()
             visible(workbench).filterIsInstance<TextView>().first {
                 it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
             }.performClick()
@@ -289,8 +312,8 @@ class AiWorkbenchPanelTest {
         for (label in labels) {
             val button = visible(workbench).filterIsInstance<TextView>().first { it.text == it.context.getString(label) }
             val rect = Rect().also { button.getDrawingRect(it); workbench.offsetDescendantRectToMyCoords(button, it) }
-            assertTrue("Command must stay inside the workbench", rect.top >= 0 && rect.bottom <= workbench.height &&
-                rect.left >= 0 && rect.right <= workbench.width)
+            assertTrue("$stage command '${button.text}' is outside workbench at ${configuration.screenWidthDp}x${configuration.screenHeightDp} scale ${configuration.fontScale}: $rect / ${workbench.width}x${workbench.height}",
+                rect.top >= 0 && rect.bottom <= workbench.height && rect.left >= 0 && rect.right <= workbench.width)
             assertTrue("Command must remain a full touch target", button.height >= 48 * button.resources.displayMetrics.density)
             val layout = checkNotNull(button.layout)
             assertTrue("Command text must fit: ${button.text} at ${configuration.screenWidthDp}dp / ${configuration.fontScale}", (0 until layout.lineCount).all { layout.getEllipsisCount(it) == 0 })

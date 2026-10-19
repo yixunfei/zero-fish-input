@@ -37,10 +37,20 @@ fun networkViolation(path: String, text: String): String? {
 }
 
 fun pageAccessViolation(path: String, text: String): String? {
-    if (!path.contains("/src/main/")) return null
     val adapter = "app/src/main/kotlin/dev/zeroinput/ime/ai/page/PageReferenceService.kt"
+    val fixtures = setOf(
+        "KeyboardEditorIntegrationTest.kt", "KeyboardNavigationGestureTest.kt", "PinyinEditingInteractionTest.kt", "RgiEmojiTest.kt",
+        "clipboard/ClipboardExternalImportTest.kt", "clipboard/ClipboardSelectionCopyTest.kt", "clipboard/SecurePasteReturnTest.kt",
+        "clipboardguard/ClipboardDeviceTestSupport.kt", "clipboardguard/ClipboardGuardOverlayTest.kt",
+        "clipboardguard/SystemClipboardPlatformTest.kt",
+    ).map { "app/src/androidTest/kotlin/dev/zeroinput/ime/$it" }.toSet()
+    val keyFiltering = Regex("""\b(?:onKeyEvent|canRequestFilterKeyEvents|requestFilterKeyEvents|FLAG_REQUEST_FILTER_KEY_EVENTS)\b""")
+    if (keyFiltering.containsMatchIn(text)) return "Accessibility key filtering is forbidden"
     val capabilities = Regex("""android\.accessibilityservice\.AccessibilityService|android\.view\.accessibility\.AccessibilityNodeInfo|\brootInActiveWindow\b|\bgetRootInActiveWindow\b""")
-    if (capabilities.containsMatchIn(text) && path != adapter && path != "app/src/main/AndroidManifest.xml") {
+    if (Regex("""android\.accessibilityservice\.AccessibilityService\b""").containsMatchIn(text) && path in fixtures) {
+        return "Platform fixtures cannot introduce accessibility services"
+    }
+    if (capabilities.containsMatchIn(text) && path != adapter && path !in fixtures && path != "app/src/main/AndroidManifest.xml") {
         return "External page reads are restricted to the approved one-shot adapter"
     }
     if (path == adapter && Regex("""\b(?:dispatchGesture|performGlobalAction|performAction|takeScreenshot)\b""").containsMatchIn(text)) {
@@ -49,13 +59,79 @@ fun pageAccessViolation(path: String, text: String): String? {
     return null
 }
 
-fun validPageReferenceConfig(file: File, modern: Boolean): Boolean {
-    val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+val androidNamespace = "http://schemas.android.com/apk/res/android"
+
+fun readXml(file: File): org.w3c.dom.Document = file.inputStream().use {
+    javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
         isNamespaceAware = true
         isExpandEntityReferences = false
         setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+    }.newDocumentBuilder().parse(it)
+}
+
+fun manifestBoundaryViolations(document: org.w3c.dom.Document, release: Boolean): List<String> {
+    val errors = mutableListOf<String>()
+    val application = document.getElementsByTagName("application").item(0) as? org.w3c.dom.Element
+        ?: return listOf("Missing application")
+    fun attribute(element: org.w3c.dom.Element, name: String) = element.getAttributeNS(androidNamespace, name)
+    if (attribute(application, "allowBackup") != "false") errors += "Backup must be disabled"
+    if (release && attribute(application, "debuggable") !in setOf("", "false")) errors += "Release must not be debuggable"
+    if (attribute(application, "fullBackupContent") != "@xml/backup_rules" ||
+        attribute(application, "dataExtractionRules") != "@xml/data_extraction_rules") errors += "Unexpected backup rules"
+    val approved = mapOf(
+        "dev.zeroinput.ime.settings.MainActivity" to ("activity" to ""),
+        "dev.zeroinput.ime.clipboard.ClipboardImportActivity" to ("activity" to ""),
+        "dev.zeroinput.ime.ZeroInputService" to ("service" to "android.permission.BIND_INPUT_METHOD"),
+        "dev.zeroinput.ime.ai.page.PageReferenceService" to ("service" to "android.permission.BIND_ACCESSIBILITY_SERVICE"),
+    )
+    val found = mutableSetOf<String>()
+    for (tag in listOf("activity", "activity-alias", "service", "receiver", "provider")) {
+        val components = application.getElementsByTagName(tag)
+        for (index in 0 until components.length) {
+            val component = components.item(index) as org.w3c.dom.Element
+            val rawName = attribute(component, "name")
+            val packageName = document.documentElement.getAttribute("package").ifEmpty { "dev.zeroinput.ime" }
+            val name = when {
+                rawName.startsWith(".") -> packageName + rawName
+                "." !in rawName -> "$packageName.$rawName"
+                else -> rawName
+            }
+            val exported = attribute(component, "exported")
+            val implicit = exported.isEmpty() && (component.getElementsByTagName("intent-filter").length > 0 || tag == "provider")
+            if (exported != "true" && !implicit) continue
+            val expected = approved[name]
+            if (implicit || expected == null || expected.first != tag || expected.second != attribute(component, "permission")) {
+                errors += "Unexpected exported component: $name"
+            } else if (!found.add(name)) errors += "Duplicate exported component: $name"
+        }
     }
-    val root = file.inputStream().use { factory.newDocumentBuilder().parse(it) }.documentElement
+    if (found != approved.keys) errors += "Missing approved exported components"
+    return errors
+}
+
+fun validBackupRules(document: org.w3c.dom.Document, extraction: Boolean): Boolean {
+    val root = document.documentElement
+    val domains = setOf("root", "file", "database", "sharedpref", "external", "device_root", "device_file", "device_database", "device_sharedpref")
+    fun excluded(element: org.w3c.dom.Element): Boolean {
+        val exclusions = element.getElementsByTagName("exclude")
+        val actual = mutableSetOf<String>()
+        for (index in 0 until exclusions.length) {
+            val item = exclusions.item(index) as org.w3c.dom.Element
+            if (item.getAttribute("path") != ".") return false
+            actual += item.getAttribute("domain")
+        }
+        return actual == domains && exclusions.length == domains.size && element.getElementsByTagName("include").length == 0
+    }
+    if (!extraction) return root.tagName == "full-backup-content" && excluded(root)
+    if (root.tagName != "data-extraction-rules") return false
+    return listOf("cloud-backup", "device-transfer").all { tag ->
+        val nodes = root.getElementsByTagName(tag)
+        nodes.length == 1 && excluded(nodes.item(0) as org.w3c.dom.Element)
+    }
+}
+
+fun validPageReferenceConfig(document: org.w3c.dom.Document, modern: Boolean): Boolean {
+    val root = document.documentElement
     val expected = mutableMapOf(
         "description" to "@string/ai_page_access_description",
         "accessibilityEventTypes" to "typeWindowStateChanged|typeWindowsChanged",
@@ -73,6 +149,59 @@ fun validPageReferenceConfig(file: File, modern: Boolean): Boolean {
         }
     }
     return root.tagName == "accessibility-service" && actual == expected
+}
+
+fun approvedPrivacyResource(path: String): Boolean {
+    val name = path.substringAfterLast('/')
+    return path == "app/src/main/res/xml/$name" ||
+        name == "page_reference_service.xml" && path == "app/src/main/res/xml-v31/$name"
+}
+
+fun testManifestAndBackupBoundaries(root: File) {
+    val source = File(root, "app/src/main/AndroidManifest.xml")
+    check(manifestBoundaryViolations(readXml(source), true).isEmpty())
+    for ((attribute, value) in listOf("allowBackup" to "true", "debuggable" to "true", "fullBackupContent" to "@xml/other")) {
+        val document = readXml(source)
+        (document.getElementsByTagName("application").item(0) as org.w3c.dom.Element)
+            .setAttributeNS(androidNamespace, "android:$attribute", value)
+        check(manifestBoundaryViolations(document, true).isNotEmpty())
+    }
+    for (tag in listOf("activity", "activity-alias", "service", "provider", "receiver")) {
+        val document = readXml(source)
+        val component = document.createElement(tag)
+        component.setAttributeNS(androidNamespace, "android:name", "unapproved.Component")
+        component.setAttributeNS(androidNamespace, "android:exported", "true")
+        document.getElementsByTagName("application").item(0).appendChild(component)
+        check(manifestBoundaryViolations(document, false).isNotEmpty())
+        component.removeAttributeNS(androidNamespace, "exported")
+        component.appendChild(document.createElement("intent-filter"))
+        check(manifestBoundaryViolations(document, false).isNotEmpty())
+    }
+    val serviceDocument = readXml(source)
+    val services = serviceDocument.getElementsByTagName("service")
+    for (index in 0 until services.length) {
+        val service = services.item(index) as org.w3c.dom.Element
+        if (service.getAttributeNS(androidNamespace, "exported") == "true") {
+            service.setAttributeNS(androidNamespace, "android:permission", "unapproved.PERMISSION")
+        }
+    }
+    check(manifestBoundaryViolations(serviceDocument, false).isNotEmpty())
+    val config = readXml(File(root, "app/src/main/res/xml/page_reference_service.xml"))
+    check(validPageReferenceConfig(config, false))
+    config.documentElement.setAttributeNS(androidNamespace, "android:canRequestFilterKeyEvents", "true")
+    check(!validPageReferenceConfig(config, false))
+    for (path in listOf("app/src/main/res/xml-v33/page_reference_service.xml",
+        "app/src/debug/res/xml/page_reference_service.xml", "app/src/main/res/xml-v31/backup_rules.xml")) {
+        check(!approvedPrivacyResource(path))
+    }
+    for (extraction in listOf(false, true)) {
+        val name = if (extraction) "data_extraction_rules" else "backup_rules"
+        val document = readXml(File(root, "app/src/main/res/xml/$name.xml"))
+        check(validBackupRules(document, extraction))
+        val exclude = document.getElementsByTagName("exclude").item(0)
+        exclude.parentNode.removeChild(exclude)
+        check(!validBackupRules(document, extraction))
+    }
 }
 
 tasks.register("testPrivacyBoundary") {
@@ -128,6 +257,110 @@ tasks.register("testPrivacyBoundary") {
             "service::performAction", "service::dispatchGesture", "service::takeScreenshot", "service::performGlobalAction")) {
             check(pageAccessViolation(page, action) != null)
         }
+        for (path in listOf(page, "app/src/debug/kotlin/Reader.kt", "app/src/androidTest/kotlin/Reader.kt")) {
+            for (key in listOf("onKeyEvent", "canRequestFilterKeyEvents", "requestFilterKeyEvents", "FLAG_REQUEST_FILTER_KEY_EVENTS")) {
+                check(pageAccessViolation(path, key) != null)
+            }
+        }
+        check(pageAccessViolation("app/src/debug/kotlin/Reader.kt", "rootInActiveWindow") != null)
+        testManifestAndBackupBoundaries(rootProject.projectDir)
+    }
+}
+
+fun Project.scanPrivacySources(violations: MutableList<String>) {
+    val sourceRoots = subprojects.map { it.file("src") }
+
+    sourceRoots.filter(File::exists).forEach { root ->
+        root.walkTopDown()
+            .filter { it.isFile && it.extension in setOf("kt", "java", "xml") }
+            .forEach { file ->
+                val text = file.readText()
+                val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
+                systemClipboardViolation(path, text)?.let { violations += "$path: $it" }
+                networkViolation(path, text)?.let { violations += "$path: $it" }
+                pageAccessViolation(path, text)?.let { violations += "$path: $it" }
+            }
+    }
+}
+
+fun Project.checkMergedPrivacyManifests(violations: MutableList<String>) {
+    val androidNamespace = "http://schemas.android.com/apk/res/android"
+    listOf("debug", "release").forEach { variant ->
+        val manifestRoot = project(":app").layout.buildDirectory.dir("intermediates/merged_manifest/$variant").get().asFile
+        val manifests = manifestRoot.walkTopDown()
+            .filter { it.isFile && it.name == "AndroidManifest.xml" }
+            .toList()
+        if (manifests.isEmpty()) {
+            violations += "Missing merged $variant manifest; packaged permissions were not verified"
+        }
+        manifests.forEach { manifest ->
+            val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+                isNamespaceAware = true
+                isExpandEntityReferences = false
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            }
+            val document = manifest.inputStream().use { factory.newDocumentBuilder().parse(it) }
+            violations += manifestBoundaryViolations(document, variant == "release")
+            val packageName = document.documentElement.getAttribute("package")
+            val services = document.getElementsByTagName("service")
+            val pageName = "dev.zeroinput.ime.ai.page.PageReferenceService"
+            var pageServices = 0
+            for (index in 0 until services.length) {
+                val service = services.item(index) as org.w3c.dom.Element
+                val name = service.getAttributeNS(androidNamespace, "name")
+                val permission = service.getAttributeNS(androidNamespace, "permission")
+                if (permission == "android.permission.BIND_ACCESSIBILITY_SERVICE" && name != pageName) {
+                    violations += "Unexpected accessibility service"
+                }
+                if (name == pageName) {
+                    pageServices++
+                    if (permission != "android.permission.BIND_ACCESSIBILITY_SERVICE" ||
+                        service.getAttributeNS(androidNamespace, "exported") != "true") {
+                        violations += "Page service must be system-bound and explicitly exported"
+                    }
+                }
+            }
+            if (pageServices != 1) violations += "Missing or duplicate page reference service"
+            val allowedPermissions = setOf(
+                "android.permission.USE_BIOMETRIC",
+                "android.permission.USE_FINGERPRINT",
+                "android.permission.POST_NOTIFICATIONS",
+                "android.permission.SYSTEM_ALERT_WINDOW",
+                "android.permission.INTERNET",
+                "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+            )
+            val permissionNames = buildSet {
+                val elements = document.getElementsByTagName("*")
+                for (index in 0 until elements.length) {
+                    val element = elements.item(index) as? org.w3c.dom.Element ?: continue
+                    if (!element.tagName.startsWith("uses-permission")) continue
+                    element.getAttributeNS(androidNamespace, "name")
+                        .takeIf(String::isNotBlank)
+                        ?.let(::add)
+                }
+            }
+            val unexpected = permissionNames - allowedPermissions
+            if (unexpected.isNotEmpty()) {
+                violations += "${manifest.relativeTo(rootProject.projectDir)}: " +
+                    "Unexpected packaged permissions: ${unexpected.sorted().joinToString()}"
+            }
+        }
+    }
+}
+
+fun Project.checkPrivacyResources(violations: MutableList<String>) {
+    for (variant in listOf("xml", "xml-v31")) {
+        if (!validPageReferenceConfig(readXml(rootProject.file("app/src/main/res/$variant/page_reference_service.xml")),
+                modern = variant == "xml-v31")) violations += "Unexpected page reference capability"
+    }
+    rootProject.file("app/src").walkTopDown().filter { it.isFile && it.name in
+        setOf("page_reference_service.xml", "backup_rules.xml", "data_extraction_rules.xml") }.forEach { file ->
+        val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
+        val page = file.name == "page_reference_service.xml"
+        if (!approvedPrivacyResource(path)) violations += "Unapproved capability/backup resource override: $path"
+        else if (!page && !validBackupRules(readXml(file), file.name == "data_extraction_rules.xml")) {
+            violations += "Incomplete backup exclusions: $path"
+        }
     }
 }
 
@@ -137,86 +370,10 @@ tasks.register("privacyCheck") {
     dependsOn("testPrivacyBoundary", ":app:processDebugMainManifest", ":app:processReleaseMainManifest")
 
     doLast {
-        val sourceRoots = subprojects.map { it.file("src") }
         val violations = mutableListOf<String>()
-
-        sourceRoots.filter(File::exists).forEach { root ->
-            root.walkTopDown()
-                .filter { it.isFile && it.extension in setOf("kt", "java", "xml") }
-                .forEach { file ->
-                    val text = file.readText()
-                    val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
-                    systemClipboardViolation(path, text)?.let { violations += "$path: $it" }
-                    networkViolation(path, text)?.let { violations += "$path: $it" }
-                    pageAccessViolation(path, text)?.let { violations += "$path: $it" }
-                }
-        }
-
-        val androidNamespace = "http://schemas.android.com/apk/res/android"
-        listOf("debug", "release").forEach { variant ->
-            val manifestRoot = rootProject.file("app/build/intermediates/merged_manifest/$variant")
-            val manifests = manifestRoot.walkTopDown()
-                .filter { it.isFile && it.name == "AndroidManifest.xml" }
-                .toList()
-            if (manifests.isEmpty()) {
-                violations += "Missing merged $variant manifest; packaged permissions were not verified"
-            }
-            manifests.forEach { manifest ->
-                val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
-                    isNamespaceAware = true
-                    isExpandEntityReferences = false
-                    setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-                }
-                val document = manifest.inputStream().use { factory.newDocumentBuilder().parse(it) }
-                val packageName = document.documentElement.getAttribute("package")
-                val services = document.getElementsByTagName("service")
-                val pageName = "dev.zeroinput.ime.ai.page.PageReferenceService"
-                var pageServices = 0
-                for (index in 0 until services.length) {
-                    val service = services.item(index) as org.w3c.dom.Element
-                    val name = service.getAttributeNS(androidNamespace, "name")
-                    val permission = service.getAttributeNS(androidNamespace, "permission")
-                    if (permission == "android.permission.BIND_ACCESSIBILITY_SERVICE" && name != pageName) {
-                        violations += "Unexpected accessibility service"
-                    }
-                    if (name == pageName) {
-                        pageServices++
-                        if (permission != "android.permission.BIND_ACCESSIBILITY_SERVICE" ||
-                            service.getAttributeNS(androidNamespace, "exported") != "true") {
-                            violations += "Page service must be system-bound and explicitly exported"
-                        }
-                    }
-                }
-                if (pageServices != 1) violations += "Missing or duplicate page reference service"
-                val allowedPermissions = setOf(
-                    "android.permission.USE_BIOMETRIC",
-                    "android.permission.USE_FINGERPRINT",
-                    "android.permission.POST_NOTIFICATIONS",
-                    "android.permission.SYSTEM_ALERT_WINDOW",
-                    "android.permission.INTERNET",
-                    "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
-                )
-                val permissionNames = buildSet {
-                    val elements = document.getElementsByTagName("*")
-                    for (index in 0 until elements.length) {
-                        val element = elements.item(index) as? org.w3c.dom.Element ?: continue
-                        if (!element.tagName.startsWith("uses-permission")) continue
-                        element.getAttributeNS(androidNamespace, "name")
-                            .takeIf(String::isNotBlank)
-                            ?.let(::add)
-                    }
-                }
-                val unexpected = permissionNames - allowedPermissions
-                if (unexpected.isNotEmpty()) {
-                    violations += "${manifest.relativeTo(rootProject.projectDir)}: " +
-                        "Unexpected packaged permissions: ${unexpected.sorted().joinToString()}"
-                }
-            }
-        }
-        for (variant in listOf("xml", "xml-v31")) {
-            if (!validPageReferenceConfig(rootProject.file("app/src/main/res/$variant/page_reference_service.xml"),
-                    modern = variant == "xml-v31")) violations += "Unexpected page reference capability"
-        }
+        scanPrivacySources(violations)
+        checkMergedPrivacyManifests(violations)
+        checkPrivacyResources(violations)
         check(violations.isEmpty()) { violations.joinToString("\n") }
     }
 }

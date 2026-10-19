@@ -61,8 +61,11 @@ The glide projection deduplicates readings by strongest public frequency.
 
 Weekly updates continue to open a PR, never auto-merge. The PR includes the
 updated optional LTS catalog. After reviewing licenses, hashes and native tests,
-run the explicit publication workflow for that reviewed commit, then merge the
-catalog. Resource releases include attribution and applicable source/rebuild
+merge the reviewed catalog, then run the explicit publication workflow for its
+full commit SHA already reachable from main. The build job is read-only; a
+separate publisher rechecks ancestry before uploading hash-verified assets. Until
+publication succeeds, failed downloads preserve installed offline resources.
+Resource releases include attribution and applicable source/rebuild
 archives, including LGPL Tegaki source materials. No APK is published by this
 workflow. Older immutable resources remain available.
 

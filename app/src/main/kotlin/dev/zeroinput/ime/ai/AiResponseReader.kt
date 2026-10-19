@@ -3,7 +3,6 @@ package dev.zeroinput.ime.ai
 import dev.zeroinput.ai.api.AiLimits
 import dev.zeroinput.ai.api.AiProviderError
 import org.json.JSONObject
-import org.json.JSONTokener
 import java.io.Reader
 
 /** Bounded JSON responses for servers returning non-streaming completions and model catalogs. */
@@ -51,10 +50,7 @@ internal object AiResponseReader {
             }
             if (cancelled()) throw InterruptedException()
             return try {
-                val tokens = JSONTokener(text.toString())
-                val root = tokens.nextValue() as? JSONObject ?: throw IllegalArgumentException()
-                require(tokens.nextClean() == '\u0000' && root.isNull("error"))
-                decode(root)
+                decode(AiJsonResponse.objectValue(text.toString()))
             } catch (error: AiProviderError) { throw error
             } catch (_: Exception) { throw AiProviderError.Response("AI response is invalid") }
         } finally { buffer.fill('\u0000'); text.setLength(0) }

@@ -20,9 +20,19 @@ internal class AiConversationListView(context: Context) : LinearLayout(context) 
 
     init { orientation = VERTICAL; isSaveEnabled = false }
 
-    fun render(values: List<AiConversationSummary>) { this.values = values; rebuild() }
-    fun current(id: String?) { current = id; pendingDelete = null; rebuild() }
+    fun render(values: List<AiConversationSummary>) {
+        if (childCount != 0 && this.values == values) return
+        this.values = values
+        rebuild()
+    }
+    fun current(id: String?) {
+        if (childCount != 0 && current == id && pendingDelete == null) return
+        current = id
+        pendingDelete = null
+        rebuild()
+    }
     fun status(saving: Boolean, loading: Boolean, failed: Boolean) {
+        if (childCount != 0 && this.saving == saving && this.loading == loading && this.failed == failed) return
         this.saving = saving; this.loading = loading; this.failed = failed
         rebuild()
     }
@@ -42,7 +52,10 @@ internal class AiConversationListView(context: Context) : LinearLayout(context) 
         if (!saving || loading || failed) return
         values.forEach { value ->
             addView(button(if (value.id == current) context.getString(R.string.ai_conversation_current, value.title)
-                else value.title) { pendingDelete = null; onSelect(value.id) })
+                else value.title) {
+                if (pendingDelete != null) { pendingDelete = null; rebuild() }
+                onSelect(value.id)
+            })
             addView(LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 addView(button(context.getString(R.string.ai_conversation_rename)) { onRename(value.id, value.title) },

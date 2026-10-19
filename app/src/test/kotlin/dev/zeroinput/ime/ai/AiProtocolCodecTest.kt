@@ -7,6 +7,30 @@ import org.junit.Test
 import java.io.StringReader
 
 class AiProtocolCodecTest {
+    @Test fun anthropicThinkingAlwaysLeavesAnAnswerBudgetAndHonorsExplicitLimits() {
+        for (mode in listOf(AiReasoningMode.FAST, AiReasoningMode.DEEP)) {
+            val request = AiRequest(null, AiAction.ASK, "public", reasoningMode = mode)
+            val root = JSONObject(AiRequestEncoder.encode(request, "m", AiProtocol.ANTHROPIC_MESSAGES, false))
+            val budget = root.getJSONObject("thinking").getInt("budget_tokens")
+            assertTrue(budget < root.getInt("max_tokens"))
+            assertThrows(AiProviderError.Configuration::class.java) {
+                AiRequestEncoder.encode(request.copy(outputTokenLimit = budget), "m", AiProtocol.ANTHROPIC_MESSAGES, false)
+            }
+        }
+        val request = AiRequest(null, AiAction.ASK, "public", reasoningMode = AiReasoningMode.FAST, outputTokenLimit = 2048)
+        val root = JSONObject(AiRequestEncoder.encode(request, "m", AiProtocol.ANTHROPIC_MESSAGES, false))
+        assertEquals(2048, root.getInt("max_tokens"))
+    }
+
+    @Test fun deeplyNestedJsonAndSseEventsAreRejectedForEveryProtocol() {
+        val nested = "{\"unknown\":" + "[".repeat(10_000) + "0" + "]".repeat(10_000) + "}"
+        for (protocol in AiProtocol.entries) {
+            assertThrows(AiProviderError.Response::class.java) { read(protocol, nested, true) }
+            val event = "{\"unknown\":" + "[".repeat(100) + "0" + "]".repeat(100) + "}"
+            assertThrows(AiProviderError.Response::class.java) { read(protocol, "data: $event\n\n") }
+        }
+    }
+
     @Test fun `translation prompt treats greetings as source data`() {
         val root = JSONObject(AiRequestEncoder.encode(
             AiRequest(null, AiAction.TRANSLATE, "晚上好", targetLanguage = "English"),

@@ -1,6 +1,7 @@
 param()
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "pinned-source-archive.ps1")
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $thirdPartyRoot = Join-Path $repositoryRoot "third_party"
@@ -33,14 +34,10 @@ function Install-PinnedArchive {
     )
 
     $destination = Join-Path $rimeDependenciesRoot $Name
-    if (Test-Path (Join-Path $destination "CMakeLists.txt")) { return }
-    New-Item -ItemType Directory -Force -Path $destination | Out-Null
     $archive = Join-Path $thirdPartyRoot "$Name.tar.gz"
     if (-not (Test-Path $archive)) { Invoke-WebRequest $Url -OutFile $archive }
-    $actualHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -ne $Sha256) { throw "$Name archive checksum mismatch" }
-    tar --strip-components=1 -xf $archive -C $destination
-    if ($LASTEXITCODE -ne 0) { throw "Unable to extract $Name" }
+    Install-VerifiedSourceArchive -Archive $archive -Destination $destination -Sha256 $Sha256 `
+        -TemporaryRoot (Join-Path $thirdPartyRoot ".source-verification")
 }
 
 Install-PinnedArchive `
@@ -64,21 +61,15 @@ Install-PinnedArchive `
     -Url "https://codeload.github.com/jbeder/yaml-cpp/tar.gz/f7320141120f720aecc4c32be25586e7da9eb978" `
     -Sha256 "2fd3bf695ccc056835a70dd6d3046312cc1004e8338b8b5c91646918a27b7ef6"
 
-if (-not (Test-Path (Join-Path $boostRoot "CMakeLists.txt"))) {
-    $boostArchive = Join-Path $thirdPartyRoot "boost-1.89.0-cmake.tar.xz"
-    if (-not (Test-Path $boostArchive)) {
-        Invoke-WebRequest `
-            "https://github.com/boostorg/boost/releases/download/boost-1.89.0/boost-1.89.0-cmake.tar.xz" `
-            -OutFile $boostArchive
-    }
-    $boostHash = (Get-FileHash $boostArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($boostHash -ne "67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74") {
-        throw "Boost archive checksum mismatch"
-    }
-    tar -xf $boostArchive -C $thirdPartyRoot
-    if ($LASTEXITCODE -ne 0) { throw "Unable to extract Boost" }
-    Move-Item -LiteralPath (Join-Path $thirdPartyRoot "boost-1.89.0") -Destination $boostRoot
+$boostArchive = Join-Path $thirdPartyRoot "boost-1.89.0-cmake.tar.xz"
+if (-not (Test-Path $boostArchive)) {
+    Invoke-WebRequest `
+        "https://github.com/boostorg/boost/releases/download/boost-1.89.0/boost-1.89.0-cmake.tar.xz" `
+        -OutFile $boostArchive
 }
+Install-VerifiedSourceArchive -Archive $boostArchive -Destination $boostRoot `
+    -Sha256 "67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74" `
+    -TemporaryRoot (Join-Path $thirdPartyRoot ".source-verification")
 
 function Receive-VerifiedFile {
     param(

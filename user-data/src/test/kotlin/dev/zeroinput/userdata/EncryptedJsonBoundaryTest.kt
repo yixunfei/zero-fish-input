@@ -26,6 +26,16 @@ class EncryptedJsonBoundaryTest {
         store.assertUntouchedAndWiped()
     }
 
+    @Test fun lexiconAndEmojiRejectMalformedUtf8AndPreserveSupplementaryCharacters() {
+        val malformed = "{\"format\":1,".toByteArray() + byteArrayOf(0xC3.toByte())
+        assertThrows(UserDictionaryException::class.java) { UserLexiconFormat.parse(malformed) }
+        assertThrows(ExpressionException::class.java) { EmojiHistoryFormat.decode(malformed) }
+        val lexicon = "\uFEFF" + """{"format":1,"terms":[{"shortcut":"public","value":"你好 🌏","language":"CHINESE"}]}"""
+        assertEquals("你好 🌏", UserLexiconFormat.parse(lexicon.toByteArray()).single().value)
+        val emoji = listOf(EmojiUsage("🌏", 1, 1L))
+        assertEquals(emoji, EmojiHistoryFormat.decode(EmojiHistoryFormat.encode(emoji)))
+    }
+
     @Test fun incompleteCurrentConfigurationCannotSilentlyBecomeDefaults() {
         val store = Store("""{"format":5}""")
         assertThrows(IllegalStateException::class.java) { AiConfigurationRepository(store).read() }

@@ -2,7 +2,6 @@ package dev.zeroinput.ime.ai
 
 import dev.zeroinput.ai.api.*
 import org.json.JSONObject
-import org.json.JSONTokener
 import java.io.BufferedReader
 
 internal object AiProtocolResponse {
@@ -16,12 +15,7 @@ internal object AiProtocolResponse {
             AiLimits.MAX_STREAM_CHARS, ::anthropic) else AnthropicStreamReader().read(AiEventReader(reader, cancelled), emit)
     }
 
-    internal fun objectValue(text: String): JSONObject = try {
-        val tokens = JSONTokener(text)
-        val root = tokens.nextValue() as? JSONObject ?: throw IllegalArgumentException()
-        requireResponse(tokens.nextClean() == '\u0000' && root.isNull("error"))
-        root
-    } catch (_: Exception) { throw AiProviderError.Response("AI response is invalid") }
+    internal fun objectValue(text: String): JSONObject = AiJsonResponse.objectValue(text)
 
     private fun responses(root: JSONObject): String {
         if (root.optString("status") == "incomplete") throw outputLimit()

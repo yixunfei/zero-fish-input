@@ -7,8 +7,9 @@ internal class AiContextSelection {
     var state = AiContextState()
         private set
 
-    fun reset(messages: List<AiMessage> = emptyList()) {
+    fun reset(messages: List<AiMessage> = emptyList(), includeRecent: Boolean = false) {
         state = AiContextState(state.revision + 1, messages.toList())
+        if (includeRecent) recent(state.revision)
     }
 
     fun history(): List<AiMessage> = state.messages.filterIndexed { index, _ -> index in state.selectedHistory }

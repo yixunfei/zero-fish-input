@@ -22,6 +22,7 @@ import androidx.core.view.isEmpty
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
 import dev.zeroinput.engine.api.DoublePinyinScheme
+import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.ime.core.EditorInputOptions
 import dev.zeroinput.ime.core.EditorLayout
 import dev.zeroinput.ime.core.EnterAction
@@ -34,7 +35,9 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var backspaceRepeater: BackspaceRepeater? = null
     private var page = KeyboardPage.LETTERS
     private var shift = Shift.OFF
-    private var languageLabel = "中"
+    private var language = KeyboardLanguage(InputLanguage.CHINESE)
+    private val languageLabel: String get() = context.getString(language.labelResource)
+    private var alternativesPopup: PopupWindow? = null
     private var keyboardLayout = ChineseKeyboardLayout.FULL
     private var doublePinyinScheme = DoublePinyinScheme.OFF
     private var editor = EditorInputOptions()
@@ -91,6 +94,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun applyAppearance(value: KeyboardAppearance) {
         appearance = value.sanitized()
+        colorsResolved = false
         radius = if (appearance.material == KeyboardMaterial.CLASSIC) 0f else dp(appearance.cornerRadius).toFloat()
         inset = if (appearance.material == KeyboardMaterial.CLASSIC) 0 else dp(appearance.keySpacing)
         render()
@@ -176,9 +180,10 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         }
     }
 
-    fun setLanguageLabel(value: String) {
-        if (languageLabel == value) return
-        languageLabel = value
+    fun setLanguage(value: InputLanguage, languagePack: Boolean = false) {
+        val updated = KeyboardLanguage(value, languagePack)
+        if (language == updated) return
+        language = updated
         shift = Shift.OFF
         render()
     }
@@ -279,7 +284,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private fun specs(): List<List<KeySpec>> = (when (page) {
         KeyboardPage.LETTERS -> if (keyboardLayout == ChineseKeyboardLayout.NINE_KEY)
             KeyboardLayouts.nineKey(context, languageLabel) else KeyboardLayouts.letters(context, shift != Shift.OFF,
-                languageLabel, doublePinyinScheme == DoublePinyinScheme.MICROSOFT)
+                languageLabel, language.usesChinesePunctuation, doublePinyinScheme == DoublePinyinScheme.MICROSOFT)
         KeyboardPage.SYMBOLS -> KeyboardLayouts.symbols(context, languageLabel)
         KeyboardPage.MORE_SYMBOLS -> KeyboardLayouts.moreSymbols(context, languageLabel)
         KeyboardPage.NUMERIC -> NumericKeyboardLayout.rows(context, editor)
@@ -382,6 +387,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     private fun showAlternatives(anchor: View, values: List<String>) {
         onUserInteraction()
+        alternativesPopup?.dismiss()
         var popup: PopupWindow? = null
         val row = LinearLayout(context).apply {
             orientation = HORIZONTAL
@@ -405,12 +411,15 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
                 })
             }
         }
-        popup = PopupWindow(row, ViewGroup.LayoutParams.WRAP_CONTENT, dp(56), true).apply {
+        val shown = PopupWindow(row, ViewGroup.LayoutParams.WRAP_CONTENT, dp(56), true).apply {
             elevation = dp(8).toFloat()
             setBackgroundDrawable(Color.WHITE.toDrawable())
             isOutsideTouchable = true
-            showAsDropDown(anchor, 0, -anchor.height - dp(64))
         }
+        popup = shown
+        alternativesPopup = shown
+        shown.setOnDismissListener { if (alternativesPopup === shown) alternativesPopup = null }
+        shown.showAsDropDown(anchor, 0, -anchor.height - dp(64))
     }
 
     private fun bind(view: KeyboardKeyView, original: KeySpec, preserveCaseGesture: Boolean = false) {
@@ -477,7 +486,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
                 // pinyin segment delimiter.  Treating the symbol as a paired
                 // literal commits the preedit and inserts "''" at the editor
                 // cursor, which loses the requested caret position.
-                val delimiter = action.opening == "'" && composing && languageLabel == "中"
+                val delimiter = action.opening == "'" && composing && language.supportsCompositionDelimiter
                 onAction(when {
                     delimiter -> KeyboardAction.Text("'")
                     pairedSymbolsEnabled -> action
@@ -488,7 +497,13 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         }
     }
 
-    fun cancelPendingGestures() { glide.cancel(); backspaceRepeater?.cancel(); keys.forEach { it.cancelTouch() } }
+    fun cancelPendingGestures() {
+        alternativesPopup?.dismiss()
+        alternativesPopup = null
+        glide.cancel()
+        backspaceRepeater?.cancel()
+        keys.forEach { it.cancelTouch() }
+    }
     internal val preferredHeight: Int get() = (0 until childCount).sumOf { getChildAt(it).layoutParams.height }
     override fun onDetachedFromWindow() { cancelPendingGestures(); super.onDetachedFromWindow() }
     private fun rowHeight() = (dp(if (compact) 48 else heightPreset.rowHeight(landscape)) * heightScale).toInt()

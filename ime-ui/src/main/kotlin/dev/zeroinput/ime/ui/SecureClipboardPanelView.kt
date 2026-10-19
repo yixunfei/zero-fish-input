@@ -26,6 +26,7 @@ class SecureClipboardPanelView @JvmOverloads constructor(
     private var enabled = false
     private var failed = false
     private var items = emptyList<SecureClipboardItemUi>()
+    private var renderedPasteConfirmation = false
     private val copySelection = MaterialButton(context).apply {
         setText(R.string.secure_clipboard_copy_selection)
         isAllCaps = false
@@ -47,6 +48,9 @@ class SecureClipboardPanelView @JvmOverloads constructor(
     }
 
     fun render(enabled: Boolean, items: List<SecureClipboardItemUi>, failed: Boolean = false) {
+        if (list.childCount != 0 && this.enabled == enabled && this.items == items && this.failed == failed &&
+            renderedPasteConfirmation == pasteConfirmation) return
+        renderedPasteConfirmation = pasteConfirmation
         this.enabled = enabled
         this.items = items
         this.failed = failed

@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalCandidatePagingTest {
+    @Test fun `returning to native pages preserves their next edge after personal exhaustion`() {
+        val paging = PersonalCandidatePaging()
+        val store = Store()
+        var native = EngineSnapshot("ni", "ni", hasPreviousPage = true)
+        fun publish() = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        publish()
+        walkPages { if (paging.changePage(PageDirection.NEXT, native)) { publish(); true } else false }
+        assertFalse(publish().hasNextPage)
+        walkPages { if (paging.changePage(PageDirection.PREVIOUS, native)) { publish(); true } else false }
+        native = native.copy(hasNextPage = true)
+        assertTrue(publish().hasNextPage)
+        assertFalse(paging.isBrowsing)
+        assertFalse(paging.changePage(PageDirection.NEXT, native))
+    }
+
     @Test fun `personal first candidate becomes the highlighted default`() {
         val paging = PersonalCandidatePaging()
         val native = EngineSnapshot("cs", "cs", listOf(Candidate("native", "产生")), highlightedIndex = 0)
@@ -44,7 +59,7 @@ class PersonalCandidatePagingTest {
             paging.changePage(PageDirection.NEXT, native)
             assertTrue(visible().candidates.size <= PersonalCandidatePaging.MAX_PAGES * PersonalCandidatePaging.PAGE_SIZE + 1)
         }
-        while (paging.changePage(PageDirection.PREVIOUS, native)) visible()
+        walkPages { if (paging.changePage(PageDirection.PREVIOUS, native)) { visible(); true } else false }
         assertEquals(first.candidates, visible().candidates.take(first.candidates.size))
     }
 
@@ -55,11 +70,10 @@ class PersonalCandidatePagingTest {
         fun visible() = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
         var result = visible()
         val seen = mutableSetOf<String>()
-        do {
+        walkPages {
             seen += result.candidates.filter { it.id.startsWith("personal:") }.map { it.id }
-            if (!paging.changePage(PageDirection.NEXT, native)) break
-            result = visible()
-        } while (true)
+            if (paging.changePage(PageDirection.NEXT, native)) { result = visible(); true } else false
+        }
         assertEquals(117, seen.size)
         assertFalse(result.hasNextPage)
         assertTrue(paging.changePage(PageDirection.PREVIOUS, native))
@@ -86,6 +100,11 @@ class PersonalCandidatePagingTest {
         val result = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
         assertEquals(native.candidates, result.candidates)
         assertFalse(result.hasNextPage)
+    }
+
+    private fun walkPages(advance: () -> Boolean) {
+        repeat(64) { if (!advance()) return }
+        fail("Paging did not reach its boundary within 64 transitions")
     }
 
     private class Store : PagedPersonalizationStore {

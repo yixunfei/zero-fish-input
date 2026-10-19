@@ -6,6 +6,7 @@ import dev.zeroinput.engine.api.*
 internal class FallbackPinyinEngine(
     options: ChineseInputOptions = ChineseInputOptions(),
 ) : InputEngine, CompositionEditingEngine, CompositionCursorEngine {
+    private val nineKey = options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY
     private val cursorEditing = options.keyboardLayout == ChineseKeyboardLayout.FULL
     private val pageSize = options.candidatePageSize
     private val doublePinyinScheme = options.effectiveDoublePinyinScheme
@@ -33,7 +34,7 @@ internal class FallbackPinyinEngine(
             EngineCapability.CANDIDATE_PAGE_SIZE,
             EngineCapability.FUZZY_PINYIN,
             EngineCapability.DOUBLE_PINYIN,
-        ),
+        ) + if (nineKey) setOf(EngineCapability.NINE_KEY_PINYIN) else emptySet(),
     )
 
     override fun start(context: EditorContext): EngineSnapshot = reset()
@@ -133,8 +134,9 @@ internal class FallbackPinyinEngine(
 
     private fun character(text: String): EngineUpdate {
         val letter = text.singleOrNull()?.lowercaseChar()
-        val normalized = letter?.let { if (it in '2'..'9') nineKeyRepresentative(it) else it }
+        val normalized = letter?.let { if (!nineKey && it in '2'..'9') nineKeyRepresentative(it) else it }
         if (normalized != null && (normalized in 'a'..'z' || normalized == '\'' ||
+                nineKey && normalized in '2'..'9' ||
                 doublePinyinScheme == DoublePinyinScheme.MICROSOFT && normalized == ';')) {
             if (input.length == MAX_INPUT) return EngineUpdate(snapshot, consumed = false)
             input.append(normalized)
@@ -269,6 +271,11 @@ internal class FallbackPinyinEngine(
                             } ?: DoublePinyin.encode(variant, options.effectiveDoublePinyinScheme) ?: continue
                         val current = get(code).orEmpty()
                         if (entry !in current) put(code, current + entry)
+                        if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) {
+                            val numeric = variant.map(NineKeyReadings::digitFor).joinToString("")
+                            val numericEntries = get(numeric).orEmpty()
+                            if (entry !in numericEntries) put(numeric, numericEntries + entry)
+                        }
                     }
                 }
             }

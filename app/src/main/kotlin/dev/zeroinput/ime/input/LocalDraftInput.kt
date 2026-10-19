@@ -32,15 +32,18 @@ internal class LocalDraftInput(
     private var generation = 0L
     private var retryWhenIdle = false
     private var idleRetries = 0
+    var chineseOptions: ChineseInputOptions = ChineseInputOptions()
+        private set
 
     init { require(maxChars in 1..65_536) }
 
-    fun start(language: InputLanguage) {
+    fun start(language: InputLanguage, options: ChineseInputOptions = ChineseInputOptions()) {
         close()
+        chineseOptions = options
         val session = ++generation
         val owner = graph()
         val input = InputSessionController(
-            connection = DraftConnection(), engineProvider = owner::createDraftEngine,
+            connection = DraftConnection(), engineProvider = { owner.createDraftEngine(it, chineseOptions) },
             personalization = NoPersonalization,
             deferHeavyEngineCreation = true,
             onStateChanged = ::emit,
@@ -118,6 +121,19 @@ internal class LocalDraftInput(
         return text.toString()
     }
 
+    fun committedText(): String = text.toString()
+
+    fun replaceCommittedText(value: String): Boolean {
+        val input = controller ?: return false
+        if (value.length > maxChars) return false
+        input.reset()
+        wipeText()
+        text.append(value)
+        emit(input.state)
+        resumePreparation()
+        return true
+    }
+
     fun appendImported(value: String): Boolean {
         if (value.length + text.length > maxChars || controller == null) return false
         controller?.reset()
@@ -138,7 +154,7 @@ internal class LocalDraftInput(
      */
     fun appendPreedit(value: String): Boolean {
         val input = controller ?: return false
-        if (value.isEmpty() || value.any { it !in 'a'..'z' && it != '\'' }) return appendImported(value)
+        if (!dev.zeroinput.ime.core.ChinesePreeditCode.accepts(value)) return appendImported(value)
         if (value.length + text.length > maxChars) return false
         val accepted = runCatching {
             value.forEach { input.handle(InputCommand.Text(it.toString())) }
@@ -166,6 +182,7 @@ internal class LocalDraftInput(
         // A retry must also re-attempt native runtime initialization; without
         // it an unavailable engine can never come back during this session.
         warmup?.request(EngineWarmupRequest(generation, state.language, null, null, state.privacy,
+            chineseOptions = chineseOptions,
             retryInitialization = idleRetries > 0))
     }
 

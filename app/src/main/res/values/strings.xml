@@ -268,4 +268,6 @@
     <string name="ai_models_failed">%1$s\n仍可手动填写模型并检测。</string>
     <string name="ai_models_select">选择要保留的模型（最多 32 个）</string>
     <string name="ai_models_apply">应用到草稿</string>
+    <string name="public_dictionary_previous_page">上一页</string>
+    <string name="public_dictionary_next_page">下一页</string>
 </resources>

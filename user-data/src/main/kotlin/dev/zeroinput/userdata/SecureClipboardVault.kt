@@ -28,6 +28,7 @@ class SecureClipboardVault(
     private var indexCache: List<StoredSummary>? = null
     private var deletionPending = false
     private var indexNeedsRepair = false
+    private var transactionFailed = false
 
     fun count(): Int = synchronized(lock) { loadIndexSafely().size }
 
@@ -102,7 +103,8 @@ class SecureClipboardVault(
         checkOperationActive(expectedGeneration, isActive)
         require(grant.consume()) { "Authentication expired or was already used" }
         val cleanValue = validateValue(String(value))
-        val entries = load().toMutableList()
+        val previous = load()
+        val entries = previous.toMutableList()
         require(entries.size < MAX_ENTRIES) { "Secure clipboard is full" }
         val entry = SecureClipboardEntry(
             id = UUID.randomUUID().toString(),
@@ -112,10 +114,7 @@ class SecureClipboardVault(
         )
         entries += entry
         checkOperationActive(expectedGeneration, isActive)
-        persist(entries) { checkOperationActive(expectedGeneration, isActive) }
-        checkOperationActive(expectedGeneration, isActive)
-        persistIndex(entries)
-        checkOperationActive(expectedGeneration, isActive)
+        commit(previous, entries, expectedGeneration, isActive)
         entry.toMetadata()
     }
 
@@ -124,15 +123,13 @@ class SecureClipboardVault(
         return synchronized(lock) {
             checkOperationActive(expected) { true }
             require(grant.consume()) { "Authentication expired or was already used" }
-            val entries = load().toMutableList()
+            val previous = load()
+            val entries = previous.toMutableList()
             checkOperationActive(expected) { true }
             val removed = entries.removeAll { it.id == id }
             if (removed) {
                 if (!generation.compareAndSet(expected, expected + 1)) throw CancellationException("Clipboard operation cancelled")
-                persist(entries) { checkOperationActive(expected + 1) { true } }
-                checkOperationActive(expected + 1) { true }
-                persistIndex(entries)
-                checkOperationActive(expected + 1) { true }
+                commit(previous, entries, expected + 1) { true }
             }
             removed
         }
@@ -167,6 +164,7 @@ class SecureClipboardVault(
             }
             deletionPending = false
             indexNeedsRepair = false
+            transactionFailed = false
         }
     }
 
@@ -179,6 +177,60 @@ class SecureClipboardVault(
 
     private fun checkStorageAvailable() {
         if (deletionPending) throw IOException("Secure clipboard deletion is incomplete")
+        if (transactionFailed) throw IOException("Secure clipboard transaction recovery is incomplete")
+    }
+
+    /**
+     * Stage the body-free index first. The body's atomic write is the commit point:
+     * cancellation after that point cannot turn a saved operation into a failure.
+     * An interrupted process can leave a stale index, reconciled only after authentication.
+     */
+    private fun commit(
+        previous: List<SecureClipboardEntry>,
+        entries: List<SecureClipboardEntry>,
+        expectedGeneration: Long,
+        isActive: () -> Boolean,
+    ) {
+        var bodyWriteStarted = false
+        try {
+            checkOperationActive(expectedGeneration, isActive)
+            persistIndex(entries)
+            persist(entries) {
+                checkOperationActive(expectedGeneration, isActive)
+                bodyWriteStarted = true
+            }
+        } catch (error: Throwable) {
+            // A clear owns the newer generation, including all cleanup; never restore old data over it.
+            if (generation.get() == expectedGeneration && !deletionPending) {
+                rollback(previous, bodyWriteStarted, expectedGeneration, error)
+            }
+            throw error
+        }
+    }
+
+    private fun rollback(
+        previous: List<SecureClipboardEntry>,
+        restoreBody: Boolean,
+        expectedGeneration: Long,
+        failure: Throwable,
+    ) {
+        if (restoreBody) {
+            try {
+                persist(previous) { checkOperationActive(expectedGeneration) { true } }
+            } catch (error: Throwable) {
+                if (generation.get() != expectedGeneration) return
+                transactionFailed = true
+                failure.addSuppressed(error)
+            }
+        }
+        if (generation.get() != expectedGeneration || deletionPending) return
+        try {
+            persistIndex(previous)
+        } catch (error: Throwable) {
+            indexCache = null
+            indexNeedsRepair = true
+            failure.addSuppressed(error)
+        }
     }
 
     private fun load(): List<SecureClipboardEntry> {
@@ -357,8 +409,6 @@ class SecureClipboardVault(
         try {
             beforeWrite()
             store.write(bytes)
-            indexCache = null
-            indexNeedsRepair = true
         } finally {
             bytes.fill(0)
         }
@@ -366,6 +416,7 @@ class SecureClipboardVault(
 
     private fun persistIndex(entries: List<SecureClipboardEntry>) {
         checkStorageAvailable()
+        val expectedGeneration = generation.get()
         indexCache = null
         indexNeedsRepair = true
         val summaries = entries.map { entry ->
@@ -388,8 +439,10 @@ class SecureClipboardVault(
         } finally {
             bytes.fill(0)
         }
-        indexCache = summaries
-        indexNeedsRepair = false
+        if (generation.get() == expectedGeneration) {
+            indexCache = summaries
+            indexNeedsRepair = false
+        }
     }
 
     private fun validateId(value: String): String = value.also {

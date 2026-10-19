@@ -100,7 +100,8 @@
   才允许恢复备份；暂存失败保留原目录，新包激活后的备份清理失败不会回滚有效新包。
 - release 构建关闭调试，源码不得记录输入文本。
 - AI 工作台默认关闭，只有用户同时打开 AI 总开关和联网开关后才可发起网络请求。请求只携带
-  用户在 AI 面板主动提交的文本与用户明确选择的会话历史；不读取编辑器周边内容、选区、系统
+  用户在 AI 面板主动提交的文本与用户明确选择的会话历史；会话列表的显式加载会默认选中预算内
+  的最近历史供继续对话，并可在上下文面板逐条撤选。不读取宿主编辑器周边内容或选区、系统
   剪贴板、安全剪贴板、个人词库、emoji 历史或其他输入历史。密码、PIN、邮箱、URI、隐身、
   未知或隐私收紧的输入会 fail-closed。流式结果只显示在面板，必须再次点击“插入结果”才可
   写入当前编辑器。
@@ -663,6 +664,15 @@ drafts revoke delivery ownership; old callbacks cannot restore text or change th
 new draft's language. These handoffs retain the empty personal-data port and never
 read or write the host editor. Regression fixtures cover delayed preparation,
 partial selection, close/restart and public Chinese conversion.
+The AI draft itself may expose a selected range through its own contextual action;
+the service verifies that the exact source and offsets still match its committed
+draft before replacing the local draft. This action sends nothing; the user must
+still explicitly submit the draft. It does not read the host editor's selection.
+Answer-section checks operate only on the displayed, bounded plain text;
+empty selections are not insertable, and insertion still validates the result
+generation and active editor connection. Saved transcript text and context controls
+remain collapsed by default. Conversation deletion keeps the active transcript until
+the encrypted delete succeeds, so storage failure cannot silently discard the view.
 The always-discoverable AI icon is only an explanation action in those contexts:
 it displays a fixed, localized restriction message without opening the workbench,
 loading AI history, reading editor/clipboard content or creating a request. The
@@ -835,7 +845,8 @@ page or imported reference is added to the saved conversation format.
 
 Context selection has its own revision so stale checkboxes cannot modify a later
 conversation. Saved messages are separate from the selected request projection;
-opening a saved conversation sends nothing and initially selects no history.
+opening a saved conversation sends nothing and selects only the bounded recent
+history by default so the user can continue it, with per-message review available.
 Changing context revokes active output. Over-budget selections are rejected intact.
 Only explicit submission sends checked references/history and the question.
 
@@ -1001,6 +1012,43 @@ unknown protocols, missing required fields and unknown formats fail closed.
 Negative tests cover reset failure, protocol switching, schema mismatch, truncation,
 redirect rejection, oversized events, cancellation and separate catalog/generation
 404 status. See [ADR 0024](adr/0024-ai-provider-protocols.md).
+
+## Review hardening (2026-10-18)
+
+- Vault writes stage the body-free index, then atomically commit the body. Failed
+  precommit work rolls back without crossing a newer deletion generation; failed
+  body rollback blocks access. Tests cover index/body failures, cancellation around
+  commit, rollback failure and concurrent clear. Process death can leave stale
+  body-free metadata; authenticated reconciliation remains necessary. This does
+  not provide a crash-atomic transaction across the two files.
+- User lexicon and emoji decoding use bounded readers over wipeable buffers rather
+  than an immutable whole-file plaintext String. Individual parsed model strings
+  still cannot be reliably erased by the JVM. Keystore provider failure propagates
+  instead of being mistaken for key absence. Capacity and cancellation are distinct
+  from storage failure; saved AI conversations are not silently evicted at capacity.
+- AI requests apply actual editor privacy at submission; the no-suggestions text
+  exception retains its independent draft and disabled personalization. Inbox claims
+  consume data only on acceptance. JSON depth is capped at 32 before recursive
+  parsing; malformed/deep responses terminate without insertable output. Queue and
+  deadline exhaustion report capacity. Negative tests cover policy, rejected claims,
+  malformed streams and token-budget bounds; real endpoints remain unverified.
+- Cancelled clipboard management authentication clears metadata and closes the page.
+  Bounded cleanup reserves a slot after obsolete queued work is cancelled. Settings
+  deletion results survive Activity recreation only while the process survives.
+  Platform editor exceptions invalidate uncertain editing context and do not replay
+  a mutation that may already have reached the target editor.
+- Public resource cache entries are bounded, process-local and established only
+  after full digest checks. Reuse requires matching dev/ino/size/mtime/ctime; without
+  this metadata every acquisition is hashed. Cold reads and unsupported filesystems
+  retain the original cost. Mutation/identity/unsupported-metadata tests check this
+  boundary. Language-pack indices use linear space and corrupt enablement fails closed.
+- Privacy gates inspect Debug/Release merged manifests, backup exclusions, exported
+  components and permissions, and reject unknown qualified privacy-resource overrides
+  or accessibility key filtering. Negative fixtures accompany these checks. Source
+  archive reuse verifies archive and tree contents. Wrapper and Linux publication
+  wheels are hash-pinned; publication checks reviewed main ancestry and separates
+  read-only builds from write-authorized uploads. CI execution/publication and a
+  compromised trusted host remain outside local verification.
 
 ### Provider form and invisible routes (2026-10-15)
 

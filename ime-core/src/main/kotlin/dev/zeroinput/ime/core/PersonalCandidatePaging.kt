@@ -45,12 +45,20 @@ internal class PersonalCandidatePaging {
                 requested = (start - PAGE_SIZE).coerceAtLeast(0)
                 return true
             }
+            // The cached personal rows remain visible while the native window
+            // moves. Its paging edge now owns NEXT until native exhaustion.
+            offset = 0
+            requested = 0
             return false
         }
         val last = pages.lastEntry()
         if (direction == PageDirection.NEXT && (offset > 0 || !native.hasNextPage) && last?.value?.hasMore == true) {
             requested = last.key + PAGE_SIZE
             return true
+        }
+        if (native.hasNextPage) {
+            offset = 0
+            requested = 0
         }
         return false
     }
@@ -118,7 +126,7 @@ internal class PersonalCandidatePaging {
             offset > 0 || editsApplied) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
             hasPreviousPage = hasPrevious || includesNative && native.hasPreviousPage,
-            hasNextPage = if (isBrowsing) pages.lastEntry()?.value?.hasMore == true else native.hasNextPage || first.hasMore)
+            hasNextPage = native.hasNextPage || (pages.lastEntry()?.value ?: first).hasMore)
     }
 
     private fun TreeMap<Int, PersonalSuggestionPage>.firstKeyOrNull(): Int? = firstEntry()?.key

@@ -15,6 +15,8 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
     var onRemove: (Long, Int) -> Unit = { _, _ -> }
     private var state = AiContextState()
     private var preview = false
+    private var renderedState: AiContextState? = null
+    private var renderedPreview = false
 
     init { orientation = VERTICAL; isSaveEnabled = false }
 
@@ -25,6 +27,9 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
     }
 
     fun render(value: AiContextState) {
+        if (renderedState == value && renderedPreview == preview) return
+        renderedState = value
+        renderedPreview = preview
         state = value
         removeAllViews()
         addView(label(context.getString(R.string.ai_context_count, value.references.size,

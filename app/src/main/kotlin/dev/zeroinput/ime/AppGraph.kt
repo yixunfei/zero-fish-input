@@ -114,6 +114,24 @@ class AppGraph(context: Context) : AutoCloseable {
 
     fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
 
+    internal val settingsDeletions = dev.zeroinput.ime.settings.SettingsDeletionCoordinator(
+        post = { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
+        delete = { kind, completed ->
+            when (kind) {
+                dev.zeroinput.ime.settings.SettingsDeletion.PERSONALIZATION -> {
+                    clearPersonalizationData()
+                    completed(true)
+                }
+                dev.zeroinput.ime.settings.SettingsDeletion.SECURE_CLIPBOARD -> {
+                    securePaste.cancel()
+                    secureClipboard.purge()
+                    completed(true)
+                }
+                dev.zeroinput.ime.settings.SettingsDeletion.AI -> clearAiData(completed)
+            }
+        },
+    )
+
     private val aiConfigurationListeners = CopyOnWriteArrayList<() -> Unit>()
 
     fun observeAiConfiguration(listener: () -> Unit): AutoCloseable {
@@ -258,9 +276,9 @@ class AppGraph(context: Context) : AutoCloseable {
         InputLanguage.ENGLISH -> english.create()
     }
 
-    /** Internal drafts always use full pinyin and never inherit an editor's layout. */
-    fun createDraftEngine(language: InputLanguage): InputEngine = when (language) {
-        InputLanguage.CHINESE -> rime.createFallback(ChineseInputOptions())
+    /** Drafts share only public conversion options, never editor or personal data. */
+    fun createDraftEngine(language: InputLanguage, options: ChineseInputOptions = ChineseInputOptions()): InputEngine = when (language) {
+        InputLanguage.CHINESE -> rime.createFallback(options)
         InputLanguage.ENGLISH -> english.create()
     }
 
@@ -386,6 +404,7 @@ class AppGraph(context: Context) : AutoCloseable {
         listOf(rime.descriptor, english.descriptor) + languagePackRegistry.descriptors()
 
     override fun close() {
+        settingsDeletions.close()
         pageReferences.invalidate()
         pageReferenceExecutor.shutdownNow()
         keyboardBackgrounds.close()

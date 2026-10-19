@@ -48,7 +48,7 @@ def digest(path):
 def sources(pack):
     target = OUT / (pack['id'] + '-' + pack['version'] + '-sources.zip')
     paths = [ROOT / 'tools/resources/catalog.json', ROOT / 'tools/resources/prepare.py',
-             ROOT / 'tools/resources/README.md']
+             ROOT / 'tools/resources/README.md', ROOT / 'tools/resources/requirements-linux-cpu.txt']
     if pack['id'] == 'handwriting':
         paths += [ROOT / 'LICENSES/Apache-2.0.txt', ROOT / 'LICENSES/Tegaki-LGPL-2.1.txt',
                   ROOT / 'LICENSES/Zinnia-BSD-3-Clause.txt', ROOT / 'tools/prepare-handwriting-stroke-model.py',

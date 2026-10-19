@@ -78,6 +78,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         authenticationRequest = null
         pendingAddition?.close()
         pendingAddition = null
+        metadata = emptyList()
         worker.shutdownNow()
         super.onDestroy()
     }
@@ -100,11 +101,11 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
             return
         }
         screen.renderLoading()
-        authenticate(cancelClosesScreen = true, onGranted = ::loadMetadata)
+        authenticate(onGranted = ::loadMetadata)
     }
 
     private fun enableAndOpen() {
-        authenticate(cancelClosesScreen = false) { grant ->
+        authenticate { grant ->
             graph.settings.secureClipboardEnabled = true
             loadMetadata(grant)
         }
@@ -168,7 +169,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
                     draftHandler.removeCallbacks(expireAddition)
                     draftHandler.postDelayed(expireAddition, PendingClipboardAddition.TIMEOUT_MILLIS)
                     dialog.dismiss()
-                    authenticate(false, onCancelled = { releaseAddition(draft) }) { grant ->
+                    authenticate(onCancelled = { releaseAddition(draft) }) { grant ->
                         addItem(itemLabel, draft, grant, generation)
                     }
                 }
@@ -235,7 +236,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
             .setMessage(item.label)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
-                authenticate(false) { grant -> deleteItem(item, grant) }
+                authenticate { grant -> deleteItem(item, grant) }
             }
             .create()
         protectDialog(dialog)
@@ -267,7 +268,6 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
     }
 
     private fun authenticate(
-        cancelClosesScreen: Boolean,
         onCancelled: () -> Unit = {},
         onGranted: (AuthenticationGrant) -> Unit,
     ) {
@@ -285,17 +285,12 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
                 onGranted(grant)
             } else {
                 onCancelled()
+                // Additional authentication does not extend the previous list
+                // authorization after cancellation or timeout.
+                metadata = emptyList()
+                screen.clearMetadata()
                 setBusy(false)
-                if (cancelClosesScreen) {
-                    finish()
-                } else {
-                    if (graph.settings.secureClipboardEnabled) {
-                        screen.renderEntries(metadata)
-                    } else {
-                        screen.renderDisabled()
-                    }
-                    showError(getString(R.string.authentication_failed))
-                }
+                finish()
             }
         }
     }

@@ -18,9 +18,9 @@ class DictionaryCommitTest {
         assertEquals(listOf("nihao"), commit(page, InputCommand.Space))
         assertEquals(listOf("nihao", ","), commit(page, InputCommand.Text(",")))
     }
-    @Test fun pendingDictionaryEditsKeepCompositionUntilTheQueryResolves() {
+    @Test fun pendingDictionaryEditsCommitRawInputWithoutSelectingUnfilteredCandidates() {
         val page = PersonalSuggestionPage(ready = false, dictionaryEditsApplied = true)
-        assertTrue(commit(page, InputCommand.Space).isEmpty())
+        assertEquals(listOf("nihao"), commit(page, InputCommand.Space))
     }
 
     private fun commit(page: PersonalSuggestionPage, command: InputCommand): List<String> {

@@ -59,6 +59,38 @@ class DictionaryCatalogTest {
         }
     }
 
+    @Test fun githubTreeBoundsOnlySupportedRowsAndRejectsAnOversizedCatalog() {
+        val entries = org.json.JSONArray()
+        repeat(1025) { entries.put(org.json.JSONObject().put("path", "other/$it.txt").put("type", "blob")) }
+        repeat(1024) { entries.put(org.json.JSONObject().put("path", "dicts/$it.dict.yaml").put("type", "blob")) }
+        val response = org.json.JSONObject().put("tree", entries)
+        val sha = "a".repeat(40)
+        assertEquals(1024, catalog.parseGithubTree(response, "amzxyz/rime-wanxiang", "dicts/", sha).size)
+        entries.put(org.json.JSONObject().put("path", "dicts/overflow.dict.yaml").put("type", "blob"))
+        assertThrows(IllegalArgumentException::class.java) {
+            catalog.parseGithubTree(response, "amzxyz/rime-wanxiang", "dicts/", sha)
+        }
+    }
+
+    @Test fun zhwikiRejectsMoreThan1024SupportedAssets() {
+        val assets = org.json.JSONArray()
+        repeat(1024) { assets.put(org.json.JSONObject().put("name", "$it.dict.yaml")
+            .put("browser_download_url", "https://github.com/a/$it")) }
+        val release = org.json.JSONObject().put("tag_name", "test").put("assets", assets)
+        assertEquals(1024, catalog.parseZhwiki(release.toString()).size)
+        assets.put(org.json.JSONObject().put("name", "overflow.dict.yaml").put("browser_download_url", "https://github.com/a"))
+        assertThrows(IllegalArgumentException::class.java) { catalog.parseZhwiki(release.toString()) }
+    }
+
+    @Test fun websiteCatalogsUseTheSame1024RowLimit() {
+        val html = (0 until 1024).joinToString("") { "<a href='/detail?dict_id=$it'>fixture $it</a>" }
+        val address = "https://cdict.qq.pinyin.cn/list?cate_id=1"
+        assertEquals(1024, catalog.parseWebsite(DictionarySource.QQ, address, html).size)
+        assertThrows(IllegalArgumentException::class.java) {
+            catalog.parseWebsite(DictionarySource.QQ, address, html + "<a href='/detail?dict_id=overflow'>overflow</a>")
+        }
+    }
+
     private fun release(address: String) = org.json.JSONObject().apply {
         put("tag_name", "test")
         put("assets", org.json.JSONArray().put(org.json.JSONObject().apply {

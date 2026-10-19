@@ -18,7 +18,7 @@ internal object KeyboardLayouts {
     private fun digit(label: String, code: String) = KeySpec(label, label, KeyboardAction.Text(code))
 
     fun letters(context: android.content.Context, shifted: Boolean, languageLabel: String,
-        microsoftDoublePinyin: Boolean = false): List<List<KeySpec>> {
+        chinesePunctuation: Boolean, microsoftDoublePinyin: Boolean = false): List<List<KeySpec>> {
         val rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
         return listOf(
             characterRow(rows[0], shifted),
@@ -33,9 +33,9 @@ internal object KeyboardLayouts {
             listOf(
                 KeySpec("?123", context.getString(R.string.key_symbols), KeyboardAction.ShowSymbols, 1.35f, KeyStyle.MODIFIER),
                 KeySpec(languageLabel, context.getString(R.string.key_language), KeyboardAction.SwitchLanguage, 1.1f, KeyStyle.MODIFIER),
-                KeySpec(if (languageLabel == "En") "," else "，", context.getString(R.string.key_comma), KeyboardAction.Text(","), 0.9f),
+                KeySpec(if (chinesePunctuation) "，" else ",", context.getString(R.string.key_comma), KeyboardAction.Text(","), 0.9f),
                 KeySpec(context.getString(R.string.key_space), context.getString(R.string.key_space), KeyboardAction.Space, 3.8f),
-                KeySpec(if (languageLabel == "En") "." else "。", context.getString(R.string.key_period), KeyboardAction.Text("."), 0.9f),
+                KeySpec(if (chinesePunctuation) "。" else ".", context.getString(R.string.key_period), KeyboardAction.Text("."), 0.9f),
                 KeySpec("↵", context.getString(R.string.key_enter), KeyboardAction.Enter, 1.35f, KeyStyle.PRIMARY),
             ),
         )

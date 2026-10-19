@@ -25,6 +25,7 @@
     <string name="ai_model_unavailable">模型或接口不存在，请检查模型名称和服务地址。</string>
     <string name="ai_rate_limited">请求受限，请检查额度或稍后重试。</string>
     <string name="ai_service_unavailable">服务暂不可用，请稍后重试。</string>
+    <string name="ai_capacity_busy">当前忙碌，请稍后重试。</string>
     <string name="ai_open">打开 AI 工作台</string>
     <string name="ai_entry_unavailable">AI 暂不可用，点按查看原因</string>
     <string name="ai_entry_privacy_blocked">当前输入框或隐私设置禁止 AI，请检查隐身、学习和个性化设置。</string>
@@ -162,6 +163,12 @@
     <string name="ai_assistant_message">AI：%1$s</string>
     <string name="ai_edit">编辑</string>
     <string name="ai_read">预览</string>
+    <string name="ai_use_selection">将所选文字替换为 AI 草稿</string>
+    <string name="ai_show_history">展开上下文</string>
+    <string name="ai_hide_history">收起上下文</string>
+    <string name="ai_select_all">全选区段</string>
+    <string name="ai_clear_selection">清空选择</string>
+    <string name="ai_selected_sections">已选 %1$d / %2$d 段</string>
     <string-array name="ai_target_languages" translatable="false">
         <item>English</item><item>中文</item><item>日本語</item><item>한국어</item>
         <item>Français</item><item>Deutsch</item><item>Español</item><item>العربية</item>
@@ -190,5 +197,8 @@
     <string name="handwriting_candidate_value">输入 %1$s</string>
     <string name="language_sensitive_protection">敏感输入保护中</string>
     <string name="language_switch">切换语言</string>
+    <string name="language_short_chinese">中</string>
+    <string name="language_short_english">En</string>
+    <string name="language_short_pack">包</string>
     <string name="ai_page_reference_item">引用 %1$d（%2$d 字符）：%3$s</string>
 </resources>

@@ -2,9 +2,6 @@ package dev.zeroinput.userdata
 
 import android.util.JsonReader
 import android.util.JsonToken
-import java.io.StringReader
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -15,6 +12,7 @@ internal object EmojiHistoryFormat {
     const val MAX_COUNT = 1_000_000
     private const val MAX_BYTES = 128 * 1024
 
+    // JSONObject serialization briefly creates a non-wipeable String; it is not retained.
     fun encode(values: List<EmojiUsage>): ByteArray = JSONObject().apply {
         put("format", 1)
         put("entries", JSONArray().apply {
@@ -31,11 +29,7 @@ internal object EmojiHistoryFormat {
     fun decode(bytes: ByteArray): List<EmojiUsage> {
         if (bytes.size > MAX_BYTES) corrupt()
         return try {
-            val characters = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes))
-            try {
-                JsonReader(StringReader(characters.toString())).use { input -> readRoot(input) }
-            } finally { if (characters.hasArray()) characters.array().fill('\u0000') }
+            withJsonReader(bytes, ::readRoot)
         } catch (_: Exception) { corrupt() }
     }
 

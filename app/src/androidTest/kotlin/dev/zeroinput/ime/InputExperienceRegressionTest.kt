@@ -86,7 +86,7 @@ class InputExperienceRegressionTest {
 
     @Test fun numberPadStaysOpenAndReturnsToLettersWithoutChangingLanguage() = onMain {
         val panel = KeyboardPanel(context)
-        panel.setLanguageLabel("En")
+        panel.setLanguage(dev.zeroinput.engine.api.InputLanguage.ENGLISH)
         measure(panel)
         val originalHeight = panel.height
         val actions = mutableListOf<KeyboardAction>()

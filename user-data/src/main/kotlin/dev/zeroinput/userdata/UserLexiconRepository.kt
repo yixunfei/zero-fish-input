@@ -295,12 +295,14 @@ class UserLexiconRepository(
         try {
             if (bytes.size > UserLexiconFormat.MAX_IMPORT_BYTES) capacityExceeded()
             ensureCurrent(expected)
-            store.write(bytes)
+            try {
+                store.write(bytes)
+            } catch (error: Throwable) {
+                writeFailure = UserDictionaryFailure.WRITE_FAILED
+                writeFailureListeners.forEach { listener -> runCatching { listener(error) } }
+                throw error
+            }
             writeFailure = null
-        } catch (error: Throwable) {
-            writeFailure = UserDictionaryFailure.WRITE_FAILED
-            writeFailureListeners.forEach { listener -> runCatching { listener(error) } }
-            throw error
         } finally {
             bytes.fill(0)
         }

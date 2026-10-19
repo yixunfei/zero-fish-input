@@ -30,6 +30,8 @@ class AiStorageFailurePanelTest {
             f.flush()
             assertEquals(1, f.storageFailures)
             assertEquals("public answer", f.panel.findViewById<TextView>(UiR.id.ai_result_text).text.toString())
+            assertFalse(f.button(UiR.string.ai_insert).isEnabled)
+            f.button(UiR.string.ai_select_all).performClick()
             assertTrue(f.button(UiR.string.ai_insert).isEnabled)
             f.button(UiR.string.ai_insert).performClick()
             assertEquals("public answer", f.inserted)
@@ -61,6 +63,8 @@ class AiStorageFailurePanelTest {
             })
             f.button(UiR.string.ai_show_result).performClick()
             assertEquals("public answer", f.panel.findViewById<TextView>(UiR.id.ai_result_text).text.toString())
+            assertFalse(f.button(UiR.string.ai_insert).isEnabled)
+            f.button(UiR.string.ai_select_all).performClick()
             assertTrue(f.button(UiR.string.ai_insert).isEnabled)
             f.button(UiR.string.ai_insert).performClick()
             assertEquals("public answer", f.inserted)
@@ -85,13 +89,15 @@ class AiStorageFailurePanelTest {
         val controller = AiWorkbenchController(AiCoordinator(provider), AiConversationRepository(store), worker,
             { configuration }, AiDataGeneration(), { ui.execute(it); true }, { true }, panel::render,
             panel::renderConversations, panel::renderConversation,
+            editorPrivacy = { dev.zeroinput.ime.core.privacy.SessionPrivacy(false, true, true,
+                dev.zeroinput.ime.core.privacy.PrivacyReason.NONE) },
             renderHistoryStatus = panel::renderHistoryStatus, storageFailed = { storageFailures++ })
 
         init {
             panel.renderDraft("public question")
             panel.onConversationsRequested = { controller.refreshConversations() }
-            panel.onInsert = { displayed, _ ->
-                inserted = controller.consumeResult()?.takeIf { it == displayed }
+            panel.onInsert = { displayed, thinking, sections ->
+                inserted = controller.consumeResult(thinking, displayed, sections)
             }
         }
 

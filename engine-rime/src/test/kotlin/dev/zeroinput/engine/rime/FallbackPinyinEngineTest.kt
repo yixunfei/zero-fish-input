@@ -11,6 +11,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FallbackPinyinEngineTest {
+    @Test fun `nine key handoff preserves digits and converts using public readings`() {
+        val engine = FallbackPinyinEngine(ChineseInputOptions(
+            keyboardLayout = dev.zeroinput.engine.api.ChineseKeyboardLayout.NINE_KEY))
+        "64".forEach { engine.handle(EngineKey.Character(it.toString())) }
+        assertEquals("64", engine.snapshot.rawInput)
+        assertTrue(engine.snapshot.candidates.any { it.text == "你" })
+        val update = engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "你" })
+        assertEquals("你", update.committedText)
+        assertEquals("ni", update.committedInput)
+        engine.restoreComposition("64")
+        assertTrue(engine.snapshot.candidates.any { it.text == "你" })
+    }
+
     @Test fun `leading separators are consumed by whole phrase completions`() {
         for (raw in listOf("'nih", "''ni'h", "'nihao'")) {
             val engine = FallbackPinyinEngine()

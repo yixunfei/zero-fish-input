@@ -23,5 +23,6 @@ fun aiErrorMessage(error: AiProviderError): Int = when (error) {
         AiNetworkFailure.RATE_LIMIT -> R.string.ai_rate_limited
         AiNetworkFailure.SERVICE -> R.string.ai_service_unavailable
         AiNetworkFailure.REQUEST -> R.string.ai_request_rejected
+        AiNetworkFailure.CAPACITY -> R.string.ai_capacity_busy
     }
 }

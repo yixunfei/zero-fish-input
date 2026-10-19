@@ -17,6 +17,27 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalDraftInputTest {
+    @Test fun layoutSpecificHandoffKeepsConvertiblePreeditWithoutPersonalization() = onMain {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        for ((options, code) in listOf(
+            dev.zeroinput.engine.api.ChineseInputOptions(keyboardLayout = dev.zeroinput.engine.api.ChineseKeyboardLayout.NINE_KEY) to "64",
+            dev.zeroinput.engine.api.ChineseInputOptions(doublePinyinScheme = dev.zeroinput.engine.api.DoublePinyinScheme.MICROSOFT) to "n;",
+        )) {
+            var state = InputSessionState()
+            var committed = ""
+            val draft = LocalDraftInput({ graph }, { false }, {}, { text, _, next -> committed = text; state = next }, maxChars = 64)
+            try {
+                draft.start(InputLanguage.CHINESE, options)
+                assertTrue(draft.appendPreedit(code))
+                assertEquals("", committed)
+                assertEquals(code, state.snapshot.rawInput)
+                assertTrue(state.snapshot.isComposing)
+                assertFalse(state.privacy.personalizationAllowed)
+                assertFalse(state.privacy.learningAllowed)
+            } finally { draft.close() }
+        }
+    }
+
     @Test fun preparedNativeEngineRestoresTheDraftWhilePinyinIsStillComposing() {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         val deadline = SystemClock.uptimeMillis() + 60_000

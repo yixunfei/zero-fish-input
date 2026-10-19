@@ -19,6 +19,7 @@ internal class AiWorkbenchController(
     private val render: (AiStreamEvent) -> Unit,
     private val renderList: (List<AiConversationSummary>) -> Unit,
     private val renderConversation: (AiConversation?) -> Unit,
+    private val editorPrivacy: () -> dev.zeroinput.ime.core.privacy.SessionPrivacy?,
     private val renderModels: (List<String>, String?) -> Unit = { _, _ -> },
     private val renderContext: (AiContextState) -> Unit = {},
     private val renderHistoryStatus: (Boolean, Boolean, Boolean) -> Unit = { _, _, _ -> },
@@ -153,7 +154,9 @@ internal class AiWorkbenchController(
         newConversation()
         storage({ current -> conversations.find(id, current) }, deliver = {
             selected = it
-            context.reset(it?.messages.orEmpty())
+            // Opening a saved chat is an explicit choice to continue it. Include
+            // only the bounded recent history; users can uncheck individual turns.
+            context.reset(it?.messages.orEmpty(), includeRecent = true)
             renderContext(context.state)
             showConversation(it)
         })
@@ -163,13 +166,17 @@ internal class AiWorkbenchController(
         reconcilePersistence()
         if (!allowed() || configuration()?.saveConversations != true) return
         stop()
-        if (selected?.id == id) {
-            selected = null
-            context.reset()
-            renderContext(context.state)
-            showConversation(null)
-        }
-        storage({ current -> conversations.delete(id, current) }, deliver = { refreshConversations() })
+        storage({ current -> conversations.delete(id, current) }, deliver = {
+            if (selected?.id == id) {
+                selected = null
+                context.reset()
+                renderContext(context.state)
+                showConversation(null)
+            }
+            refreshConversations()
+        }, onFailure = {
+            selected?.takeIf { it.id == id }?.let(::showConversation)
+        })
     }
 
     fun renameConversation(id: String, title: String) {
@@ -242,18 +249,32 @@ internal class AiWorkbenchController(
         delivery = sink
         renderOutput(AiStreamEvent.Started)
         try {
-            handle = coordinator.submit(request, AiGenerationPolicy(true, true, false), sink::offer)
+            val policy = AiEditorPolicy.generationPolicy(config.enabled, config.networkAllowed, editorPrivacy())
+            handle = coordinator.submit(request, policy, sink::offer)
         } catch (_: Exception) {
             fail()
         }
     }
 
     /** The UI cannot supply arbitrary text or revive a result from an older editor. */
-    fun consumeResult(includeThinking: Boolean = false, displayedResult: String? = null): String? {
+    fun consumeResult(
+        includeThinking: Boolean = false,
+        displayedResult: String? = null,
+        selectedSections: List<Int>? = null,
+    ): String? {
         reconcilePersistence()
         if (!allowed() || !contextCurrent() || !dataGeneration.isCurrent(resultDataGeneration)) return null
         if (displayedResult != null && displayedResult != result) return null
-        return (if (includeThinking) fullResult else result).also { result = null; fullResult = null }
+        val source = if (includeThinking) fullResult else result
+        val insertable = when {
+            source == null -> null
+            selectedSections == null -> source
+            includeThinking -> null // Section indices are bound to the displayed answer, never hidden output.
+            else -> AiResultSections.select(source, selectedSections)
+        } ?: return null
+        result = null
+        fullResult = null
+        return insertable
     }
 
     fun splitResult(value: String): AiThinkingText.Split = AiThinkingText.split(value)
@@ -283,6 +304,7 @@ internal class AiWorkbenchController(
         token: Long = generation.get(),
         data: Long = dataGeneration.current(),
         historyRead: Boolean = false,
+        onFailure: () -> Unit = {},
     ) {
         val config = configuration()
         val current = { generation.get() == token && dataGeneration.isCurrent(data) && contextCurrent() &&
@@ -295,12 +317,14 @@ internal class AiWorkbenchController(
                     reconcilePersistence()
                     if (current() && allowed()) value.fold(deliver) {
                         reportStorageFailure(historyRead)
+                        onFailure()
                     }
                 }
             }
         } catch (_: RejectedExecutionException) {
             if (current() && allowed()) {
                 reportStorageFailure(historyRead)
+                onFailure()
             }
         }
     }

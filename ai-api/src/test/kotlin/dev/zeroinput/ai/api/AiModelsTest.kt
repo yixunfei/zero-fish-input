@@ -4,6 +4,17 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class AiModelsTest {
+    @Test fun independentDraftPermissionDoesNotOverrideSensitiveOrDisabledBoundaries() {
+        val request = AiRequest(null, AiAction.ASK, "hello")
+        val allowed = AiGenerationPolicy(true, true, false, personalizationAllowed = false, independentAiAllowed = true)
+        allowed.check(request)
+        for (restricted in listOf(allowed.copy(sensitiveEditor = true), allowed.copy(enabled = false),
+            allowed.copy(networkAllowed = false), allowed.copy(suggestionsAllowed = false),
+            allowed.copy(independentAiAllowed = false))) {
+            assertThrows(AiProviderError.Policy::class.java) { restricted.check(request) }
+        }
+    }
+
     @Test
     fun requestRejectsOversizedInput() {
         assertThrows(IllegalArgumentException::class.java) {

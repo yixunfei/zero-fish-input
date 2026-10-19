@@ -21,6 +21,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PreparedEngineHandoffTest {
+    @Test fun `runtime engine failure is observable and prepared replacement restores conversion`() {
+        val connection = ComposingConnection()
+        val failed = object : InputEngine by HandoffEngine("failed") {
+            override fun handle(key: EngineKey): EngineUpdate = error("engine unavailable")
+        }
+        val controller = controller(connection, failed)
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("n"))
+        assertEquals(null, controller.state.engineDescriptor)
+        assertEquals(listOf("n"), connection.commits)
+        val replacement = HandoffEngine("recovered")
+        assertTrue(controller.adoptPreparedEngine(prepared(controller, replacement)))
+        assertEquals("recovered", controller.state.engineDescriptor?.id)
+        controller.handle(InputCommand.Text("nihao"))
+        controller.handle(InputCommand.SelectCandidate(0))
+        assertEquals(listOf("n", "你好"), connection.commits)
+        controller.close()
+    }
+
     @Test
     fun `prepared native engine continues a fallback pinyin composition`() {
         val connection = ComposingConnection()

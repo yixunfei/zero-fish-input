@@ -62,7 +62,7 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
             // Category and pagination links share the list route; retain their full query.
             output.putIfAbsent(url, CatalogItem(id, title, url, category,
                 if (source == DictionarySource.QQ) "qq" else "scel"))
-            require(output.size <= 1024)
+            require(output.size <= MAX_ITEMS)
         }
         require(output.isNotEmpty()) { "Source catalog unavailable" }
         return output.values.toList()
@@ -74,17 +74,24 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
             .getString("sha")
         require(commit.matches(Regex("[a-f0-9]{40}")))
         val response = JSONObject(read("https://api.github.com/repos/$repo/git/trees/$commit?recursive=1"))
+        return parseGithubTree(response, repo, prefix, commit)
+    }
+
+    internal fun parseGithubTree(response: JSONObject, repo: String, prefix: String, commit: String): List<CatalogItem> {
+        require(commit.matches(Regex("[a-f0-9]{40}")))
         require(!response.optBoolean("truncated"))
         val entries = response.getJSONArray("tree")
-        return (0 until entries.length()).map { entries.getJSONObject(it) }.filter {
-            val path = it.getString("path")
-            path.startsWith(prefix) && path.endsWith(".dict.yaml") && it.getString("type") == "blob"
-        }.map {
-            val path = it.getString("path")
+        val output = ArrayList<CatalogItem>()
+        for (index in 0 until entries.length()) {
+            val entry = entries.getJSONObject(index)
+            val path = entry.getString("path")
+            if (!path.startsWith(prefix) || !path.endsWith(".dict.yaml") || entry.getString("type") != "blob") continue
+            require(output.size < MAX_ITEMS)
             require(path.matches(Regex("[a-zA-Z0-9_./-]+")) && !path.contains(".."))
-            CatalogItem(path.substringAfterLast('/').removeSuffix(".dict.yaml"), path.substringAfterLast('/'),
+            output += CatalogItem(path.substringAfterLast('/').removeSuffix(".dict.yaml"), path.substringAfterLast('/'),
                 validatedAddress("https://raw.githubusercontent.com/$repo/$commit/$path"), version = commit)
         }
+        return output
     }
 
     private fun zhwiki(): List<CatalogItem> {
@@ -94,11 +101,16 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
     internal fun parseZhwiki(json: String): List<CatalogItem> {
         val release = JSONObject(json)
         val assets: JSONArray = release.getJSONArray("assets")
-        return (0 until assets.length()).map { assets.getJSONObject(it) }
-            .filter { it.getString("name").endsWith(".dict.yaml") }.map {
-                CatalogItem(it.getString("name").removeSuffix(".dict.yaml"), it.getString("name"),
-                    validatedAddress(it.getString("browser_download_url")), version = release.getString("tag_name"))
-            }
+        val output = ArrayList<CatalogItem>()
+        for (index in 0 until assets.length()) {
+            val asset = assets.getJSONObject(index)
+            val name = asset.getString("name")
+            if (!name.endsWith(".dict.yaml")) continue
+            require(output.size < MAX_ITEMS)
+            output += CatalogItem(name.removeSuffix(".dict.yaml"), name,
+                validatedAddress(asset.getString("browser_download_url")), version = release.getString("tag_name"))
+        }
+        return output
     }
 
     private fun read(address: String): String {
@@ -116,4 +128,6 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
     }
 
     private fun validatedAddress(address: String): String = DictionaryDownloadTransport.validate(address).toASCIIString()
+
+    private companion object { const val MAX_ITEMS = 1024 }
 }

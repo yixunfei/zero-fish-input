@@ -123,6 +123,7 @@
     <string name="ai_model_unavailable">Model or endpoint not found. Check the model name and service URL.</string>
     <string name="ai_rate_limited">Request limited. Check your quota or retry later.</string>
     <string name="ai_service_unavailable">Service temporarily unavailable. Please retry later.</string>
+    <string name="ai_capacity_busy">Currently busy. Please retry later.</string>
     <string name="ai_open">Open AI workbench</string>
     <string name="ai_entry_unavailable">AI unavailable. Tap for details</string>
     <string name="ai_entry_privacy_blocked">AI is blocked by this field or your privacy settings.</string>
@@ -161,6 +162,12 @@
     <string name="ai_assistant_message">AI: %1$s</string>
     <string name="ai_edit">Edit</string>
     <string name="ai_read">View</string>
+    <string name="ai_use_selection">Replace AI draft with selection</string>
+    <string name="ai_show_history">Show context</string>
+    <string name="ai_hide_history">Hide context</string>
+    <string name="ai_select_all">Select all sections</string>
+    <string name="ai_clear_selection">Clear selection</string>
+    <string name="ai_selected_sections">%1$d of %2$d sections selected</string>
     <string name="fuzzy_short">Fuzzy</string>
     <string name="fuzzy_toggle">Toggle fuzzy pinyin</string>
     <string name="fuzzy_choose_rules">Choose fuzzy pinyin rules in settings first</string>
@@ -185,6 +192,9 @@
     <string name="handwriting_candidate_value">Insert %1$s</string>
     <string name="language_sensitive_protection">Sensitive input protection enabled</string>
     <string name="language_switch">Switch language</string>
+    <string name="language_short_chinese">中</string>
+    <string name="language_short_english">En</string>
+    <string name="language_short_pack">Pack</string>
     <string name="ai_page_reference_item">Reference %1$d (characters: %2$d): %3$s</string>
     <string name="secure_clipboard_load_failed">Unable to load snippets. Retry or open Manage and authenticate to recover.</string>
 </resources>
