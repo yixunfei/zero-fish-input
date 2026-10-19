@@ -1116,3 +1116,18 @@ one-use approval/click, screen-off, foreground switching and service revocation.
 Physical-device behavior, Activity recreation and live-provider acceptance remain
 separate and are not implied by unit, privacy or lint checks. See [ADR 0025](adr/0025-ai-device-agent-boundary.md)
 and [the implementation plan](ai-device-agent-plan.md).
+
+### Stage 6 review boundary
+
+Stage 6 is a separate review backlog requested by the owner. Notification
+access, media and system settings, camera/microphone, file selection,
+telephony/SMS, contacts/calendar and screen recording are not enabled by the
+device-agent switch. Each category requires its own permission analysis,
+disclosure, capability gate, final confirmation, revocation and negative tests.
+
+The proposed first low-risk item is a user-selected file attachment delivered
+through Android's document picker and the existing bounded attachment reader.
+It would be task-scoped input only: no storage permission, URI persistence,
+file-management action, provider scan or agent history. This is recorded as a
+proposal in [ADR 0026](adr/0026-ai-device-agent-stage6-minimal-capabilities.md)
+and is not an enabled data path until its boundary is confirmed.

@@ -113,6 +113,48 @@ class AiTransportProtocolTest {
         }
     }
 
+    @Test fun deviceAgentUsesTheSharedAuthenticatedTransportAndDecodesOneResponse() {
+        Fixture().use { f ->
+            f.exchange.type = "application/json"
+            f.exchange.response = """{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Done","tool_calls":[]}}]}"""
+            val snapshot = DeviceScreenSnapshot(
+                packageName = "com.example.fixture",
+                windowId = 7,
+                snapshotId = "fixture-snapshot",
+                elements = listOf(DeviceElement(
+                    ref = "0", role = "Text", label = "Public fixture", text = "Public fixture",
+                    bounds = DeviceBounds(0, 0, 80, 40), clickable = false, longClickable = false,
+                    scrollable = false, editable = false, password = false, sensitive = false, enabled = true,
+                )),
+            )
+            val request = DeviceAgentModelRequest(
+                task = "Read the public fixture",
+                targetPackage = snapshot.packageName,
+                snapshot = snapshot,
+                tools = DeviceActionCatalog.definitions,
+            )
+            val done = CountDownLatch(1)
+            val events = CopyOnWriteArrayList<DeviceAgentProviderEvent>()
+            f.provider.request(request) { event ->
+                events += event
+                if (event is DeviceAgentProviderEvent.Completed || event is DeviceAgentProviderEvent.Failed ||
+                    event == DeviceAgentProviderEvent.Cancelled) done.countDown()
+            }
+
+            assertTrue(done.await(3, TimeUnit.SECONDS))
+            assertEquals("/v1/chat/completions", f.uri?.path)
+            assertEquals("POST", f.exchange.method)
+            assertEquals("fixture-key", f.exchange.key)
+            assertEquals("Done", (events.last() as DeviceAgentProviderEvent.Completed).response.message)
+            val body = f.exchange.written.toString("UTF-8")
+            assertTrue(body.contains("Read the public fixture"))
+            assertTrue(body.contains("fixture-snapshot"))
+            assertFalse(body.contains("fixture-key"))
+            assertFalse(body.contains("api_key"))
+            assertTrue(f.exchange.disconnected)
+        }
+    }
+
     @Test fun catalogFetchRequiresNoSelectedModelAndNeverSendsDraftOrGenerationRequest() {
         Fixture().use { f ->
             f.config = f.config.copy(providers = listOf(f.profile.copy(models = emptyList(), selectedModel = "")))

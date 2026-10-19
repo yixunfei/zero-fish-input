@@ -257,7 +257,16 @@ continue while that Activity is behind the selected target app; changing away
 from the target app revokes it. Android 16 emulator coverage exercises public
 fixture capture/redaction, JPEG limits, one-use approval/click, foreground change,
 screen-off and service revocation. Physical-device and live-provider acceptance
-remain separate. See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
+remain separate. Activity instance recreation and a fake provider exchange are
+also covered; process-death, physical-device and live-provider acceptance
+remain separate.
+
+Stage 6 is under per-capability review. Notification, system-settings, camera,
+microphone, telephony/SMS, contact/calendar and screen-recording access is not
+enabled by the device-agent switch. The proposed task-scoped selected-file input
+is documented in [ADR 0026](docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md)
+and does not add permissions or runtime access until approved and implemented.
+See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
 
 # Public dictionaries
 
