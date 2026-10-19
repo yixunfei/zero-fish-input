@@ -19,6 +19,15 @@ class AiResultSectionsTest {
         assertEquals(response, AiResultSections.select(response, sections.indices.toList()))
     }
 
+    @Test fun fenceWithTrailingTextDoesNotCloseTheCodeSection() {
+        val response = "```text\nbefore\n```still code\nafter\n``` \n\nTail"
+
+        assertEquals(
+            listOf("```text\nbefore\n```still code\nafter\n``` ", "Tail"),
+            AiResultSections.split(response).map { it.text },
+        )
+    }
+
     @Test fun selectedSectionsAreOrderedDeduplicatedAndTrimmed() {
         val response = "Keep this\n\nRemove this\n\nKeep this too"
 
@@ -34,6 +43,17 @@ class AiResultSectionsTest {
 
         assertEquals(AiResultSections.MAX_SECTIONS, sections.size)
         assertTrue(sections.last().text.contains("part ${AiResultSections.MAX_SECTIONS}"))
+        assertEquals(response, AiResultSections.select(response, sections.indices.toList()))
+    }
+
+    @Test fun maximumSizeResponseWithManySectionsKeepsOverflow() {
+        val response = List(AiLimits.MAX_OUTPUT_CHARS / 4) { "# x" }.joinToString("\n")
+
+        val sections = AiResultSections.split(response)
+
+        assertEquals(AiResultSections.MAX_SECTIONS, sections.size)
+        val overflowSections = AiLimits.MAX_OUTPUT_CHARS / 4 - AiResultSections.MAX_SECTIONS + 1
+        assertEquals(List(overflowSections) { "# x" }.joinToString("\n\n"), sections.last().text)
         assertEquals(response, AiResultSections.select(response, sections.indices.toList()))
     }
 }

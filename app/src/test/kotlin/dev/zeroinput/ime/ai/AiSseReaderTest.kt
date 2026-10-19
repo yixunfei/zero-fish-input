@@ -2,6 +2,7 @@ package dev.zeroinput.ime.ai
 
 import dev.zeroinput.ai.api.AiLimits
 import dev.zeroinput.ai.api.AiProviderError
+import java.io.BufferedReader
 import java.io.StringReader
 import org.junit.Assert.*
 import org.junit.Test
@@ -48,6 +49,21 @@ class AiSseReaderTest {
     @Test fun multilingualDeltasStopAtDone() {
         assertEquals("你好 world", read(": keepalive\n" + chunk("你好") + chunk(" world") + stop + done + chunk("ignored")))
     }
+
+    @Test fun acceptsBareCarriageReturnLineSeparators() {
+        assertEquals("fixture", read(chunk("fixture").replace("\n", "\r") +
+            stop.replace("\n", "\r") + done.replace("\n", "\r")))
+    }
+
+    @Test fun eventReaderAcceptsBareCarriageReturnAndCrLfSeparators() {
+        for (separator in listOf("\r", "\r\n")) {
+            val reader = AiEventReader(
+                BufferedReader(StringReader("data: {\"type\":\"ping\"}${separator}${separator}")),
+            ) { false }
+
+            assertEquals("{\"type\":\"ping\"}", reader.next())
+        }
+    }
     @Test fun acceptsBomAndOptionalFieldIndentation() {
         assertEquals("fixture", read("\uFEFF  data: {\"choices\":[{\"delta\":{\"content\":\"fixture\"}}]}\n\n" + stop + done))
     }
@@ -61,6 +77,10 @@ class AiSseReaderTest {
         assertThrows(AiProviderError.Response::class.java) { read("x".repeat(AiLimits.MAX_STREAM_LINE_CHARS + 1)) }
         assertThrows(AiProviderError.Response::class.java) { read(chunk("x".repeat(8_192)).repeat(5)) }
         assertThrows(AiProviderError.Response::class.java) { read(":\n".repeat(AiLimits.MAX_STREAM_CHARS / 2 + 1)) }
+        val crlf = ":\r\n".repeat(AiLimits.MAX_STREAM_CHARS / 3 + 1) +
+            (chunk("OK") + stop + done).replace("\n", "\r\n")
+        val oversized = assertThrows(AiProviderError.Response::class.java) { read(crlf) }
+        assertEquals("AI stream is too large", oversized.message)
         assertThrows(InterruptedException::class.java) {
             AiSseReader().read(StringReader(chunk("fixture")).buffered(), { true }, {})
         }

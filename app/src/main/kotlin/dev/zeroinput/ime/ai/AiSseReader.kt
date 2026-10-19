@@ -6,7 +6,10 @@ import java.io.BufferedReader
 
 /** Bounded SSE parser; an interrupted or truncated answer is never a completed result. */
 internal class AiSseReader {
+    private var skipLf = false
+
     fun read(reader: BufferedReader, cancelled: () -> Boolean, emit: (String) -> Unit): String {
+        skipLf = false
         val output = StringBuilder()
         val event = StringBuilder()
         var streamChars = 0
@@ -14,9 +17,9 @@ internal class AiSseReader {
         while (true) {
             if (cancelled()) throw InterruptedException()
             val line = readLine(reader, cancelled) ?: throw AiProviderError.Response("AI stream ended early")
-            streamChars += line.length + 1
+            streamChars += line.rawLength
             if (streamChars > AiLimits.MAX_STREAM_CHARS) throw AiProviderError.Response("AI stream is too large")
-            val field = line.removePrefix("\uFEFF").trimStart(' ', '\t')
+            val field = line.text.removePrefix("\uFEFF").trimStart(' ', '\t')
             if (field.startsWith("data:")) {
                 if (event.length + field.length > AiLimits.MAX_STREAM_LINE_CHARS)
                     throw AiProviderError.Response("AI event is too large")
@@ -67,13 +70,25 @@ internal class AiSseReader {
     } catch (error: AiProviderError) { throw error
     } catch (_: Exception) { throw AiProviderError.Response("AI response is invalid") }
 
-    private fun readLine(reader: BufferedReader, cancelled: () -> Boolean): String? {
+    private data class Line(val text: String, val rawLength: Int)
+
+    private fun readLine(reader: BufferedReader, cancelled: () -> Boolean): Line? {
         val line = StringBuilder()
+        var rawLength = 0
         while (true) {
             if (cancelled()) throw InterruptedException()
             val value = reader.read()
-            if (value < 0) return if (line.isEmpty()) null else line.toString()
-            if (value == '\n'.code) return line.toString().removeSuffix("\r")
+            if (value < 0) return if (line.isEmpty()) null else Line(line.toString(), rawLength)
+            rawLength++
+            if (skipLf) {
+                skipLf = false
+                if (value == '\n'.code) continue
+            }
+            if (value == '\r'.code) {
+                skipLf = true
+                return Line(line.toString(), rawLength)
+            }
+            if (value == '\n'.code) return Line(line.toString(), rawLength)
             if (line.length >= AiLimits.MAX_STREAM_LINE_CHARS) throw AiProviderError.Response("AI stream line is too large")
             line.append(value.toChar())
         }

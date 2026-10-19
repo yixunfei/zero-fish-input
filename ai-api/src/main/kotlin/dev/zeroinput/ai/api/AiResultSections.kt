@@ -10,30 +10,30 @@ object AiResultSections {
     fun split(value: String): List<AiResultSection> {
         require(value.length <= AiLimits.MAX_OUTPUT_CHARS) { "AI result is too large" }
         if (value.isBlank()) return emptyList()
-        val sections = mutableListOf<String>()
+        val sections = SectionAccumulator()
         val paragraph = StringBuilder()
         val lines = value.split('\n')
         var index = 0
         while (index < lines.size) {
             val line = lines[index]
             val content = line.removeSuffix("\r")
+            val fence = openingFence(content)
             when {
                 content.isBlank() -> flush(paragraph, sections)
-                isFence(content) -> {
+                fence != null -> {
                     flush(paragraph, sections)
                     val code = StringBuilder(line)
-                    val fence = content.trimStart().takeWhile { it == '`' || it == '~' }
                     index++
                     while (index < lines.size) {
                         code.append('\n').append(lines[index])
                         if (isClosingFence(lines[index].removeSuffix("\r"), fence)) break
                         index++
                     }
-                    addBounded(sections, code.toString())
+                    sections.add(code.toString())
                 }
                 isStandaloneSection(content) -> {
                     flush(paragraph, sections)
-                    addBounded(sections, line)
+                    sections.add(line)
                 }
                 else -> {
                     if (paragraph.isNotEmpty()) paragraph.append('\n')
@@ -43,8 +43,8 @@ object AiResultSections {
             index++
         }
         flush(paragraph, sections)
-        if (sections.isEmpty()) addBounded(sections, value)
-        return sections.mapIndexed { sectionIndex, text -> AiResultSection(sectionIndex, text) }
+        if (sections.isEmpty) sections.add(value)
+        return sections.finish().mapIndexed { sectionIndex, text -> AiResultSection(sectionIndex, text) }
     }
 
     /** All selected returns the exact original response; subsets retain provider order. */
@@ -56,25 +56,58 @@ object AiResultSections {
         return selected.joinToString("\n\n") { sections[it].text.trim() }.trim().takeIf(String::isNotBlank)
     }
 
-    private fun flush(paragraph: StringBuilder, sections: MutableList<String>) {
+    private fun flush(paragraph: StringBuilder, sections: SectionAccumulator) {
         if (paragraph.isEmpty()) return
-        addBounded(sections, paragraph.toString())
+        sections.add(paragraph.toString())
         paragraph.setLength(0)
     }
 
-    private fun addBounded(sections: MutableList<String>, value: String) {
-        if (value.isBlank()) return
-        if (sections.size < MAX_SECTIONS) {
-            sections += value
+    private class SectionAccumulator {
+        private val sections = ArrayList<String>(MAX_SECTIONS)
+        private val overflow = StringBuilder()
+        private var hasOverflow = false
+
+        val isEmpty: Boolean get() = sections.isEmpty() && !hasOverflow
+
+        fun add(value: String) {
+            if (value.isBlank()) return
+            if (sections.size < MAX_SECTIONS - 1) {
+                sections += value
+                return
+            }
+            if (hasOverflow) overflow.append("\n\n")
+            overflow.append(value)
+            hasOverflow = true
+        }
+
+        fun finish(): List<String> = if (hasOverflow) {
+            sections + overflow.toString()
         } else {
-            sections[MAX_SECTIONS - 1] = sections[MAX_SECTIONS - 1] + "\n\n" + value
+            sections
         }
     }
 
-    private fun isFence(line: String): Boolean = line.trimStart().startsWith("```") || line.trimStart().startsWith("~~~")
+    private fun openingFence(line: String): String? {
+        val indentation = line.takeWhile { it == ' ' }.length
+        if (indentation > 3) return null
+        val content = line.drop(indentation)
+        val marker = content.firstOrNull()?.takeIf { it == '`' || it == '~' } ?: return null
+        var length = 0
+        while (content.getOrNull(length) == marker) length++
+        if (length < 3) return null
+        if (marker == '`' && '`' in content.substring(length)) return null
+        return marker.toString().repeat(length)
+    }
 
-    private fun isClosingFence(line: String, fence: String): Boolean =
-        fence.isNotEmpty() && line.trimStart().startsWith(fence)
+    private fun isClosingFence(line: String, fence: String): Boolean {
+        val indentation = line.takeWhile { it == ' ' }.length
+        if (indentation > 3 || fence.isEmpty()) return false
+        val content = line.drop(indentation)
+        val marker = fence.first()
+        var length = 0
+        while (content.getOrNull(length) == marker) length++
+        return length >= fence.length && content.drop(length).all { it == ' ' || it == '\t' }
+    }
 
     private fun isStandaloneSection(line: String): Boolean {
         val value = line.trimStart()

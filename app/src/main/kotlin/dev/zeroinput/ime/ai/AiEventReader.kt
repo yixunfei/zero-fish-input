@@ -8,6 +8,7 @@ import java.io.BufferedReader
 internal class AiEventReader(private val reader: BufferedReader, private val cancelled: () -> Boolean) {
     private var total = 0
     private var first = true
+    private var skipLf = false
 
     fun next(): String {
         val data = StringBuilder()
@@ -30,7 +31,18 @@ internal class AiEventReader(private val reader: BufferedReader, private val can
             if (cancelled()) throw InterruptedException()
             val char = reader.read()
             if (char < 0) return if (value.isEmpty()) null else value.toString()
+            if (skipLf) {
+                skipLf = false
+                if (char == '\n'.code) {
+                    requireResponse(++total <= AiLimits.MAX_STREAM_CHARS)
+                    continue
+                }
+            }
             requireResponse(++total <= AiLimits.MAX_STREAM_CHARS)
+            if (char == '\r'.code) {
+                skipLf = true
+                return value.toString()
+            }
             if (char == '\n'.code) return value.toString().removeSuffix("\r")
             requireResponse(value.length < AiLimits.MAX_STREAM_LINE_CHARS)
             value.append(char.toChar())
