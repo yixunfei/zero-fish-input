@@ -125,6 +125,18 @@ function Assert-TestApk {
         "android.permission.SYSTEM_ALERT_WINDOW",
         # User-approved optional AI transport; input and clipboard features remain offline.
         "android.permission.INTERNET",
+        # Stage 6 permissions are separately enabled, target-scoped and task-approved.
+        "android.permission.WRITE_SETTINGS",
+        "android.permission.READ_SMS",
+        "android.permission.SEND_SMS",
+        "android.permission.READ_CALL_LOG",
+        "android.permission.CALL_PHONE",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
     )
     $unexpectedPermissions = @($permissionNames | Where-Object { $_ -notin $allowedPermissions })

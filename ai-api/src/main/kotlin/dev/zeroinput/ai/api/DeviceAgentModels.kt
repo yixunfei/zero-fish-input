@@ -242,6 +242,8 @@ data class DeviceActionResult(
 class DeviceAgentPolicy(
     val enabled: Boolean = false,
     val disclosureAccepted: Boolean = false,
+    val stage6DisclosureAccepted: Boolean = false,
+    stage6Capabilities: Set<DeviceStage6Capability> = emptySet(),
     val scope: DeviceCapabilityScope = DeviceCapabilityScope.DISABLED,
     val approvalMode: DeviceApprovalMode = DeviceApprovalMode.EACH_ACTION,
     val allowScreenshots: Boolean = false,
@@ -250,25 +252,30 @@ class DeviceAgentPolicy(
 ) {
     val allowedPackages: Set<String> = Collections.unmodifiableSet(allowedPackages.toSet())
     val allowedCategories: Set<DeviceActionCategory> = Collections.unmodifiableSet(allowedCategories.toSet())
+    val stage6Capabilities: Set<DeviceStage6Capability> = Collections.unmodifiableSet(stage6Capabilities.toSet())
 
     fun copy(
         enabled: Boolean = this.enabled,
         disclosureAccepted: Boolean = this.disclosureAccepted,
+        stage6DisclosureAccepted: Boolean = this.stage6DisclosureAccepted,
+        stage6Capabilities: Set<DeviceStage6Capability> = this.stage6Capabilities,
         scope: DeviceCapabilityScope = this.scope,
         approvalMode: DeviceApprovalMode = this.approvalMode,
         allowScreenshots: Boolean = this.allowScreenshots,
         allowedPackages: Set<String> = this.allowedPackages,
         allowedCategories: Set<DeviceActionCategory> = this.allowedCategories,
-    ) = DeviceAgentPolicy(enabled, disclosureAccepted, scope, approvalMode, allowScreenshots, allowedPackages, allowedCategories)
+    ) = DeviceAgentPolicy(enabled, disclosureAccepted, stage6DisclosureAccepted, stage6Capabilities, scope, approvalMode, allowScreenshots, allowedPackages, allowedCategories)
 
     /** Per-task consent may tighten screenshot permission, never expand a setting. */
     fun isWithin(current: DeviceAgentPolicy): Boolean =
         enabled && current.enabled && disclosureAccepted && current.disclosureAccepted &&
+            stage6DisclosureAccepted == current.stage6DisclosureAccepted && stage6Capabilities == current.stage6Capabilities &&
             scope == current.scope && approvalMode == current.approvalMode &&
             allowedPackages == current.allowedPackages && allowedCategories == current.allowedCategories &&
             (!allowScreenshots || current.allowScreenshots)
     init {
         require(allowedPackages.size <= DeviceAgentLimits.MAX_ALLOWLIST_PACKAGES) { "Too many device packages" }
+        require(!stage6DisclosureAccepted || disclosureAccepted) { "Stage 6 disclosure requires device disclosure" }
         allowedPackages.forEach {
             require(it.matches(Regex("[A-Za-z0-9_][A-Za-z0-9_.]{0,254}"))) { "Invalid device package" }
         }
@@ -278,8 +285,11 @@ class DeviceAgentPolicy(
     fun permitsPackage(packageName: String): Boolean = scope == DeviceCapabilityScope.FULL_SUPPORT ||
         scope == DeviceCapabilityScope.ALLOWLIST && packageName in allowedPackages
 
+    fun permitsStage6(capability: DeviceStage6Capability): Boolean =
+        enabled && disclosureAccepted && stage6DisclosureAccepted && capability in stage6Capabilities
+
     override fun toString(): String =
-        "DeviceAgentPolicy(enabled=$enabled,scope=$scope,approval=$approvalMode,screenshots=$allowScreenshots)"
+        "DeviceAgentPolicy(enabled=$enabled,scope=$scope,approval=$approvalMode,screenshots=$allowScreenshots,stage6=${stage6Capabilities.size})"
 }
 
 class DeviceAgentModelRequest(
@@ -289,23 +299,29 @@ class DeviceAgentModelRequest(
     tools: List<DeviceActionDefinition>,
     history: List<DeviceAgentTurn> = emptyList(),
     val model: String? = null,
+    attachments: List<AiAttachment> = emptyList(),
 ) {
     val tools: List<DeviceActionDefinition> = Collections.unmodifiableList(tools.toList())
     val history: List<DeviceAgentTurn> = Collections.unmodifiableList(history.toList())
+    val attachments: List<AiAttachment> = Collections.unmodifiableList(attachments.toList())
     init {
         require(task.isNotBlank() && task.length <= DeviceAgentLimits.MAX_TASK_CHARS) { "Invalid device task" }
         require(snapshot.packageName == targetPackage) { "Snapshot target mismatch" }
         require(tools.size in 1..DeviceAgentLimits.MAX_TOOLS) { "Invalid device tool set" }
         require(history.size <= DeviceAgentLimits.MAX_ACTIONS) { "Too many device turns" }
+        require(attachments.size <= DeviceAgentLimits.MAX_TASK_ATTACHMENTS) { "Too many device task attachments" }
+        require(attachments.sumOf { it.bytes.size } <= AiLimits.MAX_ATTACHMENT_BYTES) { "Device task attachments are too large" }
         require(history.map { it.call.callId }.toSet().size == history.size) { "Duplicate device turn" }
         require(history.sumOf { turn -> turn.continuation.sumOf { it.encryptedContent.length } } <=
             DeviceAgentLimits.MAX_TRANSCRIPT_CHARS) { "Device continuation limit exceeded" }
     }
 
-    fun copy(snapshot: DeviceScreenSnapshot = this.snapshot) =
-        DeviceAgentModelRequest(task, targetPackage, snapshot, tools, history, model)
+    fun copy(
+        snapshot: DeviceScreenSnapshot = this.snapshot,
+        attachments: List<AiAttachment> = this.attachments,
+    ) = DeviceAgentModelRequest(task, targetPackage, snapshot, tools, history, model, attachments)
 
-    override fun toString(): String = "DeviceAgentModelRequest(tools=${tools.size},turns=${history.size})"
+    override fun toString(): String = "DeviceAgentModelRequest(tools=${tools.size},turns=${history.size},attachments=${attachments.size})"
 }
 
 class DeviceReasoningItem(val id: String, val encryptedContent: String) {
@@ -379,13 +395,19 @@ object DeviceAgentLimits {
     const val MAX_REQUEST_BYTES = 4 * 1024 * 1024
     const val MAX_ARGUMENT_CHARS = 512
     const val MAX_ARGUMENTS = 8
-    const val MAX_TOOLS = 16
+    const val MAX_TOOLS = 32
     const val MAX_ALLOWLIST_PACKAGES = 32
+    const val MAX_TASK_ATTACHMENTS = 2
     const val MAX_MODEL_ROUNDS = 24
     const val MAX_ACTIONS = 48
     const val MAX_ACTIONS_PER_RESPONSE = 1
     const val MAX_CONTINUATION_CHARS = 65_536
     const val MAX_TRANSCRIPT_CHARS = 262_144
+    const val MAX_STAGE6_TARGET_CHARS = 256
+    const val MAX_STAGE6_TARGETS = 8
+    const val MAX_STAGE6_FIELDS = 16
+    const val MAX_STAGE6_FIELD_CHARS = 512
+    const val MAX_STAGE6_GRANT_MS = 60_000L
     const val MAX_SNAPSHOT_AGE_MS = 60_000L
     const val MAX_TOOL_RESULT_CHARS = 2_048
     const val MAX_EVENT_HISTORY = 128

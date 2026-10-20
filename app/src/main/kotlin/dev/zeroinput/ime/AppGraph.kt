@@ -32,6 +32,8 @@ import dev.zeroinput.ai.api.DeviceApprovalMode
 import dev.zeroinput.ai.api.DeviceCapabilityScope
 import dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityBroker
 import dev.zeroinput.ime.ai.device.DeviceAgentCoordinator
+import dev.zeroinput.ime.ai.device.DeviceStage6Controller
+import dev.zeroinput.ime.ai.device.AndroidDeviceStage6Platform
 
 class AppGraph(context: Context) : AutoCloseable {
     private val applicationContext = context.applicationContext
@@ -127,6 +129,15 @@ class AppGraph(context: Context) : AutoCloseable {
             aiConfigurationSnapshot()?.let { it.enabled && it.networkAllowed } == true &&
             policy.isWithin(deviceAgentPolicySnapshot()) },
     )
+    /** Direct stage 6 data access remains a separate approval and generation gate. */
+    internal val deviceStage6Controller = DeviceStage6Controller(
+        executor = deviceAgentExecutor,
+        platform = AndroidDeviceStage6Platform(applicationContext),
+        unlocked = {
+            !applicationContext.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+        },
+        foregroundPackage = { deviceAgentBroker.currentWindow()?.packageName },
+    )
     internal val deviceAgentCoordinator = DeviceAgentCoordinator(
         provider = OpenAiCompatibleProvider(
             { aiConfigurationSnapshot() ?: AiConfiguration() },
@@ -143,12 +154,14 @@ class AppGraph(context: Context) : AutoCloseable {
             AutoCloseable { handler.removeCallbacks(callback) }
         },
         text = dev.zeroinput.ime.ai.device.DeviceAgentDescriptions(applicationContext),
+        stage6Controller = deviceStage6Controller,
     )
     private val aiImportSettingsObserver = settings.addChangeListener {
         aiContentInbox.clear()
         pageReferences.invalidate()
         deviceAgentCoordinator.stop()
         deviceAgentBroker.invalidate()
+        deviceStage6Controller.invalidate()
     }
 
     fun deviceAgentPolicySnapshot(): DeviceAgentPolicy {
@@ -156,6 +169,8 @@ class AppGraph(context: Context) : AutoCloseable {
         return DeviceAgentPolicy(
         enabled = settings.deviceAgentEnabled && scope != DeviceCapabilityScope.DISABLED,
         disclosureAccepted = settings.deviceAgentDisclosureAccepted,
+        stage6DisclosureAccepted = settings.deviceAgentStage6DisclosureAccepted,
+        stage6Capabilities = settings.deviceAgentStage6Capabilities,
         scope = scope,
         approvalMode = settings.deviceAgentApprovalMode,
         allowScreenshots = settings.deviceAgentAllowScreenshots,
@@ -468,6 +483,7 @@ class AppGraph(context: Context) : AutoCloseable {
         aiConfigurationListeners.clear()
         aiCoordinator.close()
         deviceAgentCoordinator.close()
+        deviceStage6Controller.close()
         deviceAgentBroker.close()
         aiContentInbox.clear()
         aiExecutor.shutdownNow()

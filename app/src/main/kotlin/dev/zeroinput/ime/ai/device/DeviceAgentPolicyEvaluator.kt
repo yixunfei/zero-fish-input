@@ -67,6 +67,35 @@ class DeviceAgentPolicyEvaluator(private val ownPackage: String = "dev.zeroinput
         return DevicePolicyDecision.allow(approval)
     }
 
+    fun checkStage6Action(
+        policy: DeviceAgentPolicy,
+        entry: DeviceStage6ToolCatalog.Entry?,
+        call: DeviceActionCall,
+        snapshot: DeviceScreenSnapshot,
+        currentPackage: String?,
+    ): DevicePolicyDecision {
+        val ready = checkTarget(policy, snapshot.packageName)
+        if (!ready.allowed) return ready
+        if (entry == null || entry.definition.name != call.toolName ||
+            !policy.permitsStage6(entry.capability) || !DeviceStage6Catalog.permits(entry.capability, entry.operation)) {
+            return deny(DevicePolicyReason.CATEGORY_NOT_ALLOWED)
+        }
+        if (snapshot.snapshotId != call.snapshotId || currentPackage != snapshot.packageName) {
+            return deny(DevicePolicyReason.SNAPSHOT_EXPIRED)
+        }
+        if (!DeviceActionArguments.valid(entry.definition, call.arguments)) {
+            return deny(DevicePolicyReason.INVALID_ARGUMENT)
+        }
+        val requestedPackage = entry.packageParameter?.let { call.arguments[it] }
+        if (requestedPackage != null &&
+            (!policy.permitsPackage(requestedPackage) ||
+                DeviceAgentSafety.blockedNotificationPackage(requestedPackage, ownPackage))) {
+            return deny(DevicePolicyReason.PACKAGE_NOT_ALLOWED)
+        }
+        // Stage 6 calls always require a fresh approval, including read-only calls.
+        return DevicePolicyDecision.allow(requiresApproval = true)
+    }
+
     private fun checkElement(call: DeviceActionCall, element: DeviceElement, snapshot: DeviceScreenSnapshot): DevicePolicyDecision {
         if (call.toolName == "input_text" &&
             (DeviceAgentSafety.sensitiveLabel(element.label) || DeviceAgentSafety.blockedEffect(element.label))) {

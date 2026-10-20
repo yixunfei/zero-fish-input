@@ -18,7 +18,8 @@ An accessibility service has broad platform authority. The product therefore
 needs a separate consent flow, a local policy gate, a fixed tool directory, and
 short-lived task state. This decision also records the user's confirmed release
 choice: side-loading or private distribution, with the complete stage 0-5
-action set allowed by this plan. It does not approve high-risk extensions.
+action set allowed by this plan. High-risk direct capabilities are reviewed and
+approved separately by [ADR 0026](0026-ai-device-agent-stage6-minimal-capabilities.md).
 
 ## Decision
 
@@ -35,10 +36,12 @@ action set allowed by this plan. It does not approve high-risk extensions.
    external side effects are absent. Adding an action requires a catalog entry,
    local argument validation, policy tests, privacy review, and a new ADR when
    it changes the data or permission boundary.
-4. The model receives only the user-authored device task, the current bounded
-   UI snapshot, and bounded redacted action results. It cannot read the host
-   editor, system or private clipboard, notifications, files, contacts,
-   messages, calls, calendars, credentials, or personal input data.
+4. The stage 0-5 loop receives only the user-authored device task, the current
+   bounded UI snapshot, and bounded redacted action results. It cannot read the
+   host editor, system or private clipboard, notifications, files, contacts,
+   messages, calls, calendars, credentials, or personal input data. Stage 6
+   direct tools have a separate disclosure, capability switch, target grant,
+   runtime/special permission and one-use approval boundary.
 5. Every task is bound to a session generation, task ID, target package, window
    ID, and snapshot ID. A foreground package change, window/event invalidation,
    lock screen, service disconnect, setting change, cancellation, timeout, or
@@ -77,7 +80,8 @@ selected target app; the broker revokes it when the target leaves the foreground
 Android 16 emulator tests cover the public fixture, redaction, screenshot bounds,
 single-use approval/click, screen-off, foreground switching and service revocation.
 Physical-device behavior, Activity recreation and live-provider acceptance remain
-separate validation items, not implicit permissions.
+separate validation items, not implicit permissions. Stage 6 notification,
+provider, sensor and runtime-permission behavior is documented in ADR 0026.
 
 ## Validation required
 

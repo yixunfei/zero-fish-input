@@ -7,6 +7,7 @@ import dev.zeroinput.ai.api.DeviceAgentModelRequest
 import dev.zeroinput.ai.api.DeviceElement
 import dev.zeroinput.ai.api.DeviceBounds
 import dev.zeroinput.ai.api.DeviceScreenSnapshot
+import dev.zeroinput.ai.api.DeviceStage6ToolCatalog
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,6 +84,31 @@ class DeviceAgentProtocolCodecTest {
             assertFalse(response.completed)
             assertEquals("click", response.calls.single().toolName)
             assertEquals("0.0", response.calls.single().arguments["element_ref"])
+        }
+    }
+
+    @Test
+    fun eachProtocolEncodesAndDecodesAStage6ToolCall() {
+        val tools = DeviceActionCatalog.definitions + DeviceStage6ToolCatalog.definitions
+        val stage6Request = DeviceAgentModelRequest(
+            task = "Read the selected contact",
+            targetPackage = snapshot.packageName,
+            snapshot = snapshot,
+            tools = tools,
+        )
+        val responses = listOf(
+            AiProtocol.CHAT_COMPLETIONS to """{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"tool_calls":[{"id":"stage6-1","type":"function","function":{"name":"read_contact","arguments":"{\"display_name\":\"Alice\"}"}}]}}]}""",
+            AiProtocol.RESPONSES to """{"status":"completed","output":[{"type":"function_call","call_id":"stage6-1","name":"read_contact","arguments":"{\"display_name\":\"Alice\"}"}]}""",
+            AiProtocol.ANTHROPIC_MESSAGES to """{"type":"message","role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","id":"stage6-1","name":"read_contact","input":{"display_name":"Alice"}}]}""",
+        )
+
+        responses.forEach { (protocol, raw) ->
+            val encoded = DeviceAgentProtocolCodec.encode(stage6Request, "fixture", protocol)
+            assertTrue(encoded.contains("read_contact"))
+            assertTrue(encoded.contains("CONTACTS"))
+            val decoded = DeviceAgentProtocolCodec.decode(raw, protocol)
+            assertEquals("read_contact", decoded.calls.single().toolName)
+            assertEquals("Alice", decoded.calls.single().arguments["display_name"])
         }
     }
 

@@ -186,6 +186,7 @@ internal class DeviceAgentAccessibilityBroker(
     fun presentApproval(
         owner: DeviceTaskLease, approvalId: String, title: String, details: String,
         call: DeviceActionCall? = null, snapshotToken: Long = -1,
+        oneShotOnly: Boolean = false,
         onDecision: (Boolean) -> Unit,
     ): Boolean {
         val source = port ?: return false
@@ -200,7 +201,8 @@ internal class DeviceAgentAccessibilityBroker(
                     if (lease !== owner || pendingApproval != approvalId) false else {
                         pendingApproval = null
                         if (accepted && valid) {
-                            if (call == null) taskApproved = true else approvedCall = call
+                            if (call == null && !oneShotOnly) taskApproved = true
+                            else if (call != null) approvedCall = call
                         }
                         true
                     }

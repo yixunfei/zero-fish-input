@@ -89,8 +89,9 @@ object DeviceActionCatalog {
 
     private val byName = definitions.associateBy { it.name }
 
-    fun find(name: String): DeviceActionDefinition? = byName[name]
+    fun find(name: String): DeviceActionDefinition? = byName[name] ?: DeviceStage6ToolCatalog.find(name)?.definition
 
     fun require(name: String): DeviceActionDefinition =
         find(name) ?: throw IllegalArgumentException("Unknown device action")
+
 }

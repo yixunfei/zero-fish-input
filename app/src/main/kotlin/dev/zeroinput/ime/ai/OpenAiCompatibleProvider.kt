@@ -55,12 +55,16 @@ class OpenAiCompatibleProvider internal constructor(
     override fun request(
         request: DeviceAgentModelRequest,
         listener: (DeviceAgentProviderEvent) -> Unit,
-    ): AiRequestHandle = launch(null, { listener(DeviceAgentProviderEvent.Started) },
-        { listener(DeviceAgentProviderEvent.Failed(it)) }, { listener(DeviceAgentProviderEvent.Cancelled) }) { config, operation ->
+    ): AiRequestHandle {
+        val ownedAttachments = request.attachments.map { AiAttachment(it.mimeType, it.bytes.copyOf(), it.displayName) }
+        val ownedRequest = request.copy(attachments = ownedAttachments)
+        return launch(null, { listener(DeviceAgentProviderEvent.Started) },
+            { listener(DeviceAgentProviderEvent.Failed(it)) }, { listener(DeviceAgentProviderEvent.Cancelled) },
+            resources = ownedAttachments) { config, operation ->
         val profile = checkNotNull(config.activeProvider())
-        val model = request.model ?: config.activeModel()
-        validateAgentConfiguration(config, model, request.snapshot.hasScreenshot)
-        val body = DeviceAgentProtocolCodec.encode(request, model, profile.protocol)
+        val model = ownedRequest.model ?: config.activeModel()
+        validateAgentConfiguration(config, model, ownedRequest.snapshot.hasScreenshot, ownedRequest.attachments)
+        val body = DeviceAgentProtocolCodec.encode(ownedRequest, model, profile.protocol)
             .toByteArray(StandardCharsets.UTF_8)
         try {
             require(body.size <= DeviceAgentLimits.MAX_REQUEST_BYTES)
@@ -79,6 +83,7 @@ class OpenAiCompatibleProvider internal constructor(
             }
             operation.complete { listener(DeviceAgentProviderEvent.Completed(response)) }
         } finally { body.fill(0) }
+    }
     }
 
     override fun fetchModels(listener: (AiModelCatalogEvent) -> Unit): AiRequestHandle =
@@ -100,9 +105,10 @@ class OpenAiCompatibleProvider internal constructor(
     private fun launch(
         request: AiRequest?, started: () -> Unit,
         failed: (AiProviderError) -> Unit, cancelled: () -> Unit,
+        resources: List<AiAttachment> = emptyList(),
         work: (AiConfiguration, Operation) -> Unit,
     ): AiRequestHandle {
-        val operation = Operation(request?.attachments.orEmpty(), failed, cancelled)
+        val operation = Operation(request?.attachments.orEmpty() + resources, failed, cancelled)
         // Bind credentials/model at submission, not when a queued worker eventually starts.
         val config = try { configurationReader() } catch (_: Exception) {
             operation.fail(AiProviderError.Configuration("AI configuration unavailable"))
@@ -281,7 +287,12 @@ class OpenAiCompatibleProvider internal constructor(
             throw AiProviderError.Configuration("Selected model does not support the attachment")
     }
 
-    private fun validateAgentConfiguration(config: AiConfiguration, model: String, hasScreenshot: Boolean) {
+    private fun validateAgentConfiguration(
+        config: AiConfiguration,
+        model: String,
+        hasScreenshot: Boolean,
+        attachments: List<AiAttachment>,
+    ) {
         val profile = config.activeProvider() ?: throw AiProviderError.Configuration("AI provider is missing")
         AiEndpoint.parse(profile.endpoint, profile.protocol)
         if (model.isBlank() || model.length > 128 || model.any(Char::isISOControl) || model !in profile.models) {
@@ -289,6 +300,15 @@ class OpenAiCompatibleProvider internal constructor(
         }
         if (hasScreenshot && model !in profile.imageModels) {
             throw AiProviderError.Configuration("Selected model does not support device screenshots")
+        }
+        if (!profile.protocol.supportsAudio && attachments.any { it.mimeType.startsWith("audio/") }) {
+            throw AiProviderError.Configuration("This protocol does not support device audio")
+        }
+        if (attachments.any { it.mimeType.startsWith("image/") } && model !in profile.imageModels) {
+            throw AiProviderError.Configuration("Selected model does not support device media")
+        }
+        if (attachments.any { it.mimeType.startsWith("audio/") } && model !in profile.audioModels) {
+            throw AiProviderError.Configuration("Selected model does not support device audio")
         }
     }
 

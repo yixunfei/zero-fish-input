@@ -3,6 +3,11 @@ package dev.zeroinput.ai.api
 /** Shared validation for decoding, policy evaluation and the final platform boundary. */
 object DeviceActionArguments {
     fun valid(definition: DeviceActionDefinition, arguments: Map<String, String>): Boolean {
+        DeviceStage6ToolCatalog.find(definition.name)?.let { return DeviceStage6ToolCatalog.valid(it, arguments) }
+        return validGeneric(definition, arguments)
+    }
+
+    internal fun validGeneric(definition: DeviceActionDefinition, arguments: Map<String, String>): Boolean {
         if (arguments.keys.any { key -> definition.parameters.none { it.name == key } }) return false
         if (definition.parameters.any { parameter ->
                 val value = arguments[parameter.name]

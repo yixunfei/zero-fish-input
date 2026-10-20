@@ -225,12 +225,19 @@ an approval policy and Android accessibility authorization. The service is
 protected by `BIND_ACCESSIBILITY_SERVICE`; authorization alone does not start a
 task. The feature is separate from the read-only page-reference service.
 
-Only the fixed catalog of `wait`, `back`, `home`, `scroll`, `click`, `long_click`,
-`swipe`, `input_text`, `ime_action` and `open_app` is available. `open_app` is
-restricted to the selected target package. There is no device-agent path to
-clipboard contents, notifications, messages, calls, contacts, calendars, files,
-payments, installation, permission grants, shell, root, ADB or Shizuku. Full
-support means the complete local catalog and cannot bypass system security.
+The accessibility action catalog remains fixed to `wait`, `back`, `home`,
+`scroll`, `click`, `long_click`, `swipe`, `input_text`, `ime_action` and
+`open_app`; `open_app` is restricted to the selected target package. Stage 6 is
+a separate set of independently disabled, high-risk tools. When a user enables
+one category and grants its Android permission, the model may read or operate
+only the explicit target for the current task: up to five active notifications
+for one package; one selected file/media URI; four non-security system settings;
+one camera frame or one-second microphone sample; one SMS/call record or one
+send/dial operation; and one contact or calendar record/create/update/delete
+operation. Clipboard contents, payments, installation, permission grants,
+shell, root, ADB, Shizuku, bulk scans, background rules and screen recording
+remain unavailable. Full support means the complete fixed catalog and cannot
+bypass system security.
 
 The model receives an independent task draft, a bounded current-window
 accessibility snapshot and redacted action results. It never receives host editor
@@ -261,11 +268,17 @@ remain separate. Activity instance recreation and a fake provider exchange are
 also covered; process-death, physical-device and live-provider acceptance
 remain separate.
 
-Stage 6 is under per-capability review. Notification, system-settings, camera,
-microphone, telephony/SMS, contact/calendar and screen-recording access is not
-enabled by the device-agent switch. The proposed task-scoped selected-file input
-is documented in [ADR 0026](docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md)
-and does not add permissions or runtime access until approved and implemented.
+Stage 6 is implemented under per-capability gates and remains disabled by
+default. Each operation requires the task disclosure, capability switch,
+foreground target, unlocked device, relevant Android permission and a fresh
+one-use approval. Selected URIs and sensor results stay in memory, are bounded
+by the remaining provider attachment budget, and are cleared on cancellation,
+revocation, task end or delivery failure. Read or captured content may be sent
+to the configured provider only after the operation is approved; provider
+retention is outside ZeroInput's control. Notification-related follow-up
+actions still require a fresh approval in the current task; background rules,
+screen recording, bulk scans and general file management are still excluded. See
+[ADR 0026](docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md).
 See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
 
 # Public dictionaries

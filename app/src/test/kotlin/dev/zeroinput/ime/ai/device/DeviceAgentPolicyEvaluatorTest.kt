@@ -82,4 +82,73 @@ class DeviceAgentPolicyEvaluatorTest {
             evaluator.checkAction(policy, DeviceActionCatalog.find("input_text"), input, sensitive, "com.example.app").reason,
         )
     }
+
+    @Test fun notificationReadMayTargetAnotherAllowedPackage() {
+        val stage6Policy = policy.copy(
+            stage6DisclosureAccepted = true,
+            stage6Capabilities = setOf(DeviceStage6Capability.NOTIFICATIONS),
+            allowedPackages = setOf("com.example.app", "com.example.notifications"),
+        )
+        val call = DeviceActionCall(
+            "notification-read",
+            "read_notifications",
+            snapshot.snapshotId,
+            mapOf("package_name" to "com.example.notifications"),
+            0,
+        )
+        val decision = evaluator.checkStage6Action(
+            stage6Policy,
+            DeviceStage6ToolCatalog.find(call.toolName),
+            call,
+            snapshot,
+            "com.example.app",
+        )
+
+        assertTrue(decision.allowed)
+        assertTrue(decision.requiresApproval)
+    }
+
+    @Test fun notificationReadStillRejectsPackageOutsidePolicy() {
+        val stage6Policy = policy.copy(
+            stage6DisclosureAccepted = true,
+            stage6Capabilities = setOf(DeviceStage6Capability.NOTIFICATIONS),
+        )
+        val call = DeviceActionCall(
+            "notification-read-blocked",
+            "read_notifications",
+            snapshot.snapshotId,
+            mapOf("package_name" to "com.example.notifications"),
+            0,
+        )
+        val decision = evaluator.checkStage6Action(
+            stage6Policy,
+            DeviceStage6ToolCatalog.find(call.toolName),
+            call,
+            snapshot,
+            "com.example.app",
+        )
+
+        assertEquals(DevicePolicyReason.PACKAGE_NOT_ALLOWED, decision.reason)
+    }
+
+    @Test fun notificationReadCanTargetCommunicationAppsButNotPlatformControls() {
+        val stage6Policy = policy.copy(
+            stage6DisclosureAccepted = true,
+            stage6Capabilities = setOf(DeviceStage6Capability.NOTIFICATIONS),
+            allowedPackages = setOf("com.example.app", "com.whatsapp", "com.android.permissioncontroller"),
+        )
+        fun decision(packageName: String, callId: String) = evaluator.checkStage6Action(
+            stage6Policy,
+            DeviceStage6ToolCatalog.find("read_notifications"),
+            DeviceActionCall(callId, "read_notifications", snapshot.snapshotId, mapOf("package_name" to packageName), 0),
+            snapshot,
+            "com.example.app",
+        )
+
+        assertTrue(decision("com.whatsapp", "whatsapp-notifications").allowed)
+        assertEquals(
+            DevicePolicyReason.PACKAGE_NOT_ALLOWED,
+            decision("com.android.permissioncontroller", "system-notifications").reason,
+        )
+    }
 }

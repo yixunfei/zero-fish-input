@@ -86,6 +86,7 @@ fun manifestBoundaryViolations(document: org.w3c.dom.Document, release: Boolean)
         "dev.zeroinput.ime.ZeroInputService" to ("service" to "android.permission.BIND_INPUT_METHOD"),
         "dev.zeroinput.ime.ai.page.PageReferenceService" to ("service" to "android.permission.BIND_ACCESSIBILITY_SERVICE"),
         "dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityService" to ("service" to "android.permission.BIND_ACCESSIBILITY_SERVICE"),
+        "dev.zeroinput.ime.ai.device.DeviceStage6NotificationListenerService" to ("service" to "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"),
     )
     val found = mutableSetOf<String>()
     for (tag in listOf("activity", "activity-alias", "service", "receiver", "provider")) {
@@ -338,8 +339,10 @@ fun Project.checkMergedPrivacyManifests(violations: MutableList<String>) {
             val services = document.getElementsByTagName("service")
             val pageName = "dev.zeroinput.ime.ai.page.PageReferenceService"
             val deviceName = "dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityService"
+            val notificationName = "dev.zeroinput.ime.ai.device.DeviceStage6NotificationListenerService"
             var pageServices = 0
             var deviceServices = 0
+            var notificationServices = 0
             for (index in 0 until services.length) {
                 val service = services.item(index) as org.w3c.dom.Element
                 val name = service.getAttributeNS(androidNamespace, "name")
@@ -361,15 +364,34 @@ fun Project.checkMergedPrivacyManifests(violations: MutableList<String>) {
                         violations += "Device agent service must be system-bound and explicitly exported"
                     }
                 }
+                if (name == notificationName) {
+                    notificationServices++
+                    if (permission != "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" ||
+                        service.getAttributeNS(androidNamespace, "exported") != "true") {
+                        violations += "Notification access must be explicitly system-bound"
+                    }
+                }
             }
             if (pageServices != 1) violations += "Missing or duplicate page reference service"
             if (deviceServices != 1) violations += "Missing or duplicate device agent service"
+            if (notificationServices != 1) violations += "Missing or duplicate notification listener service"
             val allowedPermissions = setOf(
                 "android.permission.USE_BIOMETRIC",
                 "android.permission.USE_FINGERPRINT",
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.SYSTEM_ALERT_WINDOW",
                 "android.permission.INTERNET",
+                "android.permission.WRITE_SETTINGS",
+                "android.permission.READ_SMS",
+                "android.permission.SEND_SMS",
+                "android.permission.READ_CALL_LOG",
+                "android.permission.CALL_PHONE",
+                "android.permission.READ_CONTACTS",
+                "android.permission.WRITE_CONTACTS",
+                "android.permission.READ_CALENDAR",
+                "android.permission.WRITE_CALENDAR",
+                "android.permission.CAMERA",
+                "android.permission.RECORD_AUDIO",
                 "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
             )
             val permissionNames = buildSet {

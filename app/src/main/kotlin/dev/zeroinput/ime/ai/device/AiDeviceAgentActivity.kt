@@ -1,7 +1,9 @@
 package dev.zeroinput.ime.ai.device
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import android.text.InputFilter
@@ -12,6 +14,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -20,8 +23,11 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import dev.zeroinput.ai.api.DeviceAgentEvent
 import dev.zeroinput.ai.api.DeviceAgentLimits
 import dev.zeroinput.ai.api.AiRequestHandle
+import dev.zeroinput.ai.api.DeviceStage6Capability
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
+import java.lang.ref.WeakReference
+import java.util.concurrent.RejectedExecutionException
 
 /**
  * Standalone task surface. The activity only owns user input and rendering;
@@ -32,6 +38,9 @@ class AiDeviceAgentActivity : AppCompatActivity() {
     private lateinit var targetPackage: EditText
     private lateinit var task: EditText
     private lateinit var screenshots: MaterialSwitch
+    private lateinit var attachmentButton: MaterialButton
+    private lateinit var removeAttachmentButton: MaterialButton
+    private lateinit var attachmentStatus: TextView
     private lateinit var start: MaterialButton
     private lateinit var stop: MaterialButton
     private lateinit var status: TextView
@@ -44,10 +53,52 @@ class AiDeviceAgentActivity : AppCompatActivity() {
     private var pendingAttempts = 0
     private var taskHandle: AiRequestHandle? = null
     private var launchingTarget = false
+    private var selectedDocument: SelectedDocument? = null
+    private var readSignal: CancellationSignal? = null
+    private var dataGeneration = 0L
     private val pendingStarter = Runnable { tryStartPending() }
+    private val attachmentPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null || isFinishing || isDestroyed) return@registerForActivityResult
+        if (!graph.deviceAgentPolicySnapshot().let { it.permitsStage6(DeviceStage6Capability.FILES) || it.permitsStage6(DeviceStage6Capability.MEDIA) }) {
+            attachmentStatus.setText(R.string.ai_device_agent_activity_file_disabled)
+            return@registerForActivityResult
+        }
+        val generation = dataGeneration
+        val signal = CancellationSignal().also { readSignal = it }
+        attachmentButton.isEnabled = false
+        renderReadyState()
+        val owner = WeakReference(this)
+        try {
+            graph.aiDocumentExecutor.execute {
+                val value = runCatching { inspectSelectedDocument(uri, signal) }.getOrNull()
+                if (!mainHandler.post {
+                    val activity = owner.get()
+                    if (activity == null || activity.dataGeneration != generation || activity.isFinishing || activity.isDestroyed) {
+                        Unit
+                    } else {
+                        activity.readSignal = null
+                        activity.selectedDocument = value
+                        activity.removeAttachmentButton.visibility = if (value == null) View.GONE else View.VISIBLE
+                        activity.attachmentStatus.setText(
+                            if (value == null) R.string.ai_attachment_failed
+                            else R.string.ai_device_agent_activity_file_selected,
+                        )
+                        activity.attachmentButton.isEnabled = true
+                        activity.renderReadyState()
+                    }
+                }) Unit
+            }
+        } catch (_: RejectedExecutionException) {
+            readSignal = null
+            attachmentButton.isEnabled = true
+            attachmentStatus.setText(R.string.ai_attachment_failed)
+            renderReadyState()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dataGeneration++
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         taskHandle = lastCustomNonConfigurationInstance as? AiRequestHandle
         buildScreen()
@@ -61,6 +112,7 @@ class AiDeviceAgentActivity : AppCompatActivity() {
                     launchingTarget = false
                     mainHandler.removeCallbacks(pendingStarter)
                 }
+                if (!graph.deviceAgentPolicySnapshot().let { it.permitsStage6(DeviceStage6Capability.FILES) || it.permitsStage6(DeviceStage6Capability.MEDIA) }) clearSelectedAttachment()
                 renderReadyState()
             }
         }
@@ -119,6 +171,13 @@ class AiDeviceAgentActivity : AppCompatActivity() {
             isChecked = false
         }
         content.addView(screenshots)
+        attachmentButton = button(R.string.ai_device_agent_activity_add_file) { chooseAttachment() }
+        content.addView(attachmentButton)
+        removeAttachmentButton = button(R.string.ai_device_agent_activity_file_removed) { clearSelectedAttachment() }
+        removeAttachmentButton.visibility = View.GONE
+        content.addView(removeAttachmentButton)
+        attachmentStatus = TextView(this).apply { textSize = 13f; isSaveEnabled = false }
+        content.addView(attachmentStatus)
         status = TextView(this).apply { textSize = 14f; setPadding(0, dp(8), 0, dp(8)) }
         content.addView(status)
         start = button(R.string.ai_device_agent_activity_start) { startTask() }
@@ -167,6 +226,11 @@ class AiDeviceAgentActivity : AppCompatActivity() {
             return
         }
         val basePolicy = graph.deviceAgentPolicySnapshot()
+        if (selectedDocument != null && selectedAttachmentCapability()?.let { !basePolicy.permitsStage6(it) } == true) {
+            attachmentStatus.setText(R.string.ai_device_agent_activity_file_disabled)
+            clearSelectedAttachment()
+            return
+        }
         val targetDecision = DeviceAgentPolicyEvaluator().checkTarget(basePolicy, packageName)
         if (!targetDecision.allowed || !graph.deviceAgentBroker.canStart(basePolicy, packageName)) {
             status.setText(R.string.ai_device_agent_activity_target_not_ready)
@@ -183,14 +247,26 @@ class AiDeviceAgentActivity : AppCompatActivity() {
 
     private fun launchTask(start: PendingStart) {
         val policy = graph.deviceAgentPolicySnapshot()
+        val attachmentCapability = selectedAttachmentCapability()
+        val attachmentUri = selectedDocument?.uri
+        val attachmentLabel = selectedDocument?.displayName
+        val attachmentTarget = attachmentCapability?.let { capability -> attachmentUri?.let { capability to it } }
         taskHandle = graph.deviceAgentCoordinator.start(
             task = start.task,
             targetPackage = start.packageName,
             policy = policy.copy(
                 allowScreenshots = policy.allowScreenshots && start.allowScreenshots,
             ),
+            // The selected URI is read only if the model requests its fixed Stage 6 tool;
+            // this avoids sending the same document once as an attachment and again as a tool result.
+            attachments = emptyList(),
+            stage6Targets = attachmentTarget?.let { mapOf(it.first to it.second) }.orEmpty(),
+            stage6TargetLabels = if (attachmentCapability != null && attachmentLabel != null) {
+                mapOf(attachmentCapability to attachmentLabel)
+            } else emptyMap(),
             listener = {},
         )
+        clearSelectedAttachment()
         renderReadyState()
     }
 
@@ -281,10 +357,12 @@ class AiDeviceAgentActivity : AppCompatActivity() {
     private fun renderReadyState() {
         if (!::start.isInitialized) return
         val running = graph.deviceAgentCoordinator.hasActiveTask
-        start.isEnabled = !running
+        start.isEnabled = !running && readSignal == null
         stop.isEnabled = running && taskHandle != null
         if (!graph.settings.deviceAgentAllowScreenshots) screenshots.isChecked = false
         screenshots.isEnabled = !running && graph.settings.deviceAgentAllowScreenshots
+        attachmentButton.isEnabled = !running
+        removeAttachmentButton.isEnabled = !running && selectedDocument != null
         if (!running && status.text.isNullOrBlank()) {
             status.setText(if (graph.deviceAgentBroker.connected) {
                 R.string.ai_device_agent_activity_ready
@@ -303,6 +381,7 @@ class AiDeviceAgentActivity : AppCompatActivity() {
     override fun onRetainCustomNonConfigurationInstance(): Any? = taskHandle
 
     override fun onDestroy() {
+        clearSelectedAttachment()
         mainHandler.removeCallbacks(pendingStarter)
         pendingStart = null
         observer?.close()
@@ -330,10 +409,62 @@ class AiDeviceAgentActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    private fun chooseAttachment() {
+        if (!graph.deviceAgentPolicySnapshot().let { it.permitsStage6(DeviceStage6Capability.FILES) || it.permitsStage6(DeviceStage6Capability.MEDIA) }) {
+            attachmentStatus.setText(R.string.ai_device_agent_activity_file_disabled)
+            return
+        }
+        attachmentPicker.launch(ALLOWED_TYPES)
+    }
+
+    private fun clearSelectedAttachment() {
+        cancelSelectionRead()
+        selectedDocument = null
+        if (::attachmentStatus.isInitialized) attachmentStatus.text = ""
+        if (::removeAttachmentButton.isInitialized) removeAttachmentButton.visibility = View.GONE
+    }
+
+    private fun cancelSelectionRead() {
+        dataGeneration++
+        val signal = readSignal ?: return
+        readSignal = null
+        runCatching { graph.aiCancellationExecutor.execute { signal.cancel() } }
+    }
+
+    private fun selectedAttachmentCapability(): DeviceStage6Capability? = when {
+        selectedDocument == null -> null
+        selectedDocument?.mimeType?.let { mime ->
+            mime.startsWith("image/") || mime.startsWith("audio/") || mime.startsWith("video/")
+        } == true -> DeviceStage6Capability.MEDIA
+        else -> DeviceStage6Capability.FILES
+    }
+
+    private fun inspectSelectedDocument(uri: Uri, cancellation: CancellationSignal): SelectedDocument {
+        require(uri.scheme == android.content.ContentResolver.SCHEME_CONTENT)
+        val mimeType = requireNotNull(applicationContext.contentResolver.getType(uri))
+            .lowercase().substringBefore(';')
+        require(mimeType in ALLOWED_MIME_TYPES)
+        val displayName = applicationContext.contentResolver.query(
+            uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+            cancellation,
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            .orEmpty().take(128).filterNot(Char::isISOControl).ifBlank { "selected item" }
+        cancellation.throwIfCanceled()
+        return SelectedDocument(uri.toString(), mimeType, displayName)
+    }
+
     companion object {
         const val EXTRA_TARGET_PACKAGE = "dev.zeroinput.ime.ai.device.TARGET_PACKAGE"
         private val PACKAGE_PATTERN = Regex("[A-Za-z0-9_][A-Za-z0-9_.]{0,254}")
+        private val ALLOWED_TYPES = arrayOf("text/plain", "image/jpeg", "image/png", "image/webp", "audio/wav", "audio/x-wav", "audio/mpeg")
+        private val ALLOWED_MIME_TYPES = setOf("text/plain", "image/jpeg", "image/png", "image/webp", "audio/wav", "audio/x-wav", "audio/mpeg")
     }
+
+    private data class SelectedDocument(val uri: String, val mimeType: String, val displayName: String)
 
     private data class PendingStart(
         val packageName: String,

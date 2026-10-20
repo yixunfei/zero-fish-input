@@ -921,12 +921,29 @@ also enforces bounded model rounds, action count, tool results and five-minute
 wall time. Unknown tools, unknown/duplicate arguments, stale snapshots and
 sensitive editable nodes fail closed before an Android action is attempted.
 
-The initial action catalog contains only bounded navigation, pointer, waiting and
-non-sensitive text-editor operations. It has no clipboard, notification, message,
-call, contact, calendar, file, payment, install, permission-grant, shell, root or
-ADB port. `open_app` is constrained to the explicitly selected target package.
-The full-support setting therefore means the complete local catalog, not full
-device authority.
+The accessibility action catalog contains bounded navigation, pointer, waiting
+and non-sensitive text-editor operations. `open_app` is constrained to the
+explicitly selected target package. Stage 6 is a separate `ai-api` tool catalog
+and `DeviceStage6Controller`, with its own capability switches, short-lived
+target grant, one-use approval and foreground/unlock revalidation. The Android
+adapter is `AndroidDeviceStage6Platform`; notification access is isolated in a
+system-bound `DeviceStage6NotificationListenerService`, while one-shot camera
+and microphone capture live in `DeviceStage6SensorCapture`. These adapters are
+not exposed through the accessibility broker and cannot call arbitrary Android
+APIs.
+
+Stage 6 tools are limited to five current notifications for one package, a
+single user-selected document/media URI, four non-security system settings,
+one camera frame or up-to-one-second audio capture, one addressed SMS/call-log
+record or send/dial action, and fixed single-contact/calendar record actions.
+Reads and captures flow to the existing HTTPS provider only after the matching
+tool approval. Text/media attachments share the existing 1 MB per-request
+budget; selected URI metadata is not sent as a tool argument. URI, sensor and
+result bytes are transient and cleared on task end, cancellation, invalidation
+or failed delivery. No screen recording, background notification rule,
+directory crawl, bulk provider scan, arbitrary file write, clipboard, payment,
+permission grant, shell, root or ADB port is present. Full-support means the
+complete fixed local catalog, not full device authority.
 
 Screenshot consent is represented by a settings capability gate plus a fresh
 per-task confirmation in `AiDeviceAgentActivity`. On API 30 and above the

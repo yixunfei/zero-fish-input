@@ -11,6 +11,11 @@ internal object DeviceAgentSafety {
             name != "dev.zeroinput.ime.debug.test" || BLOCKED_PACKAGES.any(name::contains)
     }
 
+    fun blockedNotificationPackage(value: String, ownPackage: String): Boolean {
+        val name = value.lowercase()
+        return name == ownPackage || name == "android" || NOTIFICATION_SYSTEM_PACKAGES.any(name::contains)
+    }
+
     fun sensitiveLabel(value: CharSequence?): Boolean = matches(value, SENSITIVE)
     fun blockedEffect(value: CharSequence?): Boolean = matches(value, EFFECTS)
     fun safeSearchAction(value: String?): Boolean = value?.trim()?.lowercase() in setOf("search", "搜索", "搜尋")
@@ -41,6 +46,10 @@ internal object DeviceAgentSafety {
         "bank", "wallet", "alipay", "tencent.mm", "tencent.mobileqq", "whatsapp", "telegram",
         "messaging", "mms", "dialer", "contacts", "calendar", "email", "gmail", "outlook",
         "documentsui", "filemanager", "password", "authenticator", "keychain",
+    )
+    private val NOTIFICATION_SYSTEM_PACKAGES = setOf(
+        "com.android.systemui", "com.android.settings", "permissioncontroller", "packageinstaller",
+        "com.android.providers.settings", "keychain",
     )
     private val SENSITIVE = setOf(
         "password", "passwd", "passcode", "pin", "密码", "口令", "payment", "支付", "cvv", "cvc",

@@ -1098,14 +1098,14 @@ IDs and stale snapshots are rejected by the protocol/policy layer.
 The provider reuses the sole existing HTTPS transport and supports only the
 already selected Chat Completions, Responses, or Anthropic Messages protocol.
 There is no new WebView, MCP endpoint, telemetry, shell, root, ADB, Shizuku,
-clipboard, notification, message, call, contact, calendar, file, payment,
-install, or permission-grant path. Device-agent history is not persisted by
-default. The screenshot switch is a separately stored capability gate, and the
-standalone device-task page requires a fresh per-task confirmation. On API 30
-and above the service may capture one bounded JPEG while the task token, target
-window and unlock checks remain valid; the provider codec sends it only as a
-native image part, never stores it, and clears the bytes when the snapshot or
-task is invalidated. Unsupported, oversized or expired captures fail closed.
+clipboard, payment, install or permission-grant path. Device-agent history is
+not persisted by default. The screenshot switch is a separately stored
+capability gate, and the standalone device-task page requires a fresh per-task
+confirmation. On API 30 and above the service may capture one bounded JPEG
+while the task token, target window and unlock checks remain valid; the provider
+codec sends it only as a native image part, never stores it, and clears the
+bytes when the snapshot or task is invalidated. Unsupported, oversized or
+expired captures fail closed.
 
 The AI panel and standalone Activity use separate task drafts. The Activity owns
 only rendering and reattaches to the coordinator's bounded in-memory timeline
@@ -1117,17 +1117,28 @@ Physical-device behavior, Activity recreation and live-provider acceptance remai
 separate and are not implied by unit, privacy or lint checks. See [ADR 0025](adr/0025-ai-device-agent-boundary.md)
 and [the implementation plan](ai-device-agent-plan.md).
 
-### Stage 6 review boundary
+### Stage 6 direct-capability boundary
 
-Stage 6 is a separate review backlog requested by the owner. Notification
-access, media and system settings, camera/microphone, file selection,
-telephony/SMS, contacts/calendar and screen recording are not enabled by the
-device-agent switch. Each category requires its own permission analysis,
-disclosure, capability gate, final confirmation, revocation and negative tests.
+Stage 6 is implemented as independent, default-off capabilities. Each operation
+requires the stage 6 disclosure, category switch, explicit task target,
+foreground and unlock checks, the relevant Android runtime/special permission,
+and a fresh one-use approval. `DeviceStage6Controller` owns the short-lived
+grant and generation checks; the model cannot supply a grant or an Android API.
 
-The proposed first low-risk item is a user-selected file attachment delivered
-through Android's document picker and the existing bounded attachment reader.
-It would be task-scoped input only: no storage permission, URI persistence,
-file-management action, provider scan or agent history. This is recorded as a
-proposal in [ADR 0026](adr/0026-ai-device-agent-stage6-minimal-capabilities.md)
-and is not an enabled data path until its boundary is confirmed.
+The current direct limits are: at most five active notifications for one named
+package; one user-selected content URI for bounded read/delete; four
+non-security `Settings.System` keys; one in-memory camera JPEG or one-second
+microphone WAV; one addressed SMS/call-log read or one send/dial action; and
+fixed single-contact/calendar operations. Notification access is provided by a
+system-bound listener and retains no history. Selected URI metadata is held only
+for the task and the URI is not sent as a model argument. Sensor and provider
+bytes are cleared on task end, cancellation, invalidation, failed delivery and
+provider attachment-budget rejection. Existing provider requests cap all
+attachments at 1 MB total.
+
+The user-visible approval names the capability, operation, target and bounded
+fields. The result may be sent to the configured AI provider only after that
+approval; provider retention is outside ZeroInput's control. Screen recording,
+background notification rules, bulk provider scans, arbitrary file management,
+clipboard access, payment, installation and system-security changes remain
+excluded. See [ADR 0026](adr/0026-ai-device-agent-stage6-minimal-capabilities.md).

@@ -1,7 +1,7 @@
 # ADR 0026: AI device agent stage 6 minimal capability gates
 
-- Status: Accepted direction; per-capability implementation boundaries remain open
-- Date: 2026-10-19
+- Status: Accepted and implemented for the documented direct-operation subset
+- Date: 2026-10-20
 - Scope: Stage 6 capability review for the side-load/private-distribution device agent
 
 ## Context
@@ -30,19 +30,52 @@ the model to read every accessible record or perform every available action.
    settings mutation is implied.
 3. Provider requests receive only the data required for the current task. No
    personal content is persisted as agent history or written to logs. Background
-   access is off by default; the notification rule service, if implemented,
-   needs a separate user-created rule with an explicit package and predicate.
+   access is off by default. Notification-triggered operations remain inside the
+   active task and require a fresh approval for each read or follow-up action;
+   background rules and automatic replies are not included.
 4. Calls, messages, contact/calendar writes, media deletion and system-setting
    changes require a fresh per-action approval that displays the exact target
    and effect. Approval is single-use and never authorizes later actions.
 5. Camera/microphone capture is task-scoped and off outside an explicit capture
    action. No continuous or hidden capture is included.
-6. The Android platform cannot provide generic direct file access to arbitrary
-   user documents under scoped storage without a broad special access. Such
-   access is not approved by this ADR; the initial file implementation must
-   stay within a separately defined media collection and file type.
+6. Files and media are addressed only by a URI selected in the current task.
+   The picker accepts the small allowlist already supported by the attachment
+   reader; no storage permission, directory traversal, URI persistence or
+   arbitrary destination is exposed. Reads are bounded by the remaining
+   provider attachment budget and deletes require a separate approval.
 7. Screen recording remains a separate review item. It is not included in the
    direct-read/action implementation scope requested so far.
+
+## Implemented operation matrix
+
+The application now exposes a static tool for each operation below. Every
+tool is independently enabled in settings, is bound to the current task and
+foreground package, and consumes a single approval. The Android adapter also
+checks the relevant runtime or special permission immediately before access.
+
+- Notifications: read at most five active notifications for the explicitly
+  named package; no notification history, replies or background rules.
+- Files and media: read or delete the one user-selected `content://` URI;
+  media MIME types are checked against the provider result.
+- System settings: read or modify four non-security `Settings.System` keys;
+  secure settings, permissions, default IME, network and developer options are
+  outside the catalog.
+- Camera and microphone: one in-memory JPEG frame or at most one second of
+  PCM/WAV audio; no recording, preview persistence or background capture.
+- SMS and telephony: read the newest record for one explicit number, send one
+  SMS or start one call; no bulk scan, deletion or call recording.
+- Contacts and calendar: read an explicitly named contact/event and perform
+  the fixed create/update/delete operations listed in the tool catalog; no
+  provider crawl or agent history.
+
+Runtime permissions are requested from separate operation-specific controls;
+for example, SMS read and send permission are separate requests. Notification
+access and system-settings write access use their own system settings pages.
+
+The selected URI and sensor bytes are cleared when a task ends, is cancelled,
+is invalidated or cannot deliver its result. A task with a user-selected item
+does not send that item as an automatic attachment: the model must request the
+corresponding fixed Stage 6 read tool, after which the result is sent once.
 
 ## Data and lifecycle boundaries
 
@@ -65,9 +98,9 @@ the model to read every accessible record or perform every available action.
 
 ## Validation
 
-Implementation remains pending per-capability action definitions. The first
-subtask must choose a data domain and define exact read/write operations before
-adding permissions. Every subtask needs oversize/unsupported input tests,
-Activity recreation, settings/task invalidation, byte clearing, provider model
-capability rejection and protocol-specific encoding where applicable. No
-capability is enabled by this review record alone.
+Validation covers the static catalog and argument limits, policy and grant
+expiry, one-use approvals, task invalidation, provider tool encoding, selected
+URI lifecycle and attachment budgets. Device permissions, notification access,
+camera/microphone hardware and real providers still require physical-device
+acceptance. Screen recording, background notification rules, bulk scans and
+general file management remain out of scope.
