@@ -9,7 +9,14 @@ import dev.zeroinput.ai.api.AiLimits
 
 /** Reads only a user-granted document, with a hard cap even for lying providers. */
 internal object AiAttachmentReader {
-    fun read(resolver: ContentResolver, uri: Uri, cancellation: CancellationSignal = CancellationSignal()): AiAttachment {
+    fun read(
+        resolver: ContentResolver,
+        uri: Uri,
+        cancellation: CancellationSignal = CancellationSignal(),
+        maxBytes: Int = AiLimits.MAX_ATTACHMENT_BYTES,
+        stillValid: () -> Boolean = { true },
+    ): AiAttachment {
+        require(maxBytes in 1..AiLimits.MAX_ATTACHMENT_BYTES)
         require(uri.scheme == ContentResolver.SCHEME_CONTENT)
         val mime = resolver.getType(uri)?.lowercase()?.substringBefore(';')
             ?: throw IllegalArgumentException("Unknown attachment type")
@@ -23,7 +30,7 @@ internal object AiAttachmentReader {
         val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null, cancellation)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }.orEmpty().take(128).filterNot(Char::isISOControl).ifBlank { "attachment" }
-        val buffer = ByteArray(AiLimits.MAX_ATTACHMENT_BYTES + 1)
+        val buffer = ByteArray(maxBytes + 1)
         try {
             var size = 0
             val descriptor = resolver.openAssetFileDescriptor(uri, "r", cancellation)
@@ -32,13 +39,14 @@ internal object AiAttachmentReader {
             descriptor.use { it.createInputStream().use { input ->
                 while (size < buffer.size) {
                     cancellation.throwIfCanceled()
+                    if (!stillValid()) throw java.util.concurrent.CancellationException("Attachment read expired")
                     val count = input.read(buffer, size, buffer.size - size)
                     if (count < 0) break
                     require(count > 0)
                     size += count
                 }
             } }
-            require(size in 1..AiLimits.MAX_ATTACHMENT_BYTES)
+            require(size in 1..maxBytes)
             val bytes = buffer.copyOf(size)
             return try { AiAttachment(normalized, bytes, name) }
                 catch (error: Exception) { bytes.fill(0); throw error }

@@ -26,6 +26,8 @@ import dev.zeroinput.ai.api.*
 class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
     var onCancel: () -> Unit = {}
+    var onDeviceAgentDraftChanged: (KeyboardAction) -> Unit = {}
+    var onDeviceAgentTaskSubmitted: (String) -> Unit = {}
     var onInsert: (String, Boolean, List<Int>?) -> Unit = { _, _, _ -> }
     var onUseDraftSelection: (String, Int, Int) -> Unit = { _, _, _ -> }
     var onCandidateSelected: (Int, String) -> Unit = { _, _ -> }
@@ -49,6 +51,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onModelSelected: (String) -> Unit = {}
     var onEditingChanged: (Boolean) -> Unit = {}
     var onSettings: () -> Unit = {}
+    var onDeviceAgent: () -> Unit = {}
     var onAddContent: () -> Unit = {}
     var onImportContent: () -> Unit = {}
     var onRemoveAttachment: (Int) -> Unit = {}
@@ -64,8 +67,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private var showThinking = false
     private var reasoningMode = AiReasoningMode.DEFAULT
     private var inputLanguage = InputLanguage.CHINESE
+    private var deviceAgentMode = false
     var editing = false
         private set
+    val isDeviceAgentMode: Boolean get() = deviceAgentMode
     val editingHeightDp: Int get() = 248 + (if (attachmentRow.isNotEmpty()) 48 else 0) +
         (if (hasCandidates) 48 else 0)
 
@@ -156,6 +161,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         else setEditing(!editing)
     }
     private val submit = button(R.string.ai_submit) { submit() }
+    private val deviceCancel = button(R.string.ai_device_agent_cancel) { onCancel() }
     private val cancel = button(R.string.ai_cancel) { onCancel() }
     private val insert = button(R.string.ai_insert) {
         onInsert(result.text.toString(), showThinking, if (showThinking) null else resultSections.selection)
@@ -173,6 +179,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         }
     }
     private val settings = button(R.string.ai_settings) { onSettings() }
+    private val deviceAgent = button(R.string.ai_device_agent_open_task) { onDeviceAgent() }
     private val addContent = button(R.string.ai_add_content) { onAddContent() }
     private val importContent = button(R.string.ai_import_content) { onImportContent() }
     private val more = panelIconButton(context, R.drawable.ic_keyboard_tools, R.string.ai_more) { showMore() }
@@ -183,6 +190,9 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             updateActionStyles()
         }
     }
+    private lateinit var headerRow: LinearLayout
+    private lateinit var controlsRow: View
+    private lateinit var attachmentViewport: HorizontalScrollView
 
     init {
         orientation = VERTICAL
@@ -190,21 +200,24 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         if (Build.VERSION.SDK_INT >= 30) importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         isSaveEnabled = false
         setPadding(dp(8), 0, dp(8), 0)
-        addView(LinearLayout(context).apply {
+        headerRow = LinearLayout(context).apply {
             orientation = HORIZONTAL
             addView(model, LayoutParams(0, dp(48), 1f))
             addView(newConversation, LayoutParams(dp((88 * resources.configuration.fontScale.coerceAtLeast(1f)).toInt()), dp(48)))
-        }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
-        addView(scrollRow(listOf(pageButton, contextButton, conversationsButton, answerButton, renameCancel) +
-            actions.values + target + reasoning), LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        }
+        addView(headerRow, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
+        controlsRow = scrollRow(listOf(pageButton, contextButton, conversationsButton, answerButton, deviceAgent, renameCancel) +
+            actions.values + target + reasoning)
+        addView(controlsRow, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         addView(inputStatus, LayoutParams(LayoutParams.MATCH_PARENT, dp(32)))
         addView(draftViewport, LayoutParams(LayoutParams.MATCH_PARENT, dp(72)))
         addView(candidates, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
-        addView(HorizontalScrollView(context).apply { addView(attachmentRow) })
+        attachmentViewport = HorizontalScrollView(context).apply { addView(attachmentRow) }
+        addView(attachmentViewport)
         addView(detail, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(LinearLayout(context).apply {
             orientation = HORIZONTAL
-            listOf(submit, edit, insert).forEach { addView(it, LayoutParams(0, dp(48), 1f)) }
+            listOf(submit, deviceCancel, edit, insert).forEach { addView(it, LayoutParams(0, dp(48), 1f)) }
             addView(more, LayoutParams(dp(48), dp(48)))
         }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         detailContent.addView(thinking, 0)
@@ -212,6 +225,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         detailContent.addView(cancel, 0)
         importContent.visibility = GONE
         configureDraftSelection()
+        updateDeviceAgentVisibility()
         renderConversations(emptyList())
         updateActionStyles()
         render(AiStreamEvent.Cancelled)
@@ -234,6 +248,31 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         inputLanguage = language
         renderInputStatus()
         refreshCommands()
+    }
+
+    fun setDeviceAgentMode(value: Boolean) {
+        if (deviceAgentMode == value) return
+        deviceAgentMode = value
+        if (value) {
+            detailMode = DetailMode.RESULT
+            updateDetailVisibility()
+            draft.hint = context.getString(R.string.ai_device_agent_target_hint)
+            cancel.setText(R.string.ai_device_agent_cancel)
+            cancel.visibility = VISIBLE
+            cancel.isEnabled = true
+            deviceCancel.visibility = VISIBLE
+            setEditing(true)
+        } else {
+            draft.hint = context.getString(R.string.ai_input_hint)
+            cancel.setText(R.string.ai_cancel)
+            cancel.visibility = GONE
+            cancel.isEnabled = false
+            deviceCancel.visibility = GONE
+            setEditing(false)
+        }
+        updateDeviceAgentVisibility()
+        refreshCommands()
+        renderInputStatus()
     }
 
     fun renderCandidates(value: dev.zeroinput.engine.api.EngineSnapshot) {
@@ -423,6 +462,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private fun renderInputStatus() {
         if (renaming) inputStatus.setText(R.string.ai_conversation_rename)
         else if (streaming) inputStatus.setText(R.string.ai_generating)
+        else if (deviceAgentMode) inputStatus.setText(R.string.ai_device_agent_running)
         else inputStatus.text = context.getString(if (editing) R.string.ai_draft_mode else R.string.ai_result_mode,
             context.getString(if (inputLanguage == InputLanguage.CHINESE) R.string.ai_input_chinese else R.string.ai_input_english))
         draft.isSelected = editing
@@ -457,6 +497,13 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         reasoningMode = AiReasoningMode.DEFAULT
         reasoning.setText(R.string.ai_reasoning_default)
         action = AiAction.ASK
+        deviceAgentMode = false
+        draft.hint = context.getString(R.string.ai_input_hint)
+        cancel.setText(R.string.ai_cancel)
+        cancel.visibility = GONE
+        cancel.isEnabled = false
+        deviceCancel.visibility = GONE
+        updateDeviceAgentVisibility()
         updateActionStyles()
         renderConversations(emptyList())
         render(AiStreamEvent.Cancelled)
@@ -470,11 +517,37 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     private fun refreshCommands() {
         val selecting = detailMode == DetailMode.PAGE
-        submit.setText(when { selecting -> R.string.ai_page_add; renaming -> R.string.ai_rename_save; else -> R.string.ai_submit })
-        edit.setText(when { selecting -> R.string.ai_page_cancel; editing -> R.string.ai_read; else -> R.string.ai_edit })
-        insert.visibility = if (selecting) GONE else VISIBLE
+        submit.setText(when {
+            selecting -> R.string.ai_page_add
+            deviceAgentMode -> R.string.ai_device_agent_start
+            renaming -> R.string.ai_rename_save
+            else -> R.string.ai_submit
+        })
+        edit.setText(when {
+            selecting -> R.string.ai_page_cancel
+            deviceAgentMode -> R.string.ai_device_agent_cancel
+            editing -> R.string.ai_read
+            else -> R.string.ai_edit
+        })
+        edit.isEnabled = !deviceAgentMode
+        insert.visibility = if (selecting || deviceAgentMode) GONE else VISIBLE
+        deviceCancel.visibility = if (deviceAgentMode) VISIBLE else GONE
         submit.isEnabled = if (selecting) pageRows.selection.isNotEmpty() else !streaming && draft.text.isNotBlank()
         refreshInsertEnabled()
+    }
+
+    private fun updateDeviceAgentVisibility() {
+        val ordinary = !deviceAgentMode
+        headerRow.visibility = if (ordinary) VISIBLE else GONE
+        controlsRow.visibility = if (ordinary) VISIBLE else GONE
+        attachmentViewport.visibility = if (ordinary && attachmentRow.isNotEmpty()) VISIBLE else GONE
+        detail.visibility = if (ordinary && !editing) VISIBLE else GONE
+        listOf(pageButton, contextButton, conversationsButton, answerButton, deviceAgent,
+            renameCancel, target, reasoning, edit, insert, more).forEach {
+            it.visibility = if (ordinary) VISIBLE else GONE
+        }
+        actions.values.forEach { it.visibility = if (ordinary) VISIBLE else GONE }
+        deviceCancel.visibility = if (deviceAgentMode) VISIBLE else GONE
     }
 
     private fun refreshInsertEnabled() {
@@ -526,6 +599,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         val text = draft.text.toString().trim()
         if (text.isBlank()) { draft.error = context.getString(R.string.ai_input_required); return }
         draft.error = null
+        if (deviceAgentMode) {
+            onDeviceAgentTaskSubmitted(text)
+            return
+        }
         val language = resources.getStringArray(R.array.ai_target_languages)[languageIndex]
         onSubmit(action, text, language)
     }

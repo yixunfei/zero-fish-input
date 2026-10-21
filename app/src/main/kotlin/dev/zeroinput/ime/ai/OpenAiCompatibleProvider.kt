@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.ai
 
 import dev.zeroinput.ai.api.*
+import dev.zeroinput.ime.ai.device.DeviceAgentProtocolCodec
 import dev.zeroinput.userdata.AiConfiguration
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -23,7 +24,7 @@ class OpenAiCompatibleProvider internal constructor(
     private val exchangeFactory: (URI) -> AiTransportExchange = { PlatformExchange(it) },
     private val nanoTime: () -> Long = System::nanoTime,
     private val scheduleTimeout: (Long, () -> Unit) -> AutoCloseable = AiRequestTimeouts::schedule,
-) : AiProvider, AiModelCatalog {
+) : AiProvider, AiModelCatalog, DeviceAgentProvider {
     override fun stream(request: AiRequest, listener: (AiStreamEvent) -> Unit): AiRequestHandle =
         launch(request, { listener(AiStreamEvent.Started) },
             { listener(AiStreamEvent.Failed(it)) }, { listener(AiStreamEvent.Cancelled) }) { config, operation ->
@@ -51,6 +52,40 @@ class OpenAiCompatibleProvider internal constructor(
             } finally { body.fill(0) }
         }
 
+    override fun request(
+        request: DeviceAgentModelRequest,
+        listener: (DeviceAgentProviderEvent) -> Unit,
+    ): AiRequestHandle {
+        val ownedAttachments = request.attachments.map { AiAttachment(it.mimeType, it.bytes.copyOf(), it.displayName) }
+        val ownedRequest = request.copy(attachments = ownedAttachments)
+        return launch(null, { listener(DeviceAgentProviderEvent.Started) },
+            { listener(DeviceAgentProviderEvent.Failed(it)) }, { listener(DeviceAgentProviderEvent.Cancelled) },
+            resources = request.attachments + ownedAttachments) { config, operation ->
+        val profile = checkNotNull(config.activeProvider())
+        val model = ownedRequest.model ?: config.activeModel()
+        validateAgentConfiguration(config, model, ownedRequest.snapshot.hasScreenshot, ownedRequest.attachments)
+        val body = DeviceAgentProtocolCodec.encode(ownedRequest, model, profile.protocol)
+            .toByteArray(StandardCharsets.UTF_8)
+        try {
+            require(body.size <= DeviceAgentLimits.MAX_REQUEST_BYTES)
+            val response = exchange(config, AiEndpoint.parse(profile.endpoint, profile.protocol).generation, body, operation) { http ->
+                val type = http.contentType()?.substringBefore(';')?.trim()?.lowercase()
+                if (type != "application/json") throw AiProviderError.Response("Device agent protocol is invalid")
+                http.input().use { input ->
+                    val decoder = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    InputStreamReader(input, decoder).buffered().use { reader ->
+                        AiResponseReader.parse(reader, operation::stopped, AiLimits.MAX_STREAM_CHARS) { root ->
+                            DeviceAgentProtocolCodec.decode(root, profile.protocol)
+                        }
+                    }
+                }
+            }
+            operation.complete { listener(DeviceAgentProviderEvent.Completed(response)) }
+        } finally { body.fill(0) }
+    }
+    }
+
     override fun fetchModels(listener: (AiModelCatalogEvent) -> Unit): AiRequestHandle =
         launch(null, { listener(AiModelCatalogEvent.Started) },
             { listener(AiModelCatalogEvent.Failed(it)) }, { listener(AiModelCatalogEvent.Cancelled) }) { config, operation ->
@@ -70,9 +105,10 @@ class OpenAiCompatibleProvider internal constructor(
     private fun launch(
         request: AiRequest?, started: () -> Unit,
         failed: (AiProviderError) -> Unit, cancelled: () -> Unit,
+        resources: List<AiAttachment> = emptyList(),
         work: (AiConfiguration, Operation) -> Unit,
     ): AiRequestHandle {
-        val operation = Operation(request?.attachments.orEmpty(), failed, cancelled)
+        val operation = Operation(request?.attachments.orEmpty() + resources, failed, cancelled)
         // Bind credentials/model at submission, not when a queued worker eventually starts.
         val config = try { configurationReader() } catch (_: Exception) {
             operation.fail(AiProviderError.Configuration("AI configuration unavailable"))
@@ -249,6 +285,31 @@ class OpenAiCompatibleProvider internal constructor(
         if (request.attachments.any { it.mimeType.startsWith("image/") } && model !in profile.imageModels ||
             request.attachments.any { it.mimeType.startsWith("audio/") } && model !in profile.audioModels)
             throw AiProviderError.Configuration("Selected model does not support the attachment")
+    }
+
+    private fun validateAgentConfiguration(
+        config: AiConfiguration,
+        model: String,
+        hasScreenshot: Boolean,
+        attachments: List<AiAttachment>,
+    ) {
+        val profile = config.activeProvider() ?: throw AiProviderError.Configuration("AI provider is missing")
+        AiEndpoint.parse(profile.endpoint, profile.protocol)
+        if (model.isBlank() || model.length > 128 || model.any(Char::isISOControl) || model !in profile.models) {
+            throw AiProviderError.Configuration("AI model is invalid")
+        }
+        if (hasScreenshot && model !in profile.imageModels) {
+            throw AiProviderError.Configuration("Selected model does not support device screenshots")
+        }
+        if (!profile.protocol.supportsAudio && attachments.any { it.mimeType.startsWith("audio/") }) {
+            throw AiProviderError.Configuration("This protocol does not support device audio")
+        }
+        if (attachments.any { it.mimeType.startsWith("image/") } && model !in profile.imageModels) {
+            throw AiProviderError.Configuration("Selected model does not support device media")
+        }
+        if (attachments.any { it.mimeType.startsWith("audio/") } && model !in profile.audioModels) {
+            throw AiProviderError.Configuration("Selected model does not support device audio")
+        }
     }
 
     private fun Throwable.asProviderError(): AiProviderError = when (this) {

@@ -38,6 +38,7 @@ fun networkViolation(path: String, text: String): String? {
 
 fun pageAccessViolation(path: String, text: String): String? {
     val adapter = "app/src/main/kotlin/dev/zeroinput/ime/ai/page/PageReferenceService.kt"
+    val deviceAdapter = "app/src/main/kotlin/dev/zeroinput/ime/ai/device/DeviceAgentAccessibilityService.kt"
     val fixtures = setOf(
         "KeyboardEditorIntegrationTest.kt", "KeyboardNavigationGestureTest.kt", "PinyinEditingInteractionTest.kt", "RgiEmojiTest.kt",
         "clipboard/ClipboardExternalImportTest.kt", "clipboard/ClipboardSelectionCopyTest.kt", "clipboard/SecurePasteReturnTest.kt",
@@ -50,7 +51,8 @@ fun pageAccessViolation(path: String, text: String): String? {
     if (Regex("""android\.accessibilityservice\.AccessibilityService\b""").containsMatchIn(text) && path in fixtures) {
         return "Platform fixtures cannot introduce accessibility services"
     }
-    if (capabilities.containsMatchIn(text) && path != adapter && path !in fixtures && path != "app/src/main/AndroidManifest.xml") {
+    if (capabilities.containsMatchIn(text) && path != adapter && path != deviceAdapter &&
+        path !in fixtures && path != "app/src/main/AndroidManifest.xml") {
         return "External page reads are restricted to the approved one-shot adapter"
     }
     if (path == adapter && Regex("""\b(?:dispatchGesture|performGlobalAction|performAction|takeScreenshot)\b""").containsMatchIn(text)) {
@@ -83,6 +85,8 @@ fun manifestBoundaryViolations(document: org.w3c.dom.Document, release: Boolean)
         "dev.zeroinput.ime.clipboard.ClipboardImportActivity" to ("activity" to ""),
         "dev.zeroinput.ime.ZeroInputService" to ("service" to "android.permission.BIND_INPUT_METHOD"),
         "dev.zeroinput.ime.ai.page.PageReferenceService" to ("service" to "android.permission.BIND_ACCESSIBILITY_SERVICE"),
+        "dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityService" to ("service" to "android.permission.BIND_ACCESSIBILITY_SERVICE"),
+        "dev.zeroinput.ime.ai.device.DeviceStage6NotificationListenerService" to ("service" to "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"),
     )
     val found = mutableSetOf<String>()
     for (tag in listOf("activity", "activity-alias", "service", "receiver", "provider")) {
@@ -151,10 +155,34 @@ fun validPageReferenceConfig(document: org.w3c.dom.Document, modern: Boolean): B
     return root.tagName == "accessibility-service" && actual == expected
 }
 
+fun validDeviceAgentConfig(document: org.w3c.dom.Document, modern: Boolean): Boolean {
+    val root = document.documentElement
+    val expected = mutableMapOf(
+        "description" to "@string/ai_device_agent_service_description",
+        "accessibilityEventTypes" to "typeWindowStateChanged|typeWindowsChanged|typeViewFocused|typeWindowContentChanged|typeViewScrolled|typeViewTextChanged",
+        "accessibilityFeedbackType" to "feedbackGeneric",
+        "accessibilityFlags" to "flagRetrieveInteractiveWindows|flagReportViewIds",
+        "canRetrieveWindowContent" to "true",
+        "canPerformGestures" to "true",
+        "notificationTimeout" to "0",
+    )
+    if (modern) {
+        expected["isAccessibilityTool"] = "false"
+        expected["canTakeScreenshot"] = "true"
+    }
+    val actual = mutableMapOf<String, String>()
+    for (index in 0 until root.attributes.length) {
+        val attribute = root.attributes.item(index)
+        if (attribute.namespaceURI == androidNamespace) actual[attribute.localName] = attribute.nodeValue
+    }
+    return root.tagName == "accessibility-service" && actual == expected
+}
+
 fun approvedPrivacyResource(path: String): Boolean {
     val name = path.substringAfterLast('/')
     return path == "app/src/main/res/xml/$name" ||
-        name == "page_reference_service.xml" && path == "app/src/main/res/xml-v31/$name"
+        name in setOf("page_reference_service.xml", "device_agent_service.xml") &&
+        path in setOf("app/src/main/res/xml-v30/$name", "app/src/main/res/xml-v31/$name")
 }
 
 fun testManifestAndBackupBoundaries(root: File) {
@@ -190,6 +218,12 @@ fun testManifestAndBackupBoundaries(root: File) {
     check(validPageReferenceConfig(config, false))
     config.documentElement.setAttributeNS(androidNamespace, "android:canRequestFilterKeyEvents", "true")
     check(!validPageReferenceConfig(config, false))
+    val deviceConfig = readXml(File(root, "app/src/main/res/xml/device_agent_service.xml"))
+    check(validDeviceAgentConfig(deviceConfig, false))
+    deviceConfig.documentElement.setAttributeNS(androidNamespace, "android:canRequestFilterKeyEvents", "true")
+    check(!validDeviceAgentConfig(deviceConfig, false))
+    val modernDeviceConfig = readXml(File(root, "app/src/main/res/xml-v31/device_agent_service.xml"))
+    check(validDeviceAgentConfig(modernDeviceConfig, true))
     for (path in listOf("app/src/main/res/xml-v33/page_reference_service.xml",
         "app/src/debug/res/xml/page_reference_service.xml", "app/src/main/res/xml-v31/backup_rules.xml")) {
         check(!approvedPrivacyResource(path))
@@ -304,12 +338,16 @@ fun Project.checkMergedPrivacyManifests(violations: MutableList<String>) {
             val packageName = document.documentElement.getAttribute("package")
             val services = document.getElementsByTagName("service")
             val pageName = "dev.zeroinput.ime.ai.page.PageReferenceService"
+            val deviceName = "dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityService"
+            val notificationName = "dev.zeroinput.ime.ai.device.DeviceStage6NotificationListenerService"
             var pageServices = 0
+            var deviceServices = 0
+            var notificationServices = 0
             for (index in 0 until services.length) {
                 val service = services.item(index) as org.w3c.dom.Element
                 val name = service.getAttributeNS(androidNamespace, "name")
                 val permission = service.getAttributeNS(androidNamespace, "permission")
-                if (permission == "android.permission.BIND_ACCESSIBILITY_SERVICE" && name != pageName) {
+                if (permission == "android.permission.BIND_ACCESSIBILITY_SERVICE" && name != pageName && name != deviceName) {
                     violations += "Unexpected accessibility service"
                 }
                 if (name == pageName) {
@@ -319,14 +357,41 @@ fun Project.checkMergedPrivacyManifests(violations: MutableList<String>) {
                         violations += "Page service must be system-bound and explicitly exported"
                     }
                 }
+                if (name == deviceName) {
+                    deviceServices++
+                    if (permission != "android.permission.BIND_ACCESSIBILITY_SERVICE" ||
+                        service.getAttributeNS(androidNamespace, "exported") != "true") {
+                        violations += "Device agent service must be system-bound and explicitly exported"
+                    }
+                }
+                if (name == notificationName) {
+                    notificationServices++
+                    if (permission != "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" ||
+                        service.getAttributeNS(androidNamespace, "exported") != "true") {
+                        violations += "Notification access must be explicitly system-bound"
+                    }
+                }
             }
             if (pageServices != 1) violations += "Missing or duplicate page reference service"
+            if (deviceServices != 1) violations += "Missing or duplicate device agent service"
+            if (notificationServices != 1) violations += "Missing or duplicate notification listener service"
             val allowedPermissions = setOf(
                 "android.permission.USE_BIOMETRIC",
                 "android.permission.USE_FINGERPRINT",
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.SYSTEM_ALERT_WINDOW",
                 "android.permission.INTERNET",
+                "android.permission.WRITE_SETTINGS",
+                "android.permission.READ_SMS",
+                "android.permission.SEND_SMS",
+                "android.permission.READ_CALL_LOG",
+                "android.permission.CALL_PHONE",
+                "android.permission.READ_CONTACTS",
+                "android.permission.WRITE_CONTACTS",
+                "android.permission.READ_CALENDAR",
+                "android.permission.WRITE_CALENDAR",
+                "android.permission.CAMERA",
+                "android.permission.RECORD_AUDIO",
                 "$packageName.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
             )
             val permissionNames = buildSet {
@@ -352,13 +417,16 @@ fun Project.checkPrivacyResources(violations: MutableList<String>) {
     for (variant in listOf("xml", "xml-v31")) {
         if (!validPageReferenceConfig(readXml(rootProject.file("app/src/main/res/$variant/page_reference_service.xml")),
                 modern = variant == "xml-v31")) violations += "Unexpected page reference capability"
+        if (!validDeviceAgentConfig(readXml(rootProject.file("app/src/main/res/$variant/device_agent_service.xml")),
+                modern = variant == "xml-v31")) violations += "Unexpected device agent capability"
     }
     rootProject.file("app/src").walkTopDown().filter { it.isFile && it.name in
-        setOf("page_reference_service.xml", "backup_rules.xml", "data_extraction_rules.xml") }.forEach { file ->
+        setOf("page_reference_service.xml", "device_agent_service.xml", "backup_rules.xml", "data_extraction_rules.xml") }.forEach { file ->
         val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
         val page = file.name == "page_reference_service.xml"
+        val device = file.name == "device_agent_service.xml"
         if (!approvedPrivacyResource(path)) violations += "Unapproved capability/backup resource override: $path"
-        else if (!page && !validBackupRules(readXml(file), file.name == "data_extraction_rules.xml")) {
+        else if (!page && !device && !validBackupRules(readXml(file), file.name == "data_extraction_rules.xml")) {
             violations += "Incomplete backup exclusions: $path"
         }
     }

@@ -217,6 +217,75 @@ AI conversation-storage failures preserve a completed answer only within its exi
 valid session. Editor, context, settings and data revocation still reject insertion
 and stale storage feedback. Page-reference settings guidance shares the broker's
 enablement policy and never bypasses the editor privacy check.
+## AI device agent
+
+The AI device agent is an opt-in side-load/private-distribution feature. It is
+disabled by default and requires an in-app disclosure, an exact target package,
+an approval policy and Android accessibility authorization. The service is
+protected by `BIND_ACCESSIBILITY_SERVICE`; authorization alone does not start a
+task. The feature is separate from the read-only page-reference service.
+
+The accessibility action catalog remains fixed to `wait`, `back`, `home`,
+`scroll`, `click`, `long_click`, `swipe`, `input_text`, `ime_action` and
+`open_app`; `open_app` is restricted to the selected target package. Stage 6 is
+a separate set of independently disabled, high-risk tools. When a user enables
+one category and grants its Android permission, the model may read or operate
+only the explicit target for the current task: up to five active notifications
+for one package; one selected file/media URI; four non-security system settings;
+one camera frame or one-second microphone sample; one SMS/call record or one
+send/dial operation; and one contact or calendar record/create/update/delete
+operation. Clipboard contents, payments, installation, permission grants,
+shell, root, ADB, Shizuku, bulk scans, background rules and screen recording
+remain unavailable. Full support means the complete fixed catalog and cannot
+bypass system security.
+
+The model receives an independent task draft, a bounded current-window
+accessibility snapshot and redacted action results. It never receives host editor
+text, selections, system/private clipboard data, personal dictionaries or emoji
+history. Package/window/snapshot/session-generation checks run before every
+action. Password, PIN, email, URI, payment, OTP, verification-code and
+platform-sensitive fields are rejected for observation and text input, even when
+the node otherwise looks editable. Android text input variations for email and
+URI are treated as sensitive when the source application does not provide a useful
+label.
+Unknown tools and arguments, duplicate call IDs, stale snapshots, lock screen,
+service loss, app switching, cancellation and timeout fail closed.
+
+The screenshot setting is separately stored and defaults off. The standalone
+device-task page requires a fresh per-task confirmation; on API 30 and above a
+single bounded JPEG may be captured while the target window and task token are
+valid, encoded as a native image part for the configured provider, and cleared
+when the snapshot or task ends. Unsupported, oversized or expired captures are
+discarded. Device-agent history is memory-only by default; task text, node text,
+action arguments and tool results are not logged. The AI panel and standalone
+Activity use independent task drafts, and Activity recreation reattaches to the
+in-memory coordinator timeline without starting a second task. The task may
+continue while that Activity is behind the selected target app; changing away
+from the target app revokes it. Android 16 emulator coverage exercises public
+fixture capture/redaction, JPEG limits, one-use approval/click, foreground change,
+screen-off and service revocation. Physical-device and live-provider acceptance
+remain separate. Activity instance recreation and a fake provider exchange are
+also covered; process-death, physical-device and live-provider acceptance
+remain separate.
+
+Stage 6 is implemented under per-capability gates and remains disabled by
+default. Each operation requires the task disclosure, capability switch,
+foreground target, unlocked device, relevant Android permission and a fresh
+one-use approval. Selected URIs and sensor results stay in memory, are bounded
+by the remaining provider attachment budget, and are cleared on cancellation,
+revocation, task end or delivery failure. Read or captured content may be sent
+to the configured provider only after the operation is approved; provider
+retention is outside ZeroInput's control. Notification-related follow-up
+actions still require a fresh approval in the current task; background rules,
+screen recording, bulk scans and general file management are still excluded. See
+[ADR 0026](docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md).
+Telephone actions accept only conventional numbers containing 3–15 digits and
+an optional leading `+`; USSD/service-code characters and invalid plus placement
+are rejected. Stage 6
+approval is tied to the current snapshot, and its overlay uses `FLAG_SECURE` to
+protect displayed targets and message bodies from ordinary screen capture.
+See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
+
 # Public dictionaries
 
 Foreground dictionary settings have a separately approved HTTPS download boundary

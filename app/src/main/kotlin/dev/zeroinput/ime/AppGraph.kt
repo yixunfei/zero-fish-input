@@ -27,6 +27,13 @@ import java.util.concurrent.ExecutorService
 import dev.zeroinput.ime.ai.AiCoordinator
 import dev.zeroinput.ime.ai.AiDataGeneration
 import dev.zeroinput.ime.ai.OpenAiCompatibleProvider
+import dev.zeroinput.ai.api.DeviceAgentPolicy
+import dev.zeroinput.ai.api.DeviceApprovalMode
+import dev.zeroinput.ai.api.DeviceCapabilityScope
+import dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityBroker
+import dev.zeroinput.ime.ai.device.DeviceAgentCoordinator
+import dev.zeroinput.ime.ai.device.DeviceStage6Controller
+import dev.zeroinput.ime.ai.device.AndroidDeviceStage6Platform
 
 class AppGraph(context: Context) : AutoCloseable {
     private val applicationContext = context.applicationContext
@@ -68,6 +75,21 @@ class AppGraph(context: Context) : AutoCloseable {
         name = "zeroinput-ai-storage",
         queueCapacity = 2,
     )
+    internal val deviceAgentExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-device-agent",
+        queueCapacity = 4,
+    )
+    internal val deviceAgentScreenshotExecutor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-device-agent-screenshot",
+        queueCapacity = 1,
+    )
+    // Stage 6 providers may block in binder calls that do not accept cancellation.
+    // Keep those reads off the broker/provider worker so one bad URI cannot stall
+    // ordinary observation and action delivery.
+    internal val deviceAgentStage6Executor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-device-agent-stage6",
+        queueCapacity = 2,
+    )
 
     val settings = SettingsRepository(applicationContext)
     internal val keyboardBackgrounds = dev.zeroinput.ime.settings.KeyboardBackgroundStore(applicationContext, settings)
@@ -107,9 +129,61 @@ class AppGraph(context: Context) : AutoCloseable {
         enabled = { settings.aiPageReferencesEnabled && settings.learningEnabled && !settings.incognitoMode &&
             aiConfigurationSnapshot()?.let { it.enabled && it.networkAllowed } == true },
     )
+    internal val deviceAgentBroker = DeviceAgentAccessibilityBroker(
+        executor = deviceAgentExecutor,
+        post = { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
+        runtimeAllowed = { policy -> settings.learningEnabled && !settings.incognitoMode &&
+            aiConfigurationSnapshot()?.let { it.enabled && it.networkAllowed } == true &&
+            policy.isWithin(deviceAgentPolicySnapshot()) },
+    )
+    /** Direct stage 6 data access remains a separate approval and generation gate. */
+    internal val deviceStage6Controller = DeviceStage6Controller(
+        executor = deviceAgentStage6Executor,
+        platform = AndroidDeviceStage6Platform(applicationContext),
+        unlocked = {
+            !applicationContext.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+        },
+        foregroundPackage = { deviceAgentBroker.currentWindow()?.packageName },
+    )
+    internal val deviceAgentCoordinator = DeviceAgentCoordinator(
+        provider = OpenAiCompatibleProvider(
+            { aiConfigurationSnapshot() ?: AiConfiguration() },
+            deviceAgentExecutor,
+            aiCancellationExecutor,
+        ),
+        broker = deviceAgentBroker,
+        executor = deviceAgentExecutor,
+        post = { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
+        schedule = { delay, action ->
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            val callback = Runnable(action)
+            handler.postDelayed(callback, delay)
+            AutoCloseable { handler.removeCallbacks(callback) }
+        },
+        text = dev.zeroinput.ime.ai.device.DeviceAgentDescriptions(applicationContext),
+        stage6Controller = deviceStage6Controller,
+    )
     private val aiImportSettingsObserver = settings.addChangeListener {
         aiContentInbox.clear()
         pageReferences.invalidate()
+        deviceAgentCoordinator.stop()
+        deviceAgentBroker.invalidate()
+        deviceStage6Controller.invalidate()
+    }
+
+    fun deviceAgentPolicySnapshot(): DeviceAgentPolicy {
+        val scope = settings.deviceAgentScope
+        return DeviceAgentPolicy(
+        enabled = settings.deviceAgentEnabled && scope != DeviceCapabilityScope.DISABLED,
+        disclosureAccepted = settings.deviceAgentDisclosureAccepted,
+        stage6DisclosureAccepted = settings.deviceAgentStage6DisclosureAccepted,
+        stage6Capabilities = settings.deviceAgentStage6Capabilities,
+        scope = scope,
+        approvalMode = settings.deviceAgentApprovalMode,
+        allowScreenshots = settings.deviceAgentAllowScreenshots,
+        allowedPackages = settings.deviceAgentAllowedPackages,
+        allowedCategories = settings.deviceAgentAllowedCategories,
+        )
     }
 
     fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
@@ -415,6 +489,9 @@ class AppGraph(context: Context) : AutoCloseable {
         engineMaintenanceExecutor.shutdownNow()
         aiConfigurationListeners.clear()
         aiCoordinator.close()
+        deviceAgentCoordinator.close()
+        deviceStage6Controller.close()
+        deviceAgentBroker.close()
         aiContentInbox.clear()
         aiExecutor.shutdownNow()
         aiProbeExecutor.shutdownNow()
@@ -422,6 +499,9 @@ class AppGraph(context: Context) : AutoCloseable {
         aiImportSettingsObserver.close()
         aiCancellationExecutor.shutdown()
         aiPersistenceExecutor.shutdownNow()
+        deviceAgentExecutor.shutdownNow()
+        deviceAgentScreenshotExecutor.shutdownNow()
+        deviceAgentStage6Executor.shutdownNow()
         queuedPersonalization.close()
         dictionaryScriptObserver.close()
         languagePackSnapshot = emptyList()

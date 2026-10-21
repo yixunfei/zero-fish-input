@@ -128,6 +128,11 @@
     <string name="ai_entry_unavailable">AI unavailable. Tap for details</string>
     <string name="ai_entry_privacy_blocked">AI is blocked by this field or your privacy settings.</string>
     <string name="ai_input_hint">Enter a question or text</string>
+    <string name="ai_device_agent_open_task">Device agent</string>
+    <string name="ai_device_agent_running">Device agent task</string>
+    <string name="ai_device_agent_target_hint">Describe the device task to complete</string>
+    <string name="ai_device_agent_start">Start task</string>
+    <string name="ai_device_agent_cancel">Cancel</string>
     <string name="ai_target_language_hint">Translation language</string>
     <string name="ai_submit">Send</string>
     <string name="ai_cancel">Stop</string>

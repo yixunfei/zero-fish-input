@@ -179,6 +179,9 @@ class MainActivity : AppCompatActivity() {
         screen.onAiPageSettingsRequested = {
             startActivity(Intent(this, dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java))
         }
+        screen.onAiDeviceAgentSettingsRequested = {
+            startActivity(Intent(this, dev.zeroinput.ime.ai.device.DeviceAgentSettingsActivity::class.java))
+        }
         screen.onInterfaceLanguageChanged = { tag ->
             AppCompatDelegate.setApplicationLocales(
                 if (tag == "system") LocaleListCompat.getEmptyLocaleList()

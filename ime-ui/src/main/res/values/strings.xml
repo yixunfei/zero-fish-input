@@ -30,6 +30,11 @@
     <string name="ai_entry_unavailable">AI 暂不可用，点按查看原因</string>
     <string name="ai_entry_privacy_blocked">当前输入框或隐私设置禁止 AI，请检查隐身、学习和个性化设置。</string>
     <string name="ai_input_hint">输入问题或文字</string>
+    <string name="ai_device_agent_open_task">设备代理</string>
+    <string name="ai_device_agent_running">设备代理任务</string>
+    <string name="ai_device_agent_target_hint">描述要完成的设备任务</string>
+    <string name="ai_device_agent_start">开始任务</string>
+    <string name="ai_device_agent_cancel">取消</string>
     <string name="ai_target_language_hint">目标语言（翻译时可选）</string>
     <string name="ai_submit">发送</string>
     <string name="ai_cancel">停止</string>

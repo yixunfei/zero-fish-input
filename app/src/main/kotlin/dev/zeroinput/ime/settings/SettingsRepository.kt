@@ -12,6 +12,9 @@ import dev.zeroinput.ime.ui.KeyboardTheme
 import dev.zeroinput.ime.ui.KeyboardHeight
 import dev.zeroinput.ime.ui.KeyboardPlacement
 import dev.zeroinput.ime.ui.KeyboardPlacementMode
+import dev.zeroinput.ai.api.DeviceApprovalMode
+import dev.zeroinput.ai.api.DeviceCapabilityScope
+import dev.zeroinput.ai.api.DeviceStage6Capability
 
 class SettingsRepository(context: Context) {
     private val preferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -40,6 +43,50 @@ class SettingsRepository(context: Context) {
     var aiPageReferencesEnabled: Boolean
         get() = preferences.getBoolean("ai.pageReferences", false)
         set(value) = edit("ai.pageReferences", value)
+
+    var deviceAgentEnabled: Boolean
+        get() = preferences.getBoolean(KEY_DEVICE_AGENT_ENABLED, false)
+        set(value) = edit(KEY_DEVICE_AGENT_ENABLED, value)
+
+    var deviceAgentDisclosureAccepted: Boolean
+        get() = preferences.getBoolean(KEY_DEVICE_AGENT_DISCLOSURE, false)
+        set(value) = edit(KEY_DEVICE_AGENT_DISCLOSURE, value)
+
+    var deviceAgentStage6DisclosureAccepted: Boolean
+        get() = preferences.getBoolean(KEY_DEVICE_AGENT_STAGE6_DISCLOSURE, false)
+        set(value) = edit(KEY_DEVICE_AGENT_STAGE6_DISCLOSURE, value)
+
+    var deviceAgentScope: DeviceCapabilityScope
+        get() = enumPreference(KEY_DEVICE_AGENT_SCOPE, DeviceCapabilityScope.DISABLED)
+        set(value) = preferences.edit().putString(KEY_DEVICE_AGENT_SCOPE, value.name).apply()
+
+    var deviceAgentApprovalMode: DeviceApprovalMode
+        get() = enumPreference(KEY_DEVICE_AGENT_APPROVAL, DeviceApprovalMode.EACH_ACTION)
+        set(value) = preferences.edit().putString(KEY_DEVICE_AGENT_APPROVAL, value.name).apply()
+
+    var deviceAgentAllowScreenshots: Boolean
+        get() = preferences.getBoolean(KEY_DEVICE_AGENT_SCREENSHOTS, false)
+        set(value) = edit(KEY_DEVICE_AGENT_SCREENSHOTS, value)
+
+    var deviceAgentAllowedPackages: Set<String>
+        get() = preferences.getStringSet(KEY_DEVICE_AGENT_ALLOWLIST, emptySet()).orEmpty().toSet()
+        set(value) {
+            preferences.edit().putStringSet(KEY_DEVICE_AGENT_ALLOWLIST, value.toSet()).apply()
+        }
+
+    var deviceAgentAllowedCategories: Set<dev.zeroinput.ai.api.DeviceActionCategory>
+        get() {
+            val values = preferences.getStringSet("ai.device-agent.categories", null)
+                ?: return dev.zeroinput.ai.api.DeviceActionCategory.entries.toSet()
+            return dev.zeroinput.ai.api.DeviceActionCategory.entries.filter { it.name in values }.toSet()
+        }
+        set(value) { preferences.edit().putStringSet("ai.device-agent.categories", value.map { it.name }.toSet()).apply() }
+
+    /** Stage 6 domains require explicit, independent opt-in and default to none. */
+    var deviceAgentStage6Capabilities: Set<DeviceStage6Capability>
+        get() = preferences.getStringSet(KEY_DEVICE_AGENT_STAGE6, emptySet()).orEmpty()
+            .mapNotNull { value -> DeviceStage6Capability.entries.firstOrNull { it.name == value } }.toSet()
+        set(value) = preferences.edit().putStringSet(KEY_DEVICE_AGENT_STAGE6, value.map { it.name }.toSet()).apply()
 
     var experimentalModelRanking: Boolean
         get() = preferences.getBoolean(KEY_MODEL_RANKING, false)
@@ -156,6 +203,9 @@ class SettingsRepository(context: Context) {
         preferences.edit().putBoolean(key, value).apply()
     }
 
+    private inline fun <reified T : Enum<T>> enumPreference(key: String, fallback: T): T =
+        runCatching { enumValueOf<T>(preferences.getString(key, fallback.name).orEmpty()) }.getOrDefault(fallback)
+
     private companion object {
         const val FILE_NAME = "zeroinput-settings"
         const val KEY_LEARNING = "learning.enabled"
@@ -179,5 +229,13 @@ class SettingsRepository(context: Context) {
         const val KEY_DOUBLE_PINYIN = "chinese.double-pinyin"
         const val KEY_TYPO_CORRECTION = "chinese.experimental-typo-correction"
         const val KEY_MODEL_RANKING = "chinese.experimental-model-ranking"
+        const val KEY_DEVICE_AGENT_ENABLED = "ai.device-agent.enabled"
+        const val KEY_DEVICE_AGENT_DISCLOSURE = "ai.device-agent.disclosure"
+        const val KEY_DEVICE_AGENT_STAGE6_DISCLOSURE = "ai.device-agent.stage6-disclosure"
+        const val KEY_DEVICE_AGENT_SCOPE = "ai.device-agent.scope"
+        const val KEY_DEVICE_AGENT_APPROVAL = "ai.device-agent.approval"
+        const val KEY_DEVICE_AGENT_SCREENSHOTS = "ai.device-agent.screenshots"
+        const val KEY_DEVICE_AGENT_ALLOWLIST = "ai.device-agent.allowlist"
+        const val KEY_DEVICE_AGENT_STAGE6 = "ai.device-agent.stage6-capabilities"
     }
 }
