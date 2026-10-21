@@ -4,7 +4,7 @@ import dev.zeroinput.ai.api.*
 
 enum class DevicePolicyReason {
     ALLOWED, DISABLED, DISCLOSURE_REQUIRED, SERVICE_UNAVAILABLE, DEVICE_LOCKED,
-    TARGET_MISMATCH, PACKAGE_NOT_ALLOWED, SNAPSHOT_EXPIRED, UNKNOWN_ACTION,
+    TARGET_MISMATCH, PACKAGE_NOT_ALLOWED, SNAPSHOT_EXPIRED, SNAPSHOT_INCOMPLETE, UNKNOWN_ACTION,
     SENSITIVE_ELEMENT, INVALID_ARGUMENT, HARD_BLOCKED, CATEGORY_NOT_ALLOWED, APPROVAL_REQUIRED,
 }
 
@@ -50,6 +50,9 @@ class DeviceAgentPolicyEvaluator(private val ownPackage: String = "dev.zeroinput
         if (definition.category !in policy.allowedCategories) return deny(DevicePolicyReason.CATEGORY_NOT_ALLOWED)
         if (snapshot.snapshotId != call.snapshotId || currentPackage != snapshot.packageName) return deny(DevicePolicyReason.SNAPSHOT_EXPIRED)
         if (!DeviceActionArguments.valid(definition, call.arguments)) return deny(DevicePolicyReason.INVALID_ARGUMENT)
+        // A coordinate gesture can cross nodes omitted by a bounded snapshot.
+        // Node-bound actions still revalidate their exact platform target below.
+        if (snapshot.incomplete && call.toolName == "swipe") return deny(DevicePolicyReason.SNAPSHOT_INCOMPLETE)
         if (definition.risk == DeviceActionRisk.HIGH) return deny(DevicePolicyReason.HARD_BLOCKED)
         if (call.toolName == "open_app" && call.arguments["package_name"] != snapshot.packageName) return deny(DevicePolicyReason.TARGET_MISMATCH)
         val element = call.arguments["element_ref"]?.let { ref -> snapshot.elements.firstOrNull { it.ref == ref } }
@@ -97,8 +100,10 @@ class DeviceAgentPolicyEvaluator(private val ownPackage: String = "dev.zeroinput
     }
 
     private fun checkElement(call: DeviceActionCall, element: DeviceElement, snapshot: DeviceScreenSnapshot): DevicePolicyDecision {
-        if (call.toolName == "input_text" &&
-            (DeviceAgentSafety.sensitiveLabel(element.label) || DeviceAgentSafety.blockedEffect(element.label))) {
+        if (call.toolName == "input_text" && hasSensitiveText(element)) {
+            return deny(DevicePolicyReason.SENSITIVE_ELEMENT)
+        }
+        if (call.toolName in setOf("scroll", "swipe") && hasUnsafePointerText(element)) {
             return deny(DevicePolicyReason.SENSITIVE_ELEMENT)
         }
         val allowed = when (call.toolName) {
@@ -112,6 +117,18 @@ class DeviceAgentPolicyEvaluator(private val ownPackage: String = "dev.zeroinput
         }
         return if (allowed) DevicePolicyDecision.allow() else deny(DevicePolicyReason.HARD_BLOCKED)
     }
+
+    private fun hasSensitiveText(element: DeviceElement): Boolean =
+        listOf(element.label, element.text).any {
+            DeviceAgentSafety.sensitiveValue(it) || DeviceAgentSafety.sensitiveLabel(it) ||
+                DeviceAgentSafety.blockedEffect(it)
+        }
+
+    private fun hasUnsafePointerText(element: DeviceElement): Boolean =
+        listOf(element.label, element.text).any {
+            DeviceAgentSafety.sensitiveValue(it) || DeviceAgentSafety.sensitivePointerLabel(it) ||
+                DeviceAgentSafety.blockedPointerEffect(it)
+        }
 
     private fun safeSwipe(call: DeviceActionCall, element: DeviceElement, snapshot: DeviceScreenSnapshot): Boolean {
         if (!element.scrollable || element.editable) return false

@@ -55,6 +55,7 @@ class DeviceAgentProtocolCodecTest {
             assertEquals(DeviceActionCatalog.definitions.size, tools.length())
             assertTrue(root.toString().contains("Tap Continue"))
             assertFalse(root.toString().contains("api_key"))
+            assertFalse(root.toString().contains("window_id"))
             if (protocol == AiProtocol.ANTHROPIC_MESSAGES) {
                 assertTrue(tools.getJSONObject(0).has("input_schema"))
             } else if (protocol == AiProtocol.CHAT_COMPLETIONS) {
@@ -120,6 +121,14 @@ class DeviceAgentProtocolCodecTest {
         )
         assertTrue(response.completed)
         assertEquals("Done", response.message)
+    }
+
+    @Test
+    fun responsesRequestIncludesObservationWhenNoMediaIsPresent() {
+        val encoded = DeviceAgentProtocolCodec.encode(request, "fixture", AiProtocol.RESPONSES)
+        assertTrue(encoded.contains("observation"))
+        assertTrue(encoded.contains("Continue"))
+        assertFalse(encoded.contains("\"content\":[]"))
     }
 
     @Test

@@ -157,22 +157,32 @@ internal class DeviceAgentAccessibilityBroker(
         val source = port
         if (source == null || !snapshotCurrent(owner, token, snapshot)) { deliver(expired(call)); return }
         val decision = synchronized(lock) {
-            val checked = evaluator.checkAction(owner.policy, DeviceActionCatalog.find(call.toolName), call, snapshot,
-                owner.target.packageName, taskApproved)
-            when {
-                !checked.allowed -> checked
-                executing != null -> DevicePolicyDecision.deny(DevicePolicyReason.SNAPSHOT_EXPIRED)
-                checked.requiresApproval && approvedCall !== call -> DevicePolicyDecision.deny(DevicePolicyReason.APPROVAL_REQUIRED)
-                else -> { approvedCall = null; executing = call.callId; checked }
+            if (lease !== owner || scene != token) {
+                DevicePolicyDecision.deny(DevicePolicyReason.SNAPSHOT_EXPIRED)
+            } else {
+                val checked = evaluator.checkAction(owner.policy, DeviceActionCatalog.find(call.toolName), call, snapshot,
+                    owner.target.packageName, taskApproved)
+                when {
+                    !checked.allowed -> checked
+                    executing != null -> DevicePolicyDecision.deny(DevicePolicyReason.SNAPSHOT_EXPIRED)
+                    checked.requiresApproval && approvedCall !== call -> DevicePolicyDecision.deny(DevicePolicyReason.APPROVAL_REQUIRED)
+                    else -> { approvedCall = null; executing = call.callId; checked }
+                }
             }
         }
-        if (!decision.allowed) { deliver(DeviceActionResult(call.callId, DeviceActionResultStatus.REJECTED, decision.reason.name)); return }
+        if (!decision.allowed) {
+            val status = if (decision.reason == DevicePolicyReason.SNAPSHOT_EXPIRED) {
+                DeviceActionResultStatus.EXPIRED
+            } else DeviceActionResultStatus.REJECTED
+            deliver(DeviceActionResult(call.callId, status, decision.reason.name))
+            return
+        }
         val current = { source === port && isCurrent(owner) && synchronized(lock) { executing == call.callId && scene == token } }
         submit({ finishPerform(owner, call); deliver(expired(call)) }) {
             val result = if (current()) runCatching { source.perform(call, snapshot, current) }.getOrElse {
                 DeviceActionResult(call.callId, DeviceActionResultStatus.FAILED, "Action failed")
             } else expired(call)
-            val valid = isCurrent(owner)
+            val valid = current()
             finishPerform(owner, call)
             val delivery = { deliver(if (valid && isCurrent(owner)) result else expired(call)) }
             if (!post(delivery)) deliver(expired(call))
@@ -196,7 +206,8 @@ internal class DeviceAgentAccessibilityBroker(
             pendingApproval = approvalId
             approvedCall = null
             pendingDecision = { accepted ->
-                val valid = isCurrent(owner) && (call == null || snapshotCurrent(owner, snapshotToken))
+                val valid = isCurrent(owner) &&
+                    (snapshotToken < 0L || snapshotCurrent(owner, snapshotToken))
                 val consumed = synchronized(lock) {
                     if (lease !== owner || pendingApproval != approvalId) false else {
                         pendingApproval = null

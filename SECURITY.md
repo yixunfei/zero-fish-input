@@ -279,6 +279,11 @@ retention is outside ZeroInput's control. Notification-related follow-up
 actions still require a fresh approval in the current task; background rules,
 screen recording, bulk scans and general file management are still excluded. See
 [ADR 0026](docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md).
+Telephone actions accept only conventional numbers containing 3–15 digits and
+an optional leading `+`; USSD/service-code characters and invalid plus placement
+are rejected. Stage 6
+approval is tied to the current snapshot, and its overlay uses `FLAG_SECURE` to
+protect displayed targets and message bodies from ordinary screen capture.
 See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
 
 # Public dictionaries

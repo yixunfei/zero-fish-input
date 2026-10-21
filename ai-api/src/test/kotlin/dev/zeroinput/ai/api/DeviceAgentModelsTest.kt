@@ -28,6 +28,16 @@ class DeviceAgentModelsTest {
         }
     }
 
+    @Test fun deepGeneratedElementReferencesFitTheModelContract() {
+        val deepRef = buildString {
+            append('0')
+            repeat(DeviceAgentLimits.MAX_DEPTH) { append(".31") }
+        }
+        assertEquals(1 + DeviceAgentLimits.MAX_DEPTH * 3, deepRef.length)
+        val deep = element.copy(ref = deepRef)
+        assertEquals(deepRef, deep.ref)
+    }
+
     @Test fun callsAreBoundedAndRedactedInDiagnostics() {
         val call = DeviceActionCall("call-1", "click", snapshot.snapshotId, mapOf("element_ref" to element.ref), 0)
         assertFalse(call.toString().contains(element.label!!))

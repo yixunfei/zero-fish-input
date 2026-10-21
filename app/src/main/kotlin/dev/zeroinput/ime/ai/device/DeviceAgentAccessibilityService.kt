@@ -15,6 +15,8 @@ import android.graphics.Canvas
 import android.hardware.HardwareBuffer
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.text.InputType
 import android.view.Display
@@ -51,6 +53,8 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
     private var receiverRegistered = false
     private var overlay: LinearLayout? = null
     private var approval: ((Boolean) -> Unit)? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var connectionGeneration = 0L
     private val windowPackages = LinkedHashMap<Int, String>()
     private val lockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -61,9 +65,18 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         if (Build.VERSION.SDK_INT >= 33) setCacheEnabled(false)
+        connectionGeneration++
+        clearOverlay()
         registration?.close()
         registration = graph.deviceAgentBroker.attach(Port())
         invalidation?.close()
+        val generation = connectionGeneration
+        invalidation = graph.deviceAgentBroker.observeInvalidation {
+            mainHandler.post {
+                if (generation == connectionGeneration) clearOverlay()
+            }
+        }
+        synchronized(windowPackages) { windowPackages.clear() }
         if (!receiverRegistered) {
             ContextCompat.registerReceiver(
                 this, lockReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED,
@@ -103,6 +116,7 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
     }
 
     private fun cleanup() {
+        connectionGeneration++
         approval = null
         clearOverlay()
         invalidation?.close()
@@ -111,6 +125,7 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         registration = null
         if (receiverRegistered) unregisterReceiver(lockReceiver)
         receiverRegistered = false
+        synchronized(windowPackages) { windowPackages.clear() }
         graph.deviceAgentBroker.invalidate()
     }
 
@@ -168,7 +183,8 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
         try { checkNotNull(getSystemService(WindowManager::class.java)).addView(view, params) }
@@ -257,10 +273,16 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
                     ?: return failed(call, "Wait duration is invalid")
                 if (milliseconds !in 0L..5_000L) return rejected(call, "Wait duration is outside the safe range")
                 val deadline = SystemClock.elapsedRealtime() + milliseconds
+                var nextCheck = 0L
                 while (SystemClock.elapsedRealtime() < deadline) {
-                    if (!current()) return expired(call)
+                    val now = SystemClock.elapsedRealtime()
+                    if (now >= nextCheck) {
+                        if (!current()) return expired(call)
+                        nextCheck = now + WAIT_RECHECK_MS
+                    }
                     try {
-                        Thread.sleep(minOf(50L, deadline - SystemClock.elapsedRealtime()))
+                        val remaining = (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(1L)
+                        Thread.sleep(minOf(50L, remaining))
                     } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
                         return expired(call)
@@ -268,15 +290,15 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
                 }
                 success(call, "Wait completed")
             }
-            "back" -> global(call, GLOBAL_ACTION_BACK)
-            "home" -> global(call, GLOBAL_ACTION_HOME)
+            "back" -> global(call, GLOBAL_ACTION_BACK, current)
+            "home" -> global(call, GLOBAL_ACTION_HOME, current)
             "click" -> nodeAction(call, snapshot, root, AccessibilityNodeInfo.ACTION_CLICK, current)
             "long_click" -> nodeAction(call, snapshot, root, AccessibilityNodeInfo.ACTION_LONG_CLICK, current)
             "scroll" -> scroll(call, snapshot, root, current)
             "input_text" -> inputText(call, snapshot, root, current)
             "ime_action" -> imeAction(call, snapshot, root, current)
             "swipe" -> swipe(call, snapshot, root, current)
-            "open_app" -> openApp(call, snapshot.packageName)
+            "open_app" -> openApp(call, snapshot.packageName, current)
             else -> failed(call, "Unsupported action")
         }
     }
@@ -399,15 +421,20 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         catch (_: InterruptedException) { Thread.currentThread().interrupt(); false }
         return if (finished && succeeded.get() && current()) success(call, "Swipe completed") else failed(call, "Swipe did not complete")
     }
-    private fun openApp(call: DeviceActionCall, targetPackage: String): DeviceActionResult {
+    private fun openApp(call: DeviceActionCall, targetPackage: String, current: () -> Boolean): DeviceActionResult {
+        if (!current()) return expired(call)
         if (call.arguments["package_name"] != targetPackage) return rejected(call, "Target package mismatch")
         val intent = packageManager.getLaunchIntentForPackage(targetPackage) ?: return failed(call, "Target app unavailable")
+        if (!current()) return expired(call)
         startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return success(call, "Target app opened")
     }
 
-    private fun global(call: DeviceActionCall, action: Int): DeviceActionResult =
-        if (performGlobalAction(action)) success(call, "Navigation completed") else failed(call, "Navigation was not accepted")
+    private fun global(call: DeviceActionCall, action: Int, current: () -> Boolean): DeviceActionResult {
+        if (!current()) return expired(call)
+        return if (performGlobalAction(action)) success(call, "Navigation completed")
+        else failed(call, "Navigation was not accepted")
+    }
 
     private data class CollectedElements(val elements: List<DeviceElement>, val incomplete: Boolean)
 
@@ -425,7 +452,10 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         state.pending.add(PendingNode(AccessibilityNodeInfo.obtain(root), "0", false))
         try {
             while (state.pending.isNotEmpty() && state.elements.size < DeviceAgentLimits.MAX_NODES) {
-                check(current()) { "Device task expired" }
+                // Full lease/platform checks are expensive binder and settings reads.
+                // The capture boundary rechecks before delivery; sampling here only
+                // shortens work after invalidation without trusting stale work.
+                if (state.visited % CURRENT_CHECK_INTERVAL == 0) check(current()) { "Device task expired" }
                 if (++state.visited > DeviceAgentLimits.MAX_NODE_VISITS) { state.incomplete = true; break }
                 val pending = state.pending.removeFirst()
                 try { collectNode(pending, state) } finally { pending.node.recycle() }
@@ -446,14 +476,25 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
     private fun collectNode(item: PendingNode, state: CollectionState) {
         val node = item.node
         val bounds = Rect().also(node::getBoundsInScreen)
-        val protected = item.protectedAncestor || sensitive(node)
+        // Keep the unclipped bounds for the later node match; clipping is only used
+        // to decide whether the element is visible at all inside this window.
+        val visible = Rect(bounds)
+        val visibleInWindow = visible.intersect(state.bounds)
         val editor = node.isEditable
-        if (node.isVisibleToUser && bounds.intersect(state.bounds) && !bounds.isEmpty && bounds.left >= 0 && bounds.top >= 0) {
-            val rawLabel = if (protected || item.protectedAncestor) null else node.contentDescription
+        val inherited = item.protectedAncestor || sensitive(node) ||
+            node.isVisibleToUser && DeviceAgentSafety.sensitiveValue(node.contentDescription)
+        if (node.isVisibleToUser && visibleInWindow && !visible.isEmpty && bounds.left >= 0 && bounds.top >= 0) {
+            val rawLabel = if (inherited) null else node.contentDescription
             // Only leaf text is public. Editable values and descendants are never read.
-            val rawText = if (protected || editor || item.protectedAncestor || node.childCount > 0) null else node.text
-            val label = safeText(rawLabel)
-            val text = safeText(rawText)
+            val rawText = if (inherited || editor || node.childCount > 0) null else node.text
+            // Platform flags do not mark every credential rendered as plain text.
+            // Treat a leaf whose text itself looks sensitive as protected too.
+            val protected = inherited || rawText?.let {
+                DeviceAgentSafety.sensitivePointerLabel(it) ||
+                    DeviceAgentSafety.blockedPointerEffect(it) || DeviceAgentSafety.sensitiveValue(it)
+            } == true || rawLabel?.let(DeviceAgentSafety::sensitiveValue) == true
+            val label = if (protected) null else safeText(rawLabel)
+            val text = if (protected) null else safeText(rawText)
             if (rawLabel != null && rawLabel.isNotEmpty() && label == null || rawText != null && rawText.isNotEmpty() && text == null) {
                 state.incomplete = true
             }
@@ -461,7 +502,7 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
             if (state.textUnits > DeviceAgentLimits.MAX_SNAPSHOT_TEXT_CHARS) { state.incomplete = true; return }
             if (label != null || text != null || node.isClickable || node.isLongClickable || node.isScrollable || editor || protected) {
                 state.elements += DeviceElement(
-                    item.ref, node.className?.toString()?.substringAfterLast('.')?.take(128) ?: "View", label, text,
+                    item.ref, DeviceAgentSafety.roleLabel(node.className), label, text,
                     DeviceBounds(bounds.left, bounds.top, bounds.right, bounds.bottom), node.isClickable,
                     node.isLongClickable, node.isScrollable, editor, node.isPassword, protected, node.isEnabled,
                     if (protected) null else imeActionLabel(node),
@@ -474,9 +515,13 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         }
         if (node.childCount > 32) state.incomplete = true
         for (index in 0 until minOf(node.childCount, 32)) {
-            val child = child(node, index) ?: continue
+            val child = child(node, index)
+            if (child == null) {
+                state.incomplete = true
+                continue
+            }
             if (state.pending.size >= DeviceAgentLimits.MAX_PENDING_NODES) { child.recycle(); state.incomplete = true; break }
-            state.pending.add(PendingNode(child, "${item.ref}.$index", protected || editor))
+            state.pending.add(PendingNode(child, "${item.ref}.$index", inherited || editor))
         }
     }
     /**
@@ -662,7 +707,7 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         return node.isVisibleToUser && node.isEnabled && !sensitive(node) &&
             actual.left == element.bounds.left && actual.top == element.bounds.top &&
             actual.right == element.bounds.right && actual.bottom == element.bounds.bottom &&
-            node.className?.toString()?.substringAfterLast('.') == element.role &&
+            DeviceAgentSafety.roleLabel(node.className) == element.role &&
             node.isEditable == element.editable && node.isClickable == element.clickable &&
             node.isLongClickable == element.longClickable && node.isScrollable == element.scrollable &&
             safeText(node.contentDescription) == element.label &&
@@ -679,14 +724,16 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
     private fun windowBounds(window: AccessibilityWindowInfo): Rect = Rect().also(window::getBoundsInScreen)
 
     private fun sensitive(node: AccessibilityNodeInfo): Boolean {
-        val contentLabel = buildString {
-            node.contentDescription?.let(::append)
-            node.hintText?.let {
-                if (isNotEmpty()) append(' ')
-                append(it)
-            }
-        }
-        if (sensitiveLabel(contentLabel)) return true
+        val content = DeviceAgentSafety.boundedText(node.contentDescription)
+        val hint = DeviceAgentSafety.boundedText(node.hintText)
+        // Labels like "Email" or "URL" are ordinary navigation; pointer-sensitive
+        // nouns and destructive verbs remain blocked, while editable values are
+        // handled separately by input type and leaf-text screening.
+        if (DeviceAgentSafety.sensitiveValue(content) || DeviceAgentSafety.sensitiveValue(hint) ||
+            DeviceAgentSafety.sensitivePointerLabel(content) ||
+            DeviceAgentSafety.sensitivePointerLabel(hint)) return true
+        if (content != null && hint != null &&
+            DeviceAgentSafety.sensitivePointerLabel("$content $hint", DeviceAgentLimits.MAX_ELEMENT_TEXT * 2 + 1)) return true
         if (node.isPassword || (Build.VERSION.SDK_INT >= 34 && node.isAccessibilityDataSensitive)) return true
         if (node.inputType == 0) return node.isEditable
         val inputClass = node.inputType and InputType.TYPE_MASK_CLASS
@@ -706,13 +753,12 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun sensitiveLabel(value: CharSequence?): Boolean {
-        return DeviceAgentSafety.sensitiveLabel(value)
-    }
-
-    private fun safeText(value: CharSequence?): String? = value?.toString()?.trim()?.takeIf {
-        it.isNotEmpty() && it.length <= dev.zeroinput.ai.api.DeviceAgentLimits.MAX_ELEMENT_TEXT &&
-            it.none { character -> character.isISOControl() && character !in "\n\r\t" }
+    private fun safeText(value: CharSequence?): String? {
+        val length = value?.length ?: return null
+        if (length == 0 || length > DeviceAgentLimits.MAX_ELEMENT_TEXT) return null
+        return value.toString().trim().takeIf {
+            it.isNotEmpty() && it.none { character -> character.isISOControl() && character !in "\n\r\t" }
+        }
     }
 
     private fun success(call: DeviceActionCall, summary: String) =
@@ -728,6 +774,8 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
         DeviceActionResult(call.callId, DeviceActionResultStatus.EXPIRED, "Device task expired")
 
     private companion object {
+        const val CURRENT_CHECK_INTERVAL = 64
+        const val WAIT_RECHECK_MS = 200L
         val CONTENT_EVENTS = setOf(
             AccessibilityEvent.TYPE_VIEW_FOCUSED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,

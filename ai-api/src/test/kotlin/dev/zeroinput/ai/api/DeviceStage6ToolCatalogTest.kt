@@ -27,6 +27,14 @@ class DeviceStage6ToolCatalogTest {
         assertTrue(DeviceActionArguments.valid(send.definition, mapOf("phone_number" to "+852 6123 4567", "body" to "Hello")))
         assertFalse(DeviceActionArguments.valid(send.definition, mapOf("phone_number" to "not-a-number", "body" to "Hello")))
         assertFalse(DeviceActionArguments.valid(send.definition, mapOf("phone_number" to "1234", "body" to " ")))
+
+        val call = requireNotNull(DeviceStage6ToolCatalog.find("place_call"))
+        assertFalse(DeviceActionArguments.valid(call.definition, mapOf("phone_number" to "*21*123456#")))
+        assertFalse(DeviceActionArguments.valid(call.definition, mapOf("phone_number" to "+ +852 6123 4567")))
+        assertFalse(DeviceActionArguments.valid(call.definition, mapOf("phone_number" to "1234567890123456")))
+        assertFalse(DeviceActionArguments.valid(call.definition, mapOf("phone_number" to "123(456")))
+        assertFalse(DeviceActionArguments.valid(call.definition, mapOf("phone_number" to "123()456")))
+        assertTrue(DeviceActionArguments.valid(call.definition, mapOf("phone_number" to "+852 (6123) 4567")))
     }
 
     @Test

@@ -172,7 +172,7 @@ internal object DeviceAgentProtocolCodec {
                 element.imeActionLabel?.let { put("ime_action_label", it) }
             })
         }
-        return JSONObject().put("package", value.packageName).put("window_id", value.windowId)
+        return JSONObject().put("package", value.packageName)
             .put("snapshot_id", value.snapshotId).put("incomplete", value.incomplete)
             .put("screenshot_available", value.hasScreenshot).put("elements", elements)
     }
@@ -180,8 +180,8 @@ internal object DeviceAgentProtocolCodec {
     private fun chatContent(payload: String, screenshot: String?, attachments: List<dev.zeroinput.ai.api.AiAttachment>): Any =
         contentParts(payload, screenshot, attachments, AiProtocol.CHAT_COMPLETIONS) ?: payload
 
-    private fun responseContent(payload: String, screenshot: String?, attachments: List<dev.zeroinput.ai.api.AiAttachment>): JSONArray =
-        contentParts(payload, screenshot, attachments, AiProtocol.RESPONSES) ?: JSONArray()
+    private fun responseContent(payload: String, screenshot: String?, attachments: List<dev.zeroinput.ai.api.AiAttachment>): Any =
+        contentParts(payload, screenshot, attachments, AiProtocol.RESPONSES) ?: payload
 
     private fun anthropicContent(payload: String, screenshot: String?, attachments: List<dev.zeroinput.ai.api.AiAttachment>): Any =
         contentParts(payload, screenshot, attachments, AiProtocol.ANTHROPIC_MESSAGES) ?: payload

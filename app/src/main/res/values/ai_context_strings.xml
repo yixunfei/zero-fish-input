@@ -37,6 +37,7 @@
     <string name="ai_device_agent_stop">停止任务</string>
     <string name="ai_device_agent_task_hint">描述要完成的设备任务</string>
     <string name="ai_device_agent_task_started">设备任务已开始</string>
+    <string name="ai_device_agent_task_busy">已有设备任务运行，请先等待或停止当前任务</string>
     <string name="ai_device_agent_task_completed">设备任务已完成：%1$s</string>
     <string name="ai_device_agent_task_failed">设备任务已停止：%1$s</string>
     <string name="ai_device_agent_activity_title">独立设备任务</string>
@@ -92,6 +93,8 @@
     <string name="ai_device_agent_result_rejected">操作未执行</string>
     <string name="ai_device_agent_stage6_title">阶段 6 直接数据能力</string>
     <string name="ai_device_agent_stage6_description">每个类别单独授权，仅限当前任务与单个明确目标。每次操作仍需确认；读取或采集的通知、短信、联系人、日历、媒体及传感器内容会发送到当前配置的 AI 服务商，服务商可能按其策略留存。设备代理总开关不会自动授予这些能力。</string>
+    <string name="ai_device_agent_stage6_capability_disclosure">“%1$s”仅用于当前任务中你明确选择或确认的单个目标。相关读取或采集结果会发送到当前配置的 AI 服务商；每次读取、采集或写入仍需单独确认。</string>
+    <string name="ai_device_agent_stage6_confirm">确认并启用</string>
     <string name="ai_device_agent_stage6_disclosure">我已理解直接数据能力以及读取内容发送给 AI 服务商的风险，并同意启用所选类别</string>
     <string name="ai_device_agent_stage6_notifications">通知读取</string>
     <string name="ai_device_agent_stage6_media">媒体读取或删除</string>

@@ -1084,7 +1084,13 @@ actions, tool results and wall time are bounded. Snapshot/package/window/session
 generation checks run before every action. Events, lock screen, service loss,
 foreground-app changes, setting changes, cancellation and timeout revoke pending
 work. Accessibility cache is disabled where supported and nodes are recycled
-inside the service boundary.
+inside the service boundary. Visible leaf text and notification title/text are
+screened for credential nouns before entering the model request; an incomplete
+snapshot cannot drive coordinate swipes. A locally denied action is returned as a
+bounded rejected turn without executing, while authority loss or a stale snapshot
+still terminates the task. Stage 6 reads use a cancellation signal and a separate
+bounded executor; a provider that ignores cancellation remains a runtime
+validation item.
 
 The static catalog has only waiting, navigation, pointer, and non-sensitive text
 editor actions. The local evaluator blocks the ZeroInput package, Android/system
@@ -1142,3 +1148,10 @@ approval; provider retention is outside ZeroInput's control. Screen recording,
 background notification rules, bulk provider scans, arbitrary file management,
 clipboard access, payment, installation and system-security changes remain
 excluded. See [ADR 0026](adr/0026-ai-device-agent-stage6-minimal-capabilities.md).
+
+Telephone targets accept only a conventional number with 3–15 digits and an
+optional leading `+`; `*`/`#` service strings (including USSD codes) and invalid
+characters or plus placement are rejected before any SMS or dial operation. Stage 6 action approval
+is bound to the captured snapshot token, so a changed scene cannot consume an old
+approval. Approval/status overlays set `FLAG_SECURE` to exclude their target and
+operation details from ordinary screen capture.

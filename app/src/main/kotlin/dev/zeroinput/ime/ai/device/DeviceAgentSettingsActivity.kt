@@ -11,6 +11,7 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -40,6 +41,7 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
     private val categoryChecks = linkedMapOf<DeviceActionCategory, MaterialCheckBox>()
     private val stage6Checks = linkedMapOf<DeviceStage6Capability, MaterialCheckBox>()
     private val stage6PermissionButtons = linkedMapOf<Stage6RuntimePermission, MaterialButton>()
+    private var disclosureDialog: AlertDialog? = null
     private val stage6RuntimePermissions = listOf(
         Stage6RuntimePermission(DeviceStage6Capability.CAMERA, R.string.ai_device_agent_stage6_capture, android.Manifest.permission.CAMERA),
         Stage6RuntimePermission(DeviceStage6Capability.MICROPHONE, R.string.ai_device_agent_stage6_capture, android.Manifest.permission.RECORD_AUDIO),
@@ -86,6 +88,7 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
                     } else if (!checked) {
                         graph.settings.deviceAgentScope = DeviceCapabilityScope.DISABLED
                         graph.settings.deviceAgentAllowScreenshots = false
+                        graph.settings.deviceAgentStage6DisclosureAccepted = false
                         graph.settings.deviceAgentStage6Capabilities = emptySet()
                     }
                     render()
@@ -98,15 +101,17 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
             minHeight = dp(64)
             setOnCheckedChangeListener { _, checked ->
                 if (!rendering) {
-                    graph.settings.deviceAgentDisclosureAccepted = checked
                     if (!checked) {
+                        graph.settings.deviceAgentDisclosureAccepted = false
                         graph.settings.deviceAgentEnabled = false
                         graph.settings.deviceAgentScope = DeviceCapabilityScope.DISABLED
                         graph.settings.deviceAgentAllowScreenshots = false
-                    } else if (graph.settings.deviceAgentScope == DeviceCapabilityScope.DISABLED) {
-                        graph.settings.deviceAgentScope = DeviceCapabilityScope.FULL_SUPPORT
+                        graph.settings.deviceAgentStage6DisclosureAccepted = false
+                        graph.settings.deviceAgentStage6Capabilities = emptySet()
+                        render()
+                    } else {
+                        showDisclosureDialog()
                     }
-                    render()
                 }
             }
         }
@@ -198,9 +203,12 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
             minHeight = dp(64)
             setOnCheckedChangeListener { _, checked ->
                 if (!rendering) {
-                    graph.settings.deviceAgentStage6DisclosureAccepted = checked
-                    if (!checked) graph.settings.deviceAgentStage6Capabilities = emptySet()
-                    render()
+                    if (checked) showDisclosureDialog(stage6 = true)
+                    else {
+                        graph.settings.deviceAgentStage6DisclosureAccepted = false
+                        graph.settings.deviceAgentStage6Capabilities = emptySet()
+                        render()
+                    }
                 }
             }
         }
@@ -211,10 +219,12 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
                 minHeight = dp(48)
                 setOnCheckedChangeListener { _, checked ->
                     if (!rendering) {
-                        val selected = graph.settings.deviceAgentStage6Capabilities.toMutableSet()
-                        if (checked) selected += capability else selected -= capability
-                        graph.settings.deviceAgentStage6Capabilities = selected
-                        render()
+                        if (checked) showDisclosureDialog(stage6Capability = capability)
+                        else {
+                            graph.settings.deviceAgentStage6Capabilities =
+                                graph.settings.deviceAgentStage6Capabilities - capability
+                            render()
+                        }
                     }
                 }
             }
@@ -279,6 +289,8 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
                     if (selected == DeviceCapabilityScope.DISABLED) {
                         graph.settings.deviceAgentEnabled = false
                         graph.settings.deviceAgentAllowScreenshots = false
+                        graph.settings.deviceAgentStage6DisclosureAccepted = false
+                        graph.settings.deviceAgentStage6Capabilities = emptySet()
                     }
                     render()
                 }
@@ -361,13 +373,94 @@ class DeviceAgentSettingsActivity : AppCompatActivity() {
     }
 
     private fun explainAndOpenSettings() {
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.ai_device_agent_title)
-            .setMessage(R.string.ai_device_agent_description)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.ai_device_agent_authorize) { _, _ ->
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }.show()
+        showDisclosureDialog(openSystemSettings = true)
+    }
+
+    private fun showDisclosureDialog(
+        openSystemSettings: Boolean = false,
+        stage6: Boolean = false,
+        stage6Capability: DeviceStage6Capability? = null,
+    ) {
+        disclosureDialog?.dismiss()
+        val density = resources.displayMetrics.density
+        val capabilityDisclosure = stage6Capability != null
+        val acknowledgement = MaterialCheckBox(this).apply {
+            setText(if (stage6 || capabilityDisclosure) R.string.ai_device_agent_stage6_disclosure
+            else R.string.ai_device_agent_disclosure)
+            isChecked = when {
+                openSystemSettings || capabilityDisclosure -> false
+                stage6 -> graph.settings.deviceAgentStage6DisclosureAccepted
+                else -> graph.settings.deviceAgentDisclosureAccepted
+            }
+            minHeight = (56 * density).toInt()
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = (20 * density).toInt()
+            setPadding(padding, 0, padding, 0)
+            addView(TextView(this@DeviceAgentSettingsActivity).apply {
+                text = when {
+                    stage6Capability != null -> getString(
+                        R.string.ai_device_agent_stage6_capability_disclosure,
+                        stage6Label(stage6Capability),
+                    )
+                    stage6 -> getString(R.string.ai_device_agent_stage6_description)
+                    else -> getString(R.string.ai_device_agent_description)
+                }
+                textSize = 15f
+            })
+            addView(acknowledgement)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(when {
+                stage6Capability != null -> stage6Label(stage6Capability)
+                stage6 -> getString(R.string.ai_device_agent_stage6_title)
+                else -> getString(R.string.ai_device_agent_title)
+            })
+            .setView(content)
+            .setNegativeButton(R.string.cancel) { _, _ -> render() }
+            .setPositiveButton(when {
+                openSystemSettings -> R.string.ai_device_agent_authorize
+                stage6 || capabilityDisclosure -> R.string.ai_device_agent_stage6_confirm
+                else -> R.string.ai_device_agent_enable
+            }, null)
+            .create()
+        dialog.setOnShowListener {
+            val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            DeviceAgentDisclosureAcknowledgement.bind(acknowledgement, positiveButton)
+            positiveButton.setOnClickListener {
+                if (stage6Capability != null) {
+                    graph.settings.deviceAgentStage6Capabilities =
+                        graph.settings.deviceAgentStage6Capabilities + stage6Capability
+                } else if (stage6) {
+                    graph.settings.deviceAgentStage6DisclosureAccepted = true
+                } else {
+                    graph.settings.deviceAgentDisclosureAccepted = true
+                    graph.settings.deviceAgentEnabled = true
+                    if (graph.settings.deviceAgentScope == DeviceCapabilityScope.DISABLED) {
+                        graph.settings.deviceAgentScope = DeviceCapabilityScope.FULL_SUPPORT
+                    }
+                }
+                dialog.dismiss()
+                render()
+                if (openSystemSettings) startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        }
+        dialog.setOnDismissListener {
+            if (disclosureDialog === dialog) {
+                disclosureDialog = null
+                if (!isFinishing && !isDestroyed && ::status.isInitialized) render()
+            }
+        }
+        disclosureDialog = dialog
+        dialog.show()
+        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    override fun onDestroy() {
+        disclosureDialog?.dismiss()
+        disclosureDialog = null
+        super.onDestroy()
     }
 
     private fun openNotificationAccessSettings() {

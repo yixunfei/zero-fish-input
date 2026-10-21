@@ -920,6 +920,12 @@ events, accessibility window changes and task cancellation. The coordinator
 also enforces bounded model rounds, action count, tool results and five-minute
 wall time. Unknown tools, unknown/duplicate arguments, stale snapshots and
 sensitive editable nodes fail closed before an Android action is attempted.
+Locally denied calls are returned to the model as bounded rejected turns without
+executing an Android action; authority loss, stale snapshots and malformed
+responses still terminate the task. Visible leaf text and notification title/text
+are screened before entering a snapshot or result, and an incomplete snapshot
+cannot drive a coordinate swipe. Stage 6 provider work uses a separate bounded
+executor so a blocked content provider cannot stall accessibility observation.
 
 The accessibility action catalog contains bounded navigation, pointer, waiting
 and non-sensitive text-editor operations. `open_app` is constrained to the

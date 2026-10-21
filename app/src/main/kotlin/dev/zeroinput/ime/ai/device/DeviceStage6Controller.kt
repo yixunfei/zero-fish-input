@@ -13,7 +13,6 @@ import dev.zeroinput.ai.api.DeviceStage6Result
 import dev.zeroinput.ai.api.DeviceStage6ResultStatus
 import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
-import java.util.concurrent.atomic.AtomicBoolean
 
 enum class DeviceStage6PolicyReason {
     ALLOWED,
@@ -99,6 +98,7 @@ internal interface DeviceStage6Platform {
         request: DeviceStage6OperationRequest,
         maxAttachmentBytes: Int,
         stillValid: () -> Boolean,
+        cancellation: DeviceStage6Cancellation,
     ): DeviceStage6Result
 }
 
@@ -116,23 +116,34 @@ internal class DeviceStage6Controller(
     private var activeTaskId: String? = null
     private val consumedApprovals = mutableMapOf<String, MutableSet<String>>()
     private val running = mutableSetOf<String>()
+    private val cancellations = mutableMapOf<String, DeviceStage6Cancellation>()
 
     val currentGeneration: Long get() = synchronized(lock) { generation }
 
-    fun invalidate() = synchronized(lock) {
-        generation++
-        activeTaskId = null
-        running.clear()
-        consumedApprovals.clear()
-    }
-
-    fun endTask(taskId: String) = synchronized(lock) {
-        if (activeTaskId == taskId) {
+    fun invalidate() {
+        val toCancel = synchronized(lock) {
             generation++
             activeTaskId = null
-            consumedApprovals.clear()
             running.clear()
+            consumedApprovals.clear()
+            cancellations.values.toList().also { cancellations.clear() }
         }
+        toCancel.forEach { it.cancel() }
+    }
+
+    fun endTask(taskId: String) {
+        val toCancel = synchronized(lock) {
+            if (activeTaskId != taskId) {
+                emptyList()
+            } else {
+                generation++
+                activeTaskId = null
+                consumedApprovals.clear()
+                running.clear()
+                cancellations.values.toList().also { cancellations.clear() }
+            }
+        }
+        toCancel.forEach { it.cancel() }
     }
 
     fun execute(
@@ -144,11 +155,13 @@ internal class DeviceStage6Controller(
         maxAttachmentBytes: Int = AiLimits.MAX_ATTACHMENT_BYTES,
         deliver: (DeviceStage6Result) -> Unit,
     ): AiRequestHandle {
-        val cancelled = AtomicBoolean()
+        val cancellation = DeviceStage6Cancellation()
         val handleGeneration = synchronized(lock) {
             if (closed || grant.taskId != request.taskId || grant.generation != request.generation ||
                 grant.generation != generation) return rejected(deliver, DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
-            if (!approvalId.matches(Regex("[A-Za-z0-9._-]{1,128}"))) {
+            // The coordinator prefixes the model call id ("stage6-"), so the bound
+            // must leave room for that prefix on top of MAX_CALL_ID_CHARS.
+            if (!approvalId.matches(Regex("[A-Za-z0-9._-]{1,160}"))) {
                 return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Approval is invalid")
             }
             if (maxAttachmentBytes !in 0..AiLimits.MAX_ATTACHMENT_BYTES) {
@@ -168,26 +181,31 @@ internal class DeviceStage6Controller(
             if (!running.add(request.taskId)) {
                 return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Another data operation is running")
             }
+            cancellations[request.taskId] = cancellation
             generation
         }
         try {
             executor.execute {
                 val stillValid = {
-                    !cancelled.get() && isCurrent(request, handleGeneration) && runCatching {
+                    !cancellation.isCancelled && isCurrent(request, handleGeneration) && runCatching {
                         policy.check(policySnapshot, grant, request, unlocked(), foregroundPackage(), approved).allowed
                     }.getOrDefault(false)
                 }
                 val result = runCatching {
                     if (!stillValid()) DeviceStage6Result(DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
-                    else boundAttachment(platform.execute(request, maxAttachmentBytes, stillValid), maxAttachmentBytes)
+                    else boundAttachment(
+                        platform.execute(request, maxAttachmentBytes, stillValid, cancellation),
+                        maxAttachmentBytes,
+                    )
                 }.getOrElse { DeviceStage6Result(DeviceStage6ResultStatus.FAILED, "Data operation failed") }
                 val current = synchronized(lock) {
                     val valid = !closed && generation == handleGeneration && request.generation == generation &&
                         request.taskId in running
                     running.remove(request.taskId)
+                    if (cancellations[request.taskId] === cancellation) cancellations.remove(request.taskId)
                     valid
                 }
-                if (!cancelled.get() && current) {
+                if (!cancellation.isCancelled && current) {
                     try {
                         deliver(result)
                     } finally {
@@ -200,13 +218,14 @@ internal class DeviceStage6Controller(
         } catch (_: RejectedExecutionException) {
             synchronized(lock) {
                 running.remove(request.taskId)
+                if (cancellations[request.taskId] === cancellation) cancellations.remove(request.taskId)
                 if (activeTaskId == request.taskId) activeTaskId = null
             }
             deliver(DeviceStage6Result(DeviceStage6ResultStatus.UNAVAILABLE, "Data operation queue unavailable"))
         }
         return object : AiRequestHandle {
             override fun cancel() {
-                cancelled.set(true)
+                cancellation.cancel()
             }
         }
     }
@@ -222,12 +241,16 @@ internal class DeviceStage6Controller(
         return DeviceStage6Result(DeviceStage6ResultStatus.FAILED, "Data attachment is too large")
     }
 
-    override fun close() = synchronized(lock) {
-        closed = true
-        generation++
-        activeTaskId = null
-        running.clear()
-        consumedApprovals.clear()
+    override fun close() {
+        val toCancel = synchronized(lock) {
+            closed = true
+            generation++
+            activeTaskId = null
+            running.clear()
+            consumedApprovals.clear()
+            cancellations.values.toList().also { cancellations.clear() }
+        }
+        toCancel.forEach { it.cancel() }
     }
 
     private fun rejected(deliver: (DeviceStage6Result) -> Unit, status: DeviceStage6ResultStatus, message: String): AiRequestHandle {

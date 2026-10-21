@@ -83,6 +83,13 @@ class AppGraph(context: Context) : AutoCloseable {
         name = "zeroinput-device-agent-screenshot",
         queueCapacity = 1,
     )
+    // Stage 6 providers may block in binder calls that do not accept cancellation.
+    // Keep those reads off the broker/provider worker so one bad URI cannot stall
+    // ordinary observation and action delivery.
+    internal val deviceAgentStage6Executor: ExecutorService = BoundedExecutors.singleThread(
+        name = "zeroinput-device-agent-stage6",
+        queueCapacity = 2,
+    )
 
     val settings = SettingsRepository(applicationContext)
     internal val keyboardBackgrounds = dev.zeroinput.ime.settings.KeyboardBackgroundStore(applicationContext, settings)
@@ -131,7 +138,7 @@ class AppGraph(context: Context) : AutoCloseable {
     )
     /** Direct stage 6 data access remains a separate approval and generation gate. */
     internal val deviceStage6Controller = DeviceStage6Controller(
-        executor = deviceAgentExecutor,
+        executor = deviceAgentStage6Executor,
         platform = AndroidDeviceStage6Platform(applicationContext),
         unlocked = {
             !applicationContext.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
@@ -494,6 +501,7 @@ class AppGraph(context: Context) : AutoCloseable {
         aiPersistenceExecutor.shutdownNow()
         deviceAgentExecutor.shutdownNow()
         deviceAgentScreenshotExecutor.shutdownNow()
+        deviceAgentStage6Executor.shutdownNow()
         queuedPersonalization.close()
         dictionaryScriptObserver.close()
         languagePackSnapshot = emptyList()

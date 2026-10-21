@@ -24,6 +24,14 @@ internal class DeviceAgentCoordinator(
     private var eventHistory = emptyList<DeviceAgentEvent>()
     private val observers = CopyOnWriteArrayList<(DeviceAgentEvent) -> Unit>()
     private val invalidationObserver = broker.observeInvalidation { synchronized(lock) { active?.fail("Device task expired") } }
+    private val retryablePolicyReasons = setOf(
+        DevicePolicyReason.UNKNOWN_ACTION,
+        DevicePolicyReason.CATEGORY_NOT_ALLOWED,
+        DevicePolicyReason.INVALID_ARGUMENT,
+        DevicePolicyReason.HARD_BLOCKED,
+        DevicePolicyReason.SENSITIVE_ELEMENT,
+        DevicePolicyReason.SNAPSHOT_INCOMPLETE,
+    )
     val hasActiveTask: Boolean get() = synchronized(lock) { active != null }
 
     fun observe(listener: (DeviceAgentEvent) -> Unit): AutoCloseable {
@@ -90,8 +98,8 @@ internal class DeviceAgentCoordinator(
         private val attachments = attachments.map { attachment ->
             AiAttachment(attachment.mimeType, attachment.bytes.copyOf(), attachment.displayName)
         }
-        private val stage6Targets = stage6Targets.toMap()
-        private val stage6TargetLabels = stage6TargetLabels.toMap()
+        private var stage6Targets = stage6Targets.toMap()
+        private var stage6TargetLabels = stage6TargetLabels.toMap()
         val id: String = UUID.randomUUID().toString()
         var deadline: AutoCloseable? = null
         private var ended = false
@@ -138,7 +146,10 @@ internal class DeviceAgentCoordinator(
             state(DeviceAgentState.OBSERVING)
             broker.capture(owner) { token, value -> synchronized(lock) {
                 if (!valid()) { value?.clearScreenshot(); return@synchronized }
-                if (value == null || !broker.isCurrent(owner)) return@synchronized fail("Observation unavailable")
+                if (value == null || !broker.isCurrent(owner)) {
+                    value?.clearScreenshot()
+                    return@synchronized fail("Observation unavailable")
+                }
                 snapshotToken = token
                 snapshot = value
                 requestModel()
@@ -156,15 +167,18 @@ internal class DeviceAgentCoordinator(
                     .map(DeviceStage6ToolCatalog.Entry::definition)
             availableToolNames = tools.mapTo(linkedSetOf(), DeviceActionDefinition::name)
             if (tools.isEmpty()) return fail("No device actions are enabled")
-            val extraAttachment = transientAttachment?.let {
+            // Provider requests outlive this coordinator call, so give the provider
+            // independent buffers and leave task-owned attachment bytes untouched.
+            val requestAttachments = attachments.map {
                 AiAttachment(it.mimeType, it.bytes.copyOf(), it.displayName)
-            }
-            val requestAttachments = attachments + listOfNotNull(extraAttachment)
+            } + transientAttachment?.let {
+                listOf(AiAttachment(it.mimeType, it.bytes.copyOf(), it.displayName))
+            }.orEmpty()
             val request = runCatching {
                 DeviceAgentModelRequest(taskText, target, frame, tools, history, attachments = requestAttachments)
             }
                 .getOrElse {
-                    extraAttachment?.bytes?.fill(0)
+                    requestAttachments.forEach { it.bytes.fill(0) }
                     return fail("Invalid device transcript")
                 }
             transientAttachment?.bytes?.fill(0)
@@ -173,16 +187,20 @@ internal class DeviceAgentCoordinator(
             state(DeviceAgentState.PLAN_REVIEW)
             val serial = ++requestSerial
             var delivered = false
-            val handle = provider.request(request) { event -> synchronized(lock) {
-                if (!valid() || serial != requestSerial || delivered) return@synchronized
-                when (event) {
-                    DeviceAgentProviderEvent.Started -> Unit
-                    is DeviceAgentProviderEvent.Completed -> { delivered = true; handleResponse(event.response) }
-                    is DeviceAgentProviderEvent.Failed -> { delivered = true; fail("AI request failed") }
-                    DeviceAgentProviderEvent.Cancelled -> { delivered = true; fail("AI request cancelled") }
-                }
-            } }
-            extraAttachment?.bytes?.fill(0)
+            val handle = try {
+                provider.request(request) { event -> synchronized(lock) {
+                    if (!valid() || serial != requestSerial || delivered) return@synchronized
+                    when (event) {
+                        DeviceAgentProviderEvent.Started -> Unit
+                        is DeviceAgentProviderEvent.Completed -> { delivered = true; handleResponse(event.response) }
+                        is DeviceAgentProviderEvent.Failed -> { delivered = true; fail("AI request failed") }
+                        DeviceAgentProviderEvent.Cancelled -> { delivered = true; fail("AI request cancelled") }
+                    }
+                } }
+            } catch (_: Exception) {
+                requestAttachments.forEach { it.bytes.fill(0) }
+                return fail("AI request unavailable")
+            }
             if (valid() && !delivered && serial == requestSerial) providerHandle = handle else handle.cancel()
         }
 
@@ -202,7 +220,12 @@ internal class DeviceAgentCoordinator(
             } else {
                 evaluator.checkAction(policy, definition, call, frame, broker.currentWindow()?.packageName, taskApproved)
             }
-            if (!decision.allowed) return fail(decision.reason.name)
+            if (!decision.allowed) {
+                if (decision.reason in retryablePolicyReasons) {
+                    return rejectAction(call, decision.reason, response.continuation)
+                }
+                return fail(decision.reason.name)
+            }
             pending = call
             continuation = response.continuation
             if (decision.requiresApproval) {
@@ -234,6 +257,29 @@ internal class DeviceAgentCoordinator(
             val owner = lease ?: return
             broker.showStatus(owner, text.running)
             if (pending == null) { taskApproved = true; observe() } else execute()
+        }
+
+        /**
+         * A locally denied action is model feedback, not a task failure. The model
+         * sees a bounded rejected turn and can choose another observation/action.
+         */
+        private fun rejectAction(
+            call: DeviceActionCall,
+            reason: DevicePolicyReason,
+            continuation: List<DeviceReasoningItem>,
+        ) {
+            if (!valid()) return
+            if (++actionCount > DeviceAgentLimits.MAX_ACTIONS) return fail("Task action limit reached")
+            val result = DeviceActionResult(
+                callId = call.callId,
+                status = DeviceActionResultStatus.REJECTED,
+                summary = reason.name,
+                retryable = true,
+            )
+            history = history + DeviceAgentTurn(call, result, continuation)
+            this.continuation = emptyList()
+            emit(DeviceAgentEvent.ActionFinished(result))
+            observe()
         }
 
         private fun execute() {
@@ -360,6 +406,8 @@ internal class DeviceAgentCoordinator(
             taskText = ""
             usedCallIds.clear()
             availableToolNames = emptySet()
+            stage6Targets = emptyMap()
+            stage6TargetLabels = emptyMap()
             active = null
             val owner = lease
             lease = null

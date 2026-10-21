@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.CancellationSignal
 import android.provider.CalendarContract
 import android.provider.CallLog
 import android.provider.ContactsContract
@@ -34,11 +35,12 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         request: DeviceStage6OperationRequest,
         maxAttachmentBytes: Int,
         stillValid: () -> Boolean,
+        cancellation: DeviceStage6Cancellation,
     ): DeviceStage6Result {
         if (!stillValid()) return expired()
         return when (request.capability) {
-            DeviceStage6Capability.FILES -> file(request, maxAttachmentBytes, stillValid)
-            DeviceStage6Capability.MEDIA -> media(request, maxAttachmentBytes, stillValid)
+            DeviceStage6Capability.FILES -> file(request, maxAttachmentBytes, stillValid, cancellation)
+            DeviceStage6Capability.MEDIA -> media(request, maxAttachmentBytes, stillValid, cancellation)
             DeviceStage6Capability.SYSTEM_SETTINGS -> settings(request, stillValid)
             DeviceStage6Capability.NOTIFICATIONS -> notifications(request, stillValid)
             DeviceStage6Capability.SMS -> sms(request, stillValid)
@@ -58,39 +60,62 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         }
     }
 
-    private fun file(request: DeviceStage6OperationRequest, maxAttachmentBytes: Int, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun file(
+        request: DeviceStage6OperationRequest,
+        maxAttachmentBytes: Int,
+        stillValid: () -> Boolean,
+        cancellation: DeviceStage6Cancellation,
+    ): DeviceStage6Result {
         val uri = contentUri(request) ?: return rejected("A user-granted content URI is required")
         return when (request.operation) {
-            DeviceStage6Operation.READ -> readAttachment(uri, maxAttachmentBytes, stillValid)
-            DeviceStage6Operation.DELETE -> if (stillValid()) delete(uri) else expired()
+            DeviceStage6Operation.READ -> readAttachment(uri, maxAttachmentBytes, stillValid, cancellation)
+            DeviceStage6Operation.DELETE -> delete(uri, stillValid)
             DeviceStage6Operation.CREATE,
             DeviceStage6Operation.UPDATE -> rejected("File writes require a user-selected destination")
             else -> rejected("Unsupported file operation")
         }
     }
 
-    private fun media(request: DeviceStage6OperationRequest, maxAttachmentBytes: Int, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun media(
+        request: DeviceStage6OperationRequest,
+        maxAttachmentBytes: Int,
+        stillValid: () -> Boolean,
+        cancellation: DeviceStage6Cancellation,
+    ): DeviceStage6Result {
         val uri = contentUri(request) ?: return rejected("A target media URI is required")
         if (!isMediaUri(uri)) return rejected("Target is not a media item")
         return when (request.operation) {
-            DeviceStage6Operation.READ -> readAttachment(uri, maxAttachmentBytes, stillValid)
-            DeviceStage6Operation.DELETE -> if (stillValid()) delete(uri) else expired()
+            DeviceStage6Operation.READ -> readAttachment(uri, maxAttachmentBytes, stillValid, cancellation)
+            DeviceStage6Operation.DELETE -> delete(uri, stillValid)
             else -> rejected("Unsupported media operation")
         }
     }
 
-    private fun readAttachment(uri: Uri, maxAttachmentBytes: Int, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun readAttachment(
+        uri: Uri,
+        maxAttachmentBytes: Int,
+        stillValid: () -> Boolean,
+        cancellation: DeviceStage6Cancellation,
+    ): DeviceStage6Result {
         if (!stillValid()) return expired()
+        val signal = CancellationSignal()
+        val release = cancellation.register { runCatching { signal.cancel() } }
         return try {
-            val attachment = AiAttachmentReader.read(resolver, uri, maxBytes = maxAttachmentBytes, stillValid = stillValid)
+            val attachment = AiAttachmentReader.read(
+                resolver, uri, cancellation = signal, maxBytes = maxAttachmentBytes, stillValid = stillValid,
+            )
             if (!stillValid()) {
                 attachment.bytes.fill(0)
                 expired()
             } else DeviceStage6Result(DeviceStage6ResultStatus.SUCCESS, "Selected data is ready", attachment)
         } catch (_: java.util.concurrent.CancellationException) {
             expired()
+        } catch (_: android.os.OperationCanceledException) {
+            expired()
         } catch (_: Exception) {
             DeviceStage6Result(DeviceStage6ResultStatus.FAILED, "Selected data could not be read")
+        } finally {
+            release.close()
         }
     }
 
@@ -147,7 +172,8 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
                 if (!stillValid()) return expired()
             val smsManager = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java)
                 else @Suppress("DEPRECATION") SmsManager.getDefault()
-            smsManager?.sendTextMessage(address, null, body, null, null)
+                if (!stillValid()) return expired()
+                smsManager?.sendTextMessage(address, null, body, null, null)
                 ?: return unavailable("SMS service is unavailable")
                 success("SMS send requested")
             }
@@ -175,6 +201,7 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
             val number = request.target.id.takeIf(String::isNotBlank) ?: return rejected("Call number is required")
             if (!stillValid()) return expired()
             val telecom = context.getSystemService(TelecomManager::class.java) ?: return unavailable("Telephony service unavailable")
+            if (!stillValid()) return expired()
             return try {
                 telecom.placeCall(Uri.fromParts("tel", number, null), null)
                 success("Call request started")
@@ -262,8 +289,10 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         val values = android.content.ContentValues().apply { put(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, newName) }
         val selection = "${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?"
         val args = arrayOf(rawId.toString(), ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+        if (!stillValid()) return expired()
         val changed = resolver.update(ContactsContract.Data.CONTENT_URI, values, selection, args)
         if (changed > 0) return success("Contact changed")
+        if (!stillValid()) return expired()
         val inserted = resolver.insert(ContactsContract.Data.CONTENT_URI, android.content.ContentValues().apply {
             put(ContactsContract.Data.RAW_CONTACT_ID, rawId)
             put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
@@ -418,9 +447,12 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         return target.toUri().takeIf { it.scheme == ContentResolver.SCHEME_CONTENT }
     }
 
-    private fun delete(uri: Uri): DeviceStage6Result = try {
-        if (resolver.delete(uri, null, null) == 1) success("Selected item deleted") else failed("Selected item was not deleted")
-    } catch (_: SecurityException) { rejected("Delete permission is unavailable") }
+    private fun delete(uri: Uri, stillValid: () -> Boolean): DeviceStage6Result {
+        if (!stillValid()) return expired()
+        return try {
+            if (resolver.delete(uri, null, null) == 1) success("Selected item deleted") else failed("Selected item was not deleted")
+        } catch (_: SecurityException) { rejected("Delete permission is unavailable") }
+    }
 
     private fun isMediaUri(uri: Uri): Boolean = resolver.getType(uri)?.lowercase()?.let {
         it.startsWith("image/") || it.startsWith("audio/") || it.startsWith("video/")

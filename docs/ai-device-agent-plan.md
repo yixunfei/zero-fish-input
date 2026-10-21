@@ -1,22 +1,22 @@
 # AI 设备代理设计与实现计划
 
-日期：2026-10-20
-状态：阶段 0–5 核心实现完成；公开 fixture、Activity 实例重建和 provider 伪传输已在 Android 16 模拟器/本地测试通过；阶段 6 已完成可本机验证的直接能力实现。进程终止、物理设备和真实模型服务仍待验收
+日期：2026-10-21
+状态：阶段 0–6 核心实现已完成；页面引用与设备代理专项 instrumentation（7/7）、单元测试、privacyCheck、Lint、x86_64 Debug 构建及 `-PrequireRime=true` Release 构建通过。完整 Android instrumentation 392 项中 8 项失败、14 项按环境/真实服务条件跳过；5 项键盘尺寸/布局断言稳定失败，3 项整套运行时的 fixture/启动时序失败但单独重跑通过。Activity 实例重建及进程终止后从最近任务卡片恢复已在 Android 16 模拟器验证。物理设备兼容性、阶段 6 实机权限/硬件行为和真实模型服务仍待验收。
 范围：ZeroInput 内独立的 AI 设备操作模式
 
-## 实施状态（2026-10-19）
+## 实施状态（2026-10-21）
 
 用户已确认侧载/自有分发，并同意按本计划推进阶段 0–5；随后确认阶段 6 的直接读取/操作范围。
 截图按任务单独确认但
 默认关闭；代理历史默认不保存。当前代码已形成可用闭环：`ai-api` 契约与固定动作
 目录、Android 无障碍观察与动作分发、三种 provider tool-call、策略/代次撤销、设置页
-和 AI 面板独立设备任务模式均已落地。
+和 AI 面板独立设备任务模式均已落地。阶段 6 直接能力按 ADR 0026 实现，默认关闭且每次操作需单独审批。
 
 阶段 0 的 ADR、架构和安全边界已同步；阶段 1、3、4 的平台无关契约、策略、协议和
 有界代理循环已通过当前单元测试。阶段 2 的结构化前台节点快照与 Android 30+ 有界截图
 适配器已落地，公开 fixture 的快照、截图、敏感字段和撤销 instrumentation 已在 Android 16 模拟器通过。阶段 5 已提供 AI 面板模式和独立
 `AiDeviceAgentActivity`，包含独立草稿、开始/取消、授权/停止状态条、动作审批和内存时间线；
-Activity 实例重建只重新绑定协调器，不重复启动任务；Coordinator 单元测试和 Activity 实例重建 instrumentation 已分别覆盖该行为。进程被系统终止后的恢复仍待独立验收。
+Activity 实例重建只重新绑定协调器，不重复启动任务；Coordinator 单元测试和 Activity 实例重建 instrumentation 已分别覆盖该行为。任务、审批、动作结果和选中文件只在进程内存中，未加入持久化；任务与草稿视图禁用状态保存。Android 16 模拟器使用合成草稿验证了进程终止后从最近任务卡片恢复同一系统任务：旧进程 PID 消失，点击最近任务卡片启动新进程并恢复任务页，草稿、目标包、附件状态和时间线均为空，停止操作不可用，也没有恢复代理任务或旧审批。系统低内存终止和物理设备恢复仍需单独验收。
 
 截图设置默认关闭。设置页是能力总开关，独立设备任务页还要求每次任务确认；API 30+ 在任务
 代次、目标窗口和解锁状态有效时捕获一帧有界 JPEG，并以三种协议支持的图片内容发送。截图
@@ -377,8 +377,8 @@ instrumentation 已在 Android 16 模拟器通过；物理设备兼容性仍需�
 
 当前状态：设置页、AI 面板独立设备任务模式和独立 `AiDeviceAgentActivity` 已实现，包含独立
 草稿、开始/取消、停止状态条、动作审批和内存时间线；Activity 实例重建只重新绑定现有任务。
-撤权、锁屏、前台切换和 Activity 实例重建已由 Android 16 模拟器测试确认；Activity 进程终止后
-恢复、物理设备和真实模型服务仍需单独验收。
+Android 16 模拟器已通过撤权、锁屏、前台切换、公开 fixture 观察/点击和 Activity 实例重建专项测试（页面引用与设备代理专项共 7/7）。
+Android 16 模拟器已验证 Activity 进程被杀后点击最近任务卡片可恢复系统保留的 task record；物理设备和真实模型服务仍需单独验收。
 
 交付：
 
@@ -392,7 +392,7 @@ instrumentation 已在 Android 16 模拟器通过；物理设备兼容性仍需�
 
 ### 阶段 6：高风险直接能力（已实现，默认关闭）
 
-用户要求通知读取及通知相关行为、用户指定媒体/系统设置、相机/麦克风、文件选择、短信/电话，以及用户指定联系人/日历的直接读取或操作。实现采用独立能力开关、任务目标绑定、一次性审批、短期 grant 和撤销检查；阶段 0–5 的设备进程终止、物理设备和真实 provider 验收仍未完成。
+用户要求通知读取及通知相关行为、用户指定媒体/系统设置、相机/麦克风、文件选择、短信/电话，以及用户指定联系人/日历的直接读取或操作。实现采用独立能力开关、任务目标绑定、一次性审批、短期 grant 和撤销检查；阶段 0–5 的进程终止后最近任务卡片恢复已在模拟器验证，物理设备和真实 provider 验收仍未完成。
 
 共同门槛：每种能力必须有独立 ADR、权限/Play 声明分析、单独能力开关、显著首次披露、明确的数据输入/输出与本地留存规则、不可自动批准动作表、最终确认界面、负向/撤销/清除测试和设备兼容性报告。不能通过设备代理总开关一次性打开多个类别。
 
@@ -479,7 +479,17 @@ docs/adr/0025-ai-device-agent-boundary.md
   :app:assembleDebug "-Pandroid.injected.build.abi=x86_64"
 ```
 
-设备阶段已运行公开 fixture 的 instrumentation、授权/撤销/锁屏/应用切换用例，并检查 Debug/Release 合并 Manifest。Activity 旋转/进程重建、物理设备兼容性和真实模型联网仍未运行；涉及 AccessibilityService、权限、网络协议或敏感数据时，未运行的设备和第三方应用测试必须在交付文档中明确列出，不能以单元测试替代。
+2026-10-21 本机验证记录：
+
+- 使用 JDK 21 运行 Gradle（JDK 17 供 Java 编译工具链使用）执行 `:ai-api:test :app:testDebugUnitTest privacyCheck :app:lintDebug :app:assembleDebug -Pandroid.injected.build.abi=x86_64 --no-parallel`，全部通过；`app:lintDebug` 覆盖了页面引用 API 28 常量在 minSdk 26 下的兼容路径。
+- 使用 `:app:assembleRelease -PrequireRime=true --no-parallel`，三 ABI 的真实 librime Release 构建、R8 和 Release Lint 全部通过。Release APK 未配置正式签名。
+- Android 16 / API 36 x86_64 模拟器上，页面引用与设备代理专项 instrumentation 共 7/7 通过，覆盖页面引用来源切换/锁屏/服务撤权、设备代理敏感字段脱敏、单次审批点击、前台切换、锁屏、服务撤权和 Activity 实例重建。
+- 全量 `:app:connectedDebugAndroidTest --no-parallel` 发现 392 项，8 项失败、14 项跳过。`DictionaryManagementUiTest.publicFixtureSearchFitsSmallPortraitAndLandscapeInBothThemes`、`FullscreenInputTest.sameFullscreenEditorAcceptsInputAfterRepeatedLiveRotation` 和 `ClipboardGuardOverlayTest.overlaysReplaceOneWindowDismissWithoutResurfacingAndExpire` 的失败单独重跑通过，属于整套运行时的 fixture/启动时序失败。以下 5 项单独重跑仍失败，均为当前工作区已有键盘尺寸/布局断言，与设备代理和页面引用改动无调用路径关联：`InputPanelTest.associationsKeepKeyboardSizeAndCandidateIdentityAcrossThemesAndOrientations`、`KeyboardAppearanceTest.attachedPublicAssociationsRenderInBothModes`、`KeyboardExperienceTest.idleComposingAndToolsShareTheSameCompactHeaderWithoutMovingKeys`、`KeyboardWindowIntegrationTest.floatingWindowPassesOutsideTouchesAndAllModesRemainUsable`、`NineKeyPanelTest.nineKeyReadingsAndToolbarFitSmallLargeAndLandscapeLayouts`。这些布局失败仍需后续单独修复后重跑全量套件。
+- 生命周期：`DeviceAgentCoordinator` 由进程级 `AppGraph` 持有；任务、模型历史、审批回调和选中文件 URI 没有持久化存储；任务与目标包输入禁用 View 状态恢复。使用合成草稿从正常 Activity 栈进入任务页，按 Home 后执行 `am kill --user 0 dev.zeroinput.ime.debug`，确认旧 PID 消失且最近任务记录保留；点击最近任务卡片恢复同一 task record。新进程中的任务页显示草稿、目标包、附件状态和时间线均为空，停止按钮禁用。Android 16 x86_64 模拟器上的最近任务恢复通过；操作系统低内存回收与物理设备行为仍待验收。
+- 本机仅连接 Android 16 x86_64 模拟器，没有物理设备。AI 设置页显示总开关和联网开关关闭，未读取或使用任何凭据；因此未发起真实 provider 请求。阶段 6 的通知访问、运行时权限、WRITE_SETTINGS、相机/麦克风硬件、短信/电话和厂商联系人/日历 provider 也未在真实设备执行。
+- 本轮安全修复完成后的设备复测未能启动：ADB 中 `emulator-5554` 显示 `offline`，因此未重新运行专项 instrumentation，也未验证新增的阶段 6 确认界面行为；此前模拟器专项通过记录不覆盖本轮新增改动。
+
+Android 16 x86_64 模拟器上的进程终止与最近任务卡片恢复已完成；复测使用合成文本，任务未启动，旧 PID 消失，点击原任务卡片后草稿、附件状态和时间线为空且没有活动任务。系统低内存回收仍需单独验收。不要使用真实通知、联系人、消息、附件或 provider 凭据测试。物理设备和真实 provider 仍需按相应权限披露逐项验收，不能以模拟器或伪传输替代。
 
 ## 12. 发布与产品风险
 
@@ -491,4 +501,4 @@ docs/adr/0025-ai-device-agent-boundary.md
 
 ## 13. 已确认决策
 
-用户已确认采用侧载/自有分发，不将 Google Play 作为首发渠道，并允许阶段 0–5 当前动作目录及阶段 6 的直接读取/操作范围。通知相关行为保持逐次确认，不提供后台规则或自动回复。阶段 6 默认关闭，按类别披露、授权和逐次审批；代理历史默认不保存。Activity 实例重建与 provider 伪传输已自动化验证；进程终止后恢复、物理设备兼容性和真实模型服务请求仍需在发布前单独验收。
+用户已确认采用侧载/自有分发，不将 Google Play 作为首发渠道，并允许阶段 0–5 当前动作目录及阶段 6 的直接读取/操作范围。通知相关行为保持逐次确认，不提供后台规则或自动回复。阶段 6 默认关闭，按类别披露、授权和逐次审批；代理历史默认不保存。Activity 实例重建、Android 16 模拟器进程终止后的最近任务卡片恢复与 provider 伪传输已验证；物理设备兼容性、系统低内存回收、阶段 6 真机权限/硬件行为和真实模型服务请求仍需在发布前单独验收。

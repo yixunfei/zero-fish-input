@@ -315,6 +315,15 @@ class AiDeviceAgentActivity : AppCompatActivity() {
             is DeviceAgentEvent.State -> {
                 status.text = event.message
                 addTimeline(event.message)
+                if (event.state in setOf(
+                        dev.zeroinput.ai.api.DeviceAgentState.PAUSED,
+                        dev.zeroinput.ai.api.DeviceAgentState.FAILED,
+                        dev.zeroinput.ai.api.DeviceAgentState.COMPLETED,
+                        dev.zeroinput.ai.api.DeviceAgentState.REVOKED,
+                    )) {
+                    clearFinishedHandle()
+                    renderReadyState()
+                }
             }
             is DeviceAgentEvent.ApprovalRequired -> {
                 addTimeline(event.description)
@@ -330,16 +339,22 @@ class AiDeviceAgentActivity : AppCompatActivity() {
                 ))
             }
             is DeviceAgentEvent.Completed -> {
+                clearFinishedHandle()
                 status.setText(R.string.ai_device_agent_activity_complete)
                 addTimeline(event.message)
                 renderReadyState()
             }
             is DeviceAgentEvent.Failed -> {
+                clearFinishedHandle()
                 status.text = getString(R.string.ai_device_agent_activity_failed, event.message)
                 addTimeline(event.message)
                 renderReadyState()
             }
         }
+    }
+
+    private fun clearFinishedHandle() {
+        if (!graph.deviceAgentCoordinator.hasActiveTask) taskHandle = null
     }
 
     private fun addTimeline(value: String) {

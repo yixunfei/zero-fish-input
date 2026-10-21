@@ -1068,6 +1068,12 @@ class ZeroInputService : InputMethodService() {
     private fun startDeviceAgentTask(@Suppress("UNUSED_PARAMETER") submittedByView: String) {
         syncSessionPrivacy()
         if (!aiAllowed()) return
+        // A second tap must not replace the live handle with a rejected no-op:
+        // that would make onFinishInputView unable to cancel the running task.
+        if (graph.deviceAgentCoordinator.hasActiveTask || deviceAgentRequestHandle != null) {
+            showAiFeedback(dev.zeroinput.ime.R.string.ai_device_agent_task_busy)
+            return
+        }
         val value = deviceAgentDraft.submittedText().trim()
         if (value.isBlank()) {
             showAiFeedback(dev.zeroinput.ime.R.string.ai_device_agent_task_hint)
@@ -1094,6 +1100,12 @@ class ZeroInputService : InputMethodService() {
                 is dev.zeroinput.ai.api.DeviceAgentEvent.Failed -> finishDeviceAgentUi(
                     dev.zeroinput.ime.R.string.ai_device_agent_task_failed, event.message,
                 )
+                is dev.zeroinput.ai.api.DeviceAgentEvent.State ->
+                    if (event.state == dev.zeroinput.ai.api.DeviceAgentState.PAUSED) {
+                        finishDeviceAgentUi(
+                            dev.zeroinput.ime.R.string.ai_device_agent_task_failed, event.message,
+                        )
+                    }
                 else -> Unit
             }
         }

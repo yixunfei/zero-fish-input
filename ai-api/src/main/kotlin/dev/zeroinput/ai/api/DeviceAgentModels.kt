@@ -73,7 +73,9 @@ data class DeviceElement(
     val imeActionLabel: String? = null,
 ) {
     init {
-        require(ref.matches(Regex("[0-9.]{1,96}"))) { "Invalid device element reference" }
+        require(ref.matches(Regex("[0-9.]{1,${DeviceAgentLimits.MAX_ELEMENT_REF_CHARS}}"))) {
+            "Invalid device element reference"
+        }
         require(role.length in 1..128 && role.none(Char::isISOControl)) { "Invalid device element role" }
         listOf(label, text, imeActionLabel).filterNotNull().forEach {
             require(it.length <= DeviceAgentLimits.MAX_ELEMENT_TEXT &&
@@ -385,6 +387,7 @@ object DeviceAgentLimits {
     const val MAX_TASK_CHARS = 8_192
     const val MAX_MESSAGE_CHARS = 8_192
     const val MAX_ELEMENT_TEXT = 512
+    const val MAX_ELEMENT_REF_CHARS = 128
     const val MAX_NODES = 512
     const val MAX_NODE_VISITS = 2_048
     const val MAX_PENDING_NODES = 512

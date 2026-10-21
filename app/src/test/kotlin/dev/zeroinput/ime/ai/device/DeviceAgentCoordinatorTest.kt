@@ -66,6 +66,27 @@ class DeviceAgentCoordinatorTest {
     }
 
     @Test
+    fun locallyRejectedActionBecomesModelFeedbackInsteadOfEndingTask() {
+        val fixture = Fixture()
+        val events = mutableListOf<DeviceAgentEvent>()
+        fixture.coordinator.start("Tap Continue", target.packageName, fixture.policy, events::add)
+        fixture.drain()
+        val snapshotId = fixture.provider.requests.single().snapshot.snapshotId
+        val invalid = DeviceActionCall(
+            "invalid-action", "click", snapshotId, mapOf("element_ref" to "missing"), 0,
+        )
+        fixture.provider.complete(0, DeviceAgentModelResponse(null, listOf(invalid), completed = false))
+        fixture.drain()
+
+        assertTrue(fixture.coordinator.hasActiveTask)
+        assertEquals(2, fixture.provider.requests.size)
+        assertTrue(events.any {
+            it is DeviceAgentEvent.ActionFinished && it.result.status == DeviceActionResultStatus.REJECTED
+        })
+        fixture.close()
+    }
+
+    @Test
     fun cancellationDiscardsLateProviderResponseAndDoesNotExecuteAction() {
         val fixture = Fixture()
         val events = mutableListOf<DeviceAgentEvent>()
@@ -99,15 +120,85 @@ class DeviceAgentCoordinatorTest {
         fixture.close()
     }
 
+    @Test
+    fun providerSubmissionFailureFinishesTaskWithoutLeakingActiveState() {
+        val fixture = Fixture(providerFailure = true)
+        val events = mutableListOf<DeviceAgentEvent>()
+        fixture.coordinator.start("Tap Continue", target.packageName, fixture.policy, events::add)
+        fixture.drain()
+
+        assertFalse(fixture.coordinator.hasActiveTask)
+        assertTrue(events.any { it is DeviceAgentEvent.Failed })
+        fixture.close()
+    }
+
+    @Test
+    fun providerRequestReceivesIndependentAttachmentBytes() {
+        val fixture = Fixture()
+        val attachment = dev.zeroinput.ai.api.AiAttachment("text/plain", "fixture".toByteArray(), "note.txt")
+        fixture.coordinator.start("Read selected file", target.packageName, fixture.policy,
+            attachments = listOf(attachment), listener = {})
+        fixture.drain()
+        fixture.port.approval?.invoke(true)
+        fixture.drain()
+
+        val requestAttachment = fixture.provider.requests.single().attachments.single()
+        assertEquals("fixture", String(requestAttachment.bytes))
+        assertTrue(attachment.bytes.all { it != 0.toByte() })
+        fixture.close()
+    }
+
+    @Test
+    fun stage6AttachmentRemainsReadableUntilProviderOwnsRequest() {
+        val attachment = dev.zeroinput.ai.api.AiAttachment("image/jpeg", byteArrayOf(9, 8, 7), "selected.jpg")
+        val stage6 = DeviceStage6Controller(
+            executor = Executor { it.run() },
+            platform = object : DeviceStage6Platform {
+                override fun execute(
+                    request: DeviceStage6OperationRequest,
+                    maxAttachmentBytes: Int,
+                    stillValid: () -> Boolean,
+                    cancellation: DeviceStage6Cancellation,
+                ) = if (stillValid()) {
+                    DeviceStage6Result(DeviceStage6ResultStatus.SUCCESS, "Selected data is ready", attachment)
+                } else DeviceStage6Result(DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
+            },
+            unlocked = { true },
+            foregroundPackage = { target.packageName },
+        )
+        val fixture = Fixture(stage6Controller = stage6)
+        val stage6Policy = fixture.policy.copy(
+            stage6DisclosureAccepted = true,
+            stage6Capabilities = setOf(DeviceStage6Capability.CONTACTS),
+        )
+        fixture.coordinator.start("Read the selected contact", target.packageName, stage6Policy) {}
+        fixture.drain()
+        val snapshotId = fixture.provider.requests.single().snapshot.snapshotId
+        val call = DeviceActionCall("stage6-call", "read_contact", snapshotId,
+            mapOf("display_name" to "Alice"), 0)
+        fixture.provider.complete(0, DeviceAgentModelResponse(null, listOf(call), completed = false))
+        fixture.drain()
+        assertTrue(fixture.coordinator.approve("stage6-call", true))
+        fixture.drain()
+
+        val sent = fixture.provider.requests.last().attachments.single()
+        assertArrayEquals(byteArrayOf(9, 8, 7), sent.bytes)
+        assertArrayEquals(byteArrayOf(0, 0, 0), attachment.bytes)
+        fixture.close()
+    }
+
     private fun clickResponse(snapshotId: String) = DeviceAgentModelResponse(
         message = null,
         calls = listOf(DeviceActionCall("call-1", "click", snapshotId, mapOf("element_ref" to "0"), 0)),
         completed = false,
     )
 
-    private inner class Fixture {
+    private inner class Fixture(
+        private val providerFailure: Boolean = false,
+        private val stage6Controller: DeviceStage6Controller? = null,
+    ) {
         val queue = ArrayDeque<() -> Unit>()
-        val provider = FakeProvider()
+        val provider = FakeProvider(providerFailure)
         val port = FakePort()
         var deadline: (() -> Unit)? = null
         val policy = this@DeviceAgentCoordinatorTest.policy
@@ -121,6 +212,7 @@ class DeviceAgentCoordinatorTest {
             executor = Executor { it.run() },
             post = { action -> queue.addLast(action); true },
             schedule = { _, action -> deadline = action; AutoCloseable { deadline = null } },
+            stage6Controller = stage6Controller,
         )
 
         init { broker.attach(port) }
@@ -133,10 +225,10 @@ class DeviceAgentCoordinatorTest {
             }
         }
 
-        fun close() { coordinator.close(); broker.close() }
+        fun close() { coordinator.close(); broker.close(); stage6Controller?.close(); provider.clear() }
     }
 
-    private class FakeProvider : DeviceAgentProvider {
+    private class FakeProvider(var shouldThrow: Boolean = false) : DeviceAgentProvider {
         val requests = mutableListOf<DeviceAgentModelRequest>()
         private val callbacks = mutableListOf<(DeviceAgentProviderEvent) -> Unit>()
         var cancelled = 0
@@ -145,6 +237,7 @@ class DeviceAgentCoordinatorTest {
             request: DeviceAgentModelRequest,
             listener: (DeviceAgentProviderEvent) -> Unit,
         ): AiRequestHandle {
+            if (shouldThrow) throw IllegalStateException("provider unavailable")
             requests += request
             callbacks += listener
             listener(DeviceAgentProviderEvent.Started)
@@ -153,6 +246,10 @@ class DeviceAgentCoordinatorTest {
 
         fun complete(index: Int, response: DeviceAgentModelResponse) {
             callbacks[index](DeviceAgentProviderEvent.Completed(response))
+        }
+
+        fun clear() {
+            requests.flatMap(DeviceAgentModelRequest::attachments).forEach { it.bytes.fill(0) }
         }
     }
 

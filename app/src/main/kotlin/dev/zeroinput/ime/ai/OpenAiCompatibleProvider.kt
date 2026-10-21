@@ -60,7 +60,7 @@ class OpenAiCompatibleProvider internal constructor(
         val ownedRequest = request.copy(attachments = ownedAttachments)
         return launch(null, { listener(DeviceAgentProviderEvent.Started) },
             { listener(DeviceAgentProviderEvent.Failed(it)) }, { listener(DeviceAgentProviderEvent.Cancelled) },
-            resources = ownedAttachments) { config, operation ->
+            resources = request.attachments + ownedAttachments) { config, operation ->
         val profile = checkNotNull(config.activeProvider())
         val model = ownedRequest.model ?: config.activeModel()
         validateAgentConfiguration(config, model, ownedRequest.snapshot.hasScreenshot, ownedRequest.attachments)

@@ -37,6 +37,7 @@
     <string name="ai_device_agent_stop">Stop task</string>
     <string name="ai_device_agent_task_hint">Describe the device task to complete</string>
     <string name="ai_device_agent_task_started">Device task started</string>
+    <string name="ai_device_agent_task_busy">A device task is already running; wait for it or stop it first</string>
     <string name="ai_device_agent_task_completed">Device task completed: %1$s</string>
     <string name="ai_device_agent_task_failed">Device task stopped: %1$s</string>
     <string name="ai_device_agent_activity_title">Standalone device task</string>
@@ -92,6 +93,8 @@
     <string name="ai_device_agent_result_rejected">Action was not performed</string>
     <string name="ai_device_agent_stage6_title">Stage 6 direct data capabilities</string>
     <string name="ai_device_agent_stage6_description">Each category is granted separately and limited to the current task and one explicit target. Every operation still requires approval. Read notification, SMS, contact, calendar, media and sensor content is sent to your configured AI provider, which may retain requests under its policies. The device-agent switch does not grant these capabilities.</string>
+    <string name="ai_device_agent_stage6_capability_disclosure">“%1$s” is limited to one target that you explicitly select or confirm for the current task. Read or captured results are sent to your configured AI provider; each read, capture or write still requires separate approval.</string>
+    <string name="ai_device_agent_stage6_confirm">Confirm and enable</string>
     <string name="ai_device_agent_stage6_disclosure">I understand the direct data access and provider-sharing risks and agree to enable the selected categories</string>
     <string name="ai_device_agent_stage6_notifications">Read notifications</string>
     <string name="ai_device_agent_stage6_media">Read or delete media</string>

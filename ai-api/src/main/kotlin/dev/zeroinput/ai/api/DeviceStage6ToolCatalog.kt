@@ -120,7 +120,7 @@ object DeviceStage6ToolCatalog {
         if (target.isBlank() || target.length > DeviceAgentLimits.MAX_STAGE6_TARGET_CHARS) return false
         if (entry.targetParameter?.contains("uri") == true && !target.startsWith("content://")) return false
         if (entry.targetParameter?.endsWith("_id") == true && target.toLongOrNull() == null) return false
-        if (entry.targetParameter in setOf("phone_number", "address") && !target.matches(Regex("[+0-9*#(). -]{3,32}"))) return false
+        if (entry.targetParameter in setOf("phone_number", "address") && !validPhoneTarget(target)) return false
         if (entry.packageParameter != null && !arguments[entry.packageParameter].orEmpty().matches(Regex("[A-Za-z0-9_][A-Za-z0-9_.]{0,254}"))) return false
         if (entry.definition.name.contains("system_setting") && arguments["key"].orEmpty() !in setOf(
                 "screen_brightness", "screen_off_timeout", "accelerometer_rotation", "sound_effects_enabled")) return false
@@ -148,6 +148,17 @@ object DeviceStage6ToolCatalog {
         "screen_off_timeout" -> value.toLongOrNull()?.let { it in 0..86_400_000L } == true
         "accelerometer_rotation", "sound_effects_enabled" -> value == "0" || value == "1"
         else -> false
+    }
+
+    /** Rejects USSD/service codes so a call can only target a conventional number. */
+    private fun validPhoneTarget(value: String): Boolean {
+        if (!value.matches(Regex("\\+?[0-9][0-9(). -]{2,31}"))) return false
+        val open = value.indexOf('(')
+        val close = value.indexOf(')')
+        if (value.count { it == '(' } > 1 || value.count { it == ')' } > 1 ||
+            (open >= 0 && (close <= open + 1 || close == value.lastIndex)) ||
+            (open < 0) != (close < 0)) return false
+        return value.count(Char::isDigit) in 3..15
     }
 
     private fun validEventWindow(startValue: String?, endValue: String?): Boolean {

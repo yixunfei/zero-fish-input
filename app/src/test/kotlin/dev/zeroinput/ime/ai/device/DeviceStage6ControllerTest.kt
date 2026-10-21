@@ -14,8 +14,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 
 class DeviceStage6ControllerTest {
     private val now = 2_000L
@@ -40,6 +42,20 @@ class DeviceStage6ControllerTest {
         assertEquals(1, platform.calls)
         assertEquals(DeviceStage6ResultStatus.SUCCESS, result.first().status)
         assertEquals(DeviceStage6ResultStatus.REJECTED, result.last().status)
+        controller.close()
+    }
+
+    @Test
+    fun prefixedModelCallIdUpTo128CharactersIsAccepted() {
+        val platform = FakePlatform()
+        val controller = controller(Executor { it.run() }, platform)
+        val result = mutableListOf<DeviceStage6Result>()
+        val approvalId = "stage6-" + "a".repeat(128)
+
+        controller.execute(policy, grant(), request(), approvalId, approved = true, deliver = result::add)
+
+        assertEquals(1, platform.calls)
+        assertEquals(DeviceStage6ResultStatus.SUCCESS, result.single().status)
         controller.close()
     }
 
@@ -181,6 +197,39 @@ class DeviceStage6ControllerTest {
     }
 
     @Test
+    fun cancellingRunningOperationReachesPlatformCancellation() {
+        var queued: Runnable? = null
+        val started = CountDownLatch(1)
+        val cancelled = CountDownLatch(1)
+        val platform = object : DeviceStage6Platform {
+            override fun execute(
+                request: DeviceStage6OperationRequest,
+                maxAttachmentBytes: Int,
+                stillValid: () -> Boolean,
+                cancellation: DeviceStage6Cancellation,
+            ): DeviceStage6Result {
+                started.countDown()
+                cancellation.register { cancelled.countDown() }
+                cancelled.await(5, TimeUnit.SECONDS)
+                return DeviceStage6Result(DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
+            }
+        }
+        val controller = controller(Executor { queued = it }, platform)
+        val result = mutableListOf<DeviceStage6Result>()
+        val handle = controller.execute(policy, grant(), request(), "approve-cancel", approved = true, deliver = result::add)
+
+        val worker = Thread { requireNotNull(queued).run() }
+        worker.start()
+        assertTrue(started.await(5, TimeUnit.SECONDS))
+        handle.cancel()
+        assertTrue(cancelled.await(5, TimeUnit.SECONDS))
+        worker.join(5_000)
+        assertFalse(worker.isAlive)
+        assertTrue(result.isEmpty())
+        controller.close()
+    }
+
+    @Test
     fun lateAttachmentAfterInvalidationIsClearedWithoutDelivery() {
         val platform = FakePlatform(attachment = AiAttachment("image/jpeg", byteArrayOf(7, 8), "late.jpg"))
         var controller: DeviceStage6Controller? = null
@@ -196,7 +245,7 @@ class DeviceStage6ControllerTest {
         controller!!.close()
     }
 
-    private fun controller(executor: Executor, platform: FakePlatform) = DeviceStage6Controller(
+    private fun controller(executor: Executor, platform: DeviceStage6Platform) = DeviceStage6Controller(
         executor = executor,
         platform = platform,
         policy = DeviceStage6PolicyEvaluator { now },
@@ -252,6 +301,7 @@ class DeviceStage6ControllerTest {
             request: DeviceStage6OperationRequest,
             maxAttachmentBytes: Int,
             stillValid: () -> Boolean,
+            cancellation: DeviceStage6Cancellation,
         ): DeviceStage6Result {
             if (!stillValid()) return DeviceStage6Result(DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
             calls++
