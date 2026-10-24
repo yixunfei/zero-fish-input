@@ -31,7 +31,6 @@ internal class AiWorkbenchController(
     private val generation = AtomicLong()
     private var selected: AiConversation? = null
     private var result: String? = null
-    private var fullResult: String? = null
     private var handle: AiRequestHandle? = null
     private var delivery: AiStreamDelivery? = null
     private var resultDataGeneration = -1L
@@ -63,7 +62,6 @@ internal class AiWorkbenchController(
         handle?.cancel()
         handle = null
         result = null
-        fullResult = null
         if (outputNeedsReset) renderOutput(AiStreamEvent.Cancelled)
     }
 
@@ -219,29 +217,36 @@ internal class AiWorkbenchController(
         }
         val token = generation.get()
         val data = dataGeneration.current()
+        val reasoningStream = AiThinkingText.Stream()
         val sink = AiStreamDelivery(post) { event ->
             reconcilePersistence()
             if (generation.get() != token || !dataGeneration.isCurrent(data) || !allowed() || !contextCurrent()) return@AiStreamDelivery
             when (event) {
                 is AiStreamEvent.Completed -> {
+                    reasoningStream.clear()
                     // A provider implementation can emit a terminal event
                     // without going through the bounded SSE reader. Reject
                     // malformed/empty output before exposing it as a usable
                     // result or persisting it.
-                    val answer = AiThinkingText.answer(event.text)
-                    if (event.text.isBlank() || event.text.length > AiLimits.MAX_OUTPUT_CHARS || answer.isBlank()) {
+                    val split = AiThinkingText.split(event.text)
+                    val answer = split.answer
+                    if (event.text.isBlank() || event.text.length > AiLimits.MAX_OUTPUT_CHARS || answer.isBlank() ||
+                        event.thinking.length > AiLimits.MAX_OUTPUT_CHARS - split.thinking.length) {
                         result = null
-                        fullResult = null
                         renderOutput(AiStreamEvent.Failed(AiProviderError.Response("AI response is invalid")))
                     } else {
-                        complete(request, previous, answer, event.text, token, data, config.saveConversations)
-                        renderOutput(event.copy(text = answer))
+                        complete(request, previous, answer, token, data, config.saveConversations)
+                        renderOutput(event.copy(text = answer, thinking = event.thinking + split.thinking))
                     }
                 }
+                is AiStreamEvent.Delta -> {
+                    val part = reasoningStream.append(event.text)
+                    renderOutput(event.copy(text = part.answer, thinking = event.thinking + part.thinking))
+                }
                 is AiStreamEvent.Failed, AiStreamEvent.Cancelled -> {
+                    reasoningStream.clear()
                     renderOutput(event)
                     result = null
-                    fullResult = null
                 }
                 else -> renderOutput(event)
             }
@@ -265,24 +270,23 @@ internal class AiWorkbenchController(
         reconcilePersistence()
         if (!allowed() || !contextCurrent() || !dataGeneration.isCurrent(resultDataGeneration)) return null
         if (displayedResult != null && displayedResult != result) return null
-        val source = if (includeThinking) fullResult else result
+        if (selectedSections != null && selectedSections.isEmpty()) return null
+        // Reasoning is presentation-only and can never be inserted.
+        val source = result
         val insertable = when {
             source == null -> null
             selectedSections == null -> source
-            includeThinking -> null // Section indices are bound to the displayed answer, never hidden output.
             else -> AiResultSections.select(source, selectedSections)
         } ?: return null
         result = null
-        fullResult = null
         return insertable
     }
 
     fun splitResult(value: String): AiThinkingText.Split = AiThinkingText.split(value)
 
-    private fun complete(request: AiRequest, previous: AiConversation?, text: String, full: String,
+    private fun complete(request: AiRequest, previous: AiConversation?, text: String,
         token: Long, data: Long, save: Boolean) {
         result = text
-        fullResult = full
         resultDataGeneration = data
         // Network context has a smaller budget than stored conversation history.
         // Appending to that projection would silently discard earlier messages.
@@ -358,7 +362,6 @@ internal class AiWorkbenchController(
 
     private fun fail(error: AiProviderError = AiProviderError.Policy("AI operation unavailable")) {
         result = null
-        fullResult = null
         renderOutput(AiStreamEvent.Failed(error))
     }
 

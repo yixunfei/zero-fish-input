@@ -58,7 +58,6 @@ class ModelSessionPrivacyTest {
                 assertFalse(harness.controller.state.modelRanked)
                 harness.coordinator.committed("老师正在传授")
                 harness.coordinator.interaction()
-                harness.controller.refreshPersonalization()
                 harness.coordinator.refresh(true)
             }
             SystemClock.sleep(100)

@@ -198,6 +198,30 @@ class AiTransportProtocolTest {
         }
     }
 
+    @Test fun chatReasoningIsDeliveredSeparatelyFromTheInsertableAnswer() {
+        Fixture().use { f ->
+            f.exchange.response = listOf(
+                """{"choices":[{"delta":{"reasoning_content":"plan"}}]}""",
+                """{"choices":[{"delta":{"content":"answer"}}]}""",
+                """{"choices":[{"delta":{},"finish_reason":"stop"}]}""",
+            ).joinToString("") { "data: $it\n\n" } + "data: [DONE]\n\n"
+            val events = f.stream()
+            val completed = events.filterIsInstance<AiStreamEvent.Completed>().single()
+            assertEquals("answer", completed.text)
+            assertEquals("plan", completed.thinking)
+            assertEquals("plan", events.filterIsInstance<AiStreamEvent.Delta>().joinToString("") { it.thinking })
+            assertEquals("answer", events.filterIsInstance<AiStreamEvent.Delta>().joinToString("") { it.text })
+        }
+
+        Fixture().use { f ->
+            f.exchange.type = "application/json"
+            f.exchange.response = """{"choices":[{"finish_reason":"stop","message":{"content":"answer","reasoning_content":"plan"}}]}"""
+            val completed = f.stream().filterIsInstance<AiStreamEvent.Completed>().single()
+            assertEquals("answer", completed.text)
+            assertEquals("plan", completed.thinking)
+        }
+    }
+
     @Test fun queuedRequestCannotUseReplacementCredentials() {
         Fixture().use { f ->
             val gate = CountDownLatch(1)

@@ -37,7 +37,7 @@ class CompressedDeploymentTest {
                     val started = SystemClock.elapsedRealtime()
                     check(factory.warmUp()) { "Public fixture deployment failed: ${factory.runtime.initializationError}" }
                     val cold = SystemClock.elapsedRealtime() - started
-                    val root = File(directory, "rime").listFiles().orEmpty().single { it.name.startsWith("base-9-") }
+                    val root = File(directory, "rime").listFiles().orEmpty().single { it.name.startsWith("base-10-") }
                     val tables = File(root, "dicts").listFiles().orEmpty()
                     assertEquals(16, tables.size)
                     assertTrue(tables.all { it.name.endsWith(".dict.yaml") })

@@ -10,6 +10,7 @@ internal class AiStreamDelivery(
 ) : AutoCloseable {
     private val lock = Any()
     private val delta = StringBuilder()
+    private val thinking = StringBuilder()
     private var terminal: AiStreamEvent? = null
     private var posted = false
     private var ended = false
@@ -21,11 +22,11 @@ internal class AiStreamDelivery(
             when (event) {
                 AiStreamEvent.Started -> return
                 is AiStreamEvent.Delta -> {
-                    val remaining = AiLimits.MAX_OUTPUT_CHARS - delta.length
-                    if (event.text.length > remaining) {
+                    if (event.text.length > AiLimits.MAX_OUTPUT_CHARS - delta.length ||
+                        event.thinking.length > AiLimits.MAX_OUTPUT_CHARS - thinking.length) {
                         terminal = AiStreamEvent.Failed(dev.zeroinput.ai.api.AiProviderError.Response("AI output exceeded limit"))
                         ended = true
-                    } else delta.append(event.text)
+                    } else { delta.append(event.text); thinking.append(event.thinking) }
                 }
                 else -> { terminal = event; ended = true }
             }
@@ -42,9 +43,9 @@ internal class AiStreamDelivery(
             posted = false
             if (closed) return
             buildList {
-                if (delta.isNotEmpty()) add(AiStreamEvent.Delta(delta.toString()))
+                if (delta.isNotEmpty() || thinking.isNotEmpty()) add(AiStreamEvent.Delta(delta.toString(), thinking.toString()))
                 terminal?.let(::add)
-            }.also { delta.setLength(0); terminal = null }
+            }.also { delta.setLength(0); thinking.setLength(0); terminal = null }
         }
         events.forEach(deliver)
     }
@@ -52,6 +53,7 @@ internal class AiStreamDelivery(
     override fun close() = synchronized(lock) {
         closed = true
         delta.setLength(0)
+        thinking.setLength(0)
         terminal = null
     }
 }

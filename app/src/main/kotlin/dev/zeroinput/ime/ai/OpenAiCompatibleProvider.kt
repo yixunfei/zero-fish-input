@@ -33,6 +33,7 @@ class OpenAiCompatibleProvider internal constructor(
                 profile.streaming).toByteArray(StandardCharsets.UTF_8)
             try {
                 require(body.size <= 2 * 1024 * 1024)
+                val thinking = StringBuilder()
                 val output = exchange(config, AiEndpoint.parse(profile.endpoint, profile.protocol).generation, body, operation) { http ->
                     val type = http.contentType()?.substringBefore(';')?.trim()?.lowercase()
                     if (type != "text/event-stream" && type != "application/json")
@@ -41,14 +42,18 @@ class OpenAiCompatibleProvider internal constructor(
                         val decoder = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                             .onUnmappableCharacter(CodingErrorAction.REPORT)
                         BufferedReader(InputStreamReader(input, decoder)).use { reader ->
-                            AiProtocolResponse.read(profile.protocol, type == "application/json", reader, operation::stopped) { delta ->
-                                operation.deliver { listener(AiStreamEvent.Delta(delta)) }
-                            }
+                            AiProtocolResponse.read(profile.protocol, type == "application/json", reader, operation::stopped,
+                                emit = { delta ->
+                                    operation.deliver { listener(AiStreamEvent.Delta(delta)) }
+                                }, thinking = { delta ->
+                                    AiProtocolResponse.append(thinking, delta)
+                                    operation.deliver { listener(AiStreamEvent.Delta("", delta)) }
+                                })
                         }
                     }
                 }
                 if (output.isBlank()) throw AiProviderError.Response("AI response is empty")
-                operation.complete { listener(AiStreamEvent.Completed(output)) }
+                operation.complete { listener(AiStreamEvent.Completed(output, thinking.toString())) }
             } finally { body.fill(0) }
         }
 

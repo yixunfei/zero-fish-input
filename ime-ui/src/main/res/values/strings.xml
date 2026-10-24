@@ -39,7 +39,12 @@
     <string name="ai_submit">发送</string>
     <string name="ai_cancel">停止</string>
     <string name="ai_insert">插入</string>
-    <string name="ai_insert_thinking">插入完整思考过程</string>
+    <string name="ai_show_thinking">显示思考过程</string>
+    <string name="ai_show_thinking_short">思考</string>
+    <string name="ai_thinking_content">思考过程\n%1$s</string>
+    <string name="ai_insert_all">插入全部回答</string>
+    <string name="ai_insert_selected">插入所选段落</string>
+    <string name="ai_select_result_sections">按段选择</string>
     <string name="ai_reasoning_default">自动</string>
     <string name="ai_reasoning_fast">快速</string>
     <string name="ai_reasoning_deep">深度</string>

@@ -1,9 +1,11 @@
 package dev.zeroinput.ime.personalization
 
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.engine.api.PersonalFrequencyLookup
 import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
+import dev.zeroinput.ime.concurrency.BoundedExecutors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -11,9 +13,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 class QueuedPersonalizationStoreTest {
+    @Test fun `readiness and query completion notify once and closed registration receives nothing`() {
+        val executor = TestExecutorService()
+        val store = QueuedPersonalizationStore(FakeStore(), preload = {}, executor = executor)
+        var changes = 0
+        val registration = store.observeChanges { changes++ }
+        store.suggestionPage("ni", InputLanguage.CHINESE, 0, 8)
+        assertEquals(0, changes)
+        executor.runNext()
+        assertEquals(1, changes)
+        store.suggestionPage("ni", InputLanguage.CHINESE, 0, 8)
+        executor.runNext()
+        assertEquals(2, changes)
+        assertTrue(store.suggestionPage("ni", InputLanguage.CHINESE, 0, 8).items.isNotEmpty())
+        assertEquals(2, changes)
+        registration.close()
+        store.invalidatePendingWrites()
+        assertEquals(2, changes)
+        store.close()
+    }
+
     @Test fun `clear immediately invalidates a displayed page before its worker runs`() {
         val executor = TestExecutorService()
         val store = QueuedPersonalizationStore(FakeStore(), preload = {}, executor = executor)
@@ -176,6 +199,34 @@ class QueuedPersonalizationStoreTest {
     }
 
     @Test
+    fun `failed clear blocks later preload until an explicit retry succeeds`() {
+        val delegate = FakeStore().apply { failClear = true }
+        val executor = TestExecutorService()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            store.clear()
+            try {
+                executor.runNext()
+            } catch (_: IllegalStateException) {
+                // The failed control operation must leave the store unavailable.
+            }
+
+            assertTrue(store.suggestionsFor("ni", InputLanguage.CHINESE, 3).isEmpty())
+            assertFalse(executor.hasTasks())
+
+            delegate.failClear = false
+            store.clear()
+            executor.runNext()
+            assertTrue(delegate.cleared)
+            assertTrue(store.suggestionsFor("ni", InputLanguage.CHINESE, 3).isEmpty())
+            executor.runNext() // query against the successfully cleared delegate
+            assertTrue(store.suggestionsFor("ni", InputLanguage.CHINESE, 3).isEmpty())
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
     fun `durable clear still completes when the worker rejects a control task`() {
         val delegate = FakeStore()
         val executor = TestExecutorService().apply { rejectSubmissions = true }
@@ -191,21 +242,62 @@ class QueuedPersonalizationStoreTest {
     }
 
     @Test
-    fun `listener is notified after preload and query complete`() {
+    fun `privacy invalidation preserves a queued durable clear`() {
+        val preloadStarted = CountDownLatch(1)
+        val releasePreload = CountDownLatch(1)
+        val executor = BoundedExecutors.singleThread("personalization-clear-test", 4) as ThreadPoolExecutor
+        val delegate = FakeStore()
+        val store = QueuedPersonalizationStore(
+            delegate = delegate,
+            preload = {
+                preloadStarted.countDown()
+                check(releasePreload.await(2, TimeUnit.SECONDS))
+            },
+            executor = executor,
+        )
+        var clearFailure: Throwable? = null
+        val clearThread = Thread {
+            try {
+                store.clearAndAwait()
+            } catch (error: Throwable) {
+                clearFailure = error
+            }
+        }
+        try {
+            store.warmFrequencyLookup()
+            assertTrue(preloadStarted.await(2, TimeUnit.SECONDS))
+
+            clearThread.start()
+            val queueDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (executor.queue.isEmpty() && System.nanoTime() < queueDeadline) Thread.yield()
+            assertFalse(executor.queue.isEmpty())
+
+            store.invalidatePendingWrites()
+            releasePreload.countDown()
+            clearThread.join(TimeUnit.SECONDS.toMillis(2))
+
+            assertFalse(clearThread.isAlive)
+            assertEquals(null, clearFailure)
+            assertTrue(delegate.cleared)
+        } finally {
+            releasePreload.countDown()
+            if (clearThread.isAlive) clearThread.join(TimeUnit.SECONDS.toMillis(2))
+            store.close()
+        }
+    }
+
+    @Test
+    fun `completed suggestion query is visible to a later read without a UI callback`() {
         val executor = TestExecutorService()
         val store = QueuedPersonalizationStore(FakeStore(), preload = {}, executor = executor)
-        var notifications = 0
-        val listener = store.addSuggestionListener { notifications += 1 }
         try {
             store.suggestionsFor("ni", InputLanguage.CHINESE, 3)
             executor.runNext() // preload
-            assertEquals(1, notifications)
 
             store.suggestionsFor("ni", InputLanguage.CHINESE, 3)
             executor.runNext() // query
-            assertEquals(2, notifications)
+            assertEquals(listOf("你好"), store.suggestionsFor("ni", InputLanguage.CHINESE, 3).map { it.text })
         } finally {
-            listener.close()
             store.close()
         }
     }
@@ -233,17 +325,72 @@ class QueuedPersonalizationStoreTest {
     }
 
     @Test
-    fun `frequency lookup is non-blocking and serves the prepared cache after the worker fills it`() {
+    fun `frequency lookup is cold until the worker publishes one prepared snapshot`() {
         val executor = TestExecutorService()
-        val store = QueuedPersonalizationStore(FrequencyFakeStore(), preload = {}, executor = executor)
+        val delegate = FrequencyFakeStore()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
         try {
             // Nothing is ready: the caller gets an empty answer and only a
             // preload is queued, never a delegate call on this thread.
             assertTrue(store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE).isEmpty())
             executor.runNext() // preload
-            // First cache miss queues a worker query and stays empty.
-            assertTrue(store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE).isEmpty())
-            executor.runNext() // frequency query
+            // The complete snapshot is now ready; lookup is an in-memory
+            // exact-value operation and does not enqueue another task.
+            assertEquals(1, delegate.snapshotReads)
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+            assertEquals(0, delegate.directFrequencyReads)
+            assertFalse(executor.hasTasks())
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
+    fun `frequency warmup publishes an exact lookup without querying candidate prefixes`() {
+        val executor = TestExecutorService()
+        val delegate = FrequencyFakeStore()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            store.warmFrequencyLookup()
+            executor.runNext()
+
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+            assertEquals(0, delegate.suggestionReads)
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
+    fun `a successful write replaces the frequency snapshot after the current round`() {
+        val executor = TestExecutorService()
+        val delegate = MutableFrequencyStore()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            store.warmFrequencyLookup()
+            executor.runNext() // preload
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+
+            store.learn("shijie", "世界", InputLanguage.CHINESE, learningAllowed = true)
+            // The current in-flight round retains its prepared snapshot.
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+            executor.runNext() // learn + snapshot publication
+            assertEquals(mapOf("世界" to 9), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
+    fun `a rejected learning task keeps the last usable frequency snapshot`() {
+        val executor = TestExecutorService()
+        val delegate = MutableFrequencyStore()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            store.warmFrequencyLookup()
+            executor.runNext() // preload
+            executor.rejectSubmissions = true
+            store.learn("shijie", "世界", InputLanguage.CHINESE, learningAllowed = true)
             assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
         } finally {
             store.close()
@@ -251,60 +398,40 @@ class QueuedPersonalizationStoreTest {
     }
 
     @Test
-    fun `frequency lookup caches absence once and keeps working after a write invalidates the view`() {
+    fun `prepared data invalidation preserves an accepted learning write`() {
         val executor = TestExecutorService()
-        // A delegate without the optional port resolves every word as absent.
-        val store = QueuedPersonalizationStore(FakeStore(), preload = {}, executor = executor)
+        val delegate = MutableFrequencyStore()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
         try {
-            store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE)
+            store.warmFrequencyLookup()
             executor.runNext() // preload
-            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
-            executor.runNext() // frequency query caches zero
-            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
-            // The zero entry is served from the cache: no new worker task.
-            assertFalse(executor.hasTasks())
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
 
-            // A queued learn invalidates the prepared view; the next lookup
-            // returns empty without stale data and re-queries once on the worker.
-            store.learn("weizhi", "未知词", InputLanguage.CHINESE, learningAllowed = true)
-            while (executor.hasTasks()) executor.runNext()
-            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
-            executor.runNext() // re-query after invalidation
-            assertTrue(store.frequenciesFor(listOf("未知词"), InputLanguage.CHINESE).isEmpty())
+            store.learn("shijie", "世界", InputLanguage.CHINESE, learningAllowed = true)
+            store.invalidatePreparedData()
+
+            assertTrue(store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE).isEmpty())
+            executor.runNext() // accepted learning write
+            executor.runNext() // refreshed snapshot
+
+            assertEquals(9, delegate.frequency)
+            assertEquals(mapOf("世界" to 9), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
         } finally {
             store.close()
         }
     }
 
     @Test
-    fun `frequency query does not read after privacy invalidation`() {
-        val delegate = CountingFrequencyStore()
+    fun `privacy invalidation clears the prepared frequency snapshot`() {
+        val delegate = MutableFrequencyStore()
         val executor = TestExecutorService()
         val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
         try {
-            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            store.warmFrequencyLookup()
             executor.runNext() // preload
-            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
             store.invalidatePendingWrites()
-            executor.runNext() // stale frequency query
-            assertEquals(0, delegate.frequencyReads)
-        } finally {
-            store.close()
-        }
-    }
-
-    @Test
-    fun `rejected frequency query clears pending marker for retry`() {
-        val delegate = CountingFrequencyStore()
-        val executor = TestExecutorService()
-        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
-        try {
-            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
-            executor.runNext() // preload
-            executor.rejectSubmissions = true
-            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
-            executor.rejectSubmissions = false
-            store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE)
+            assertTrue(store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE).isEmpty())
             assertTrue(executor.hasTasks())
         } finally {
             store.close()
@@ -312,11 +439,26 @@ class QueuedPersonalizationStoreTest {
     }
 
     private open class FrequencyFakeStore : PersonalFrequencyStore {
-        override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> =
-            mapOf("世界" to 7)
+        var directFrequencyReads = 0
+        var snapshotReads = 0
+        var suggestionReads = 0
 
-        override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
-            emptyList<PersonalSuggestion>()
+        override fun frequencyLookupSnapshot(): PersonalFrequencyLookup {
+            snapshotReads += 1
+            return PersonalFrequencyLookup { words, _ ->
+                if ("世界" in words) mapOf("世界" to 7) else emptyMap()
+            }
+        }
+
+        override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
+            directFrequencyReads += 1
+            return mapOf("世界" to 7)
+        }
+
+        override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int): List<PersonalSuggestion> {
+            suggestionReads++
+            return emptyList()
+        }
 
         override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
 
@@ -325,12 +467,19 @@ class QueuedPersonalizationStoreTest {
         override fun clear() = Unit
     }
 
-    private class CountingFrequencyStore : FrequencyFakeStore() {
-        var frequencyReads = 0
+    private class MutableFrequencyStore : FrequencyFakeStore() {
+        var frequency = 7
 
-        override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
-            frequencyReads += 1
-            return super.frequenciesFor(words, language)
+        override fun frequencyLookupSnapshot(): PersonalFrequencyLookup {
+            snapshotReads += 1
+            val frequencySnapshot = frequency
+            return PersonalFrequencyLookup { words, _ ->
+                if ("世界" in words) mapOf("世界" to frequencySnapshot) else emptyMap()
+            }
+        }
+
+        override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) {
+            frequency += 2
         }
     }
 
@@ -339,6 +488,7 @@ class QueuedPersonalizationStoreTest {
         var learningThread: String? = null
         val learnedValues = mutableListOf<String>()
         var cleared = false
+        var failClear = false
 
         override fun suggestionsFor(
             prefix: String,
@@ -364,6 +514,7 @@ class QueuedPersonalizationStoreTest {
         override fun recordUse(id: String, learningAllowed: Boolean) = Unit
 
         override fun clear() {
+            if (failClear) error("clear failed")
             cleared = true
             learnedValues.clear()
         }

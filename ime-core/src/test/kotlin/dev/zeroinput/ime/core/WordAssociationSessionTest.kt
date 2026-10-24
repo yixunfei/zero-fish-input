@@ -8,6 +8,23 @@ import org.junit.Test
 import java.nio.CharBuffer
 
 class WordAssociationSessionTest {
+    @Test fun `visible association refresh honors threshold and never restores hidden context`() {
+        var count = 2
+        val session = WordAssociationSession(NextWordPredictor { _, _, _ ->
+            listOf(NextWordSuggestion("alpha"), NextWordSuggestion("beta"))
+        }, frequencyProvider = { _, _ -> mapOf("beta" to count) })
+        session.committed("hello", InputLanguage.ENGLISH)
+        assertEquals("alpha", session.candidates.first().text)
+        val oldId = session.candidates.first().id
+        count = 3
+        session.refresh(InputLanguage.ENGLISH) { it }
+        assertEquals("beta", session.candidates.first().text)
+        assertNull(session.selection(oldId))
+        session.hide()
+        session.refresh(InputLanguage.ENGLISH) { it }
+        assertTrue(session.candidates.isEmpty())
+    }
+
     @Test fun `context is bounded and clearing wipes the predictor view`() {
         var captured: CharSequence? = null
         val session = WordAssociationSession(NextWordPredictor { _, context, limit ->
@@ -67,23 +84,6 @@ class WordAssociationSessionTest {
         assertEquals(1, session.candidates.size)
     }
 
-    @Test fun `refresh reruns the retained context when predictor becomes ready`() {
-        var ready = false
-        var queries = 0
-        val session = WordAssociationSession(NextWordPredictor { _, context, _ ->
-            queries++
-            if (ready) listOf(NextWordSuggestion("world")) else emptyList()
-        })
-        session.committed("hello", InputLanguage.ENGLISH)
-        assertTrue(session.candidates.isEmpty())
-        ready = true
-
-        session.refresh()
-
-        assertEquals(2, queries)
-        assertEquals(listOf("world"), session.candidates.map { it.text })
-    }
-
     @Test fun `normalization deduplicates script variants and rejects invalid output`() {
         val session = WordAssociationSession(NextWordPredictor { _, _, _ ->
             listOf(NextWordSuggestion("快乐"), NextWordSuggestion("快樂"),
@@ -94,33 +94,47 @@ class WordAssociationSessionTest {
         assertEquals("快樂", session.selection(session.candidates.single().id)?.commitText)
     }
 
-    @Test fun `refresh retains the language of a fresh fragment following punctuation`() {
+    @Test fun `frequency readiness never reranks the visible round and applies on the next commit`() {
         var ready = false
-        val contexts = mutableListOf<Pair<InputLanguage, String>>()
-        val session = WordAssociationSession(NextWordPredictor { language, context, _ ->
-            contexts += language to context.toString()
-            if (ready) listOf(NextWordSuggestion("world")) else emptyList()
-        })
-        session.committed("hello!new", InputLanguage.ENGLISH)
-        assertTrue(session.candidates.isEmpty())
+        val session = WordAssociationSession(
+            NextWordPredictor { _, _, _ ->
+                listOf(NextWordSuggestion("alpha"), NextWordSuggestion("beta"))
+            },
+            frequencyProvider = { _, _ -> if (ready) mapOf("beta" to 5) else emptyMap() },
+        )
+
+        session.committed("hello", InputLanguage.ENGLISH)
+        val firstRound = session.candidates
+        assertEquals(listOf("alpha", "beta"), firstRound.map { it.text })
+
         ready = true
+        assertEquals(firstRound, session.candidates)
 
-        session.refresh()
-
-        assertEquals(listOf(InputLanguage.ENGLISH to "new", InputLanguage.ENGLISH to "new"), contexts)
-        assertEquals(listOf("world"), session.candidates.map { it.text })
+        session.committed(" ", InputLanguage.ENGLISH)
+        assertEquals(listOf("beta", "alpha"), session.candidates.map { it.text })
     }
 
-    @Test fun `trailing punctuation cannot restore the previous fragment on refresh`() {
-        var queries = 0
-        val session = WordAssociationSession(NextWordPredictor { _, _, _ ->
-            queries++
-            listOf(NextWordSuggestion("world"))
-        })
-        session.committed("hello!", InputLanguage.ENGLISH)
-        session.refresh()
-        assertEquals(0, queries)
-        assertTrue(session.candidates.isEmpty())
+    @Test fun `frequency ranking is restricted to the public top eight`() {
+        val labels = ('a'..'l').map { "word$it" }
+        val offered = labels.map(::NextWordSuggestion)
+        var lookupWords = emptyList<String>()
+        val session = WordAssociationSession(
+            NextWordPredictor { _, _, limit ->
+            assertEquals(NextWordPredictor.MAX_SUGGESTIONS, limit)
+                offered
+            },
+            frequencyProvider = { _, words ->
+                lookupWords = words
+                mapOf("wordh" to 10, "wordk" to 100)
+            },
+        )
+
+        session.committed("hello", InputLanguage.ENGLISH)
+
+        assertEquals(labels.take(8), lookupWords)
+        assertEquals(8, session.candidates.size)
+        assertEquals("wordh", session.candidates.first().text)
+        assertFalse(session.candidates.any { it.text == "wordk" })
     }
 
     @Test fun `learned frequency reranks suggestions with a stable editorial fallback`() {

@@ -61,5 +61,6 @@ internal class DictionaryPersonalizationStore(
         if (!id.startsWith("dictionary:")) lexicon.recordUse(id, learningAllowed)
     }
     override fun frequenciesFor(words: List<String>, language: InputLanguage) = lexicon.frequenciesFor(words, language)
+    override fun frequencyLookupSnapshot() = lexicon.frequencyLookupSnapshot()
     override fun clear() { try { lexicon.clear() } finally { edits.clear() } }
 }

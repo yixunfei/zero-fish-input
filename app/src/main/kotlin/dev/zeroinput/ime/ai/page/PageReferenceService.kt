@@ -46,7 +46,7 @@ class PageReferenceService : AccessibilityService() {
         if (sourceWindow == -1 || event == null) return
         // Metadata only: never inspect event.text, event.source, or a window's root here.
         // A package/window ID can be reused after navigation; it cannot prove the page is unchanged.
-        if (invalidatesReview(event.eventType)) revoke()
+        if (shouldRevoke(event)) revoke()
     }
 
     override fun onInterrupt() { revoke() }
@@ -86,6 +86,24 @@ class PageReferenceService : AccessibilityService() {
         fun invalidatesReview(eventType: Int): Boolean =
             eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
                 eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+
+        fun shouldRevokeMetadata(eventType: Int, eventPackage: String?, windowChanges: Int): Boolean {
+            if (!invalidatesReview(eventType)) return false
+            return eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED || eventPackage != null ||
+                windowChanges != WINDOWS_CHANGE_BOUNDS
+        }
+
+        // AccessibilityEvent.WINDOWS_CHANGE_BOUNDS was added in API 28. The value is
+        // part of the platform event contract and must remain usable on minSdk 26.
+        private const val WINDOWS_CHANGE_BOUNDS = 1 shl 3
+    }
+
+    private fun shouldRevoke(event: AccessibilityEvent): Boolean {
+        val eventPackage = event.packageName?.toString()
+        // IME resizing emits a package-less bounds-only event. Focus, active-window,
+        // navigation, source-package and unknown changes still revoke synchronously.
+        val windowChanges = if (Build.VERSION.SDK_INT >= 28) event.windowChanges else 0
+        return shouldRevokeMetadata(event.eventType, eventPackage, windowChanges)
     }
 
     private fun capture(expectedPackage: String, current: () -> Boolean): PageTextSnapshot {

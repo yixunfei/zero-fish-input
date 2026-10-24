@@ -4,6 +4,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AiThinkingTextTest {
+    @Test fun `stream separates markers even when each marker arrives in pieces`() {
+        val stream = AiThinkingText.Stream()
+        val answer = StringBuilder()
+        val thinking = StringBuilder()
+        "前<think>中间过程</think>后".forEach { character ->
+            val part = stream.append(character.toString())
+            answer.append(part.answer)
+            thinking.append(part.thinking)
+        }
+        assertEquals("前后", answer.toString())
+        assertEquals("中间过程", thinking.toString())
+    }
+
     @Test fun `inline thinking is separated from answer`() {
         val split = AiThinkingText.split("<think>reason</think>晚上好")
         assertEquals("晚上好", split.answer)

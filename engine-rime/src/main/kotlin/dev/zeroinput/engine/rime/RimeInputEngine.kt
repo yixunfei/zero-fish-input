@@ -232,7 +232,12 @@ internal class RimeInputEngine(
 
     internal fun browsePage(page: Int): EngineUpdate = nativeCall {
         if (page < 0) return EngineUpdate(currentSnapshot, consumed = false)
-        val result = NativeRimeBridge.nativeCandidatePage(sessionId, page, options.candidatePageSize)
+        val result = NativeRimeBridge.nativeCandidatePage(
+            sessionId,
+            page,
+            options.candidatePageSize,
+            options.script == ChineseScript.SIMPLIFIED,
+        )
         if (result.texts.isEmpty()) return EngineUpdate(currentSnapshot, consumed = false)
         pageNumber = page
         currentSnapshot = currentSnapshot.copy(candidates = result.texts.mapIndexed { index, text ->
@@ -273,7 +278,10 @@ internal class RimeInputEngine(
     }
 
     private fun readUpdate(consumed: Boolean, learningRawInput: String? = null): EngineUpdate {
-        val update = NativeRimeBridge.nativeReadUpdate(sessionId)
+        val update = NativeRimeBridge.nativeReadUpdate(
+            sessionId,
+            options.script == ChineseScript.SIMPLIFIED,
+        )
         // Capture the old selection only on commit, before replacing it.
         val committed = learningRawInput != null && update.committedText.isNotEmpty()
         val reading = if (committed) committedReading(currentSnapshot.highlightedIndex) else ""

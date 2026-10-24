@@ -5,6 +5,7 @@ import android.os.Debug
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.zeroinput.ime.handwriting.HandwritingTestResources
 import dev.zeroinput.model.OfflineHandwritingRecognizer
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -44,12 +45,16 @@ class HandwritingModelQualityTest {
 
     private fun measure(): Metrics {
         val fixtures = fixtures()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
         val runtime = Runtime.getRuntime()
         val javaBefore = runtime.totalMemory() - runtime.freeMemory()
         val nativeBefore = Debug.getNativeHeapAllocatedSize()
         val started = SystemClock.elapsedRealtime()
         try {
-            OfflineHandwritingRecognizer(InstrumentationRegistry.getInstrumentation().targetContext).use { recognizer ->
+            OfflineHandwritingRecognizer(
+                instrumentation.targetContext,
+                HandwritingTestResources.source(instrumentation.context, instrumentation.targetContext),
+            ).use { recognizer ->
                 val loaded = SystemClock.elapsedRealtime() - started
                 val javaDelta = runtime.totalMemory() - runtime.freeMemory() - javaBefore
                 val nativeDelta = Debug.getNativeHeapAllocatedSize() - nativeBefore

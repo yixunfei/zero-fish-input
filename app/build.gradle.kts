@@ -1,3 +1,6 @@
+import java.security.MessageDigest
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +8,22 @@ plugins {
 
 val includeTestUniversalApk = providers.gradleProperty("testUniversalApk").orNull == "true"
 val licenseAssets = layout.buildDirectory.dir("generated/licenseAssets")
+val handwritingAndroidTestAssets = layout.buildDirectory.dir("generated/handwritingAndroidTestAssets")
+val handwritingAssetManifest = rootProject.file("app/src/androidTest/assets/handwriting-test-assets.properties")
+val handwritingManifestProperties = Properties().apply {
+    handwritingAssetManifest.inputStream().use { load(it) }
+}
+val handwritingAssets = handwritingManifestProperties.stringPropertyNames().sorted().map { relative ->
+    val metadata = handwritingManifestProperties.getProperty(relative).split(',', limit = 2)
+    check(metadata.size == 2) { "Invalid handwriting asset manifest entry: $relative" }
+    val source = when (relative) {
+        "handwriting/model.onnx" -> rootProject.file("build/handwriting-model/inference.onnx")
+        "handwriting/characters.txt" -> rootProject.file("build/handwriting-model/characters.txt")
+        "handwriting/stroke-simplified.zsh", "handwriting/stroke-traditional.zsh" -> rootProject.file("build/handwriting-stroke-model/${relative.substringAfter('/')}")
+        else -> error("Unsupported handwriting test asset: $relative")
+    }
+    Triple(source, relative, metadata[0].toLong() to metadata[1])
+}
 val prepareLicenseAssets = tasks.register<Sync>("prepareLicenseAssets") {
     from(rootProject.projectDir) {
         include("LICENSE", "NOTICE", "THIRD_PARTY.md", "LICENSES/**", "SOURCES.md")
@@ -12,8 +31,39 @@ val prepareLicenseAssets = tasks.register<Sync>("prepareLicenseAssets") {
     into(licenseAssets.map { it.dir("licenses") })
 }
 
+val prepareHandwritingAndroidTestAssets = tasks.register("prepareHandwritingAndroidTestAssets") {
+    val sources = handwritingAssets
+    inputs.files(sources.map { it.first })
+    outputs.dir(handwritingAndroidTestAssets)
+    doLast {
+        val root = handwritingAndroidTestAssets.get().asFile
+        root.deleteRecursively()
+        sources.forEach { (source, relative, expected) ->
+            check(source.isFile && source.length() == expected.first) {
+                "Missing pinned handwriting test asset: ${source.name}"
+            }
+            val target = root.resolve(relative)
+            target.parentFile.mkdirs()
+            source.copyTo(target, overwrite = true)
+            val digest = MessageDigest.getInstance("SHA-256")
+            target.inputStream().use { input ->
+                val buffer = ByteArray(65_536)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            check(digest.digest().joinToString("") { "%02x".format(it) } == expected.second) {
+                "Pinned handwriting test asset checksum mismatch: ${source.name}"
+            }
+        }
+    }
+}
+
 android {
     sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("build/handwriting-evaluation/platform-fixtures"))
+    sourceSets.getByName("androidTest").assets.srcDir(handwritingAndroidTestAssets)
     namespace = "dev.zeroinput.ime"
     compileSdk = 36
 
@@ -21,8 +71,8 @@ android {
         applicationId = "dev.zeroinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -93,6 +143,9 @@ android {
 }
 
 tasks.named("preBuild").configure { dependsOn(prepareLicenseAssets) }
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets") }.configureEach {
+    dependsOn(prepareHandwritingAndroidTestAssets)
+}
 
 dependencies {
     implementation(libs.jsoup)

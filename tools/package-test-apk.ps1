@@ -144,6 +144,13 @@ function Assert-TestApk {
         throw "Unexpected packaged permissions: $($unexpectedPermissions -join ', ')"
     }
 
+    $manifestTree = Invoke-CheckedCommand $AndroidTools.Aapt2 @(
+        "dump", "xmltree", $ApkPath, "--file", "AndroidManifest.xml"
+    ) -CaptureOutput
+    if (@($manifestTree | Where-Object { $_ -match 'testOnly.*=true' }).Count -gt 0) {
+        throw "The APK is marked testOnly and cannot be installed from a file manager: $ApkPath"
+    }
+
     Invoke-CheckedCommand $AndroidTools.ApkSigner @("verify", $ApkPath) -CaptureOutput | Out-Null
     return @{ PackageName = $packageName; VersionName = $packageMatch.Groups[2].Value }
 }
@@ -210,6 +217,9 @@ try {
     } else {
         $buildArguments += "-Pandroid.injected.build.abi=$Abi"
     }
+    # AGP may mark injected ABI debug builds testOnly; distributed test APKs
+    # must also install from a file manager without adb -t.
+    $buildArguments += "-Pandroid.injected.testOnly=false"
     Invoke-CheckedCommand $gradleWrapper $buildArguments
 } finally {
     Pop-Location

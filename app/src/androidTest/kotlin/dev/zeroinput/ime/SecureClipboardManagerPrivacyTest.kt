@@ -96,9 +96,10 @@ class SecureClipboardManagerPrivacyTest {
                     onMain {
                         screen = views(activity.window.decorView).filterIsInstance<SecureClipboardManagerView>().single()
                         screen.onEnableRequested()
-                        AuthenticationBroker.complete(checkNotNull(requestId.getAndSet(null)),
-                            AuthenticationGrant.afterSuccessfulSystemAuthentication())
                     }
+                    await { requestId.get() != null }
+                    onMain { AuthenticationBroker.complete(checkNotNull(requestId.getAndSet(null)),
+                        AuthenticationGrant.afterSuccessfulSystemAuthentication()) }
                     awaitOnMain { views(screen).filterIsInstance<android.widget.TextView>().any { it.text == entry.label } }
                     onMain {
                         screen.onDeleteRequested(entry)
@@ -107,8 +108,9 @@ class SecureClipboardManagerPrivacyTest {
                         }
                         dialog.findViewById<View>(android.R.id.button1).performClick()
                         instrumentation.callActivityOnStop(activity)
-                        AuthenticationBroker.complete(checkNotNull(requestId.get()), null)
                     }
+                    await { requestId.get() != null }
+                    onMain { AuthenticationBroker.complete(checkNotNull(requestId.getAndSet(null)), null) }
                     awaitOnMain { activity.isFinishing }
                     onMain {
                         assertFalse(views(screen).filterIsInstance<android.widget.TextView>().any { it.text == entry.label })
@@ -128,6 +130,15 @@ class SecureClipboardManagerPrivacyTest {
             if (!complete) android.os.SystemClock.sleep(20)
         }
         assertTrue("Manager state did not settle", complete)
+    }
+
+    private fun await(condition: () -> Boolean) {
+        val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            if (condition()) return
+            android.os.SystemClock.sleep(20)
+        }
+        assertTrue("Authentication request did not start", condition())
     }
 
     private fun withActivity(test: (SecureClipboardManagerActivity) -> Unit) {

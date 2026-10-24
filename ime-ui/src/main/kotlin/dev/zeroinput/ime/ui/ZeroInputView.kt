@@ -81,7 +81,7 @@ class ZeroInputView @JvmOverloads constructor(
     var onAiUseDraftSelection: (String, Int, Int) -> Unit = { _, _, _ -> }
     var onAiCandidateSelected: (Int, String) -> Unit = { _, _ -> }
     var onAiCandidatePageChanged: (PageDirection) -> Unit = {}
-    var onAiThinkingModeChanged: (Boolean) -> Unit = {}
+    var onAiThinkingVisibilityChanged: (Boolean) -> Unit = {}
     var onAiReasoningModeChanged: (dev.zeroinput.ai.api.AiReasoningMode) -> Unit = {}
     var onAiConversationsRequested: () -> Unit = {}
     var onAiConversationSelected: (String) -> Unit = {}
@@ -565,7 +565,7 @@ class ZeroInputView @JvmOverloads constructor(
         onAiUseDraftSelection = { _, _, _ -> }
         onAiCandidateSelected = { _, _ -> }
         onAiCandidatePageChanged = {}
-        onAiThinkingModeChanged = {}
+        onAiThinkingVisibilityChanged = {}
         onAiReasoningModeChanged = {}
         onAiConversationsRequested = {}
         onAiConversationSelected = {}
@@ -653,6 +653,8 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderAiRenaming(value: Boolean) { ai.renderRenaming(value) }
 
     fun renderAi(event: AiStreamEvent) { ai.render(event) }
+
+    fun setAiThinkingVisible(value: Boolean) { ai.setThinkingVisible(value) }
 
     fun renderAiModels(models: List<String>, selected: String?) { ai.renderModels(models, selected) }
 
@@ -847,7 +849,7 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onCandidateSelected = { index, id -> if (isAiEditing) onAiCandidateSelected(index, id) }
         ai.onCandidatePageChanged = { if (isAiEditing) onAiCandidatePageChanged(it) }
         ai.onCandidatesExpanded = { setAiCandidatesExpanded(!aiCandidatesExpanded) }
-        ai.onThinkingModeChanged = { onAiThinkingModeChanged(it) }
+        ai.onThinkingVisibilityChanged = { onAiThinkingVisibilityChanged(it) }
         ai.onReasoningModeChanged = { onAiReasoningModeChanged(it) }
         ai.onConversationSelected = { onAiConversationSelected(it) }
         ai.onConversationDeleted = { onAiConversationDeleted(it) }
@@ -1148,10 +1150,12 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     private fun applyHeaderHeight() {
-        val singleRow = toolbar.isVisible || glideSuggestions.isVisible
-        val heightDp = if (singleRow) KeyboardViewportPolicy.INLINE_HEADER_HEIGHT_DP
-            else viewportPlan.headerHeightDp
-        val heightPx = dp(heightDp)
+        // The idle toolbar needs only one row. Preserve the viewport's stacked
+        // height only while candidates are visible, so the candidate actions
+        // remain usable without leaving an empty row above an idle keyboard.
+        val headerHeight = if (candidateStrip.isVisible) viewportPlan.headerHeightDp
+            else KeyboardViewportPolicy.INLINE_HEADER_HEIGHT_DP
+        val heightPx = dp(headerHeight)
         val params = header.layoutParams
         if (params.height != heightPx) {
             params.height = heightPx

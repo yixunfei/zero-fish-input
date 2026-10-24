@@ -19,7 +19,7 @@ internal object AiResponseReader {
         ids.toList().sorted()
     }
 
-    fun chat(reader: Reader, cancelled: () -> Boolean): String = parse(reader, cancelled, AiLimits.MAX_STREAM_CHARS) { root ->
+    fun chat(reader: Reader, cancelled: () -> Boolean, thinking: (String) -> Unit = {}): String = parse(reader, cancelled, AiLimits.MAX_STREAM_CHARS) { root ->
         val choices = root.getJSONArray("choices")
         require(choices.length() == 1)
         val choice = choices.getJSONObject(0)
@@ -29,7 +29,16 @@ internal object AiResponseReader {
         requireTextOnly(message)
         val content = message.get("content") as? String ?: throw IllegalArgumentException()
         require(content.isNotBlank() && content.length <= AiLimits.MAX_OUTPUT_CHARS)
+        reasoning(message).takeIf(String::isNotEmpty)?.let(thinking)
         content
+    }
+
+    internal fun reasoning(message: JSONObject): String {
+        val key = if (!message.isNull("reasoning_content")) "reasoning_content" else "reasoning"
+        if (message.isNull(key)) return ""
+        val value = message.get(key) as? String ?: throw IllegalArgumentException()
+        require(value.length <= AiLimits.MAX_OUTPUT_CHARS)
+        return value
     }
 
     internal fun requireTextOnly(message: JSONObject) {

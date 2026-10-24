@@ -17,6 +17,37 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun reasoningIsRenderedSeparatelyAndCannotBeConsumedForInsertion() {
+        val f = Fixture(save = false)
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.provider.emit(AiStreamEvent.Completed("<think>private reasoning</think>public answer"))
+        f.flush()
+
+        val completed = f.events.filterIsInstance<AiStreamEvent.Completed>().last()
+        assertEquals("public answer", completed.text)
+        assertEquals("private reasoning", completed.thinking)
+        assertEquals("public answer", f.controller.consumeResult(includeThinking = true))
+        assertNull(f.controller.consumeResult())
+        assertTrue(f.repository.list().isEmpty())
+    }
+
+    @Test fun providerReasoningFieldStaysOutsideTheDisplayedAndStoredAnswer() {
+        val f = Fixture(save = true)
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.provider.emit(AiStreamEvent.Delta("public ", "interim reasoning"))
+        f.provider.emit(AiStreamEvent.Delta("answer"))
+        f.provider.emit(AiStreamEvent.Completed("public answer", "provider reasoning"))
+        f.flush()
+
+        val completed = f.events.filterIsInstance<AiStreamEvent.Completed>().single()
+        assertEquals("public answer", completed.text)
+        assertEquals("provider reasoning", completed.thinking)
+        assertEquals("public answer", f.controller.consumeResult(includeThinking = true))
+        f.worker.drain(); f.ui.drain()
+        assertEquals(listOf("public question", "public answer"),
+            f.repository.list().single().messages.map { it.content })
+    }
+
     @Test fun realEditorPrivacyRejectsSubmissionEvenWhenUiEligibilityAllowsIt() {
         val restrictions = PrivacyReason.entries.filter { it != PrivacyReason.NONE }.map {
             SessionPrivacy(false, true, false, it)

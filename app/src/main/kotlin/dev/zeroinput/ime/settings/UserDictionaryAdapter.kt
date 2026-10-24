@@ -14,6 +14,7 @@ import dev.zeroinput.ime.R
 import dev.zeroinput.userdata.UserTerm
 
 class UserDictionaryAdapter(
+    private val onEdit: (UserTerm) -> Unit = {},
     private val onDelete: (UserTerm) -> Unit,
 ) : ListAdapter<UserTerm, UserDictionaryAdapter.Holder>(Difference) {
 
@@ -66,6 +67,7 @@ class UserDictionaryAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val term = getItem(position)
+        holder.itemView.setOnClickListener { onEdit(term) }
         holder.value.text = term.value
         val language = holder.itemView.context.getString(
             when (term.language) {
@@ -86,6 +88,7 @@ class UserDictionaryAdapter(
         holder.value.text = ""
         holder.details.text = ""
         holder.remove.setOnClickListener(null)
+        holder.itemView.setOnClickListener(null)
         super.onViewRecycled(holder)
     }
 

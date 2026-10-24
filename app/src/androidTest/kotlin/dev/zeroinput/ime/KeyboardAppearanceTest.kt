@@ -60,10 +60,12 @@ class KeyboardAppearanceTest {
                 val checked = views(root).filterIsInstance<android.widget.RadioButton>().filter { it.isChecked }.map { it.text.toString() }
                 assertEquals(setOf(activity.getString(dev.zeroinput.ime.ui.R.string.keyboard_theme_rose),
                     activity.getString(dev.zeroinput.ime.ui.R.string.keyboard_height_comfortable),
+                    activity.getString(dev.zeroinput.ime.ui.R.string.expanded_candidates_adaptive),
+                    activity.getString(dev.zeroinput.ime.ui.R.string.expanded_candidates_spacious),
                     activity.getString(dev.zeroinput.ime.ui.R.string.material_flat),
                     activity.getString(dev.zeroinput.ime.ui.R.string.background_solid),
                     activity.getString(dev.zeroinput.ime.ui.R.string.appearance_color_auto)), checked.toSet())
-                assertEquals(5, checked.size)
+                assertEquals(7, checked.size)
             }
             instrumentation.waitForIdleSync()
             onMain {

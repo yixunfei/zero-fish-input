@@ -51,7 +51,9 @@ class PageReferencePlatformTest {
             assertTrue(choices.none { it.text.toString().contains("password fixture") ||
                 it.text.toString().contains("editable fixture") || it.text.toString().contains("invisible fixture") ||
                 it.text.toString().contains("sensitive fixture") })
-            choices.single { it.text.toString().contains("Public first reference") }.isChecked = true
+            val publicChoice = choices.firstOrNull { it.text.toString().contains("Public first reference") }
+                ?: error("Public reference choice disappeared; checkboxes=${choices.map { it.text.toString() }}")
+            publicChoice.isChecked = true
             textButton(UiR.string.ai_page_add).performClick()
             assertTrue(visible().filterIsInstance<TextView>().any { it.text.toString() == "Public first reference" })
             assertFalse(visible().filterIsInstance<TextView>().any { it.text.toString() == "Public unchecked reference" })
@@ -153,7 +155,11 @@ class PageReferencePlatformTest {
             if (onMain(condition)) return
             SystemClock.sleep(50)
         }
-        assertTrue(message, onMain(condition))
+        val state = onMain {
+            "connected=${graph.pageReferences.connected}, aiOpen=${panelOrNull()?.isAiOpen}, " +
+                "labels=${visible().filterIsInstance<TextView>().map { it.text.toString() }}"
+        }
+        assertTrue("$message; $state", onMain(condition))
     }
     private fun shell(command: String) = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command))
         .bufferedReader().use { it.readText() }

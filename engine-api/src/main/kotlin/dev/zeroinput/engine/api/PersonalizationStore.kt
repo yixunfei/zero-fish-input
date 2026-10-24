@@ -28,4 +28,11 @@ interface PersonalizationStore {
 
     /** Clears all personal entries.  Implementations may perform this asynchronously. */
     fun clear() = Unit
+
+    /**
+     * Observes content readiness or revision changes without exposing the
+     * underlying data.  Callbacks may arrive on a worker thread and must be
+     * dispatched by the platform adapter before touching UI or session state.
+     */
+    fun observeChanges(listener: () -> Unit): AutoCloseable = AutoCloseable { }
 }

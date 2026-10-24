@@ -22,7 +22,8 @@ class WordAssociationIndex private constructor(
             if (language == InputLanguage.CHINESE && start > 0 && value.length - start == 1) continue
             val words = index[value.substring(start)] ?: continue
             val separator = if (language == InputLanguage.ENGLISH && context.last() != ' ') " " else ""
-            return words.take(limit.coerceAtMost(8)).map { NextWordSuggestion(it, separator + it) }
+            return words.take(limit.coerceAtMost(NextWordPredictor.MAX_SUGGESTIONS))
+                .map { NextWordSuggestion(it, separator + it) }
         }
         return emptyList()
     }
@@ -54,7 +55,9 @@ class WordAssociationIndex private constructor(
                     prefix.all { it.isLetter() || it == ' ' } && word.all(Char::isLetter) &&
                     prefix == prefix.trim().lowercase(Locale.ROOT)) { "Invalid association text" }
                 val words = entries.getOrPut(language) { mutableMapOf() }.getOrPut(prefix) { mutableListOf() }
-                require(words.size < 8 && word !in words) { "Duplicate or excessive association" }
+                require(words.size < NextWordPredictor.MAX_SUGGESTIONS && word !in words) {
+                    "Duplicate or excessive association"
+                }
                 words += word
             }
             require(entries.keys.containsAll(InputLanguage.entries)) { "Incomplete association data" }

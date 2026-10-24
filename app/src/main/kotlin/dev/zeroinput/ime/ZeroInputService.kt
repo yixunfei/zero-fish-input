@@ -41,7 +41,6 @@ import dev.zeroinput.ime.handwriting.OnnxHandwritingRecognizer
 import dev.zeroinput.model.OfflineHandwritingRecognizer
 import java.util.Locale
 import java.util.concurrent.Future
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import dev.zeroinput.ai.api.AiAction
 import dev.zeroinput.ai.api.AiStreamEvent
@@ -115,11 +114,9 @@ class ZeroInputService : InputMethodService() {
     @Volatile
     private var activeSession: InputSession? = null
     private var languagePackObserver: AutoCloseable? = null
-    private var associationPredictorObserver: AutoCloseable? = null
     private var settingsObserver: AutoCloseable? = null
     private var personalizationObserver: AutoCloseable? = null
-    private var personalizationSuggestionObserver: AutoCloseable? = null
-    private val personalizationRefreshPending = AtomicBoolean(false)
+    private var personalCandidatesObserver: AutoCloseable? = null
     private var runtimeObserver: AutoCloseable? = null
     private var engineWarmupCoordinator: EngineWarmupCoordinator? = null
     private var engineWarmupDelivery: EngineWarmupResultDelivery? = null
@@ -290,15 +287,20 @@ class ZeroInputService : InputMethodService() {
                 reconcileLanguagePackSession(session)
             }
         }
-        associationPredictorObserver = graph.addAssociationPredictorListener {
-            mainHandler.post {
-                activeSession?.controller?.refreshWordAssociations()
-            }
-        }
         aiObserver = graph.observeAiConfiguration { mainHandler.post { invalidateAiRequest() } }
         settingsObserver = graph.settings.addChangeListener(::handleSettingsChange)
+        personalCandidatesObserver = graph.personalization.observeChanges {
+            val expected = activeSession
+            mainHandler.post {
+                if (expected != null && activeSession === expected && inputViewActive &&
+                    expected.connectionBinding.resolve(currentInputConnection) != null) {
+                    syncSessionPrivacy()
+                    expected.controller.refreshPersonalization()
+                }
+            }
+        }
         personalizationObserver = graph.addPersonalizationListener {
-            invalidatePendingPersonalization()
+            invalidatePersonalizationSessionWork()
             mainHandler.post {
                 // Clearing personal data changes the visible candidate/history
                 // state. Invalidate actions started before the clear.
@@ -307,9 +309,6 @@ class ZeroInputService : InputMethodService() {
                 activeSession?.controller?.reset()
                 inputView?.let(::renderLocalPanels)
             }
-        }
-        personalizationSuggestionObserver = graph.addPersonalizationSuggestionListener {
-            schedulePersonalizationRefresh()
         }
         runtimeObserver = graph.rime.runtime.addStateListener { state ->
             mainHandler.post {
@@ -327,11 +326,16 @@ class ZeroInputService : InputMethodService() {
     private fun handleSettingsChange() {
         // Revoke queued work before posting UI reconciliation; settings can also
         // change while an authentication activity owns the foreground.
-        invalidatePendingPersonalization()
+        val previousPrivacy = configuredPrivacy
+        refreshConfiguredSettings()
+        if (previousPrivacy != configuredPrivacy) {
+            invalidatePendingPersonalization()
+        } else {
+            invalidatePersonalizationSessionWork()
+        }
         handwritingCoordinator?.invalidate()
         graph.aiCoordinator.invalidate()
         graph.aiDataGeneration.invalidate()
-        refreshConfiguredSettings()
         mainHandler.post {
             invalidateAiRequest()
             inputView?.clearExpressionSession()
@@ -450,9 +454,12 @@ class ZeroInputService : InputMethodService() {
             deferHeavyEngineCreation = true,
             nextWordPredictor = graph.nextWordPredictor,
             kaomojiCandidates = kaomojiCandidates,
+            onAssociationWarmup = graph::warmPersonalizationForAssociations,
             wordAssociationsEnabled = { inputViewActive && configuredWordAssociations &&
                 configuredPrivacy.learningEnabled && !configuredPrivacy.incognitoMode &&
                 activeSession?.token == token && connectionBinding.resolve(currentInputConnection) != null },
+            personalPromotionThreshold = { graph.settings.personalAssociationPromotionThreshold },
+            learnFromCommittedText = { graph.settings.learnFromCommittedText },
         )
         val session = InputSession(token, newController, connectionBinding, attribute.packageName)
         activeSession = session
@@ -464,7 +471,6 @@ class ZeroInputService : InputMethodService() {
             privacyConfiguration = configuredPrivacy,
             languagePackKey = initialPackKey,
         )
-        if (graph.isAssociationPredictorReady()) newController.refreshWordAssociations()
         scheduleEngineWarmup(session, force = true)
         inputView?.let(::renderLocalPanels)
     }
@@ -482,6 +488,7 @@ class ZeroInputService : InputMethodService() {
             )) graph.clipboardGuard.retryMonitoring()
         updateNavigationBarAppearance()
         syncSessionPrivacy()
+        controller?.requestAssociationWarmup()
         reconcileChineseOptions()
         inputView?.let(::renderLocalPanels)
         bindPasteConsent()
@@ -565,14 +572,12 @@ class ZeroInputService : InputMethodService() {
         endInputSession(reset = false)
         languagePackObserver?.close()
         languagePackObserver = null
-        associationPredictorObserver?.close()
-        associationPredictorObserver = null
         settingsObserver?.close()
         settingsObserver = null
         personalizationObserver?.close()
         personalizationObserver = null
-        personalizationSuggestionObserver?.close()
-        personalizationSuggestionObserver = null
+        personalCandidatesObserver?.close()
+        personalCandidatesObserver = null
         runtimeObserver?.close()
         runtimeObserver = null
         // Close the owner of results already posted to the main looper before
@@ -589,7 +594,6 @@ class ZeroInputService : InputMethodService() {
         localPanelTask?.cancel(true)
         BoundedExecutors.purge(localDataExecutor)
         localDataExecutor.shutdownNow()
-        personalizationRefreshPending.set(false)
         mainHandler.removeCallbacksAndMessages(null)
         inputView?.release()
         inputView = null
@@ -879,6 +883,8 @@ class ZeroInputService : InputMethodService() {
         }
         view.onAiDeviceAgentTaskSubmitted = ::startDeviceAgentTask
         view.onAiInsert = { value, includeThinking, sections -> insertAiResult(value, includeThinking, sections) }
+        view.onAiThinkingVisibilityChanged = { graph.settings.aiThinkingVisible = it }
+        view.setAiThinkingVisible(graph.settings.aiThinkingVisible)
         view.onAiReasoningModeChanged = aiWorkbench::setReasoningMode
         view.onAiConversationsRequested = { aiWorkbench.refreshConversations() }
         view.onAiConversationSelected = {
@@ -1513,6 +1519,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun renderLocalPanels(view: ZeroInputView) {
+        view.setAiThinkingVisible(graph.settings.aiThinkingVisible)
         val session = activeSession
         val personalizationAllowed = inputViewActive && session?.controller?.state?.privacy?.personalizationAllowed == true
         val sensitive = session?.controller?.state?.privacy?.isSensitive == true
@@ -1595,26 +1602,6 @@ class ZeroInputService : InputMethodService() {
             secureClipboardLoadFailed = secureClipboardEnabled
             inputView?.renderExpressions(personalizationAllowed, personalExpressionCache, emptyList())
             inputView?.renderSecureClipboard(secureClipboardEnabled, emptyList(), secureClipboardLoadFailed)
-        }
-    }
-
-    /**
-     * Coalesces worker notifications into one main-thread refresh and binds
-     * that refresh to the session that requested the query.  A burst of
-     * prefixes therefore cannot enqueue an unbounded stream of UI work, and a
-     * callback from an old editor cannot repaint a newly opened editor.
-     */
-    private fun schedulePersonalizationRefresh() {
-        val session = activeSession ?: return
-        if (!personalizationRefreshPending.compareAndSet(false, true)) return
-        if (!mainHandler.post {
-                personalizationRefreshPending.set(false)
-                if (activeSession !== session) return@post
-                if (!session.controller.state.privacy.personalizationAllowed) return@post
-                session.controller.refreshPersonalization()
-            }
-        ) {
-            personalizationRefreshPending.set(false)
         }
     }
 
@@ -1912,10 +1899,14 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun invalidatePendingPersonalization() {
+        invalidatePersonalizationSessionWork()
+        graph.personalization.invalidatePendingWrites()
+    }
+
+    private fun invalidatePersonalizationSessionWork() {
         glideInput?.invalidate()
         modelRanking.invalidate()
         personalizationWriteGeneration.incrementAndGet()
-        graph.personalization.invalidatePendingWrites()
     }
 
     private fun cancelSecureClipboardRequest() {

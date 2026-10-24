@@ -4,6 +4,7 @@ import android.content.Context
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.LearnedSuggestionSource
 import dev.zeroinput.engine.api.PersonalFrequencyStore
+import dev.zeroinput.engine.api.PersonalFrequencyLookup
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.PagedPersonalizationStore
@@ -17,6 +18,7 @@ import dev.zeroinput.userdata.UserLexiconFormat.MAX_SHORTCUT_LENGTH
 import dev.zeroinput.userdata.UserLexiconFormat.MAX_TERMS
 import dev.zeroinput.userdata.UserLexiconFormat.MAX_VALUE_LENGTH
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.CopyOnWriteArrayList
@@ -25,17 +27,19 @@ import java.util.concurrent.CopyOnWriteArrayList
 class UserLexiconRepository(
     private val store: EncryptedStore,
     private val exportCipher: EncryptedExportCipher = KeyStoreExportCipher(SecurityAliases.USER_DATA_EXPORT),
+    private val readingMatches: (String, String) -> Boolean = { _, _ -> false },
 ) : LearnedSuggestionSource, PagedPersonalizationStore, PersonalFrequencyStore {
-    constructor(context: Context) : this(EncryptedFileStore(
+    constructor(context: Context, readingMatches: (String, String) -> Boolean = { _, _ -> false }) : this(EncryptedFileStore(
         context = context,
         fileName = "user-lexicon.bin",
         keyAlias = SecurityAliases.USER_DATA,
-    ), KeyStoreExportCipher(SecurityAliases.USER_DATA_EXPORT))
+    ), KeyStoreExportCipher(SecurityAliases.USER_DATA_EXPORT), readingMatches)
 
     private val lock = Any()
     private val generation = AtomicLong(0L)
     private var terms: List<UserTerm>? = null
     private var prefixIndex: Map<IndexKey, List<UserTerm>> = emptyMap()
+    private var frequencyLookup: PersonalFrequencyLookup? = null
     private var listIndex: Map<InputLanguage, List<UserTerm>> = emptyMap()
     private var allListIndex: List<UserTerm> = emptyList()
     private var deletionPending = false
@@ -57,7 +61,7 @@ class UserLexiconRepository(
             require(limit in 0..MAX_SUGGESTION_LIMIT)
             require(offset in 0..MAX_TERMS)
             loadTerms()
-            val normalized = prefix.trim().lowercase()
+            val normalized = prefix.trim().lowercase(Locale.ROOT)
             if (normalized.isEmpty() || limit == 0) return@synchronized PersonalSuggestionPage()
             val indexed = prefixIndex[IndexKey(language, normalized)].orEmpty()
             val exact = indexed.asSequence().filter { it.shortcut.equals(normalized, ignoreCase = true) }
@@ -77,33 +81,28 @@ class UserLexiconRepository(
      * prepared cache.
      */
     override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> =
-        synchronized(lock) {
-            val wanted = words.asSequence().map(String::trim).filter(String::isNotEmpty)
-                .distinct().take(PersonalFrequencyStore.MAX_LOOKUP).toSet()
-            if (wanted.isEmpty()) {
-                emptyMap()
-            } else {
-                val totals = HashMap<String, Int>(wanted.size)
-                for (term in loadTerms()) {
-                    if (term.language == language && term.value in wanted) {
-                        totals.merge(term.value, term.frequency) { total, frequency ->
-                            (total.toLong() + frequency).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                        }
-                    }
-                }
-                totals
-            }
-        }
+        frequencyLookupSnapshot().frequenciesFor(words, language)
+
+    override fun frequencyLookupSnapshot(): PersonalFrequencyLookup = synchronized(lock) {
+        loadTerms()
+        checkNotNull(frequencyLookup)
+    }
 
     fun list(language: InputLanguage? = null): List<UserTerm> = synchronized(lock) {
         loadTerms()
         if (language != null) listIndex[language].orEmpty() else allListIndex
     }
 
-    fun addPhrase(shortcut: String, value: String, language: InputLanguage): UserTerm {
+    fun addPhrase(
+        shortcut: String,
+        value: String,
+        language: InputLanguage,
+        frequency: Int = 1,
+    ): UserTerm {
         val expected = generation.get()
         val cleanShortcut = UserLexiconFormat.validateShortcut(shortcut)
         val cleanValue = UserLexiconFormat.validateValue(value)
+        require(frequency in 1..MAX_FREQUENCY)
         return synchronized(lock) {
             ensureCurrent(expected)
             val current = loadTerms().toMutableList()
@@ -111,20 +110,77 @@ class UserLexiconRepository(
             if (index < 0 && current.size >= MAX_TERMS) capacityExceeded()
             val now = System.currentTimeMillis()
             val term = if (index >= 0) current[index].copy(lastUsedEpochMillis = now) else {
-                UserTerm(UUID.randomUUID().toString(), cleanShortcut, cleanValue, language, 1, now)
+                UserTerm(UUID.randomUUID().toString(), cleanShortcut, cleanValue, language, frequency, now)
             }
-            if (index >= 0) current[index] = term else current += term
+            val updated = if (index >= 0) term.copy(frequency = frequency.coerceAtLeast(term.frequency)) else term
+            if (index >= 0) current[index] = updated else current += updated
             persist(current, expected)
-            term
+            updated
+        }
+    }
+
+    /** Management queries run on a worker and expose at most one bounded page. */
+    fun search(shortcutPrefix: String, language: InputLanguage? = null, limit: Int = 50): List<UserTerm> =
+        searchPage(shortcutPrefix, language, 0, limit).items
+
+    fun searchPage(query: String, language: InputLanguage? = null, offset: Int = 0, limit: Int = 50): UserTermPage {
+        require(limit in 1..MAX_SUGGESTION_LIMIT && offset in 0..MAX_TERMS)
+        require(query.length <= MAX_SHORTCUT_LENGTH)
+        val normalized = query.trim().lowercase(Locale.ROOT).filterNot { it == ' ' || it == '\'' }
+        return synchronized(lock) {
+            loadTerms()
+            val source = if (language == null) allListIndex else listIndex[language].orEmpty()
+            val page = source.asSequence().filter { term ->
+                if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
+                normalized.isEmpty() || term.shortcut.lowercase(Locale.ROOT).startsWith(normalized) ||
+                    term.value.startsWith(normalized) ||
+                    term.language == InputLanguage.CHINESE && readingMatches(term.value, normalized)
+            }.drop(offset).take(limit + 1).toList()
+            UserTermPage(page.take(limit), page.size > limit)
+        }
+    }
+    fun updatePhrase(
+        id: String,
+        shortcut: String,
+        value: String,
+        language: InputLanguage,
+        frequency: Int,
+    ): UserTerm {
+        val expected = generation.get()
+        val cleanShortcut = UserLexiconFormat.validateShortcut(shortcut)
+        val cleanValue = UserLexiconFormat.validateValue(value)
+        require(frequency in 1..MAX_FREQUENCY)
+        return synchronized(lock) {
+            ensureCurrent(expected)
+            val current = loadTerms().toMutableList()
+            val index = current.indexOfFirst { it.id == id }
+            if (index < 0) throw UserDictionaryException(UserDictionaryFailure.INVALID_FORMAT)
+            val duplicate = current.any {
+                it.id != id && it.shortcut.equals(cleanShortcut, ignoreCase = true) &&
+                    it.value == cleanValue && it.language == language
+            }
+            if (duplicate) throw UserDictionaryException(UserDictionaryFailure.INVALID_FORMAT)
+            val updated = current[index].copy(
+                shortcut = cleanShortcut,
+                value = cleanValue,
+                language = language,
+                frequency = frequency,
+                lastUsedEpochMillis = System.currentTimeMillis(),
+            )
+            current[index] = updated
+            persist(current, expected)
+            updated
         }
     }
 
     override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) {
         if (!learningAllowed) return
         val expected = generation.get()
-        val cleanShortcut = shortcut.trim().lowercase()
+        val cleanShortcut = shortcut.trim().lowercase(Locale.ROOT)
         val cleanValue = value.trim()
-        if (!isLearnable(cleanShortcut, 1, MAX_SHORTCUT_LENGTH) || !isLearnable(cleanValue, 2, MAX_VALUE_LENGTH)) return
+        val minimumValueLength = if (language == InputLanguage.CHINESE) 1 else 2
+        if (!isLearnable(cleanShortcut, 1, MAX_SHORTCUT_LENGTH) ||
+            !isLearnable(cleanValue, minimumValueLength, MAX_VALUE_LENGTH)) return
         synchronized(lock) {
             if (expected != generation.get()) return
             val current = loadTerms().toMutableList()
@@ -327,7 +383,7 @@ class UserLexiconRepository(
         terms = snapshot
         val byPrefix = HashMap<IndexKey, MutableList<UserTerm>>()
         snapshot.forEach { term ->
-            val shortcut = term.shortcut.lowercase()
+            val shortcut = term.shortcut.lowercase(Locale.ROOT)
             for (length in 1..shortcut.length) {
                 byPrefix.getOrPut(IndexKey(term.language, shortcut.substring(0, length))) { ArrayList() } += term
             }
@@ -335,11 +391,36 @@ class UserLexiconRepository(
         val rank = compareByDescending<UserTerm> { it.frequency }
             .thenByDescending { it.lastUsedEpochMillis }.thenBy { it.id }
         prefixIndex = byPrefix.mapValues { (_, valuesForPrefix) -> valuesForPrefix.sortedWith(rank) }
+        frequencyLookup = buildFrequencyLookup(snapshot)
         listIndex = snapshot.groupBy { it.language }.mapValues { (_, languageTerms) ->
             languageTerms.sortedWith(compareByDescending<UserTerm> { it.lastUsedEpochMillis }.thenBy { it.value })
         }
         allListIndex = snapshot.sortedWith(compareByDescending<UserTerm> { it.lastUsedEpochMillis }.thenBy { it.value })
     }
+
+    private fun buildFrequencyLookup(values: List<UserTerm>): PersonalFrequencyLookup {
+        val frequencies = HashMap<InputLanguage, MutableMap<String, Int>>()
+        values.forEach { term ->
+            val byValue = frequencies.getOrPut(term.language) { HashMap() }
+            val key = frequencyKey(term.value, term.language)
+            byValue.merge(key, term.frequency) { total, frequency ->
+                (total.toLong() + frequency).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            }
+        }
+        val snapshot = frequencies.mapValues { (_, byValue) -> byValue.toMap() }
+        return PersonalFrequencyLookup { words, language ->
+            val byValue = snapshot[language].orEmpty()
+            val result = HashMap<String, Int>(words.size.coerceAtMost(PersonalFrequencyStore.MAX_LOOKUP))
+            words.asSequence().map(String::trim).filter(String::isNotEmpty)
+                .distinct().take(PersonalFrequencyStore.MAX_LOOKUP).forEach { word ->
+                    byValue[frequencyKey(word, language)]?.let { result[word] = it }
+                }
+            result
+        }
+    }
+
+    private fun frequencyKey(value: String, language: InputLanguage): String =
+        if (language == InputLanguage.ENGLISH) value.lowercase(Locale.ROOT) else value
 
     private data class IndexKey(val language: InputLanguage, val prefix: String)
 

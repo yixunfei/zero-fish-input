@@ -62,7 +62,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
     }
 
     fun renderLoading() {
-        adapter.submitList(emptyList())
+        clearItemsImmediately()
         stateText.setText(R.string.authenticating)
         state.visibility = View.VISIBLE
         enableButton.visibility = View.GONE
@@ -71,7 +71,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
     }
 
     fun renderDisabled() {
-        adapter.submitList(emptyList())
+        clearItemsImmediately()
         stateText.setText(R.string.secure_clipboard_disabled)
         state.visibility = View.VISIBLE
         enableButton.visibility = View.VISIBLE
@@ -90,7 +90,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
     }
 
     fun clearMetadata() {
-        adapter.submitList(emptyList())
+        clearItemsImmediately()
         stateText.setText(R.string.secure_clipboard_locked)
         state.visibility = View.VISIBLE
         enableButton.visibility = View.GONE
@@ -100,6 +100,15 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
     fun setActionsEnabled(enabled: Boolean) {
         toolbar.menu.findItem(MENU_ADD)?.isEnabled = enabled
         enableButton.isEnabled = enabled
+    }
+
+    private fun clearItemsImmediately() {
+        // Detach so RecyclerView drops attached and cached holders now; scrub
+        // recycled holders before clearing the pool, then restore the adapter.
+        list.adapter = null
+        adapter.submitList(null)
+        list.recycledViewPool.clear()
+        list.adapter = adapter
     }
 
     private fun createToolbar() = MaterialToolbar(context).apply {

@@ -121,7 +121,7 @@ class SecureClipboardVaultReliabilityTest {
         assertNull(index.bytes)
     }
 
-    @Test fun anIndexRefreshFailureDoesNotLeaveCachedDeletedRowsVisible() {
+    @Test fun anIndexRefreshFailurePreservesTheEntryAndRepairsBeforeReturningRows() {
         val body = FaultStore()
         val index = FaultStore()
         val vault = SecureClipboardVault(body, index)
@@ -131,8 +131,8 @@ class SecureClipboardVaultReliabilityTest {
         assertThrows(IOException::class.java) { vault.remove(item.id, grant()) }
         assertThrows(IOException::class.java) { vault.summaries() }
         index.failWrite = false
-        assertTrue(vault.metadata(grant()).isEmpty())
-        assertEquals(0, vault.count())
+        assertEquals(listOf(item.id), vault.metadata(grant()).map { it.id })
+        assertEquals(1, vault.count())
     }
 
     private fun grant() = AuthenticationGrant.afterSuccessfulSystemAuthentication()

@@ -49,7 +49,7 @@ class ChineseOptionsTest {
             withEngine(ChineseInputOptions(script = script)) { engine ->
                 type(engine, "zhongguo")
                 val index = engine.snapshot.candidates.indexOfFirst { it.text == expected }
-                assertTrue("Configured script must appear in candidates", index >= 0)
+                assertTrue("Configured $script candidate '$expected' must appear; actual=${engine.snapshot.candidates.map { it.text }}", index >= 0)
                 assertTrue("Selected output must match the visible candidate", engine.selectCandidate(index).committedText == expected)
                 val normalizer = engine as CandidateTextNormalizer
                 assertTrue("Personal suggestions must use the same script", normalizer.normalizeCandidateText("中國") == expected)

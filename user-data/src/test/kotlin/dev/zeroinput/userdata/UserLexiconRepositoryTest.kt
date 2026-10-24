@@ -8,8 +8,77 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.IOException
+import java.util.Locale
 
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [28], manifest = org.robolectric.annotation.Config.NONE)
 class UserLexiconRepositoryTest {
+    @Test fun `single Chinese character selections can accumulate a short code habit`() {
+        val repository = UserLexiconRepository(MemoryStore())
+        repeat(3) { repository.learn("c", "测", InputLanguage.CHINESE, true) }
+        assertEquals(3, repository.suggestionsFor("c", InputLanguage.CHINESE, 8).single().frequency)
+    }
+
+    @Test fun `management pages cover every matching identity without exposing the entire list`() {
+        val repository = UserLexiconRepository(MemoryStore(), readingMatches = { text, query ->
+            text == "测试" && query == "ceshi"
+        })
+        val test = repository.addPhrase("cs", "测试", InputLanguage.CHINESE)
+        assertEquals(test.id, repository.search("ce shi").single().id)
+        repeat(55) { repository.addPhrase("fixture$it", "词组$it", InputLanguage.CHINESE) }
+        val first = repository.searchPage("fixture")
+        val second = repository.searchPage("fixture", offset = 50)
+        assertEquals(50, first.items.size)
+        assertTrue(first.hasMore)
+        assertEquals(5, second.items.size)
+        assertTrue(!second.hasMore)
+        assertEquals(55, (first.items + second.items).map { it.id }.distinct().size)
+    }
+
+    @Test fun `failed edit leaves the prior stored weight intact and successful edit survives reload`() {
+        val store = MemoryStore()
+        val repository = UserLexiconRepository(store)
+        val first = repository.addPhrase("cs", "测试", InputLanguage.CHINESE, 3)
+        store.failWrite = true
+        assertThrows(IOException::class.java) { repository.updatePhrase(first.id, "cs", "测试", InputLanguage.CHINESE, 9) }
+        assertEquals(3, repository.list().single().frequency)
+        store.failWrite = false
+        repository.updatePhrase(first.id, "cs", "测试", InputLanguage.CHINESE, 9)
+        assertEquals(9, UserLexiconRepository(store).list().single().frequency)
+    }
+
+    @Test fun `management search is case independent bounded and updates the same identity`() {
+        val repository = UserLexiconRepository(MemoryStore())
+        val first = repository.addPhrase("cs", "测试", InputLanguage.CHINESE, 3)
+        repository.addPhrase("csc", "测试词", InputLanguage.CHINESE, 1)
+        assertEquals(1, repository.search("CS", limit = 1).size)
+        assertEquals(setOf("测试", "测试词"), repository.search("CS").map { it.value }.toSet())
+        val updated = repository.updatePhrase(first.id, "ceshi", "测试", InputLanguage.CHINESE, 7)
+        assertEquals(first.id, updated.id)
+        assertEquals(7, repository.search("ceshi").single().frequency)
+        assertEquals(listOf("测试词"), repository.search("cs").map { it.value })
+        repository.remove(first.id)
+        assertTrue(repository.search("ceshi").isEmpty())
+    }
+
+    @Test fun `invalid edit duplicate or removed target never changes stored values`() {
+        val repository = UserLexiconRepository(MemoryStore(), TrackingExportCipher())
+        val first = repository.addPhrase("cs", "测试", InputLanguage.CHINESE, 3)
+        val second = repository.addPhrase("cs", "产生", InputLanguage.CHINESE, 1)
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.updatePhrase(first.id, "cs", "测试", InputLanguage.CHINESE, 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.updatePhrase(second.id, "cs", "测试", InputLanguage.CHINESE, 5)
+        }
+        assertEquals(3, repository.search("cs").first { it.id == first.id }.frequency)
+        repository.clear()
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.updatePhrase(first.id, "cs", "测试", InputLanguage.CHINESE, 5)
+        }
+        assertTrue(repository.list().isEmpty())
+    }
+
     @Test
     fun `learning rejects malformed UTF16 before writing`() {
         val store = MemoryStore()
@@ -25,6 +94,54 @@ class UserLexiconRepositoryTest {
         val repository = UserLexiconRepository(MemoryStore())
         repository.learn("fixture", "\uD83D\uDE00", InputLanguage.ENGLISH, learningAllowed = true)
         assertEquals("\uD83D\uDE00", repository.list().single().value)
+    }
+
+    @Test
+    fun `prepared frequency lookup aggregates exact values within each language and stays bounded`() {
+        val repository = UserLexiconRepository(MemoryStore())
+        repository.learn("ni", "世界", InputLanguage.CHINESE, learningAllowed = true)
+        repository.learn("shijie", "世界", InputLanguage.CHINESE, learningAllowed = true)
+        repository.learn("hello", "世界", InputLanguage.ENGLISH, learningAllowed = true)
+
+        val lookup = repository.frequencyLookupSnapshot()
+
+        assertEquals(mapOf("世界" to 2), lookup.frequenciesFor(listOf("世界", "界"), InputLanguage.CHINESE))
+        assertEquals(mapOf("世界" to 1), lookup.frequenciesFor(listOf("世界"), InputLanguage.ENGLISH))
+        val tooMany = ('a'..'j').map { "word$it" } + "世界"
+        assertEquals(emptyMap<String, Int>(), lookup.frequenciesFor(tooMany, InputLanguage.CHINESE))
+    }
+
+    @Test
+    fun `prepared English frequency lookup merges case variants while Chinese stays exact`() {
+        val repository = UserLexiconRepository(MemoryStore())
+        repository.learn("hello", "Hello", InputLanguage.ENGLISH, learningAllowed = true)
+        repository.learn("hello", "hello", InputLanguage.ENGLISH, learningAllowed = true)
+        repository.learn("test", "测试甲", InputLanguage.CHINESE, learningAllowed = true)
+        repository.learn("test", "测试乙", InputLanguage.CHINESE, learningAllowed = true)
+
+        val lookup = repository.frequencyLookupSnapshot()
+
+        assertEquals(mapOf("hello" to 2, "HELLO" to 2),
+            lookup.frequenciesFor(listOf("hello", "HELLO"), InputLanguage.ENGLISH))
+        assertEquals(mapOf("测试甲" to 1, "测试乙" to 1),
+            lookup.frequenciesFor(listOf("测试甲", "测试乙"), InputLanguage.CHINESE))
+    }
+
+    @Test
+    fun `English shortcut indexing is independent of the device locale`() {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"))
+        try {
+            val repository = UserLexiconRepository(MemoryStore())
+            repository.learn("I", "Istanbul", InputLanguage.ENGLISH, learningAllowed = true)
+
+            assertEquals(listOf("Istanbul"),
+                repository.suggestionPage("i", InputLanguage.ENGLISH, 0, 8).items.map { it.text })
+            assertEquals(mapOf("istanbul" to 1),
+                repository.frequencyLookupSnapshot().frequenciesFor(listOf("istanbul"), InputLanguage.ENGLISH))
+        } finally {
+            Locale.setDefault(previous)
+        }
     }
 
     @Test
