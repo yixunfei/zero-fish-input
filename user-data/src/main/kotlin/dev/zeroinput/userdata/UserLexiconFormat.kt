@@ -6,6 +6,7 @@ import dev.zeroinput.engine.api.InputLanguage
 import java.io.IOException
 import java.io.InterruptedIOException
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -79,7 +80,7 @@ internal object UserLexiconFormat {
             val field = reader.nextName()
             require(fields.add(field))
             when (field) {
-                "id" -> id = readString(reader).also { require(idPattern.matches(it)) }.lowercase()
+                "id" -> id = readString(reader).also { require(idPattern.matches(it)) }.lowercase(Locale.ROOT)
                 "shortcut" -> shortcut = validateShortcut(readString(reader))
                 "value" -> value = validateValue(readString(reader))
                 "language" -> language = InputLanguage.valueOf(readString(reader))
@@ -130,7 +131,7 @@ internal object UserLexiconFormat {
         return value.trim().also { require(it.isNotEmpty()) }
     }
 
-    fun identity(term: UserTerm) = PhraseIdentity(term.shortcut.lowercase(), term.value, term.language)
+    fun identity(term: UserTerm) = PhraseIdentity(term.shortcut.lowercase(Locale.ROOT), term.value, term.language)
 
     private fun invalid(): Nothing = throw UserDictionaryException(UserDictionaryFailure.INVALID_FORMAT)
 

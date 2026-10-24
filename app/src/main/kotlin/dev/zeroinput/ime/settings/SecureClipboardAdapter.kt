@@ -69,6 +69,10 @@ internal class SecureClipboardAdapter(
         holder.delete.setOnClickListener { onDelete(item) }
     }
 
+    override fun onViewRecycled(holder: Holder) {
+        holder.clearMetadata()
+    }
+
     private fun selectableBorderlessBackground(context: android.content.Context): Int {
         val values = context.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
         return values.getResourceId(0, 0).also { values.recycle() }
@@ -79,7 +83,13 @@ internal class SecureClipboardAdapter(
         val label: TextView,
         val details: TextView,
         val delete: AppCompatImageButton,
-    ) : RecyclerView.ViewHolder(itemView)
+    ) : RecyclerView.ViewHolder(itemView) {
+        fun clearMetadata() {
+            label.text = ""
+            details.text = ""
+            delete.setOnClickListener(null)
+        }
+    }
 
     private object Difference : DiffUtil.ItemCallback<SecureClipboardMetadata>() {
         override fun areItemsTheSame(oldItem: SecureClipboardMetadata, newItem: SecureClipboardMetadata): Boolean =

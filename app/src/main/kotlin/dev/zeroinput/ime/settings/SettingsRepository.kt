@@ -18,6 +18,7 @@ import dev.zeroinput.ai.api.DeviceStage6Capability
 
 class SettingsRepository(context: Context) {
     private val preferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+    private val aiDisplayPreferences = context.getSharedPreferences(AI_DISPLAY_FILE_NAME, Context.MODE_PRIVATE)
 
     /**
      * Observes settings changes without exposing the underlying
@@ -40,9 +41,19 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_LEARNING, true)
         set(value) = edit(KEY_LEARNING, value)
 
+    /** Optional opt-in for learning from implicit space/enter commits. */
+    var learnFromCommittedText: Boolean
+        get() = preferences.getBoolean(KEY_LEARN_FROM_COMMITTED_TEXT, false)
+        set(value) = edit(KEY_LEARN_FROM_COMMITTED_TEXT, value)
+
     var aiPageReferencesEnabled: Boolean
         get() = preferences.getBoolean("ai.pageReferences", false)
         set(value) = edit("ai.pageReferences", value)
+
+    /** Controls only local reasoning visibility; reasoning is never insertable. */
+    var aiThinkingVisible: Boolean
+        get() = aiDisplayPreferences.getBoolean(KEY_AI_THINKING_VISIBLE, true)
+        set(value) { aiDisplayPreferences.edit().putBoolean(KEY_AI_THINKING_VISIBLE, value).apply() }
 
     var deviceAgentEnabled: Boolean
         get() = preferences.getBoolean(KEY_DEVICE_AGENT_ENABLED, false)
@@ -115,6 +126,11 @@ class SettingsRepository(context: Context) {
     var wordAssociationsEnabled: Boolean
         get() = preferences.getBoolean(KEY_WORD_ASSOCIATIONS, true)
         set(value) = edit(KEY_WORD_ASSOCIATIONS, value)
+
+    var personalAssociationPromotionThreshold: Int
+        get() = preferences.getInt(KEY_PERSONAL_PROMOTION_THRESHOLD, DEFAULT_PERSONAL_PROMOTION_THRESHOLD)
+            .coerceIn(1, MAX_PERSONAL_PROMOTION_THRESHOLD)
+        set(value) = preferences.edit().putInt(KEY_PERSONAL_PROMOTION_THRESHOLD, value.coerceIn(1, MAX_PERSONAL_PROMOTION_THRESHOLD)).apply()
 
     var pairedSymbolsEnabled: Boolean
         get() = preferences.getBoolean(KEY_PAIRED_SYMBOLS, true)
@@ -208,12 +224,18 @@ class SettingsRepository(context: Context) {
 
     private companion object {
         const val FILE_NAME = "zeroinput-settings"
+        const val AI_DISPLAY_FILE_NAME = "zeroinput-ai-display"
+        const val KEY_AI_THINKING_VISIBLE = "thinking-visible"
         const val KEY_LEARNING = "learning.enabled"
+        const val KEY_LEARN_FROM_COMMITTED_TEXT = "learning.from-committed-text"
         const val KEY_INCOGNITO = "privacy.incognito"
         const val KEY_SECURE_CLIPBOARD = "secure-clipboard.enabled"
         const val KEY_HAPTICS = "keyboard.haptics"
         const val KEY_SOUND_EFFECTS = "keyboard.sound-effects"
         const val KEY_WORD_ASSOCIATIONS = "keyboard.word-associations"
+        const val KEY_PERSONAL_PROMOTION_THRESHOLD = "learning.personal-promotion-threshold"
+        const val DEFAULT_PERSONAL_PROMOTION_THRESHOLD = 3
+        const val MAX_PERSONAL_PROMOTION_THRESHOLD = 100
         const val KEY_PAIRED_SYMBOLS = "keyboard.paired-symbols"
         const val KEY_THEME = "keyboard.theme"
         const val KEY_HEIGHT = "keyboard.height"

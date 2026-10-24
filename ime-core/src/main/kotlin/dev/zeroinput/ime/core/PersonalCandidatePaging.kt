@@ -64,7 +64,7 @@ internal class PersonalCandidatePaging {
     }
 
     fun publish(native: EngineSnapshot, store: PersonalizationStore, language: InputLanguage,
-        allowed: Boolean, normalize: (String) -> String?): EngineSnapshot {
+        allowed: Boolean, promotionThreshold: Int = 3, normalize: (String) -> String?): EngineSnapshot {
         if (!allowed || native.rawInput.isBlank()) { clear(); return native }
         if (input != native.rawInput || composition != native.composition) {
             clear()
@@ -87,7 +87,7 @@ internal class PersonalCandidatePaging {
             // later resolution of the same revision is not mistaken for yet
             // another change and hidden again.
             revision = loaded.revision
-            if (!wasFirstPage) return publish(native, store, language, allowed, normalize)
+            if (!wasFirstPage) return publish(native, store, language, allowed, promotionThreshold, normalize)
         }
         revision = loaded.revision
         editsApplied = loaded.dictionaryEditsApplied
@@ -112,10 +112,10 @@ internal class PersonalCandidatePaging {
                     "${it.text}\t" in loaded.suppressedDictionaryEntries
         }
         val includesNative = pages.isEmpty() || pages.firstKey() == 0
-        val personal = pages.entries.flatMap { (start, value) ->
-            if (start == 0) rows(value) + visibleNative else rows(value)
-        }
-        val items = if (personal.isEmpty() && includesNative) visibleNative else personal.distinctBy(Candidate::text)
+        val personalRows = pages.values.flatMap(::rows)
+        val personal = if (includesNative) PersonalCandidateRanking.merge(visibleNative, personalRows, input, promotionThreshold)
+            else personalRows
+        val items = personal.distinctBy(Candidate::text)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         // "Previous" is a personal affordance only while the merged first
         // page has been evicted by deeper browsing (changePage then owns it);

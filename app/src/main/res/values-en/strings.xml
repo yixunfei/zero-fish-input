@@ -106,6 +106,15 @@
     <string name="user_dictionary_shortcut">Input code</string>
     <string name="user_dictionary_value">Phrase</string>
     <string name="user_dictionary_required">Enter an input code and phrase</string>
+    <string name="user_dictionary_frequency">Weight</string>
+    <string name="user_dictionary_weight_invalid">Enter a weight from 1 to 1,000,000</string>
+    <string name="user_dictionary_edit">Edit phrase</string>
+    <string name="user_dictionary_search">Search pinyin, initials, input code or phrase</string>
+    <string name="user_dictionary_previous">Previous page</string>
+    <string name="user_dictionary_next">Next page</string>
+    <string name="user_dictionary_threshold">Suggestion promotion threshold</string>
+    <string name="user_dictionary_threshold_message">Start increasing ranking at this weight. Input matching and default order still apply; phrases are never pinned. Current: %1$d</string>
+    <string name="user_dictionary_threshold_invalid">Enter an integer from 1 to 100</string>
     <plurals name="user_dictionary_imported">
         <item quantity="one">Imported %1$d phrase</item>
         <item quantity="other">Imported %1$d phrases</item>
@@ -143,6 +152,7 @@
     <string name="fuzzy_uan_uang">uan / uang</string>
     <string name="fuzzy_on_ong">on / ong</string>
     <string name="setting_learning">Local learning</string>
+    <string name="setting_learn_from_committed_text">Learn from commits (space, enter, etc.)</string>
     <string name="setting_incognito">Incognito mode</string>
     <string name="setting_haptics">Key vibration</string>
     <string name="setting_sound_effects">Key sounds</string>
@@ -161,7 +171,7 @@
     <string name="setting_switch">Switch</string>
     <string name="section_privacy">Privacy</string>
     <string name="section_data">Data</string>
-    <string name="setting_user_phrases">Personal phrases</string>
+    <string name="setting_user_phrases">Manage personal suggestions</string>
     <string name="section_language_packs">Language packs</string>
     <string name="setting_import_pack">Import language pack</string>
     <string name="language_pack_imported">Imported %1$s</string>

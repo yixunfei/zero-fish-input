@@ -6,18 +6,21 @@ import java.io.BufferedReader
 
 internal object AiProtocolResponse {
     fun read(protocol: AiProtocol, json: Boolean, reader: BufferedReader,
-        cancelled: () -> Boolean, emit: (String) -> Unit): String = when (protocol) {
-        AiProtocol.CHAT_COMPLETIONS -> if (json) AiResponseReader.chat(reader, cancelled)
-            else AiSseReader().read(reader, cancelled, emit)
+        cancelled: () -> Boolean, emit: (String) -> Unit = {},
+        thinking: (String) -> Unit = {}): String = when (protocol) {
+        AiProtocol.CHAT_COMPLETIONS -> if (json) AiResponseReader.chat(reader, cancelled, thinking)
+            else AiSseReader().read(reader, cancelled, emit, thinking)
         AiProtocol.RESPONSES -> if (json) AiResponseReader.parse(reader, cancelled,
-            AiLimits.MAX_STREAM_CHARS, ::responses) else responsesStream(AiEventReader(reader, cancelled), emit)
+            AiLimits.MAX_STREAM_CHARS) { responses(it, thinking) }
+            else responsesStream(AiEventReader(reader, cancelled), emit, thinking)
         AiProtocol.ANTHROPIC_MESSAGES -> if (json) AiResponseReader.parse(reader, cancelled,
-            AiLimits.MAX_STREAM_CHARS, ::anthropic) else AnthropicStreamReader().read(AiEventReader(reader, cancelled), emit)
+            AiLimits.MAX_STREAM_CHARS) { anthropic(it, thinking) }
+            else AnthropicStreamReader().read(AiEventReader(reader, cancelled), emit, thinking)
     }
 
     internal fun objectValue(text: String): JSONObject = AiJsonResponse.objectValue(text)
 
-    private fun responses(root: JSONObject): String {
+    private fun responses(root: JSONObject, thinking: (String) -> Unit = {}): String {
         if (root.optString("status") == "incomplete") throw outputLimit()
         requireResponse(root.optString("status") == "completed" && root.isNull("error"))
         val output = root.getJSONArray("output")
@@ -25,7 +28,14 @@ internal object AiProtocolResponse {
         for (index in 0 until output.length()) {
             val item = output.getJSONObject(index)
             when (item.getString("type")) {
-                "reasoning" -> Unit
+                "reasoning" -> {
+                    val summary = item.optJSONArray("summary")
+                    if (summary != null) for (part in 0 until summary.length()) {
+                        val block = summary.getJSONObject(part)
+                        requireResponse(block.getString("type") == "summary_text")
+                        thinking(string(block, "text"))
+                    }
+                }
                 "message" -> {
                     requireResponse(item.getString("role") == "assistant" && item.optString("status", "completed") == "completed")
                     val content = item.getJSONArray("content")
@@ -41,8 +51,9 @@ internal object AiProtocolResponse {
         return complete(text)
     }
 
-    private fun responsesStream(events: AiEventReader, emit: (String) -> Unit): String {
+    private fun responsesStream(events: AiEventReader, emit: (String) -> Unit, thinking: (String) -> Unit): String {
         val text = StringBuilder()
+        val reasoning = StringBuilder()
         while (true) {
             val root = objectValue(events.next())
             when (root.getString("type")) {
@@ -50,9 +61,15 @@ internal object AiProtocolResponse {
                     val delta = string(root, "delta")
                     append(text, delta); if (delta.isNotEmpty()) emit(delta)
                 }
+                "response.reasoning_summary_text.delta" -> {
+                    val delta = string(root, "delta")
+                    append(reasoning, delta); if (delta.isNotEmpty()) thinking(delta)
+                }
                 "response.completed" -> {
-                    val final = responses(root.getJSONObject("response"))
+                    val finalReasoning = StringBuilder()
+                    val final = responses(root.getJSONObject("response")) { append(finalReasoning, it) }
                     requireResponse(text.isEmpty() || text.toString() == final)
+                    if (reasoning.isEmpty() && finalReasoning.isNotEmpty()) thinking(finalReasoning.toString())
                     return final
                 }
                 "response.incomplete" -> throw outputLimit()
@@ -61,7 +78,7 @@ internal object AiProtocolResponse {
         }
     }
 
-    private fun anthropic(root: JSONObject): String {
+    private fun anthropic(root: JSONObject, thinking: (String) -> Unit): String {
         requireResponse(root.getString("type") == "message" && root.getString("role") == "assistant")
         finishAnthropic(root.optString("stop_reason"))
         val content = root.getJSONArray("content")
@@ -70,7 +87,8 @@ internal object AiProtocolResponse {
             val part = content.getJSONObject(index)
             when (part.getString("type")) {
                 "text" -> append(text, string(part, "text"))
-                "thinking", "redacted_thinking" -> Unit
+                "thinking" -> thinking(string(part, "thinking"))
+                "redacted_thinking" -> Unit
                 else -> throw AiProviderError.Response("Non-text AI output is unsupported")
             }
         }

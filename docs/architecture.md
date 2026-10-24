@@ -145,6 +145,9 @@ units only for the user's explicit Backspace action and retains no context histo
    否则一次纯显示故障就会把未完成的组合提交为字面文本，并在本次会话内把后续按键全部按字面提交。
 4. `PersonalizationStore` 是学习数据端口；加密实现位于 `user-data`，`ime-core` 不依赖具体仓库。
    应用层适配器负责在获得允许后按需后台预热和串行学习写入，输入主线程只读取内存缓存。
+   联想词频索引随用户词库快照在后台准备，主线程只对公开联想 TopK（最多 8 条）做精确内存查找和稳定排序；
+   快照未就绪时保持词表顺序，本轮不迟到重排，写入完成后只供下一次成功提交使用。候选构造在排序完成后进行，
+   词频预热和个人候选查询完成都不会通知界面；个人候选缓存只在后续按键更新候选时读取，后台完成不重发控制器状态。
    会话或隐私策略变化以及清除个性化数据时都会提升队列代次，使此前排队但尚未执行的学习写入
    失效，并立即隐藏旧候选；用户主动清除还会删除用户词组和 emoji 历史各自的 Keystore 密钥。
 5. emoji 最近记录与安全剪贴板无标签索引由后台线程读取并缓存。安全剪贴板正文只在一次性认证
@@ -367,11 +370,13 @@ phrase pairs on the existing engine worker. A volatile immutable provider is
 published once; there are no asynchronous private-context tasks or delivery
 callbacks. Queries before readiness return no candidates.
 
-  The public corpus currently has 1,728 pairs and 735 distinct language/prefix
+The public corpus currently has 1,728 pairs and 735 distinct language/prefix
 keys. A query still performs at most 32 suffix probes and returns at most eight
-words. Multi-character Chinese suffixes use longest matching; one-character
-Chinese keys require a full-context match to avoid completing an unrelated word
-ending in that character. English retains word-boundary matching. Public data
+words. If the asynchronous public index is not ready at the first successful
+commit, that commit produces no association row and is not replayed when loading
+finishes; a later successful commit starts a fresh query. Multi-character Chinese
+suffixes use longest matching; one-character Chinese keys require a full-context
+match to avoid completing an unrelated word ending in that character. English retains word-boundary matching. Public data
 and synthetic evaluation fixtures live in separate main/test resources.
 
 `ime-core/WordAssociationSession` owns a 32-unit wipeable buffer of successful
@@ -745,7 +750,9 @@ Event callbacks only invalidate via window metadata; only an explicit capture
 request retrieves nodes. Generation checks occur during traversal, UI delivery,
 reference acceptance, Send and Insert. See ADR 0019 for limits and OS caveats.
 Window-state and window-set events conservatively revoke review without synchronous
-window enumeration, including navigation that reuses source identifiers. Unselected
+window enumeration, including navigation that reuses source identifiers. Android's
+package-less bounds-only IME resize event is the sole metadata exception; all other
+window-set changes revoke immediately. Unselected
 snapshots expire after 30 seconds; checklist views retain only 160-character previews,
 and the binding alone owns the complete snapshot until confirmation or expiry.
 
@@ -962,3 +969,9 @@ the standalone `AiDeviceAgentActivity`; the latter renders the bounded in-memory
 action timeline and reattaches after rotation without starting another task. It may
 remain behind the selected target app while that app stays foreground; leaving
 that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.md).
+
+### Personal suggestion learning and management
+
+Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, exact versus completion match, and a logarithmic frequency bonus starting at a configurable threshold (default 3). No word is pinned. The same policy reranks the bounded public next-word list. Worker completions emit a content-free notification; the platform checks session identity and current privacy before refreshing the composition or a still-visible association round. Hidden rounds never reappear. English private suggestions are merged only in the controller, avoiding a second engine-side ranking that bypasses the threshold.
+
+Explicit candidate selection records usage by default. Learning from implicit commits is an independent, opt-in setting and remains subject to editor acceptance and privacy. Enter keeps its literal-input behavior and never invents a Chinese conversion. The manager exposes 50-row pages, searches code/text prefixes and pinyin (including polyphones and initials), and edits phrase, language and weight while retaining repository identity. Pinyin matching uses a worker-loaded verified public character table; it caches no private words. Private searches scan at most the repository's existing 20,000-term bound on a worker, and never hand the entire dictionary to the UI. The encrypted format is unchanged.

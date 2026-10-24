@@ -2,8 +2,9 @@ package dev.zeroinput.ime.ai
 
 /** One message, sequential bounded blocks, and an explicit successful terminal event. */
 internal class AnthropicStreamReader {
-    fun read(events: AiEventReader, emit: (String) -> Unit): String {
+    fun read(events: AiEventReader, emit: (String) -> Unit, thinking: (String) -> Unit = {}): String {
         val output = StringBuilder()
+        val reasoning = StringBuilder()
         var started = false
         var finished = false
         var block: String? = null
@@ -27,6 +28,9 @@ internal class AnthropicStreamReader {
                     if (block == "text") {
                         val text = AiProtocolResponse.string(content, "text")
                         AiProtocolResponse.append(output, text); if (text.isNotEmpty()) emit(text)
+                    } else if (block == "thinking") {
+                        val text = AiProtocolResponse.string(content, "thinking")
+                        AiProtocolResponse.append(reasoning, text); if (text.isNotEmpty()) thinking(text)
                     }
                 }
                 "content_block_delta" -> {
@@ -36,7 +40,11 @@ internal class AnthropicStreamReader {
                         requireResponse(delta.getString("type") == "text_delta")
                         val text = AiProtocolResponse.string(delta, "text")
                         AiProtocolResponse.append(output, text); if (text.isNotEmpty()) emit(text)
-                    } else requireResponse(delta.getString("type") in setOf("thinking_delta", "signature_delta"))
+                    } else if (block == "thinking" && delta.getString("type") == "thinking_delta") {
+                        val text = AiProtocolResponse.string(delta, "thinking")
+                        AiProtocolResponse.append(reasoning, text); if (text.isNotEmpty()) thinking(text)
+                    } else requireResponse(block in setOf("thinking", "redacted_thinking") &&
+                        delta.getString("type") == "signature_delta")
                 }
                 "content_block_stop" -> {
                     requireResponse(block != null && root.getInt("index") == index)

@@ -7,6 +7,9 @@ fun interface NextWordPredictor {
     fun suggest(language: InputLanguage, context: CharSequence, limit: Int): List<NextWordSuggestion>
 
     companion object {
+        /** Maximum number of public continuations exposed for one context. */
+        const val MAX_SUGGESTIONS = 8
+
         val Empty = NextWordPredictor { _, _, _ -> emptyList() }
     }
 }

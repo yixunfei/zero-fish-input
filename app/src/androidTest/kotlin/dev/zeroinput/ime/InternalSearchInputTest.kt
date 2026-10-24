@@ -75,15 +75,25 @@ class InternalSearchInputTest {
         }
         SystemClock.sleep(500)
         onMain { assertTrue("Handwriting layout must settle: $layouts $sizes", layouts < 10) }
-        val compact = onMain { checkNotNull(panel()).height }
+        val imePanel = onMain { checkNotNull(panel()) }
+        val compact = onMain { imePanel.height }
         DeviceTouch.tapVisible { labelled(UiR.string.handwriting_fullscreen) }
-        await { checkNotNull(panel()).height > compact * 1.5f }
+        var fullscreenGeometry = "not sampled"
+        await(message = { "Fullscreen panel did not expand: compact=$compact, geometry=$fullscreenGeometry" }) {
+            val current = panel()
+            fullscreenGeometry = current?.let {
+                "${it.height}/${it.rootView.height}/expanded=${it.isPanelExpanded}/handwriting=${it.isHandwritingOpen}"
+            } ?: "panel detached; oldAttached=${imePanel.isAttachedToWindow}, oldShown=${imePanel.isShown}, " +
+                "oldExpanded=${imePanel.isPanelExpanded}, oldHeight=${imePanel.height}, oldRoot=${imePanel.rootView.height}"
+            current?.height?.let { it > compact * 1.5f } == true
+        }
         onMain {
             val panel = checkNotNull(panel())
-            assertTrue(panel.height >= panel.rootView.height * 0.8f)
+            assertTrue("Fullscreen must fill the available IME window: $fullscreenGeometry",
+                panel.height >= panel.rootView.height * 0.8f)
         }
         DeviceTouch.tapVisible { labelled(UiR.string.handwriting_exit_fullscreen) }
-        await { checkNotNull(panel()).height == compact }
+        await { panel()?.height == compact }
     }
 
     private fun withEditor(action: (InputFixtureActivity) -> Unit) {
@@ -119,13 +129,16 @@ class InternalSearchInputTest {
     }
     private fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
-    private fun await(condition: () -> Boolean) {
+    private fun await(
+        message: () -> String = { "Public internal-input fixture did not reach the expected state" },
+        condition: () -> Boolean,
+    ) {
         val deadline = SystemClock.uptimeMillis() + 15_000
         while (SystemClock.uptimeMillis() < deadline) {
             if (onMain(condition)) return
             SystemClock.sleep(50)
         }
-        fail("Public internal-input fixture did not reach the expected state")
+        fail(message())
     }
     private fun <T> onMain(action: () -> T): T {
         var result: Result<T>? = null

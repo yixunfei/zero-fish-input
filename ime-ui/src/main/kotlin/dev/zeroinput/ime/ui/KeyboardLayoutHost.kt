@@ -168,7 +168,10 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
         val fullWindowPanel = floating || keyboard.isPanelExpanded
         val offered = MeasureSpec.getSize(heightMeasureSpec).takeIf { it > 0 } ?: dp(NATURAL_IME_VIEWPORT_DP)
         val top = if (fullWindowPanel) safeInsets.top else 0
-        val bottom = if (fullWindowPanel) safeInsets.bottom else 0
+        // The compact IME window can extend behind the gesture/navigation bar.
+        // Keep its controls above that inset while retaining the inset as empty
+        // space at the bottom of the host window.
+        val bottom = safeInsets.bottom
         val availableWidth = (width - safeInsets.left - safeInsets.right).coerceAtLeast(0)
         val availableHeight = (offered - top - bottom).coerceAtLeast(0)
         // A WRAP_CONTENT IME can be remeasured against its previous collapsed
@@ -184,14 +187,14 @@ class KeyboardLayoutHost(context: Context, val keyboard: ZeroInputView) : ViewGr
             else KeyboardPlacementGeometry.width(placement, availableWidth, dp(240))
         surface.measure(MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(availableHeight, MeasureSpec.AT_MOST))
-        setMeasuredDimension(width, if (floating || keyboard.isPanelExpanded) offered
-            else minOf(offered, surface.measuredHeight))
+        setMeasuredDimension(width, if (fullWindowPanel) offered
+            else minOf(offered, surface.measuredHeight + bottom))
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val fullWindowPanel = placement.mode == KeyboardPlacementMode.FLOATING || keyboard.isPanelExpanded
         val insetTop = if (fullWindowPanel) safeInsets.top else 0
-        val insetBottom = if (fullWindowPanel) safeInsets.bottom else 0
+        val insetBottom = safeInsets.bottom
         val (x, y) = KeyboardPlacementGeometry.position(placement,
             (width - safeInsets.left - safeInsets.right).coerceAtLeast(0),
             (height - insetTop - insetBottom).coerceAtLeast(0), surface.measuredWidth, surface.measuredHeight)

@@ -8,8 +8,6 @@ import dev.zeroinput.ime.clipboardguard.ClipboardGuardRuntime
 import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.EngineDescriptor
 import dev.zeroinput.engine.api.InputLanguage
-import dev.zeroinput.engine.api.LearnedSuggestionSource
-import dev.zeroinput.engine.api.WeightedTerm
 import dev.zeroinput.engine.english.EnglishEngineFactory
 import dev.zeroinput.engine.rime.RimeEngineFactory
 import dev.zeroinput.ime.personalization.QueuedPersonalizationStore
@@ -95,7 +93,8 @@ class AppGraph(context: Context) : AutoCloseable {
     internal val keyboardBackgrounds = dev.zeroinput.ime.settings.KeyboardBackgroundStore(applicationContext, settings)
     internal val clipboardGuardPreferences = ClipboardGuardPreferences(applicationContext)
     internal val clipboardGuard = ClipboardGuardRuntime(applicationContext, clipboardGuardPreferences)
-    val userLexicon = UserLexiconRepository(applicationContext)
+    private val personalPhraseReadings = dev.zeroinput.ime.personalization.PersonalPhraseReadings(applicationContext)
+    val userLexicon = UserLexiconRepository(applicationContext, personalPhraseReadings::matches)
     val dictionaryEdits = dev.zeroinput.userdata.DictionaryEditRepository(applicationContext)
     val publicDictionaries = dev.zeroinput.languagepack.PublicDictionaryStore(applicationContext)
     val builtInDictionaries = dev.zeroinput.languagepack.BuiltInDictionaryStore(applicationContext, publicDictionaries)
@@ -273,35 +272,26 @@ class AppGraph(context: Context) : AutoCloseable {
         }
     @Volatile private var associationPredictor: dev.zeroinput.engine.api.NextWordPredictor =
         dev.zeroinput.engine.api.NextWordPredictor.Empty
-    @Volatile private var associationPredictorReady = false
     val nextWordPredictor = dev.zeroinput.engine.api.NextWordPredictor { language, context, limit ->
         associationPredictor.suggest(language, context, limit)
     }
 
-    fun isAssociationPredictorReady(): Boolean = associationPredictorReady
+    /** Starts private-frequency preparation after a permitted session requests it. */
+    fun warmPersonalizationForAssociations() = queuedPersonalization.warmFrequencyLookup()
 
-    private val english = EnglishEngineFactory(
-        learnedSuggestions = LearnedSuggestionSource { prefix, limit ->
-            // Keep English personalization behind the same queued, encrypted
-            // store used by the controller.  This avoids a synchronous
-            // Keystore read on the IME thread and preserves privacy gating in
-            // EnglishInputEngine.start().
-            queuedPersonalization.suggestionsFor(prefix, InputLanguage.ENGLISH, limit)
-                .map { suggestion -> WeightedTerm(suggestion.text, suggestion.frequency) }
-        },
-    )
+    // Personal suggestions are merged once by the controller, under the shared threshold policy.
+    private val english = EnglishEngineFactory()
     @Volatile
     private var languagePackSnapshot: List<InstalledLanguagePack> = emptyList()
     @Volatile
     private var languagePackDiscoveryComplete = false
     private val languagePackRefreshLock = Any()
     private val languagePackListeners = CopyOnWriteArrayList<() -> Unit>()
-    private val associationPredictorListeners = CopyOnWriteArrayList<() -> Unit>()
     private val personalizationListeners = CopyOnWriteArrayList<() -> Unit>()
     private val dictionaryScriptObserver = rime.runtime.addStateListener {
         // Native OpenCC becomes available with the runtime. Discard worker results
         // prepared by the fallback before any newly prepared native engine uses them.
-        queuedPersonalization.invalidatePendingWrites()
+        queuedPersonalization.invalidatePreparedData()
     }
 
     init {
@@ -321,8 +311,6 @@ class AppGraph(context: Context) : AutoCloseable {
             engineMaintenanceExecutor.execute {
                 associationPredictor = runCatching { dev.zeroinput.engine.dictionary.WordAssociationIndex.loadBundled() }
                     .getOrDefault(dev.zeroinput.engine.api.NextWordPredictor.Empty)
-                associationPredictorReady = true
-                associationPredictorListeners.forEach { listener -> runCatching(listener) }
                 // A broken optional language pack must not prevent the core Rime
                 // runtime from publishing its terminal READY/FAILED state.
                 runCatching { refreshLanguagePacks() }
@@ -331,7 +319,7 @@ class AppGraph(context: Context) : AutoCloseable {
     }
 
     private fun dictionaryDataChanged() {
-        queuedPersonalization.invalidatePendingWrites()
+        queuedPersonalization.invalidatePreparedData()
         personalizationListeners.forEach { listener -> runCatching(listener) }
     }
 
@@ -426,16 +414,6 @@ class AppGraph(context: Context) : AutoCloseable {
         }
     }
 
-    fun addAssociationPredictorListener(listener: () -> Unit): AutoCloseable {
-        associationPredictorListeners += listener
-        if (associationPredictorReady) runCatching(listener)
-        return object : AutoCloseable {
-            override fun close() {
-                associationPredictorListeners -= listener
-            }
-        }
-    }
-
     /** Clears user phrases, frequencies, and emoji recency through their queued stores. */
     fun clearPersonalizationData() {
         // Settings invokes this on its worker.  Wait for the encrypted phrase
@@ -465,14 +443,6 @@ class AppGraph(context: Context) : AutoCloseable {
             }
         }
     }
-
-    /**
-     * Observes completion of a non-blocking personal-suggestion lookup.
-     * Callbacks run on the personalization worker and must only post work to
-     * the IME owner thread.
-     */
-    fun addPersonalizationSuggestionListener(listener: () -> Unit): AutoCloseable =
-        queuedPersonalization.addSuggestionListener(listener)
 
     fun registeredEngineDescriptors(): List<EngineDescriptor> =
         listOf(rime.descriptor, english.descriptor) + languagePackRegistry.descriptors()
@@ -506,7 +476,6 @@ class AppGraph(context: Context) : AutoCloseable {
         dictionaryScriptObserver.close()
         languagePackSnapshot = emptyList()
         languagePackListeners.clear()
-        associationPredictorListeners.clear()
         personalizationListeners.clear()
         expressionListeners.clear()
         languagePackRegistry.close()

@@ -158,6 +158,7 @@ class MainActivity : AppCompatActivity() {
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }
         screen.onLearningChanged = { graph.settings.learningEnabled = it; render() }
+        screen.onLearnFromCommittedTextChanged = { graph.settings.learnFromCommittedText = it; render() }
         screen.onIncognitoChanged = { graph.settings.incognitoMode = it; render() }
         screen.onSecureClipboardChanged = ::setSecureClipboardEnabled
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
@@ -174,6 +175,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         screen.onAiNetworkChanged = { updateAiConfig { copy(networkAllowed = it) } }
+        screen.onAiThinkingVisibleChanged = { graph.settings.aiThinkingVisible = it; render() }
         screen.onAiSettingsRequested = ::showAiSettings
         screen.onAiDataClearRequested = ::confirmClearAiData
         screen.onAiPageSettingsRequested = {
@@ -406,6 +408,7 @@ class MainActivity : AppCompatActivity() {
                 isEnabled = isEnabled,
                 isCurrent = current == component.flattenToShortString() || current == component.flattenToString(),
                 learningEnabled = graph.settings.learningEnabled,
+                learnFromCommittedText = graph.settings.learnFromCommittedText,
                 incognitoMode = graph.settings.incognitoMode,
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,
@@ -434,6 +437,7 @@ class MainActivity : AppCompatActivity() {
                 aiProviderName = aiConfig.activeProvider()?.name.orEmpty(),
                 aiKeyConfigured = aiConfig.activeKey().isNotBlank(),
                 aiSaveConversations = aiConfig.saveConversations,
+                aiThinkingVisible = graph.settings.aiThinkingVisible,
                 interfaceLanguageTag = AppCompatDelegate.getApplicationLocales().toLanguageTags(),
             ),
         )

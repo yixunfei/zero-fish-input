@@ -52,9 +52,15 @@ internal object BoundedExecutors {
      * active operation.
      */
     fun cancelQueued(executor: ExecutorService) {
+        cancelQueued(executor) { true }
+    }
+
+    /** Removes only queued tasks selected by the caller, preserving control work. */
+    fun cancelQueued(executor: ExecutorService, shouldCancel: (Runnable) -> Boolean) {
         val pool = executor as? ThreadPoolExecutor ?: return
         val queued = pool.queue.toList()
         queued.forEach { task ->
+            if (!shouldCancel(task)) return@forEach
             (task as? Future<*>)?.cancel(false)
             pool.remove(task)
         }

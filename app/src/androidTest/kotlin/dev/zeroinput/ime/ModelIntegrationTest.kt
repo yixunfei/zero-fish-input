@@ -86,7 +86,8 @@ class ModelIntegrationTest {
         assertTrue(adapter.updateSelection(0, 0))
         adapter.deleteBeforeCursor()
         adapter.reopenCommittedText("知识")
-        assertEquals(3, invalidations)
+        assertEquals("A failed commit, cursor update, deletion, and reconversion each invalidate the editor context",
+            4, invalidations)
     }
 
     @Test fun enabledImeSpaceCommitsItsVisibleHighlightedChoice() {

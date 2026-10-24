@@ -29,6 +29,11 @@ class AiImeInteractionTest {
     private val graph get() = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
 
     @Test fun typingBeforeDraftWarmupStillConvertsChineseAndLeavesTheHostUntouched() = withEditor { editor ->
+        val runtimeDeadline = SystemClock.uptimeMillis() + 60_000
+        while (!graph.rime.runtime.isReady && SystemClock.uptimeMillis() < runtimeDeadline) {
+            SystemClock.sleep(50)
+        }
+        assertTrue("Shared Rime runtime must finish startup before the draft worker is blocked", graph.rime.runtime.isReady)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val blocker = graph.engineExecutor.submit { entered.countDown(); check(release.await(30, TimeUnit.SECONDS)) }
@@ -49,7 +54,6 @@ class AiImeInteractionTest {
             }
             onMain { assertTrue(editor.editor.text.isEmpty()) }
             release.countDown()
-            graph.engineExecutor.submit {}.get(20, TimeUnit.SECONDS)
             instrumentation.waitForIdleSync()
             SystemClock.sleep(600)
             await { views(panel()).filterIsInstance<TextView>().any {

@@ -8,12 +8,14 @@ import java.io.BufferedReader
 internal class AiSseReader {
     private var skipLf = false
 
-    fun read(reader: BufferedReader, cancelled: () -> Boolean, emit: (String) -> Unit): String {
+    fun read(reader: BufferedReader, cancelled: () -> Boolean, emit: (String) -> Unit,
+        thinking: (String) -> Unit = {}): String {
         skipLf = false
         val output = StringBuilder()
         val event = StringBuilder()
         var streamChars = 0
         var finished = false
+        var thinkingChars = 0
         while (true) {
             if (cancelled()) throw InterruptedException()
             val line = readLine(reader, cancelled) ?: throw AiProviderError.Response("AI stream ended early")
@@ -37,14 +39,17 @@ internal class AiSseReader {
             if (chunk == null) continue // Optional usage-only event after the text choice.
             if (finished) throw AiProviderError.Response("AI content followed the completed choice")
             finished = chunk.finished
+            thinkingChars += chunk.thinking.length
+            if (thinkingChars > AiLimits.MAX_OUTPUT_CHARS) throw AiProviderError.Response("AI reasoning is too large")
             if (output.length + chunk.text.length > AiLimits.MAX_OUTPUT_CHARS) {
                 throw AiProviderError.Response("AI response is too large")
             }
             if (chunk.text.isNotEmpty()) { output.append(chunk.text); emit(chunk.text) }
+            if (chunk.thinking.isNotEmpty()) thinking(chunk.thinking)
         }
     }
 
-    private data class Chunk(val text: String, val finished: Boolean)
+    private data class Chunk(val text: String, val finished: Boolean, val thinking: String)
 
     private fun parse(data: String): Chunk? = try {
         val root = AiJsonResponse.objectValue(data)
@@ -65,7 +70,7 @@ internal class AiSseReader {
                 // Android JSONObject.getString coerces non-string values into text.
                 delta.get("content") as? String ?: throw IllegalArgumentException()
             }
-            Chunk(text, finished)
+            Chunk(text, finished, AiResponseReader.reasoning(delta))
         }
     } catch (error: AiProviderError) { throw error
     } catch (_: Exception) { throw AiProviderError.Response("AI response is invalid") }

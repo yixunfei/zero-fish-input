@@ -23,6 +23,7 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
     private val highlightColor: Int
     private var boundCandidate: Candidate? = null
     private var expandedAppearance: ExpandedCandidateAppearance? = null
+    private var compactLayout = false
 
     init {
         setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
@@ -75,6 +76,17 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
         text = ""
         contentDescription = null
         androidx.appcompat.widget.TooltipCompat.setTooltipText(this, null)
+    }
+
+    fun setCompactLayout(value: Boolean) {
+        if (compactLayout == value) return
+        compactLayout = value
+        // Keep the 48dp row height while using the available width efficiently
+        // on narrow screens; 44dp cells let four short choices fit the row.
+        minWidth = dp(if (value) 44 else 48)
+        val horizontalPadding = dp(if (value) 0 else 6)
+        setPadding(horizontalPadding, 0, horizontalPadding, 0)
+        requestLayout()
     }
 
     fun applyExpandedAppearance(appearance: ExpandedCandidateAppearance) {

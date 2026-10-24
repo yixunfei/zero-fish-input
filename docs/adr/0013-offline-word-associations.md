@@ -88,3 +88,4 @@ normalization, failed commits, no learning on selection, stale identities,
 privacy revocation, memory clearing and late provider readiness. Android tests
 cover actual Rime/English editor round trips, cursor/settings/restart invalidation
 and stable candidate layouts. See [validation](../word-association-validation.md).
+Personal frequencies are also used to rerank the bounded next-word list. The input-code personal candidate path and next-word association path share the encrypted local store but keep separate session and privacy gates. Asynchronous store readiness emits an in-process change signal so the active composition can refresh without blocking the input thread.

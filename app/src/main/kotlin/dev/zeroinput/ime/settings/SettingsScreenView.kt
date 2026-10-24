@@ -39,7 +39,9 @@ data class SettingsScreenState(
     val aiProviderName: String = "",
     val aiKeyConfigured: Boolean = false,
     val aiSaveConversations: Boolean = false,
+    val aiThinkingVisible: Boolean = true,
     val interfaceLanguageTag: String = "",
+    val learnFromCommittedText: Boolean = false,
 )
 
 data class LanguagePackScreenState(
@@ -56,6 +58,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onEnableRequested: () -> Unit = {}
     var onSwitchRequested: () -> Unit = {}
     var onLearningChanged: (Boolean) -> Unit = {}
+    var onLearnFromCommittedTextChanged: (Boolean) -> Unit = {}
     var onIncognitoChanged: (Boolean) -> Unit = {}
     var onSecureClipboardChanged: (Boolean) -> Unit = {}
     var onHapticsChanged: (Boolean) -> Unit = {}
@@ -79,6 +82,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onBuiltInEngineSelected: () -> Unit = {}
     var onAiEnabledChanged: (Boolean) -> Unit = {}
     var onAiNetworkChanged: (Boolean) -> Unit = {}
+    var onAiThinkingVisibleChanged: (Boolean) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
     var onAiDataClearRequested: () -> Unit = {}
     var onAiPageSettingsRequested: () -> Unit = {}
@@ -112,6 +116,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         orientation = LinearLayout.VERTICAL
     }
     private val learningSwitch = settingSwitch(context.getString(R.string.setting_learning)) { onLearningChanged(it) }
+    private val committedLearningSwitch = settingSwitch(context.getString(R.string.setting_learn_from_committed_text)) {
+        onLearnFromCommittedTextChanged(it)
+    }
     private val modelSwitch = settingSwitch(context.getString(R.string.experimental_model_ranking)) { onModelRankingChanged(it) }
     private val incognitoSwitch = settingSwitch(context.getString(R.string.setting_incognito)) { onIncognitoChanged(it) }
     private val secureClipboardSwitch = settingSwitch(context.getString(R.string.secure_clipboard)) { onSecureClipboardChanged(it) }
@@ -121,6 +128,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val pairedSymbolsSwitch = settingSwitch(context.getString(R.string.setting_paired_symbols)) { onPairedSymbolsChanged(it) }
     private val aiEnabledSwitch = settingSwitch(context.getString(R.string.ai_enabled)) { onAiEnabledChanged(it) }
     private val aiNetworkSwitch = settingSwitch(context.getString(R.string.ai_network)) { onAiNetworkChanged(it) }
+    private val aiThinkingSwitch = settingSwitch(context.getString(dev.zeroinput.ime.ui.R.string.ai_show_thinking)) { onAiThinkingVisibleChanged(it) }
     private val aiStatus = valueText()
     private val interfaceLanguage = com.google.android.material.button.MaterialButtonToggleGroup(context).apply {
         isSingleSelection = true
@@ -168,6 +176,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
                 .filterIsInstance<MaterialButton>()
                 .firstOrNull { it.tag == language }?.let { interfaceLanguage.check(it.id) }
             updateSwitch(learningSwitch, state.learningEnabled)
+            updateSwitch(committedLearningSwitch, state.learnFromCommittedText)
             updateSwitch(modelSwitch, state.experimentalModelRanking)
             updateSwitch(incognitoSwitch, state.incognitoMode)
             updateSwitch(secureClipboardSwitch, state.secureClipboardEnabled)
@@ -177,6 +186,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(pairedSymbolsSwitch, state.pairedSymbolsEnabled)
             updateSwitch(aiEnabledSwitch, state.aiEnabled)
             updateSwitch(aiNetworkSwitch, state.aiEnabled && state.aiNetworkAllowed)
+            updateSwitch(aiThinkingSwitch, state.aiThinkingVisible)
             aiNetworkSwitch.isEnabled = aiControlsEnabled && aiEnabledSwitch.isChecked
         } finally {
             suppressSwitchCallbacks = false
@@ -215,6 +225,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
 
         section(context.getString(R.string.section_privacy))
         content.addView(learningSwitch)
+        content.addView(committedLearningSwitch)
         content.addView(incognitoSwitch)
         content.addView(secureClipboardSwitch)
         command(context.getString(R.string.clipboard_guard_title)) { onClipboardGuardRequested() }
@@ -222,6 +233,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         section(context.getString(R.string.ai_title))
         content.addView(aiEnabledSwitch)
         content.addView(aiNetworkSwitch)
+        content.addView(aiThinkingSwitch)
         content.addView(valueText().apply { setText(R.string.ai_privacy_notice) })
         statusRow(context.getString(R.string.ai_configuration), aiStatus)
         command(context.getString(R.string.ai_settings)) { onAiSettingsRequested() }
@@ -290,6 +302,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
                 id = View.generateViewId()
                 setText(label)
                 isAllCaps = false
+                minWidth = 0
+                minimumWidth = 0
+                setPadding(dp(2), dp(4), dp(2), dp(4))
                 minHeight = dp(44)
                 textSize = 13f
                 layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
@@ -322,10 +337,13 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(MaterialButton(context).apply {
             text = label
             contentDescription = label
-            textSize = 16f
+            textSize = 14f
             letterSpacing = 0f
             isAllCaps = false
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            minWidth = 0
+            minimumWidth = 0
+            setPadding(0, dp(4), 0, dp(4))
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary, Color.BLACK))
             minHeight = dp(52)
@@ -359,6 +377,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         this.tag = tag
         setText(label)
         isAllCaps = false
+        isCheckable = true
+        applySettingsModeStyle()
+        setPadding(dp(2), 0, dp(2), 0)
         minHeight = dp(48)
         layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
     }

@@ -111,6 +111,24 @@ jobjectArray ToStringArray(JNIEnv* env,
   return result;
 }
 
+std::string ConvertDisplayText(JNIEnv* env, const std::string& value,
+                               bool simplified) {
+  if (value.empty()) return value;
+  const auto& converter = simplified ? simplified_converter : traditional_converter;
+  if (!converter) {
+    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+                  "Text conversion is unavailable");
+    return {};
+  }
+  try {
+    return converter->Convert(value);
+  } catch (...) {
+    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+                  "Text conversion failed");
+    return {};
+  }
+}
+
 struct ContextLease {
   RimeContext value{};
   bool acquired;
@@ -252,17 +270,8 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeConvertText(
     JNIEnv* env, jobject, jstring text, jboolean simplified) {
   std::lock_guard<std::mutex> lock(engine_mutex);
-  const auto& converter = simplified ? simplified_converter : traditional_converter;
-  if (!converter) {
-    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), "Text conversion is unavailable");
-    return nullptr;
-  }
-  try {
-    return ToJString(env, converter->Convert(ToUtf8(env, text)).c_str());
-  } catch (...) {
-    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), "Text conversion failed");
-    return nullptr;
-  }
+  const auto converted = ConvertDisplayText(env, ToUtf8(env, text), simplified);
+  return env->ExceptionCheck() ? nullptr : ToJString(env, converted.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -284,7 +293,7 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeProcessKey(
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeReadUpdate(
-    JNIEnv* env, jobject, jlong session_id) {
+    JNIEnv* env, jobject, jlong session_id, jboolean simplified) {
   std::lock_guard<std::mutex> lock(engine_mutex);
   ContextLease context(session_id);
   CommitLease commit(session_id);
@@ -295,13 +304,18 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeReadUpdate(
     const int count = std::min(menu.num_candidates, 10);
     for (int index = 0; index < count; ++index) {
       const auto& candidate = menu.candidates[index];
-      texts.emplace_back(candidate.text ? candidate.text : "");
+      texts.emplace_back(ConvertDisplayText(
+          env, candidate.text ? candidate.text : "", simplified));
+      if (env->ExceptionCheck()) return nullptr;
       comments.emplace_back(candidate.comment ? candidate.comment : "");
     }
   }
   jstring raw = ToJString(env, api ? api->get_input(session_id) : "");
   jstring composition = ToJString(env, context.acquired ? context.value.composition.preedit : "");
-  jstring committed = ToJString(env, commit.acquired ? commit.value.text : "");
+  const auto committed_text = ConvertDisplayText(
+      env, commit.acquired ? commit.value.text : "", simplified);
+  if (env->ExceptionCheck()) return nullptr;
+  jstring committed = ToJString(env, committed_text.c_str());
   jobjectArray candidates = ToStringArray(env, texts);
   jobjectArray candidate_comments = ToStringArray(env, comments);
   jclass type = env->FindClass("dev/zeroinput/engine/rime/NativeRimeUpdate");
@@ -335,7 +349,8 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeSelectCandidate(
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeCandidatePage(
-    JNIEnv* env, jobject, jlong session_id, jint page, jint size) {
+    JNIEnv* env, jobject, jlong session_id, jint page, jint size,
+    jboolean simplified) {
   std::lock_guard<std::mutex> lock(engine_mutex);
   std::vector<std::string> texts;
   std::vector<std::string> comments;
@@ -345,7 +360,12 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeCandidatePage(
     if (api->candidate_list_from_index(session_id, &iterator, page * size)) {
       while (api->candidate_list_next(&iterator)) {
         if (texts.size() == static_cast<size_t>(size)) { has_next = true; break; }
-        texts.emplace_back(iterator.candidate.text ? iterator.candidate.text : "");
+        texts.emplace_back(ConvertDisplayText(
+            env, iterator.candidate.text ? iterator.candidate.text : "", simplified));
+        if (env->ExceptionCheck()) {
+          api->candidate_list_end(&iterator);
+          return nullptr;
+        }
         comments.emplace_back(iterator.candidate.comment ? iterator.candidate.comment : "");
       }
       api->candidate_list_end(&iterator);

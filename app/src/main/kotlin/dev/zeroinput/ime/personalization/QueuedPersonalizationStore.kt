@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.personalization
 
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.engine.api.PersonalFrequencyLookup
 import dev.zeroinput.engine.api.PersonalFrequencyStore
 import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
@@ -8,9 +9,12 @@ import dev.zeroinput.engine.api.PagedPersonalizationStore
 import dev.zeroinput.engine.api.PersonalSuggestionPage
 import dev.zeroinput.ime.concurrency.BoundedExecutors
 import java.util.LinkedHashMap
+import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -27,11 +31,17 @@ internal class QueuedPersonalizationStore(
     private val generation = AtomicLong(0L)
     private val dataRevision = AtomicLong(0L)
     private val viewRevision = AtomicLong(0L)
+    private val frequencyRevision = AtomicLong(0L)
+    private val preparationRevision = AtomicLong(0L)
+    private val clearRevision = AtomicLong(0L)
     @Volatile
     private var ready = false
+    @Volatile
+    private var clearBlocked = false
     private val stateLock = Any()
     private val submissionLock = Any()
     private val delegateLock = Any()
+    private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
     private val suggestionCache = object : LinkedHashMap<QueryKey, PersonalSuggestionPage>(
         MAX_CACHED_QUERIES,
         0.75f,
@@ -42,17 +52,8 @@ internal class QueuedPersonalizationStore(
         ): Boolean = size > MAX_CACHED_QUERIES || values.sumOf { it.suppressedDictionaryTexts.size + it.suppressedDictionaryEntries.size } > 40000
     }
     private val pendingQueries = HashMap<QueryKey, QueryStamp>()
-    private val frequencyCache = object : LinkedHashMap<FrequencyKey, Int>(
-        MAX_CACHED_FREQUENCIES,
-        0.75f,
-        true,
-    ) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<FrequencyKey, Int>?): Boolean =
-            size > MAX_CACHED_FREQUENCIES
-    }
-    private val pendingFrequencyQueries = HashMap<FrequencyKey, QueryStamp>()
-    private var preloadGeneration: Long? = null
-    private val suggestionListeners = CopyOnWriteArrayList<() -> Unit>()
+    @Volatile private var frequencyLookup: PersonalFrequencyLookup? = null
+    private var preloadGeneration: PreloadStamp? = null
 
     override fun suggestionsFor(
         prefix: String,
@@ -60,10 +61,16 @@ internal class QueuedPersonalizationStore(
         limit: Int,
     ): List<PersonalSuggestion> = suggestionPage(prefix, language, 0, limit).items
 
+    override fun observeChanges(listener: () -> Unit): AutoCloseable {
+        if (closed.get()) return AutoCloseable { }
+        changeListeners += listener
+        return AutoCloseable { changeListeners -= listener }
+    }
+
     override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int): PersonalSuggestionPage {
         require(limit in 0..MAX_SUGGESTION_LIMIT)
         require(offset in 0..20000)
-        val normalized = prefix.trim().lowercase()
+        val normalized = prefix.trim().lowercase(Locale.ROOT)
         if (normalized.isEmpty() || limit == 0 || closed.get()) return PersonalSuggestionPage(revision = viewRevision.get())
 
         schedulePreload()
@@ -91,36 +98,28 @@ internal class QueuedPersonalizationStore(
     )
 
     /**
-     * Answers from the prepared frequency cache only.  Misses schedule a
-     * worker query and stay absent for this call, so the association strip
-     * keeps its editorial order instead of blocking the input thread.
-     * Known-absent words are cached as zero to avoid repeat queries.
+     * Answers from the prepared frequency snapshot only. A cold snapshot
+     * returns no frequencies for this call, preserving editorial order.
      */
     override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
-        if (closed.get()) return emptyMap()
+        if (closed.get() || clearBlocked) return emptyMap()
         val wanted = words.asSequence().map(String::trim).filter(String::isNotEmpty)
             .distinct().take(PersonalFrequencyStore.MAX_LOOKUP).toList()
         if (wanted.isEmpty()) return emptyMap()
         schedulePreload()
         if (!ready) return emptyMap()
-        // Cache contents and the data revision are read under the same lock
-        // so a completed write cannot mix old entries into a new view.
-        val (result, misses, revision) = synchronized(stateLock) {
-            val found = HashMap<String, Int>(wanted.size)
-            val missing = ArrayList<String>(wanted.size)
-            for (word in wanted) {
-                val key = FrequencyKey(language, word)
-                if (frequencyCache.containsKey(key)) {
-                    val frequency = frequencyCache.getValue(key)
-                    if (frequency > 0) found[word] = frequency
-                } else {
-                    missing += word
-                }
-            }
-            Triple(found, missing, dataRevision.get())
-        }
-        if (misses.isNotEmpty()) scheduleFrequencyQuery(misses, language, revision)
-        return result
+        val snapshot = frequencyLookup ?: return emptyMap()
+        return runCatching { snapshot.frequenciesFor(wanted, language) }
+            .getOrDefault(emptyMap())
+            .filter { (word, frequency) -> word in wanted && frequency > 0 }
+    }
+
+    /**
+     * Prepares the exact-value frequency index on the existing worker without
+     * publishing a UI result.
+     */
+    fun warmFrequencyLookup() {
+        schedulePreload()
     }
 
     override fun learn(
@@ -131,6 +130,7 @@ internal class QueuedPersonalizationStore(
     ) {
         if (!learningAllowed || closed.get()) return
         val operationGeneration = generation.get()
+        val operationFrequencyRevision = frequencyRevision.get()
         schedulePreload()
         // A query that is waiting behind this write would otherwise keep the
         // old revision marked as pending and suppress the first query for the
@@ -139,13 +139,20 @@ internal class QueuedPersonalizationStore(
         invalidateSuggestionCache(clearPending = true)
         enqueue {
             if (isGenerationCurrent(operationGeneration)) {
-                runCatching {
+                val result = runCatching {
                     withDelegate {
-                        delegate.learn(shortcut, value, language, learningAllowed = true)
+                        if (!isGenerationCurrent(operationGeneration)) null else {
+                            delegate.learn(shortcut, value, language, learningAllowed = true)
+                            (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
+                        }
                     }
                 }
-                dataRevision.incrementAndGet()
-                invalidateSuggestionCache(clearPending = true)
+                result.onSuccess { snapshot ->
+                    if (!isGenerationCurrent(operationGeneration)) return@onSuccess
+                    publishFrequencyLookup(operationGeneration, operationFrequencyRevision, snapshot)
+                    dataRevision.incrementAndGet()
+                    invalidateSuggestionCache(clearPending = true)
+                }
             }
         }
     }
@@ -153,15 +160,25 @@ internal class QueuedPersonalizationStore(
     override fun recordUse(id: String, learningAllowed: Boolean) {
         if (!learningAllowed || closed.get()) return
         val operationGeneration = generation.get()
+        val operationFrequencyRevision = frequencyRevision.get()
         schedulePreload()
         invalidateSuggestionCache(clearPending = true)
         enqueue {
             if (isGenerationCurrent(operationGeneration)) {
-                runCatching {
-                    withDelegate { delegate.recordUse(id, learningAllowed = true) }
+                val result = runCatching {
+                    withDelegate {
+                        if (!isGenerationCurrent(operationGeneration)) null else {
+                            delegate.recordUse(id, learningAllowed = true)
+                            (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
+                        }
+                    }
                 }
-                dataRevision.incrementAndGet()
-                invalidateSuggestionCache(clearPending = true)
+                result.onSuccess { snapshot ->
+                    if (!isGenerationCurrent(operationGeneration)) return@onSuccess
+                    publishFrequencyLookup(operationGeneration, operationFrequencyRevision, snapshot)
+                    dataRevision.incrementAndGet()
+                    invalidateSuggestionCache(clearPending = true)
+                }
             }
         }
     }
@@ -172,8 +189,26 @@ internal class QueuedPersonalizationStore(
         // clear() so that operation is discarded before it reaches the
         // encrypted delegate.
         generation.incrementAndGet()
+        synchronized(submissionLock) {
+            // Privacy/session revocation drops queued optional work before it
+            // consumes executor capacity. An in-flight task checks its token
+            // again after acquiring the delegate lock.
+            cancelQueuedOptionalWork()
+        }
+        synchronized(stateLock) {
+            pendingQueries.clear()
+            preloadGeneration = null
+        }
+        invalidatePreparedData()
+    }
+
+    /** Invalidates prepared reads without discarding already authorized learning writes. */
+    fun invalidatePreparedData() {
+        preparationRevision.incrementAndGet()
+        invalidateFrequencyLookup()
         (delegate as? DictionaryPersonalizationStore)?.invalidate()
         ready = false
+        dataRevision.incrementAndGet()
         invalidateSuggestionCache(clearPending = true)
     }
 
@@ -203,30 +238,16 @@ internal class QueuedPersonalizationStore(
             // generation check keeps a running callback from publishing into
             // a destroyed store.
             generation.incrementAndGet()
+            invalidateFrequencyLookup()
             ready = false
             synchronized(stateLock) {
                 suggestionCache.clear()
                 pendingQueries.clear()
-                frequencyCache.clear()
-                pendingFrequencyQueries.clear()
                 preloadGeneration = null
             }
-            suggestionListeners.clear()
             executor.shutdownNow()
+            changeListeners.clear()
             BoundedExecutors.purge(executor)
-        }
-    }
-
-    /**
-     * Observes completion of a background suggestion query. The callback is
-     * invoked on the personalization worker and must only enqueue UI work.
-     */
-    fun addSuggestionListener(listener: () -> Unit): AutoCloseable {
-        suggestionListeners += listener
-        return object : AutoCloseable {
-            override fun close() {
-                suggestionListeners -= listener
-            }
         }
     }
 
@@ -234,7 +255,7 @@ internal class QueuedPersonalizationStore(
         return synchronized(submissionLock) {
             if (closed.get()) return@synchronized false
             try {
-                executor.execute(operation)
+                executor.execute(OptionalTask(operation))
                 true
             } catch (_: RejectedExecutionException) {
                 // A bounded queue can reject optional learning during a burst;
@@ -245,13 +266,21 @@ internal class QueuedPersonalizationStore(
         }
     }
 
+    private fun cancelQueuedOptionalWork() {
+        BoundedExecutors.cancelQueued(executor) { task -> task is OptionalTask }
+    }
+
     private fun enqueueClear(await: Boolean): java.util.concurrent.Future<*>? {
         if (closed.get()) {
             if (await) error("Personalization store is closed")
             return null
         }
         generation.incrementAndGet()
+        val clearPreparationRevision = preparationRevision.incrementAndGet()
+        val clearFrequencyRevision = invalidateFrequencyLookup()
+        val clearAttempt = clearRevision.incrementAndGet()
         ready = false
+        clearBlocked = true
         // Hide the old in-memory view immediately.  The encrypted delegate is
         // cleared on the worker, but callers must not continue seeing stale
         // personal candidates during that interval.
@@ -260,23 +289,40 @@ internal class QueuedPersonalizationStore(
         // no preload has been requested yet.  This prevents a later key event
         // from scheduling a preload that could re-expose data before clearing.
         val clearGeneration = generation.get()
-        synchronized(stateLock) { preloadGeneration = clearGeneration }
+        val clearStamp = PreloadStamp(clearGeneration, clearPreparationRevision)
+        synchronized(stateLock) {
+            preloadGeneration = clearStamp
+        }
         val operation = {
             if (!closed.get()) {
                 // If clearing fails, keeping the store unavailable is safer
                 // than exposing data that the user asked us to remove.
-                runCatching { withDelegate { delegate.clear() } }
+                val clearResult = runCatching {
+                    withDelegate {
+                        delegate.clear()
+                        (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
+                    }
+                }
+                clearResult
                     .onSuccess {
+                        val snapshot = it
                         dataRevision.incrementAndGet()
+                        if (clearAttempt == clearRevision.get()) clearBlocked = false
                         synchronized(stateLock) {
-                            if (preloadGeneration == clearGeneration) preloadGeneration = null
+                            if (preloadGeneration == clearStamp) preloadGeneration = null
                             suggestionCache.clear()
+                            if (clearFrequencyRevision == frequencyRevision.get() &&
+                                clearGeneration == generation.get() &&
+                                clearPreparationRevision == preparationRevision.get() && !closed.get()) {
+                                frequencyLookup = snapshot
+                            }
                         }
-                        if (clearGeneration == generation.get() && !closed.get()) ready = true
+                        if (clearGeneration == generation.get() &&
+                            clearPreparationRevision == preparationRevision.get() && !closed.get()) ready = true
                     }
                     .onFailure {
                         synchronized(stateLock) {
-                            if (preloadGeneration == clearGeneration) preloadGeneration = null
+                            if (preloadGeneration == clearStamp) clearBlocked = true
                         }
                         ready = false
                     }
@@ -289,12 +335,14 @@ internal class QueuedPersonalizationStore(
             // a control operation and must not wait behind stale queued work.
             // Any task already running is generation-invalidated and is also
             // serialized with clear by delegateLock below.
-            BoundedExecutors.cancelQueued(executor)
+            cancelQueuedOptionalWork()
             try {
                 if (await) {
-                    executor.submit(operation)
+                    val clearTask = AwaitableControlTask(operation)
+                    executor.execute(clearTask)
+                    clearTask
                 } else {
-                    executor.execute(operation)
+                    executor.execute(ControlTask(operation))
                     null
                 }
             } catch (error: RejectedExecutionException) {
@@ -306,7 +354,7 @@ internal class QueuedPersonalizationStore(
                     null
                 } else {
                     synchronized(stateLock) {
-                        if (preloadGeneration == clearGeneration) preloadGeneration = null
+                        if (preloadGeneration == clearStamp) clearBlocked = true
                     }
                     null
                 }
@@ -319,35 +367,49 @@ internal class QueuedPersonalizationStore(
     }
 
     private fun schedulePreload() {
-        if (ready || closed.get()) return
-        val operationGeneration = generation.get()
+        if (ready || clearBlocked || closed.get()) return
+        val stamp = PreloadStamp(generation.get(), preparationRevision.get())
         synchronized(stateLock) {
-            if (closed.get() || ready || preloadGeneration == operationGeneration) return
-            preloadGeneration = operationGeneration
+            if (closed.get() || ready) return
+            if (preloadGeneration == stamp) return
+            preloadGeneration = stamp
         }
         if (!enqueue {
-            if (closed.get() || operationGeneration != generation.get()) {
+            if (!isPreparationCurrent(stamp)) {
                 synchronized(stateLock) {
-                    if (preloadGeneration == operationGeneration) preloadGeneration = null
+                    if (preloadGeneration == stamp) preloadGeneration = null
                 }
                 return@enqueue
             }
-            val result = runCatching { withDelegate { preload() } }
-            var becameReady = false
+            val preparedFrequencyRevision = frequencyRevision.get()
+            val result = runCatching {
+                withDelegate {
+                    if (isPreparationCurrent(stamp)) {
+                        preload()
+                        (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
+                    } else {
+                        null
+                    }
+                }
+            }
             synchronized(stateLock) {
-                if (preloadGeneration == operationGeneration) preloadGeneration = null
-                if (operationGeneration == generation.get() && result.isSuccess && !closed.get()) {
+                if (preloadGeneration == stamp) {
+                    preloadGeneration = null
+                }
+                if (isPreparationCurrent(stamp) && result.isSuccess) {
                     suggestionCache.clear()
+                    if (preparedFrequencyRevision == frequencyRevision.get()) frequencyLookup = result.getOrNull()
                     ready = true
-                    becameReady = true
-                } else if (operationGeneration == generation.get()) {
+                } else if (isPreparationCurrent(stamp)) {
                     ready = false
                 }
             }
-            if (becameReady) notifySuggestionListeners()
+            if (isPreparationCurrent(stamp) && result.isSuccess) notifyChanges()
         }) {
             synchronized(stateLock) {
-                if (preloadGeneration == operationGeneration) preloadGeneration = null
+                if (preloadGeneration == stamp) {
+                    preloadGeneration = null
+                }
             }
         }
     }
@@ -361,38 +423,40 @@ internal class QueuedPersonalizationStore(
             pendingQueries[key] = queryStamp
         }
         if (!enqueue {
-                var notify = false
                 try {
                     if (isQueryCurrent(queryGeneration, queryRevision)) {
                         val values = runCatching {
                             withDelegate {
-                                (delegate as? PagedPersonalizationStore)?.suggestionPage(
-                                    key.prefix, key.language, key.offset, MAX_SUGGESTION_LIMIT,
-                                ) ?: PersonalSuggestionPage(if (key.offset == 0) delegate.suggestionsFor(
-                                    key.prefix,
-                                    key.language,
-                                    MAX_SUGGESTION_LIMIT,
-                                ) else emptyList())
+                                if (isQueryCurrent(queryGeneration, queryRevision)) {
+                                    (delegate as? PagedPersonalizationStore)?.suggestionPage(
+                                        key.prefix, key.language, key.offset, MAX_SUGGESTION_LIMIT,
+                                    ) ?: PersonalSuggestionPage(if (key.offset == 0) delegate.suggestionsFor(
+                                        key.prefix,
+                                        key.language,
+                                        MAX_SUGGESTION_LIMIT,
+                                    ) else emptyList())
+                                } else {
+                                    null
+                                }
                             }
-                        }.getOrDefault(unavailablePage(viewRevision.get(), key.language))
+                        }.getOrNull()
+                        var published = false
                         synchronized(stateLock) {
-                            if (isQueryCurrent(queryGeneration, queryRevision)) {
+                            if (values != null && isQueryCurrent(queryGeneration, queryRevision)) {
                                 suggestionCache[key] = values
                                 while (suggestionCache.values.sumOf { it.suppressedDictionaryTexts.size + it.suppressedDictionaryEntries.size } > 40000) {
                                     val oldest = suggestionCache.entries.iterator()
                                     oldest.next(); oldest.remove()
                                 }
-                                notify = true
+                                published = true
                             }
                         }
+                        if (published) notifyChanges()
                     }
                 } finally {
                     synchronized(stateLock) {
                         if (pendingQueries[key] == queryStamp) pendingQueries.remove(key)
                     }
-                }
-                if (notify) {
-                    suggestionListeners.forEach { listener -> runCatching(listener) }
                 }
             }) {
             synchronized(stateLock) {
@@ -405,51 +469,19 @@ internal class QueuedPersonalizationStore(
         !closed.get() && ready &&
             queryGeneration == generation.get() && queryRevision == dataRevision.get()
 
-    private fun scheduleFrequencyQuery(misses: List<String>, language: InputLanguage, queryRevision: Long) {
-        val queryGeneration = generation.get()
-        val queryStamp = QueryStamp(queryGeneration, queryRevision)
-        val accepted = ArrayList<String>(misses.size)
+    private fun invalidateFrequencyLookup(): Long = synchronized(stateLock) {
+        frequencyLookup = null
+        frequencyRevision.incrementAndGet()
+    }
+
+    private fun publishFrequencyLookup(
+        operationGeneration: Long,
+        expectedRevision: Long,
+        snapshot: PersonalFrequencyLookup?,
+    ) {
         synchronized(stateLock) {
-            if (!isQueryCurrent(queryGeneration, queryRevision)) return
-            for (word in misses) {
-                val key = FrequencyKey(language, word)
-                if (frequencyCache.containsKey(key) || pendingFrequencyQueries[key] == queryStamp) continue
-                pendingFrequencyQueries[key] = queryStamp
-                accepted += word
-            }
-        }
-        if (accepted.isEmpty()) return
-        if (!enqueue {
-            try {
-                if (!isQueryCurrent(queryGeneration, queryRevision)) return@enqueue
-                // A delegate without the frequency port resolves every word as
-                // absent (zero), which is the safe editorial-order fallback.
-                val values = runCatching {
-                    withDelegate {
-                        (delegate as? PersonalFrequencyStore)?.frequenciesFor(accepted, language).orEmpty()
-                    }
-                }.getOrDefault(emptyMap())
-                synchronized(stateLock) {
-                    if (isQueryCurrent(queryGeneration, queryRevision)) {
-                        accepted.forEach { word ->
-                            frequencyCache[FrequencyKey(language, word)] = values[word] ?: 0
-                        }
-                    }
-                }
-            } finally {
-                synchronized(stateLock) {
-                    accepted.forEach { word ->
-                        val key = FrequencyKey(language, word)
-                        if (pendingFrequencyQueries[key] == queryStamp) pendingFrequencyQueries.remove(key)
-                    }
-                }
-            }
-        }) {
-            synchronized(stateLock) {
-                accepted.forEach { word ->
-                    val key = FrequencyKey(language, word)
-                    if (pendingFrequencyQueries[key] == queryStamp) pendingFrequencyQueries.remove(key)
-                }
+            if (isGenerationCurrent(operationGeneration) && frequencyRevision.get() == expectedRevision) {
+                frequencyLookup = snapshot
             }
         }
     }
@@ -457,10 +489,9 @@ internal class QueuedPersonalizationStore(
     private fun isGenerationCurrent(operationGeneration: Long): Boolean =
         !closed.get() && operationGeneration == generation.get()
 
-    private fun notifySuggestionListeners() {
-        if (closed.get()) return
-        suggestionListeners.forEach { listener -> runCatching { listener() } }
-    }
+    private fun isPreparationCurrent(stamp: PreloadStamp): Boolean =
+        !closed.get() && stamp.generation == generation.get() &&
+            stamp.revision == preparationRevision.get()
 
     private inline fun <T> withDelegate(block: () -> T): T = synchronized(delegateLock) { block() }
 
@@ -468,12 +499,14 @@ internal class QueuedPersonalizationStore(
         synchronized(stateLock) {
             viewRevision.incrementAndGet()
             suggestionCache.clear()
-            frequencyCache.clear()
-            if (clearPending) {
-                pendingQueries.clear()
-                pendingFrequencyQueries.clear()
-            }
+            if (clearPending) pendingQueries.clear()
         }
+        notifyChanges()
+    }
+
+    private fun notifyChanges() {
+        if (closed.get()) return
+        changeListeners.forEach { listener -> runCatching { listener() } }
     }
 
     private data class QueryKey(
@@ -482,20 +515,30 @@ internal class QueuedPersonalizationStore(
         val offset: Int,
     )
 
-    private data class FrequencyKey(
-        val language: InputLanguage,
-        val word: String,
-    )
-
     private data class QueryStamp(
         val generation: Long,
         val revision: Long,
     )
 
+    private data class PreloadStamp(
+        val generation: Long,
+        val revision: Long,
+    )
+
+    private class OptionalTask(private val operation: () -> Unit) : Runnable {
+        override fun run() = operation()
+    }
+
+    private class ControlTask(private val operation: () -> Unit) : Runnable {
+        override fun run() = operation()
+    }
+
+    private class AwaitableControlTask(operation: () -> Unit) :
+        FutureTask<Unit>(Callable { operation(); Unit })
+
     private companion object {
         const val MAX_PENDING_OPERATIONS = 64
         const val MAX_CACHED_QUERIES = 64
-        const val MAX_CACHED_FREQUENCIES = 256
         const val MAX_SUGGESTION_LIMIT = 50
     }
 }

@@ -558,11 +558,15 @@ Late public-index readiness has no session callback and cannot resurrect
 candidates.
 
 Association order may follow learned personal frequency (ADR 0014). The lookup
-is read-only, covers at most the eight displayed public rows, and is answered
-from the prepared in-memory mirror under the same personalization gate as the
-strip itself; it cannot enumerate the personal store, injects no private word
-into the strip, and performs no disk, keystore or decryption work on the input
-thread. An explicit, adapter-accepted click on a visible public continuation
+is read-only, covers only the public top eight rows, and is answered from the
+prepared in-memory mirror under the same personalization gate as the strip
+itself; it cannot enumerate the personal store, inject a private word into the
+strip, or perform disk, keystore or decryption work on the input thread. A cold
+lookup preserves editorial order for that round. Snapshot completion does not
+refresh or rerank visible candidates; a later successful commit may use the
+prepared snapshot. Personalization query notifications also cannot republish
+controller state while composition or association candidates are visible. An
+explicit, adapter-accepted click on a visible public continuation
 also learns that word through the existing encrypted `PersonalizationStore`
 with the session's learning flag — the same channel, gates and deletion
 semantics as learning a typed commit. Chinese continuations are learned with
@@ -832,7 +836,8 @@ application timeout rejects late callbacks without spawning replacement workers.
 The broker generation invalidates on settings/data clear, source window changes,
 lock, disconnection, IME panel/session changes and chat/model changes. Source events
 never read text or enumerate windows. Both window-state and window-set events revoke
-review even if a source package/window ID is reused. Unselected snapshots expire in
+review even if a source package/window ID is reused; the only exception is the
+package-less bounds-only event emitted while the IME is resized. Unselected snapshots expire in
 30 seconds. Generation validity is
 checked synchronously before Send and Insert, preventing a queued revocation UI
 callback from leaving an old result usable. Repeated capture cancels pending reads.
@@ -1155,3 +1160,5 @@ characters or plus placement are rejected before any SMS or dial operation. Stag
 is bound to the captured snapshot token, so a changed scene cannot consume an old
 approval. Approval/status overlays set `FLAG_SECURE` to exclude their target and
 operation details from ordinary screen capture.
+
+The personal suggestion manager uses `FLAG_SECURE`, disables autofill/content capture and saved field state, and returns at most 50 rows per worker query. Pinyin matching loads only the verified public character dictionary, with bounded reading alternatives; private words and search strings are never persisted outside the existing encrypted lexicon. Queries may inspect at most the repository's 20,000 terms off the input thread. Editing/deleting invalidates queued learning, preserves repository generation checks, and rejects duplicate identities, invalid weights and deleted edit targets. Worker callbacks use immutable form values rather than reading Views. Personalization notifications contain no phrase data; the IME checks captured session identity and reevaluates privacy before refreshing. Hidden association rounds cannot be resurrected. Implicit commit learning is opt-in and disabled for restricted editors; rejected editor commits never learn.

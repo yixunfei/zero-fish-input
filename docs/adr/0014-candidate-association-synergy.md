@@ -167,3 +167,11 @@ Required before acceptance, in addition to the existing suites:
 5. Device regression: existing 8 association instrumentation tests plus
    rerank acceptance and write-back round trips; ARM/API 26 remain recorded
    gaps, not claims.
+
+## Personal candidate promotion (2026-10-24)
+
+Personal candidates keep their input-code dimension and frequency. A configurable threshold (default 3, range 1–100) enables a logarithmic frequency bonus, combined with a stable engine rank prior and a lower bonus for prefix completions. Below-threshold entries retain the native position if duplicated, or follow native entries otherwise. Repeated choices and manual weight changes can change the winner; no fixed pin is introduced. Next-word suggestions use the same bonus within the public eight-word set. Settings exposes weight editing (1–1,000,000), input-code/text/pinyin search, and 50-row paging.
+
+Candidate clicks learn by default. Learning inferred from implicit space/enter commits is disabled by default and requires explicit opt-in; both paths still pass through the session privacy policy and encrypted queued store.
+
+The encrypted format stays unchanged. Management searches reuse existing terms and match public character readings only on a worker. Notifications carry no text, and asynchronous refresh checks the active session and privacy. Refresh may rerank an existing visible next-word round but cannot recreate one hidden by a panel/cursor/session change. This supersedes the original next-commit-only refresh rule.

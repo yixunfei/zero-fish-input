@@ -45,6 +45,12 @@ macOS implementation and permissions are not copied into the Android input metho
   A result remains in
   the workbench until the user taps **Insert result**, which revalidates the
   current editor session before committing it.
+- Long answers remain in the bounded result scroller. The answer supports
+  Android's native whole or partial selection copy action, the section
+  checklist supports selective insertion, and a separate full-answer action
+  inserts only the answer. Provider reasoning blocks are shown separately when
+  the local display preference is enabled (by default); reasoning is never
+  part of an insertable result.
 - Saved conversations are optional, limited, encrypted with a dedicated Keystore
   alias under `noBackupFilesDir`, and managed through background operations. The
   UI first receives bounded summaries; selecting a row loads its history. Selection,

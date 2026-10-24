@@ -92,6 +92,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         if (candidateInline == plan.candidateInline && actionDensity == plan.candidateActions) return
         candidateInline = plan.candidateInline
         actionDensity = plan.candidateActions
+        buttons.forEach { it.setCompactLayout(actionDensity != CandidateActionDensity.FULL) }
         updateViewportLayout()
         updateActionVisibility()
     }
@@ -115,6 +116,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             else snapshot.composition.ifEmpty { snapshot.rawInput })
         while (buttons.size < snapshot.candidates.size) {
             buttons += CandidateItemView(context).also { button ->
+                button.setCompactLayout(actionDensity != CandidateActionDensity.FULL)
                 button.onSelected = { index -> onCandidateSelected(index) }
                 candidates.addView(button, LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)))
             }

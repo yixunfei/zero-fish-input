@@ -1,15 +1,12 @@
 package dev.zeroinput.ime.settings
 
 import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.materialswitch.MaterialSwitch
-import com.google.android.material.color.MaterialColors
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
@@ -136,22 +133,13 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         text = label
         contentDescription = label
         isAllCaps = false
+        isCheckable = true
         letterSpacing = 0f
         minWidth = 0
         minimumWidth = 0
         textSize = 14f
         cornerRadius = dp(6)
-        strokeWidth = dp(1)
-        val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
-        backgroundTintList = ColorStateList(states, intArrayOf(
-            color(com.google.android.material.R.attr.colorPrimaryContainer, Color.LTGRAY),
-            color(com.google.android.material.R.attr.colorSurface, Color.WHITE),
-        ))
-        setTextColor(ColorStateList(states, intArrayOf(
-            color(com.google.android.material.R.attr.colorOnPrimaryContainer, Color.BLACK),
-            color(com.google.android.material.R.attr.colorOnSurface, Color.BLACK),
-        )))
-        strokeColor = ColorStateList.valueOf(color(com.google.android.material.R.attr.colorOutline, Color.GRAY))
+        applySettingsModeStyle()
         layoutParams = LayoutParams(0, dp(48), 1f)
     }
 
@@ -196,5 +184,4 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-    private fun color(attribute: Int, fallback: Int): Int = MaterialColors.getColor(context, attribute, fallback)
 }

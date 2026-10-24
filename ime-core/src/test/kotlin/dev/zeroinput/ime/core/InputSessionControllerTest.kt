@@ -204,7 +204,7 @@ class InputSessionControllerTest {
             controller.handle(InputCommand.Text("ni"))
             controller.handle(InputCommand.ChangeCandidatePage(PageDirection.NEXT))
             val snapshot = controller.state.snapshot
-            assertEquals("词组0", snapshot.candidates.first().text)
+            assertEquals("你好", snapshot.candidates.first().text)
             val later = snapshot.candidates.indexOfFirst { it.text == "词组8" }
             assertTrue(later > 0)
             val expected = when (command) {
@@ -290,7 +290,7 @@ class InputSessionControllerTest {
     @Test
     fun `personal candidate uses engine script and preserves its learning identity`() {
         val connection = RecordingConnection()
-        val personalization = RecordingPersonalization(listOf(PersonalSuggestion("fixture", "中國", 3)))
+        val personalization = RecordingPersonalization(listOf(PersonalSuggestion("fixture", "中國", 3, "zhongguo")))
         val engine = object : InputEngine by TestEngine(), CandidateTextNormalizer {
             override fun normalizeCandidateText(text: String) = "中国"
         }
@@ -305,14 +305,13 @@ class InputSessionControllerTest {
 
     @Test
     fun `failed personal text conversion hides the suggestion and leaves base candidates usable`() {
-        val personalization = RecordingPersonalization(listOf(PersonalSuggestion("fixture", "中國", 3)))
+        val personalization = RecordingPersonalization(listOf(PersonalSuggestion("fixture", "中國", 3, "zhongguo")))
         val engine = object : InputEngine by TestEngine(), CandidateTextNormalizer {
             override fun normalizeCandidateText(text: String): String = error("Conversion unavailable")
         }
         val controller = InputSessionController(RecordingConnection(), { engine }, personalization)
         controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
         controller.handle(InputCommand.Text("zhongguo"))
-        controller.refreshPersonalization()
         assertTrue(controller.state.snapshot.candidates.none { it.id.startsWith("personal:") })
         assertTrue(controller.state.snapshot.candidates.isNotEmpty())
     }
@@ -341,7 +340,7 @@ class InputSessionControllerTest {
         controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
 
         "nihao".forEach { controller.handle(InputCommand.Text(it.toString())) }
-        controller.handle(InputCommand.Space)
+        controller.handle(InputCommand.SelectCandidate(0))
 
         assertEquals(listOf("你好"), connection.commits)
         assertEquals("nihao", personalization.learned.single().shortcut)
@@ -360,7 +359,7 @@ class InputSessionControllerTest {
         assertEquals(0, controller.state.snapshot.highlightedIndex)
         controller.handle(InputCommand.Space)
         assertEquals(listOf("测试"), connection.commits)
-        assertEquals(listOf("learned"), store.usedIds)
+        assertTrue(store.usedIds.isEmpty())
         controller.close()
     }
 
@@ -479,10 +478,14 @@ class InputSessionControllerTest {
     }
 
     @Test
-    fun `refreshPersonalization overlays a background result without replaying input`() {
+    fun `background personalization result appears only after a later input event`() {
         val connection = ComposingRecordingConnection()
         val personalization = RecordingPersonalization()
-        val controller = controller(connection, personalization)
+        var stateNotifications = 0
+        val controller = InputSessionController(
+            connection, { TestEngine() }, personalization,
+            onStateChanged = { stateNotifications++ },
+        )
         controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
 
         controller.handle(InputCommand.Text("n"))
@@ -491,10 +494,14 @@ class InputSessionControllerTest {
         assertEquals("ni", connection.composing)
 
         personalization.suggestions = listOf(PersonalSuggestion("async-id", "你号", 9))
-        controller.refreshPersonalization()
-
-        assertEquals(listOf("你号", "你好"), controller.state.snapshot.candidates.map(Candidate::text))
+        val notificationsBeforeCompletion = stateNotifications
+        assertEquals(notificationsBeforeCompletion, stateNotifications)
+        assertEquals(listOf("你好"), controller.state.snapshot.candidates.map(Candidate::text))
         assertEquals("ni", connection.composing)
+
+        controller.handle(InputCommand.Text("h"))
+        assertTrue(stateNotifications > notificationsBeforeCompletion)
+        assertTrue(controller.state.snapshot.candidates.any { it.id == "personal:async-id" })
     }
 
     @Test
@@ -849,11 +856,11 @@ class InputSessionControllerTest {
         val controller = InputSessionController(connection, { TestEngine() }, store)
         controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
         controller.handle(InputCommand.Text("ni"))
-        controller.handle(InputCommand.Space)
+        controller.handle(InputCommand.SelectCandidate(0))
         assertEquals(listOf("你好"), connection.commits)
         assertEquals(1, controller.learningFailureCount)
         controller.handle(InputCommand.Text("ni"))
-        controller.handle(InputCommand.Space)
+        controller.handle(InputCommand.SelectCandidate(0))
         assertEquals(listOf("你好", "你好"), connection.commits)
         assertEquals(2, controller.learningFailureCount)
         controller.close()
@@ -864,7 +871,7 @@ class InputSessionControllerTest {
         val connection = RecordingConnection()
         val store = object : PersonalizationStore {
             override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
-                if (prefix.isEmpty()) emptyList() else listOf(PersonalSuggestion("fixture", "词组", 1))
+                if (prefix.isEmpty()) emptyList() else listOf(PersonalSuggestion("fixture", "词组", 3, "ni"))
             override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
             override fun recordUse(id: String, learningAllowed: Boolean) {
                 throw IllegalStateException("store unavailable")
@@ -907,7 +914,7 @@ class InputSessionControllerTest {
         // The typed commit learns through apply(); the association click then
         // writes itself back.  ADR 0014 phase 1: the Chinese value itself is
         // the shortcut.
-        assertEquals(listOf("ni" to "你好", "世界" to "世界"), learned)
+        assertEquals(listOf("世界" to "世界"), learned)
         controller.close()
     }
 

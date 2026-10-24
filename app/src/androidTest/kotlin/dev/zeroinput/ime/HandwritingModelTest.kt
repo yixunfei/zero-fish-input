@@ -2,6 +2,7 @@ package dev.zeroinput.ime
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.zeroinput.ime.handwriting.HandwritingTestResources
 import dev.zeroinput.model.OfflineHandwritingRecognizer
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -12,11 +13,13 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HandwritingModelTest {
     @Test fun bundledModelRecognizesPublicConstructedStrokeOffMainThread() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val resources = HandwritingTestResources.source(instrumentation.context, context)
         val worker = Executors.newSingleThreadExecutor()
         try {
             val result = worker.submit<List<String>> {
-                OfflineHandwritingRecognizer(context).use { recognizer ->
+                OfflineHandwritingRecognizer(context, resources).use { recognizer ->
                     recognizer.recognize(listOf(
                         floatArrayOf(0.22f, 0.5f, 0.78f, 0.5f),
                         floatArrayOf(0.5f, 0.17f, 0.5f, 0.83f),

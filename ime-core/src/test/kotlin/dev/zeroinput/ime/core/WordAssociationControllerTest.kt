@@ -8,6 +8,28 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WordAssociationControllerTest {
+    @Test fun `association warmup follows the core editor and privacy gate`() {
+        var warmups = 0
+        val controller = InputSessionController(
+            RecordingEditor(), { MemoryEngine() }, object : PersonalizationStore {
+                override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                    emptyList<PersonalSuggestion>()
+                override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+                override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+            },
+            onAssociationWarmup = { warmups++ },
+        )
+        controller.start(editor(), InputLanguage.ENGLISH, PrivacyConfiguration())
+        controller.requestAssociationWarmup()
+        assertEquals(1, warmups)
+
+        controller.start(editor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD),
+            InputLanguage.ENGLISH, PrivacyConfiguration())
+        controller.requestAssociationWarmup()
+        assertEquals(1, warmups)
+        controller.close()
+    }
+
     @Test fun `only accepted commits offer next words and each accepted selection writes back once`() {
         val f = Fixture()
         f.commit("hello")
@@ -83,7 +105,6 @@ class WordAssociationControllerTest {
             f.commit("hello")
             val old = f.controller.state.snapshot.candidates.single()
             action(f)
-            f.controller.refreshPersonalization()
             assertTrue(f.controller.state.snapshot.candidates.isEmpty())
             f.controller.handle(InputCommand.SelectCandidate(0, old.id))
             assertFalse(f.editor.commits.contains(" world"))
@@ -99,7 +120,6 @@ class WordAssociationControllerTest {
         assertEquals(listOf("hello"), f.editor.commits)
         assertTrue(f.controller.state.snapshot.candidates.isEmpty())
         f.enabled = true
-        f.controller.refreshPersonalization()
         assertTrue(f.controller.state.snapshot.candidates.isEmpty())
     }
 

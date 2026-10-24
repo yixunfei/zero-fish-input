@@ -99,8 +99,9 @@ class AiAttachment(val mimeType: String, val bytes: ByteArray, val displayName: 
 
 sealed interface AiStreamEvent {
     data object Started : AiStreamEvent
-    data class Delta(val text: String) : AiStreamEvent
-    data class Completed(val text: String) : AiStreamEvent
+    data class Delta(val text: String, val thinking: String = "") : AiStreamEvent
+    /** Completed output keeps reasoning separate from the insertable answer. */
+    data class Completed(val text: String, val thinking: String = "") : AiStreamEvent
     data class Failed(val error: AiProviderError) : AiStreamEvent
     data object Cancelled : AiStreamEvent
 }

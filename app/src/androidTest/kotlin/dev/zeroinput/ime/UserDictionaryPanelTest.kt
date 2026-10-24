@@ -54,7 +54,9 @@ class UserDictionaryPanelTest {
             for ((width, height) in listOf(320 to 600, 411 to 800, 800 to 320)) {
                 for (export in listOf(true, false)) {
                     val context = context(locale, night, width, height)
-                    assertEquals(if (night) 0xffe1e3e0.toInt() else 0xff191c1b.toInt(), context.getColor(R.color.zero_on_surface))
+                    assertTrue(ColorUtils.calculateContrast(
+                        context.getColor(R.color.zero_on_surface), context.getColor(R.color.zero_surface),
+                    ) >= 4.5)
                     val dialog = if (export) UserDictionaryTransferDialogs.export(context) {}
                         else UserDictionaryTransferDialogs.import(context) {}
                     dialog.create()

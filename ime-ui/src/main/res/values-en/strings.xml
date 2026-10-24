@@ -137,7 +137,12 @@
     <string name="ai_submit">Send</string>
     <string name="ai_cancel">Stop</string>
     <string name="ai_insert">Insert</string>
-    <string name="ai_insert_thinking">Insert full reasoning</string>
+    <string name="ai_show_thinking">Show reasoning</string>
+    <string name="ai_show_thinking_short">Think</string>
+    <string name="ai_thinking_content">Reasoning\n%1$s</string>
+    <string name="ai_insert_all">Insert full answer</string>
+    <string name="ai_insert_selected">Insert selected sections</string>
+    <string name="ai_select_result_sections">Select sections</string>
     <string name="ai_reasoning_default">Auto</string>
     <string name="ai_reasoning_fast">Fast</string>
     <string name="ai_reasoning_deep">Deep</string>
