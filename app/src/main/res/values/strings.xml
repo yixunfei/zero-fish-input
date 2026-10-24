@@ -108,8 +108,9 @@
     <string name="user_dictionary_search">搜索拼音、简拼、输入码或词语</string>
     <string name="user_dictionary_previous">上一页</string>
     <string name="user_dictionary_next">下一页</string>
-    <string name="user_dictionary_threshold">联想提升阈值</string>
-    <string name="user_dictionary_threshold_message">达到此权重后开始提升排序，仍结合输入匹配和默认顺序，不固定置顶。当前：%1$d</string>
+    <string name="user_dictionary_threshold">用户联想排序置信度</string>
+    <string name="user_dictionary_threshold_value">用户联想排序置信度：%1$d 次</string>
+    <string name="user_dictionary_threshold_message">默认 3 次，可设置 1–100 次。点击候选会累加词频；达到此次数后开始提升排序。手动设置的词条权重也参与比较，仍结合输入匹配和默认顺序，不固定置顶。当前：%1$d 次</string>
     <string name="user_dictionary_threshold_invalid">请输入 1 到 100 之间的整数</string>
     <plurals name="user_dictionary_imported">
         <item quantity="other">已导入 %1$d 条词组</item>

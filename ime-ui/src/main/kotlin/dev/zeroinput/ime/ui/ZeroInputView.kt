@@ -1150,12 +1150,9 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     private fun applyHeaderHeight() {
-        // The idle toolbar needs only one row. Preserve the viewport's stacked
-        // height only while candidates are visible, so the candidate actions
-        // remain usable without leaving an empty row above an idle keyboard.
-        val headerHeight = if (candidateStrip.isVisible) viewportPlan.headerHeightDp
-            else KeyboardViewportPolicy.INLINE_HEADER_HEIGHT_DP
-        val heightPx = dp(headerHeight)
+        // Candidate arrival and tool navigation must not move the key rows.
+        // Only an actual viewport change may select the compact header budget.
+        val heightPx = dp(viewportPlan.headerHeightDp)
         val params = header.layoutParams
         if (params.height != heightPx) {
             params.height = heightPx

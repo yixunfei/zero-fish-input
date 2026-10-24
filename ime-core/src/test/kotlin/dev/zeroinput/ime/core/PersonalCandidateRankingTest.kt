@@ -7,6 +7,20 @@ import org.junit.Test
 class PersonalCandidateRankingTest {
     private val native = listOf(Candidate("a", "产生"), Candidate("b", "测试"))
 
+    @Test fun `existing word frequency promotes a native candidate across input codes without replacing its route`() {
+        val ranked = PersonalCandidateRanking.merge(native, emptyList(), "cs", 3, mapOf("测试" to 3))
+        assertEquals(listOf("测试", "产生"), ranked.map { it.text })
+        assertEquals("b", ranked.first().id)
+        assertEquals("产生", PersonalCandidateRanking.merge(native, emptyList(), "cs", 4,
+            mapOf("测试" to 3)).first().text)
+    }
+
+    @Test fun `frequency lookup cannot add unrelated words or double count the same personal entry`() {
+        val personal = listOf(Candidate("personal:b", "测试", score = 3, input = "cs"))
+        assertEquals(PersonalCandidateRanking.merge(native, personal, "cs", 4),
+            PersonalCandidateRanking.merge(native, personal, "cs", 4, mapOf("测试" to 3, "额外" to 100)))
+    }
+
     @Test fun `short code stays editorial until threshold then reflects repeated choice`() {
         fun ranked(count: Int) = PersonalCandidateRanking.merge(native,
             listOf(Candidate("personal:b", "测试", score = count, input = "cs")), "cs", 3)

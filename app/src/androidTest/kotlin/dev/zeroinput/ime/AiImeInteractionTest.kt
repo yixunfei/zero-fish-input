@@ -96,10 +96,10 @@ class AiImeInteractionTest {
         onMain { assertTrue("AI typing must not compose in the host editor", editor.editor.text.isEmpty()) }
         tap { textButton(UiR.string.ai_submit) }
         await { !panel().isAiEditing && textButtonOrNull(UiR.string.ai_policy_unavailable) != null &&
-            textButtonOrNull(UiR.string.ai_insert) != null }
+            panel().findViewById<TextView>(UiR.id.ai_insert_result) != null }
         onMain {
             assertNotNull(textButton(UiR.string.ai_policy_unavailable))
-            assertFalse(textButton(UiR.string.ai_insert).isEnabled)
+            assertFalse(panel().findViewById<TextView>(UiR.id.ai_insert_result).isEnabled)
             assertTrue(editor.editor.text.isEmpty())
         }
         tap { labelled(UiR.string.keyboard_return) }
@@ -240,7 +240,7 @@ class AiImeInteractionTest {
     }
     private fun labelled(label: Int) = checkNotNull(labelledOrNull(label))
     private fun textButtonOrNull(label: Int) = views(panel()).filterIsInstance<TextView>().firstOrNull {
-        it.isShown && it.text == it.context.getString(label)
+        it.isShown && it.text.toString() == it.context.getString(label)
     }
     private fun textButton(label: Int) = checkNotNull(textButtonOrNull(label))
     private fun draft() = views(panel()).filterIsInstance<TextView>().single {
@@ -256,9 +256,13 @@ class AiImeInteractionTest {
             SystemClock.sleep(50)
         }
         val state = onMain { panels().singleOrNull()?.let {
+            val output = it.findViewById<TextView>(UiR.id.ai_result_text)
             "open=${it.isAiOpen}, editing=${it.isAiEditing}, " +
                 "policy=${textButtonOrNull(UiR.string.ai_policy_unavailable) != null}, " +
-                "insert=${textButtonOrNull(UiR.string.ai_insert) != null}"
+                "insert=${panel().findViewById<TextView>(UiR.id.ai_insert_result) != null}, " +
+                "outputShown=${output.isShown}, outputVisibility=${output.visibility}, " +
+                "outputEmpty=${output.text.isEmpty()}, " +
+                "outputIsPolicy=${output.text.toString() == output.context.getString(UiR.string.ai_policy_unavailable)}"
         } ?: "no single visible IME" }
         fail("AI editor fixture did not reach the expected state: $state")
     }

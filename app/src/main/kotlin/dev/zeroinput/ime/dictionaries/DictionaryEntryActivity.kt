@@ -72,6 +72,7 @@ class DictionaryEntryActivity : AppCompatActivity() {
         })
         query = dictionaryField(this@DictionaryEntryActivity, R.string.dictionary_search_hint, 256)
         addView(LinearLayout(this@DictionaryEntryActivity).apply {
+            isBaselineAligned = false
             addView(query, LinearLayout.LayoutParams(0, -2, 1f))
             addView(button(R.string.dictionary_search) { offset = 0; refresh() })
         })

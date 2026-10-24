@@ -14,6 +14,8 @@ internal fun dictionaryField(context: Context, hint: Int, limit: Int, initial: S
     inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     filters = arrayOf(InputFilter.LengthFilter(limit))
     maxLines = 3
+    // Input type configuration resets TextView's minimum-line/height mode.
+    minHeight = (48 * resources.displayMetrics.density).toInt()
     isSaveEnabled = false
     filterTouchesWhenObscured = true
     imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING or EditorInfo.IME_FLAG_NO_EXTRACT_UI

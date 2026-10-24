@@ -143,7 +143,10 @@ android {
 }
 
 tasks.named("preBuild").configure { dependsOn(prepareLicenseAssets) }
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets") }.configureEach {
+tasks.matching {
+    (it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets")) ||
+        (it.name.contains("AndroidTest") && it.name.contains("Lint", ignoreCase = true))
+}.configureEach {
     dependsOn(prepareHandwritingAndroidTestAssets)
 }
 

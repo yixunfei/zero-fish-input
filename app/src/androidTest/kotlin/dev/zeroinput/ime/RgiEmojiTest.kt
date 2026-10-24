@@ -78,15 +78,18 @@ class RgiEmojiTest {
                 .use { requireNotNull(BitmapFactory.decodeStream(it)) }
             try {
                 search(panel, value)
-                await { cell(panel, entry)?.text?.isEmpty() == true }
-                onMain {
-                    val cell = requireNotNull(cell(panel, entry))
+                // RecyclerView can detach a matching cell between two main-thread
+                // turns. Observe readiness and exercise that same cell atomically.
+                await {
+                    val cell = cell(panel, entry) ?: return@await false
+                    if (cell.text.isNotEmpty() || cell.width == 0 || cell.height == 0) return@await false
                     assertTrue(cell.width >= dp(cell, 48) && cell.height >= dp(cell, 48))
                     assertBundledPixels(cell, source)
                     selected = null
                     cell.performClick()
                     assertEquals(value, selected)
                     assertEquals(value.length, EmojiCatalog.longestEmojiSuffixLength(value))
+                    true
                 }
             } finally { source.recycle() }
         }

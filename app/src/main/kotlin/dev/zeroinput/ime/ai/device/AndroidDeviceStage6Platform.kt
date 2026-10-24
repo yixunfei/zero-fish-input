@@ -37,23 +37,40 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         stillValid: () -> Boolean,
         cancellation: DeviceStage6Cancellation,
     ): DeviceStage6Result {
-        if (!stillValid()) return expired()
+        val valid = { !cancellation.isCancelled && stillValid() }
+        if (!valid()) return expired()
+        return try {
+            DeviceStage6Queries(resolver, cancellation, valid).use { queries ->
+                dispatch(request, maxAttachmentBytes, valid, cancellation, queries)
+            }
+        } catch (_: android.os.OperationCanceledException) {
+            expired()
+        }
+    }
+
+    private fun dispatch(
+        request: DeviceStage6OperationRequest,
+        maxAttachmentBytes: Int,
+        stillValid: () -> Boolean,
+        cancellation: DeviceStage6Cancellation,
+        queries: DeviceStage6Queries,
+    ): DeviceStage6Result {
         return when (request.capability) {
             DeviceStage6Capability.FILES -> file(request, maxAttachmentBytes, stillValid, cancellation)
             DeviceStage6Capability.MEDIA -> media(request, maxAttachmentBytes, stillValid, cancellation)
             DeviceStage6Capability.SYSTEM_SETTINGS -> settings(request, stillValid)
             DeviceStage6Capability.NOTIFICATIONS -> notifications(request, stillValid)
-            DeviceStage6Capability.SMS -> sms(request, stillValid)
-            DeviceStage6Capability.TELEPHONY -> telephony(request, stillValid)
-            DeviceStage6Capability.CONTACTS -> contacts(request, stillValid)
-            DeviceStage6Capability.CALENDAR -> calendar(request, stillValid)
+            DeviceStage6Capability.SMS -> sms(request, stillValid, queries)
+            DeviceStage6Capability.TELEPHONY -> telephony(request, stillValid, queries)
+            DeviceStage6Capability.CONTACTS -> contacts(request, stillValid, queries)
+            DeviceStage6Capability.CALENDAR -> calendar(request, stillValid, queries)
             DeviceStage6Capability.CAMERA -> if (hasPermission(Manifest.permission.CAMERA)) {
-                DeviceStage6SensorCapture.camera(context, maxAttachmentBytes) {
+                DeviceStage6SensorCapture.camera(context, maxAttachmentBytes, cancellation) {
                     stillValid() && hasPermission(Manifest.permission.CAMERA)
                 }
             } else rejected("Camera permission is unavailable")
             DeviceStage6Capability.MICROPHONE -> if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
-                DeviceStage6SensorCapture.microphone(context, maxAttachmentBytes) {
+                DeviceStage6SensorCapture.microphone(context, maxAttachmentBytes, cancellation) {
                     stillValid() && hasPermission(Manifest.permission.RECORD_AUDIO)
                 }
             } else rejected("Microphone permission is unavailable")
@@ -151,13 +168,13 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         return success(values.joinToString("\n") { "${it.title} ${it.text}" }.take(DeviceStage6ResultLimit))
     }
 
-    private fun sms(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun sms(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         return when (request.operation) {
             DeviceStage6Operation.READ -> {
                 if (!stillValid()) return expired()
                 if (!hasPermission(Manifest.permission.READ_SMS)) return rejected("SMS read permission is unavailable")
                 val address = request.target.id.takeIf(String::isNotBlank) ?: return rejected("SMS phone number is required")
-                val result = resolver.query(Telephony.Sms.CONTENT_URI, SMS_PROJECTION,
+                val result = queries.query(Telephony.Sms.CONTENT_URI, SMS_PROJECTION,
                     "${Telephony.Sms.ADDRESS}=?", arrayOf(address), "${Telephony.Sms.DATE} DESC")?.use { cursor ->
                     if (!cursor.moveToFirst()) return failed("SMS is unavailable")
                     success("SMS ${cursor.getString(1)}: ${cursor.getString(2)}".take(DeviceStage6ResultLimit))
@@ -183,13 +200,13 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
     }
 
     @android.annotation.SuppressLint("MissingPermission")
-    private fun telephony(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun telephony(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         return when (request.operation) {
         DeviceStage6Operation.READ -> {
             if (!stillValid()) return expired()
             if (!hasPermission(Manifest.permission.READ_CALL_LOG)) return rejected("Call log permission is unavailable")
             val number = request.target.id.takeIf(String::isNotBlank) ?: return rejected("Call phone number is required")
-            val result = resolver.query(CallLog.Calls.CONTENT_URI, CALL_PROJECTION,
+            val result = queries.query(CallLog.Calls.CONTENT_URI, CALL_PROJECTION,
                 "${CallLog.Calls.NUMBER}=?", arrayOf(number), "${CallLog.Calls.DATE} DESC")?.use { cursor ->
                 if (!cursor.moveToFirst()) failed("Call is unavailable")
                 else success("Call ${cursor.getString(1)} ${cursor.getLong(2)}".take(DeviceStage6ResultLimit))
@@ -213,35 +230,35 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         }
     }
 
-    private fun contacts(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun contacts(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         return when (request.operation) {
-            DeviceStage6Operation.READ -> readContact(request, stillValid)
+            DeviceStage6Operation.READ -> readContact(request, stillValid, queries)
             DeviceStage6Operation.CREATE -> createContact(request, stillValid)
-            DeviceStage6Operation.UPDATE -> updateContact(request, stillValid)
-            DeviceStage6Operation.DELETE -> deleteContact(request, stillValid)
+            DeviceStage6Operation.UPDATE -> updateContact(request, stillValid, queries)
+            DeviceStage6Operation.DELETE -> deleteContact(request, stillValid, queries)
             else -> rejected("Unsupported contact operation")
         }
     }
 
-    private fun readContact(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun readContact(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         if (!hasPermission(Manifest.permission.READ_CONTACTS)) return rejected("Contact read permission is unavailable")
         val displayName = request.target.id.takeIf(String::isNotBlank) ?: return rejected("Contact name is required")
         if (!stillValid()) return expired()
-        val contact = findContact(displayName) ?: return failed("Contact is unavailable or ambiguous")
+        val contact = findContact(displayName, queries) ?: return failed("Contact is unavailable or ambiguous")
         val id = contact.first
         val name = contact.second
         val phones = readContactValues(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-            ContactsContract.CommonDataKinds.Phone.NUMBER, ContactsContract.CommonDataKinds.Phone.CONTACT_ID, id)
+            ContactsContract.CommonDataKinds.Phone.NUMBER, ContactsContract.CommonDataKinds.Phone.CONTACT_ID, id, queries)
         val emails = readContactValues(ContactsContract.CommonDataKinds.Email.CONTENT_URI,
-            ContactsContract.CommonDataKinds.Email.ADDRESS, ContactsContract.CommonDataKinds.Email.CONTACT_ID, id)
+            ContactsContract.CommonDataKinds.Email.ADDRESS, ContactsContract.CommonDataKinds.Email.CONTACT_ID, id, queries)
         if (!stillValid()) return expired()
         return success((listOf("Contact $name") + phones.map { "Phone $it" } + emails.map { "Email $it" })
             .joinToString("; ").take(DeviceStage6ResultLimit))
     }
 
-    private fun readContactValues(uri: Uri, column: String, idColumn: String, id: Long): List<String> {
+    private fun readContactValues(uri: Uri, column: String, idColumn: String, id: Long, queries: DeviceStage6Queries): List<String> {
         val values = mutableListOf<String>()
-        resolver.query(uri, arrayOf(column), "$idColumn=?", arrayOf(id.toString()), null)?.use { cursor ->
+        queries.query(uri, arrayOf(column), "$idColumn=?", arrayOf(id.toString()), null)?.use { cursor ->
             while (cursor.moveToNext() && values.size < MAX_CONTACT_VALUES) {
                 cursor.getString(0)?.take(MAX_CONTACT_VALUE_CHARS)?.takeIf(String::isNotBlank)?.let(values::add)
             }
@@ -258,7 +275,7 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
             android.content.ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
                 .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, name).build(),
+                .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, name).build(),
         )
         request.fields["phone"]?.takeIf(String::isNotBlank)?.let { phone ->
             operations += android.content.ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
@@ -277,76 +294,92 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         return success("Contact created")
     }
 
-    private fun updateContact(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun updateContact(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         if (!hasPermission(Manifest.permission.READ_CONTACTS)) return rejected("Contact read permission is unavailable")
         if (!hasPermission(Manifest.permission.WRITE_CONTACTS)) return rejected("Contact write permission is unavailable")
         val contactName = request.target.id.takeIf(String::isNotBlank) ?: return rejected("Contact name is required")
         val newName = request.fields["new_display_name"]?.takeIf(String::isNotBlank) ?: return rejected("New contact name is required")
         if (!stillValid()) return expired()
-        val contact = findContact(contactName) ?: return failed("Contact is unavailable or ambiguous")
-        val rawId = findRawContact(contact.first) ?: return failed("Contact is unavailable or ambiguous")
+        val contact = findContact(contactName, queries) ?: return failed("Contact is unavailable or ambiguous")
+        val rawContacts = findRawContacts(contact.first, queries)
+        if (rawContacts.size > 1) return rejected("Contact has multiple raw contacts; change it in the contacts app")
+        val rawId = rawContacts.singleOrNull() ?: return failed("Contact is unavailable")
         if (!stillValid()) return expired()
-        val values = android.content.ContentValues().apply { put(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, newName) }
+        val values = contactDisplayNameValues(newName)
         val selection = "${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?"
         val args = arrayOf(rawId.toString(), ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
         if (!stillValid()) return expired()
         val changed = resolver.update(ContactsContract.Data.CONTENT_URI, values, selection, args)
         if (changed > 0) return success("Contact changed")
         if (!stillValid()) return expired()
-        val inserted = resolver.insert(ContactsContract.Data.CONTENT_URI, android.content.ContentValues().apply {
+        val inserted = resolver.insert(ContactsContract.Data.CONTENT_URI, contactDisplayNameValues(newName).apply {
             put(ContactsContract.Data.RAW_CONTACT_ID, rawId)
             put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
-            put(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, newName)
         })
         return if (inserted != null) success("Contact changed") else failed("Contact was not changed")
     }
 
-    private fun deleteContact(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun contactDisplayNameValues(name: String) = android.content.ContentValues().apply {
+        put(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, name)
+        // Replace the full name; stale structured components must not rebuild the old display name.
+        putNull(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.MIDDLE_NAME)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.PREFIX)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.SUFFIX)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.PHONETIC_GIVEN_NAME)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.PHONETIC_MIDDLE_NAME)
+        putNull(ContactsContract.CommonDataKinds.StructuredName.PHONETIC_FAMILY_NAME)
+    }
+
+    private fun deleteContact(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         if (!hasPermission(Manifest.permission.READ_CONTACTS)) return rejected("Contact read permission is unavailable")
         if (!hasPermission(Manifest.permission.WRITE_CONTACTS)) return rejected("Contact write permission is unavailable")
         val contactName = request.target.id.takeIf(String::isNotBlank) ?: return rejected("Contact name is required")
         if (!stillValid()) return expired()
-        val contact = findContact(contactName) ?: return failed("Contact is unavailable or ambiguous")
-        val rawId = findRawContact(contact.first) ?: return failed("Contact is unavailable or ambiguous")
+        val contact = findContact(contactName, queries) ?: return failed("Contact is unavailable or ambiguous")
+        val rawContacts = findRawContacts(contact.first, queries)
+        if (rawContacts.size > 1) return rejected("Contact has multiple raw contacts; change it in the contacts app")
+        val rawId = rawContacts.singleOrNull() ?: return failed("Contact is unavailable")
         if (!stillValid()) return expired()
         val deleted = resolver.delete(ContactsContract.RawContacts.CONTENT_URI,
             "${ContactsContract.RawContacts._ID}=?", arrayOf(rawId.toString()))
         return if (deleted == 1) success("Selected contact entry deleted") else failed("Contact was not deleted")
     }
 
-    private fun findContact(displayName: String): Pair<Long, String>? {
-        val matches = resolver.query(ContactsContract.Contacts.CONTENT_URI, CONTACT_PROJECTION,
+    private fun findContact(displayName: String, queries: DeviceStage6Queries): Pair<Long, String>? {
+        val matches = queries.query(ContactsContract.Contacts.CONTENT_URI, CONTACT_PROJECTION,
             "${ContactsContract.Contacts.DISPLAY_NAME}=?", arrayOf(displayName), null)?.use { cursor ->
             buildList { while (cursor.moveToNext() && size < 2) add(cursor.getLong(0) to cursor.getString(1)) }
         }.orEmpty()
         return matches.singleOrNull()
     }
 
-    private fun findRawContact(contactId: Long): Long? = resolver.query(
+    private fun findRawContacts(contactId: Long, queries: DeviceStage6Queries): List<Long> = queries.query(
         ContactsContract.RawContacts.CONTENT_URI,
         arrayOf(ContactsContract.RawContacts._ID),
         "${ContactsContract.RawContacts.CONTACT_ID}=?",
         arrayOf(contactId.toString()),
         "${ContactsContract.RawContacts._ID} ASC",
     )?.use { cursor ->
-        buildList { while (cursor.moveToNext() && size < 2) add(cursor.getLong(0)) }.singleOrNull()
-    }
+        buildList { while (size < 2 && cursor.moveToNext()) add(cursor.getLong(0)) }
+    }.orEmpty()
 
-    private fun calendar(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun calendar(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         return when (request.operation) {
             DeviceStage6Operation.READ -> {
                 if (!stillValid()) return expired()
                 if (!hasPermission(Manifest.permission.READ_CALENDAR)) return rejected("Calendar read permission is unavailable")
-                val event = findCalendarEvent(request.target.id, request.fields["start_epoch_ms"]?.toLongOrNull())
+                val event = findCalendarEvent(request.target.id, request.fields["start_epoch_ms"]?.toLongOrNull(), queries)
                     ?: return failed("Calendar event is unavailable or ambiguous")
                 val result = success("Calendar event ${event.title} from ${event.start} to ${event.end}".take(DeviceStage6ResultLimit))
                 if (!stillValid()) expired() else result
             }
-            DeviceStage6Operation.CREATE -> createCalendarEvent(request, stillValid)
+            DeviceStage6Operation.CREATE -> createCalendarEvent(request, stillValid, queries)
             DeviceStage6Operation.UPDATE -> {
                 if (!hasPermission(Manifest.permission.READ_CALENDAR)) return rejected("Calendar read permission is unavailable")
                 if (!hasPermission(Manifest.permission.WRITE_CALENDAR)) return rejected("Calendar write permission is unavailable")
-                val event = findCalendarEvent(request.target.id, request.fields["start_epoch_ms"]?.toLongOrNull())
+                val event = findCalendarEvent(request.target.id, request.fields["start_epoch_ms"]?.toLongOrNull(), queries)
                     ?: return failed("Calendar event is unavailable or ambiguous")
                 val values = calendarUpdateValues(request.fields) ?: return rejected("Calendar update fields are invalid")
                 if (!stillValid()) return expired()
@@ -358,7 +391,7 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
                 if (!hasPermission(Manifest.permission.READ_CALENDAR)) return rejected("Calendar read permission is unavailable")
                 if (!hasPermission(Manifest.permission.WRITE_CALENDAR)) return rejected("Calendar write permission is unavailable")
                 if (!stillValid()) return expired()
-                val event = findCalendarEvent(request.target.id, request.fields["start_epoch_ms"]?.toLongOrNull())
+                val event = findCalendarEvent(request.target.id, request.fields["start_epoch_ms"]?.toLongOrNull(), queries)
                     ?: return failed("Calendar event is unavailable or ambiguous")
                 if (!stillValid()) return expired()
                 val removed = resolver.delete(CalendarContract.Events.CONTENT_URI,
@@ -369,11 +402,11 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         }
     }
 
-    private fun createCalendarEvent(request: DeviceStage6OperationRequest, stillValid: () -> Boolean): DeviceStage6Result {
+    private fun createCalendarEvent(request: DeviceStage6OperationRequest, stillValid: () -> Boolean, queries: DeviceStage6Queries): DeviceStage6Result {
         if (!hasPermission(Manifest.permission.READ_CALENDAR)) return rejected("Calendar read permission is unavailable")
         if (!hasPermission(Manifest.permission.WRITE_CALENDAR)) return rejected("Calendar write permission is unavailable")
         val calendarName = request.target.id.takeIf(String::isNotBlank) ?: return rejected("Calendar name is required")
-        val calendarId = findCalendarId(calendarName) ?: return failed("Calendar is unavailable or ambiguous")
+        val calendarId = findCalendarId(calendarName, queries) ?: return failed("Calendar is unavailable or ambiguous")
         val values = calendarValues(request.fields, requireTitle = true) ?: return rejected("Calendar event fields are invalid")
         values.put(CalendarContract.Events.CALENDAR_ID, calendarId)
         if (!stillValid()) return expired()
@@ -381,9 +414,9 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         return if (uri != null) success("Calendar event created") else failed("Calendar event was not created")
     }
 
-    private fun findCalendarEvent(title: String, start: Long?): CalendarEventValue? {
+    private fun findCalendarEvent(title: String, start: Long?, queries: DeviceStage6Queries): CalendarEventValue? {
         if (title.isBlank() || start == null || start <= 0L) return null
-        val matches = resolver.query(
+        val matches = queries.query(
             CalendarContract.Events.CONTENT_URI,
             CALENDAR_PROJECTION,
             "${CalendarContract.Events.TITLE}=? AND ${CalendarContract.Events.DTSTART}=?",
@@ -399,8 +432,8 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         return matches.singleOrNull()
     }
 
-    private fun findCalendarId(displayName: String): Long? {
-        val matches = resolver.query(
+    private fun findCalendarId(displayName: String, queries: DeviceStage6Queries): Long? {
+        val matches = queries.query(
             CalendarContract.Calendars.CONTENT_URI,
             arrayOf(CalendarContract.Calendars._ID),
             "${CalendarContract.Calendars.CALENDAR_DISPLAY_NAME}=? AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL}>=?",

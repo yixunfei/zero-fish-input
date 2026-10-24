@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** One-shot, task-approved sensor capture. Bytes remain in memory and are transferred to one provider request. */
 internal object DeviceStage6SensorCapture {
     @SuppressLint("MissingPermission")
-    fun microphone(context: Context, maxAttachmentBytes: Int, stillValid: () -> Boolean): DeviceStage6Result {
+    fun microphone(context: Context, maxAttachmentBytes: Int, cancellation: DeviceStage6Cancellation,
+        stillValid: () -> Boolean): DeviceStage6Result {
         val rate = 16_000
         val minimum = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         if (minimum <= 0) return unavailable("Microphone service is unavailable")
@@ -37,12 +38,16 @@ internal object DeviceStage6SensorCapture {
         var size = 0
         var wav: ByteArray? = null
         val started = SystemClock.elapsedRealtime()
+        val stopped = CountDownLatch(1)
+        val registration = cancellation.register { stopped.countDown() }
         return try {
+            if (!stillValid()) return expired()
             recorder.startRecording()
             while (size < pcm.size && SystemClock.elapsedRealtime() - started < MAX_CAPTURE_MS) {
                 if (!stillValid()) return expired()
-                val count = recorder.read(pcm, size, pcm.size - size)
-                if (count <= 0) break
+                val count = recorder.read(pcm, size, pcm.size - size, AudioRecord.READ_NON_BLOCKING)
+                if (count < 0) return failed("Microphone capture failed")
+                if (count == 0) stopped.await(10, TimeUnit.MILLISECONDS)
                 size += count
             }
             if (!stillValid()) return expired()
@@ -53,9 +58,13 @@ internal object DeviceStage6SensorCapture {
             }
             DeviceStage6Result(DeviceStage6ResultStatus.SUCCESS, "One-second microphone sample captured",
                 AiAttachment("audio/wav", wav!!.copyOf(), "device-audio.wav"))
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            expired()
         } catch (_: Exception) {
             failed("Microphone capture failed")
         } finally {
+            registration.close()
             pcm.fill(0)
             wav?.fill(0)
             runCatching { recorder.stop() }
@@ -64,7 +73,8 @@ internal object DeviceStage6SensorCapture {
     }
 
     @SuppressLint("MissingPermission")
-    fun camera(context: Context, maxAttachmentBytes: Int, stillValid: () -> Boolean): DeviceStage6Result {
+    fun camera(context: Context, maxAttachmentBytes: Int, cancellation: DeviceStage6Cancellation,
+        stillValid: () -> Boolean): DeviceStage6Result {
         val manager = context.getSystemService(CameraManager::class.java) ?: return unavailable("Camera service is unavailable")
         val cameraId = findBackCamera(manager) ?: return unavailable("No camera is available")
         val thread = HandlerThread("zeroinput-stage6-camera").apply { start() }
@@ -79,7 +89,9 @@ internal object DeviceStage6SensorCapture {
         val camera = AtomicReference<CameraDevice?>()
         val session = AtomicReference<CameraCaptureSession?>()
         reader.setOnImageAvailableListener({ source -> readJpeg(source, image, failure, completed) }, handler)
+        val registration = cancellation.register { image.close(); completed.countDown() }
         return try {
+            if (!stillValid()) return expired()
             openCamera(manager, cameraId, reader, handler, camera, session, failure, completed, image)
             val deadline = SystemClock.elapsedRealtime() + CAMERA_TIMEOUT_MS
             while (SystemClock.elapsedRealtime() < deadline && !completed.await(50, TimeUnit.MILLISECONDS)) {
@@ -94,9 +106,13 @@ internal object DeviceStage6SensorCapture {
             } finally {
                 bytes.fill(0)
             }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            expired()
         } catch (_: Exception) {
             failed("Camera capture failed")
         } finally {
+            registration.close()
             image.close()
             session.getAndSet(null)?.close()
             camera.getAndSet(null)?.close()

@@ -140,14 +140,17 @@ internal class ChineseSettingsView(context: Context) : LinearLayout(context) {
         textSize = 14f
         cornerRadius = dp(6)
         applySettingsModeStyle()
-        layoutParams = LayoutParams(0, dp(48), 1f)
+        setPadding(dp(4), paddingTop, dp(4), paddingBottom)
+        minHeight = dp(48)
+        layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
     }
 
     private fun modeGroup(buttons: List<MaterialButton>, select: (Int) -> Unit) = MaterialButtonToggleGroup(context).apply {
         isSingleSelection = true
         isSelectionRequired = true
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dp(52))
-        buttons.forEach(::addView)
+        minimumHeight = dp(52)
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        buttons.forEach(::addWrappingModeButton)
         addOnButtonCheckedListener { _, id, checked -> if (checked && !rendering) select(id) }
     }
 

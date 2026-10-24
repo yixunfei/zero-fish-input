@@ -562,10 +562,13 @@ is read-only, covers only the public top eight rows, and is answered from the
 prepared in-memory mirror under the same personalization gate as the strip
 itself; it cannot enumerate the personal store, inject a private word into the
 strip, or perform disk, keystore or decryption work on the input thread. A cold
-lookup preserves editorial order for that round. Snapshot completion does not
-refresh or rerank visible candidates; a later successful commit may use the
-prepared snapshot. Personalization query notifications also cannot republish
-controller state while composition or association candidates are visible. An
+lookup preserves editorial order until the prepared snapshot is ready.
+Content-free readiness notifications refresh only the active composition or
+still-visible association round after session and privacy checks; hidden rounds
+cannot reappear. Composing candidates consult the same prepared mirror in
+batches of eight, limited to the 60 already-produced native candidates. This
+reuses a word's frequency across input spellings without scanning private terms
+on the input thread, injecting new words or changing native selection routes. An
 explicit, adapter-accepted click on a visible public continuation
 also learns that word through the existing encrypted `PersonalizationStore`
 with the session's learning flag — the same channel, gates and deletion
@@ -1093,9 +1096,22 @@ inside the service boundary. Visible leaf text and notification title/text are
 screened for credential nouns before entering the model request; an incomplete
 snapshot cannot drive coordinate swipes. A locally denied action is returned as a
 bounded rejected turn without executing, while authority loss or a stale snapshot
-still terminates the task. Stage 6 reads use a cancellation signal and a separate
-bounded executor; a provider that ignores cancellation remains a runtime
-validation item.
+still terminates the task. SMS, call-log, contact and calendar queries share an
+operation-owned cancellation signal on the separate bounded Stage 6 executor;
+the signal remains registered until all cursors are consumed. Cancellation
+blocks later lookups and suppresses stale results. A provider that ignores the
+signal, or an Android write/send/dial API without cancellation support, can still
+occupy that worker until it returns. Invalidation does not roll back a dispatched
+write, and uncertain writes are never automatically retried. Sensor cancellation
+wakes capture waits and clears transient bytes; platform startup and cleanup
+latency still require physical-device acceptance.
+
+Contact names mean full display names. Renaming clears obsolete structured and
+phonetic components, without changing phone or email records. Mutation of an
+aggregate with multiple raw contacts is rejected before writing, so account
+selection cannot silently expand the approved target. Platform regression tests
+cover cooperative query cancellation, no fallback write after invalidation,
+exact-name lookup after rename, and unchanged multi-raw records after rejection.
 
 The static catalog has only waiting, navigation, pointer, and non-sensitive text
 editor actions. The local evaluator blocks the ZeroInput package, Android/system
@@ -1129,6 +1145,18 @@ separate and are not implied by unit, privacy or lint checks. See [ADR 0025](adr
 and [the implementation plan](ai-device-agent-plan.md).
 
 ### Stage 6 direct-capability boundary
+
+Record-query cancellation is propagated to Android providers using a single
+signal per operation. Tests cover cancellation during a blocked provider read,
+worker reuse, cancellation before access and signal release after completion.
+A provider that ignores cancellation, or an already dispatched write/send/dial
+without a cancellation API, can still block or complete after task invalidation.
+No rollback is promised and no automatic retry is made; old results remain
+subject to generation checks. Sensor cancellation wakes capture waits and clears
+the transient image buffer; OS initialization/cleanup latency remains a device
+acceptance item. Contact renaming replaces the full name rather than retaining
+old surname/phonetic components. Multi-raw aggregates fail closed before update
+or deletion, with an explicit unsupported-target result.
 
 Stage 6 is implemented as independent, default-off capabilities. Each operation
 requires the stage 6 disclosure, category switch, explicit task target,

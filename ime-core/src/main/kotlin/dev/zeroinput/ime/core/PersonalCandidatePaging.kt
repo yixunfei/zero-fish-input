@@ -113,7 +113,8 @@ internal class PersonalCandidatePaging {
         }
         val includesNative = pages.isEmpty() || pages.firstKey() == 0
         val personalRows = pages.values.flatMap(::rows)
-        val personal = if (includesNative) PersonalCandidateRanking.merge(visibleNative, personalRows, input, promotionThreshold)
+        val frequencies = if (includesNative) nativeFrequencies(store, visibleNative, language) else emptyMap()
+        val personal = if (includesNative) PersonalCandidateRanking.merge(visibleNative, personalRows, input, promotionThreshold, frequencies)
             else personalRows
         val items = personal.distinctBy(Candidate::text)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
@@ -123,13 +124,23 @@ internal class PersonalCandidatePaging {
         // belongs to the engine.
         val hasPrevious = pages.isNotEmpty() && pages.firstKey() > 0
         return native.copy(candidates = items, highlightedIndex = if (items.firstOrNull()?.id?.startsWith("personal:") == true ||
-            offset > 0 || editsApplied) 0 else
+            offset > 0 || editsApplied || items.firstOrNull()?.text != visibleNative.firstOrNull()?.text) 0 else
             items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
             hasPreviousPage = hasPrevious || includesNative && native.hasPreviousPage,
             hasNextPage = native.hasNextPage || (pages.lastEntry()?.value ?: first).hasMore)
     }
 
     private fun TreeMap<Int, PersonalSuggestionPage>.firstKeyOrNull(): Int? = firstEntry()?.key
+
+    private fun nativeFrequencies(store: PersonalizationStore, native: List<Candidate>,
+        language: InputLanguage): Map<String, Int> {
+        val lookup = store as? PersonalFrequencyStore ?: return emptyMap()
+        // The engine window contains at most six pages of ten candidates. Only
+        // exact lookups of these already-public values touch the prepared mirror.
+        return native.take(60).map(Candidate::text).distinct().chunked(PersonalFrequencyStore.MAX_LOOKUP)
+            .flatMap { words -> runCatching { lookup.frequenciesFor(words, language) }.getOrDefault(emptyMap()).entries }
+            .associate { it.toPair() }
+    }
 
     companion object { const val PAGE_SIZE = 8; const val MAX_PAGES = 6 }
 }

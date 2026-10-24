@@ -4,8 +4,8 @@ package dev.zeroinput.engine.api
  * Optional read-only lookup of learned frequencies by word value.
  *
  * Callers supply the values to inspect; the result cannot enumerate the
- * store because unknown words are simply absent.  It is used to rerank the
- * bounded next-word association strip and may be invoked on the IME input
+ * store because unknown words are simply absent. It reranks already-produced
+ * composing candidates and the bounded next-word strip, and may run on the IME input
  * thread, so implementations must answer from prepared in-memory state and
  * never touch disk, keystores or decryption.  Missing data, failures and
  * unready stores all return an empty map, preserving editorial order.
@@ -29,7 +29,7 @@ interface PersonalFrequencyStore : PersonalizationStore {
     fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int>
 
     companion object {
-        /** Display bound of the association strip; also the lookup bound. */
+        /** Per-call bound. Composing windows use bounded batches; associations use one. */
         const val MAX_LOOKUP = 8
     }
 }

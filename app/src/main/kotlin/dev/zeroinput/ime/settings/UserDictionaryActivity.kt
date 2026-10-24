@@ -46,6 +46,7 @@ class UserDictionaryActivity : AppCompatActivity() {
     private var hasMore = false
     private lateinit var previousPage: com.google.android.material.button.MaterialButton
     private lateinit var nextPage: com.google.android.material.button.MaterialButton
+    private lateinit var promotionThreshold: com.google.android.material.button.MaterialButton
 
     private val exporter = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) runOperation({ exportTo(uri) }) { showMessage(R.string.user_dictionary_exported) }
@@ -93,6 +94,13 @@ class UserDictionaryActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 30) importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         toolbar = createToolbar()
         addView(toolbar)
+        promotionThreshold = com.google.android.material.button.MaterialButton(context).apply {
+            minHeight = dp(48)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setOnClickListener { showThresholdDialog() }
+        }
+        addView(promotionThreshold)
+        renderThreshold()
         searchField = dictionaryField(R.string.user_dictionary_search, maxLength = 64, maxLines = 1).apply {
             setSingleLine(true)
             addTextChangedListener(object : TextWatcher {
@@ -155,13 +163,11 @@ class UserDictionaryActivity : AppCompatActivity() {
         }
         menu.add(0, MENU_IMPORT, 1, R.string.user_dictionary_import)
         menu.add(0, MENU_EXPORT, 2, R.string.user_dictionary_export)
-        menu.add(0, MENU_THRESHOLD, 3, R.string.user_dictionary_threshold)
         setOnMenuItemClickListener {
             if (!busy) when (it.itemId) {
                 MENU_ADD -> showAddDialog()
                 MENU_IMPORT -> confirmImport()
                 MENU_EXPORT -> confirmExport()
-                MENU_THRESHOLD -> showThresholdDialog()
             }
             true
         }
@@ -203,24 +209,12 @@ class UserDictionaryActivity : AppCompatActivity() {
         }
     }
     private fun showThresholdDialog() {
-        val field = dictionaryField(R.string.user_dictionary_threshold, 3, 1).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setText(String.format(java.util.Locale.ROOT, "%d", graph.settings.personalAssociationPromotionThreshold))
-        }
-        val dialog = MaterialAlertDialogBuilder(this).setTitle(R.string.user_dictionary_threshold)
-            .setMessage(getString(R.string.user_dictionary_threshold_message, graph.settings.personalAssociationPromotionThreshold))
-            .setView(field).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create()
-        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        dialog.setOnShowListener {
-            dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val value = field.text.toString().toIntOrNull()
-                if (value == null || value !in 1..100) { showMessage(R.string.user_dictionary_threshold_invalid); return@setOnClickListener }
-                graph.settings.personalAssociationPromotionThreshold = value
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
+        phraseDialog = PersonalRankingSettings.show(this, graph.settings, ::renderThreshold)
+    }
+
+    private fun renderThreshold() {
+        promotionThreshold.text = getString(R.string.user_dictionary_threshold_value,
+            graph.settings.personalAssociationPromotionThreshold)
     }
 
     private fun dictionaryField(hint: Int, maxLength: Int, maxLines: Int) =
@@ -312,7 +306,6 @@ class UserDictionaryActivity : AppCompatActivity() {
         const val MENU_ADD = 1
         const val MENU_IMPORT = 2
         const val MENU_EXPORT = 3
-        const val MENU_THRESHOLD = 4
         const val SEARCH_LIMIT = 50
         const val SEARCH_DELAY_MS = 220L
     }

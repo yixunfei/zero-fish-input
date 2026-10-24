@@ -5,7 +5,9 @@ package dev.zeroinput.ime.ai.device
  *
  * The platform adapter registers a resource-closing callback (for example a
  * ContentResolver CancellationSignal), so a blocking provider read can be
- * interrupted even when it ignores the cooperative stillValid check.
+ * interrupted by providers that honor Android's cancellation protocol. Android
+ * writes have no equivalent cancellation API: invalidation suppresses delivery
+ * and later steps, but cannot roll back a write already dispatched to a provider.
  */
 internal class DeviceStage6Cancellation {
     private val lock = Any()

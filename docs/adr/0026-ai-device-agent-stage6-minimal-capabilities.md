@@ -87,6 +87,34 @@ corresponding fixed Stage 6 read tool, after which the result is sent once.
   exceptions are not sent to the model. Only bounded, explicitly requested
   fields or media content may enter the existing HTTPS provider.
 
+## Cancellation and contact-name clarification (2026-10-24)
+
+SMS, call-log, contact and calendar lookups share an operation-owned Android
+`CancellationSignal`, registered before the first query and unregistered after
+the final cursor is consumed. Cancellation before execution performs no query;
+cancellation during a cooperative provider query releases the bounded worker.
+Every subsequent lookup rechecks the task before entering the provider.
+
+Android `insert`, `update`, `delete`, `applyBatch`, send/dial and several metadata
+APIs provide no cancellation signal or enforceable application-side timeout.
+The task deadline revokes permission to deliver results or start later steps;
+it does not imply rollback or termination of an already dispatched Binder call.
+There are no automatic retries or replacement workers for uncertain writes.
+The worker owns the in-flight call until it returns, so a non-cooperative provider
+can still delay subsequent Stage 6 work. Accessibility observation stays isolated.
+
+Microphone reads use non-blocking reads within the one-second budget, with a
+cancel-wakeable 10 ms wait when no samples are available. Camera cancellation
+closes the transient image buffer and wakes its completion wait. The capture
+worker owns recorder/camera/session cleanup; late callbacks discard resources
+and bytes. Platform initialization and teardown still depend on the OS.
+
+Contact creation and renaming mean the full display name. Renaming clears old
+structured and phonetic name components before the provider derives the new
+name. It does not edit phone/email records. An aggregate containing more than
+one raw contact is rejected explicitly for update/delete, without choosing the
+first raw account or expanding the approved write scope.
+
 ## Rejected alternatives
 
 - Requesting one shared permission for all stage 6 categories would create an

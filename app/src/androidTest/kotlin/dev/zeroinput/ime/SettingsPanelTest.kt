@@ -94,7 +94,7 @@ class SettingsPanelTest {
         instrumentation.runOnMainSync {
             result = runCatching {
                 for (locale in listOf(Locale.ENGLISH, Locale.SIMPLIFIED_CHINESE)) {
-                    for (night in listOf(false, true)) verifyPanel(locale, night)
+                    for (night in listOf(false, true)) for (scale in listOf(1f, 1.5f)) verifyPanel(locale, night, scale)
                 }
             }
         }
@@ -191,10 +191,11 @@ class SettingsPanelTest {
         assertTrue(!network.isEnabled && !network.isChecked)
     }
 
-    private fun verifyPanel(locale: Locale, night: Boolean) {
+    private fun verifyPanel(locale: Locale, night: Boolean, scale: Float) {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val configuration = Configuration(target.resources.configuration).apply {
             setLocale(locale)
+            fontScale = scale
             uiMode = Configuration.UI_MODE_TYPE_NORMAL or
                 if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
         }
@@ -230,15 +231,54 @@ class SettingsPanelTest {
             }
         }
         assertEquals(1, descendants(languageGroup).filterIsInstance<MaterialButton>().count { it.isChecked })
+        all.filterIsInstance<MaterialButtonToggleGroup>().forEach { group ->
+            val heights = (0 until group.childCount).map { group.getChildAt(it).height }
+            assertTrue("Mode buttons must share a row height", heights.distinct().size <= 1)
+        }
+        savePublicFixtures(panel, locale, night, scale)
         all.filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach {
             val available = it.width - it.compoundPaddingLeft - it.compoundPaddingRight
-            val required = it.paint.measureText(it.text.toString())
+            val layout = checkNotNull(it.layout)
             // This panel uses only built-in resource labels and synthetic state.
             val diagnostic = "Setting labels must fit a 320dp screen: locale=${locale.toLanguageTag()}, " +
-                "night=$night, view=${it.javaClass.simpleName}, label=${it.text}, " +
-                "width=${it.width}, available=$available, required=$required"
-            assertTrue(diagnostic, available >= required)
+                "night=$night, scale=$scale, view=${it.javaClass.simpleName}, label=${it.text}, " +
+                "width=${it.width}, available=$available"
+            assertTrue(diagnostic, layout.lineCount > 0)
+            for (line in 0 until layout.lineCount) {
+                assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
+                assertTrue(diagnostic, layout.getLineWidth(line) <= available + 1)
+            }
+            assertEquals(diagnostic, it.text.length, layout.getLineEnd(layout.lineCount - 1))
+            assertTrue(diagnostic, layout.height <= it.height - it.compoundPaddingTop - it.compoundPaddingBottom)
         }
+    }
+
+    private fun savePublicFixtures(panel: SettingsScreenView, locale: Locale, night: Boolean, scale: Float) {
+        val controls = descendants(panel).filterIsInstance<TextView>()
+        val targets = listOf(null, controls.first { it.text == panel.context.getString(R.string.setting_learn_from_committed_text) },
+            controls.first { it.text == panel.context.getString(R.string.keyboard_full) })
+        targets.forEachIndexed { index, target ->
+            val rect = android.graphics.Rect()
+            if (target != null) {
+                target.getDrawingRect(rect)
+                panel.offsetDescendantRectToMyCoords(target, rect)
+            }
+            panel.scrollTo(0, if (target == null) 0 else rect.top - 100)
+            if (target != null) {
+                assertTrue("Screenshot must include its target", rect.top >= panel.scrollY &&
+                    rect.bottom <= panel.scrollY + panel.height)
+            }
+            val bitmap = android.graphics.Bitmap.createBitmap(panel.width, panel.height, android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                val canvas = android.graphics.Canvas(bitmap)
+                canvas.translate(0f, -panel.scrollY.toFloat())
+                panel.draw(canvas)
+                java.io.File(panel.context.cacheDir, "settings-${locale.language}-$night-$scale-$index.png").outputStream().use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                }
+            } finally { bitmap.recycle() }
+        }
+        panel.scrollTo(0, 0)
     }
 
     private fun descendants(view: View): List<View> = if (view is ViewGroup) {

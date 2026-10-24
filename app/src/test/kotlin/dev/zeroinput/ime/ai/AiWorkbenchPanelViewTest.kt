@@ -9,7 +9,7 @@ import android.widget.TextView
 import androidx.appcompat.view.ContextThemeWrapper
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.checkbox.MaterialCheckBox
-import com.google.android.material.materialswitch.MaterialSwitch
+import androidx.appcompat.widget.SwitchCompat
 import dev.zeroinput.ai.api.AiStreamEvent
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ui.AiWorkbenchPanelView
@@ -44,7 +44,7 @@ class AiWorkbenchPanelViewTest {
         val result = panel.findViewById<TextView>(UiR.id.ai_result_text)
         assertTrue(result.isTextSelectable)
         assertTrue(panel.findViewById<ScrollView>(UiR.id.ai_result_viewport).canScrollVertically(1))
-        val thoughtSwitch = panel.findViewById<MaterialSwitch>(UiR.id.ai_thinking_toggle)
+        val thoughtSwitch = panel.findViewById<SwitchCompat>(UiR.id.ai_thinking_toggle)
         val thoughtText = panel.findViewById<TextView>(UiR.id.ai_thinking_text)
         assertTrue(thoughtSwitch.isChecked)
         assertEquals(View.VISIBLE, thoughtText.visibility)

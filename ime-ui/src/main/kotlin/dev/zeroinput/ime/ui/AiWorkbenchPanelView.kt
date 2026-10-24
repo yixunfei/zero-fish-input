@@ -182,7 +182,14 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private val insert = button(R.string.ai_insert_all) {
         if (completedResult) onInsert(result.text.toString(), false,
             if (showingSections) resultSections.selection else null)
-    }.apply { id = R.id.ai_insert_result }
+    }.apply {
+        id = R.id.ai_insert_result
+        maxLines = 2
+        ellipsize = null
+        setPadding(dp(4), 0, dp(4), 0)
+        insetTop = 0
+        insetBottom = 0
+    }
     private val sectionMode = button(R.string.ai_select_result_sections) {
         if (completedResult) {
             showingSections = !showingSections
@@ -191,11 +198,12 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             refreshCommands()
         }
     }.apply { id = R.id.ai_result_sections_toggle }
-    private val thinking = com.google.android.material.materialswitch.MaterialSwitch(context).apply {
+    private val thinking = com.google.android.material.switchmaterial.SwitchMaterial(context).apply {
         id = R.id.ai_thinking_toggle
         setText(R.string.ai_show_thinking_short)
         // The IME theme does not supply SwitchCompat's optional on/off labels.
         showText = false
+        setUseMaterialThemeColors(true)
         contentDescription = context.getString(R.string.ai_show_thinking)
         textSize = 12f
         minWidth = 0
@@ -234,7 +242,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             orientation = HORIZONTAL
             addView(model, LayoutParams(0, dp(48), 1f))
             addView(newConversation, LayoutParams(dp((88 * resources.configuration.fontScale.coerceAtLeast(1f)).toInt()), dp(48)))
-            addView(thinking, LayoutParams(dp(80), dp(48)))
+            addView(thinking, LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)))
         }
         addView(headerRow, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         controlsRow = scrollRow(listOf(pageButton, contextButton, conversationsButton, answerButton, deviceAgent, renameCancel, sectionMode) +
@@ -248,7 +256,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         addView(detail, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         addView(LinearLayout(context).apply {
             orientation = HORIZONTAL
-            listOf(submit, deviceCancel, edit, insert).forEach { addView(it, LayoutParams(0, dp(48), 1f)) }
+            isBaselineAligned = false
+            listOf(submit, deviceCancel, edit, insert).forEach {
+                addView(it, LayoutParams(0, dp(48), if (it === insert) 1.5f else 1f))
+            }
             addView(more, LayoutParams(dp(48), dp(48)))
         }, LayoutParams(LayoutParams.MATCH_PARENT, dp(48)))
         cancel.visibility = GONE

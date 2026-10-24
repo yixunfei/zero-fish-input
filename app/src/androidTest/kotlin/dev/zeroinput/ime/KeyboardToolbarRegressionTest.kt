@@ -25,20 +25,30 @@ class KeyboardToolbarRegressionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val ready = InputSessionState(privacy = SessionPrivacy(false, true, true, PrivacyReason.NONE))
 
-    @Test fun idleToolbarUsesOneRowWhileCompositionKeepsItsCandidateHeader() = withPanel { panel ->
+    @Test fun idleCompositionAndToolsKeepTheSameHeaderAndKeyPositions() = withPanel { panel ->
         val header = onMain { toolbarHeader(panel) }
+        val height = onMain { header.height }
+        val keyTop = onMain { keyTop(panel) }
         onMain {
-            assertEquals(dp(panel, 48), header.height)
+            assertTrue(height == dp(panel, 48) || height == dp(panel, 96))
             assertEquals(dp(panel, 48), checkNotNull(find(panel, UiR.string.keyboard_tools)).height)
         }
         onMain {
             panel.renderSession(ready.copy(snapshot = EngineSnapshot("ni", "ni", listOf(Candidate("public:0", "你")))))
         }
         instrumentation.waitForIdleSync()
-        onMain { assertEquals(dp(panel, 96), header.height) }
+        onMain { assertEquals(height, header.height); assertEquals(keyTop, keyTop(panel)) }
+        onMain { checkNotNull(find(panel, UiR.string.keyboard_tools)).performClick() }
+        instrumentation.waitForIdleSync()
+        onMain { assertEquals(height, header.height); assertEquals(keyTop, keyTop(panel)) }
         onMain { panel.renderSession(ready) }
         instrumentation.waitForIdleSync()
-        onMain { assertEquals(dp(panel, 48), header.height) }
+        onMain { assertEquals(height, header.height); assertEquals(keyTop, keyTop(panel)) }
+    }
+
+    private fun keyTop(panel: ZeroInputView): Int {
+        val key = visible(panel).filterIsInstance<TextView>().first { it.text.toString() == "q" }
+        return IntArray(2).also(key::getLocationOnScreen)[1]
     }
 
     @Test fun hideControlStaysAtTheRightAndRequestsHideWithoutChangingComposition() = withPanel { panel ->

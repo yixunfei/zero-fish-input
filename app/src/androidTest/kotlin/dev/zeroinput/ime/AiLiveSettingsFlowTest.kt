@@ -175,7 +175,7 @@ class AiLiveSettingsFlowTest {
                 assertTrue(panel().isAiEditing)
                 assertTrue(resultText().isEmpty())
                 assertTrue(panel().findViewById<TextView>(UiR.id.ai_draft_text).text.isEmpty())
-                assertFalse(checkNotNull(uiText(UiR.string.ai_insert)).isEnabled)
+                assertFalse(panel().findViewById<TextView>(UiR.id.ai_insert_result).isEnabled)
             }
             typeDraft("public unsent draft")
             val other = checkNotNull(graph.aiConfigurationSnapshot()?.activeProvider()).models.first { it != model }
@@ -189,7 +189,7 @@ class AiLiveSettingsFlowTest {
             typeDraft("reply with ready")
             generate()
             onMain { assertTrue("No generation may auto-insert", editor.editor.text.isEmpty()) }
-            tapUi(UiR.string.ai_insert)
+            onMain { click(panel().findViewById<TextView>(UiR.id.ai_insert_result)) }
             await { editor.editor.text.isNotEmpty() && !panel().isAiOpen }
         } finally { onMain { editor.finish() } }
     }
@@ -211,7 +211,7 @@ class AiLiveSettingsFlowTest {
 
     private fun generate() {
         tapUi(UiR.string.ai_submit)
-        await(65_000) { uiText(UiR.string.ai_insert)?.isEnabled == true }
+        await(65_000) { panel().findViewById<TextView>(UiR.id.ai_insert_result)?.isEnabled == true }
     }
 
     private fun resultText() = panel().findViewById<TextView>(UiR.id.ai_result_text).text.toString()

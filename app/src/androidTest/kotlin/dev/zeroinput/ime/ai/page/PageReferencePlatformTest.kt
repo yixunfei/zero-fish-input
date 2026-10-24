@@ -62,7 +62,7 @@ class PageReferencePlatformTest {
         shell("settings delete secure enabled_accessibility_services")
         await { !graph.pageReferences.connected }
         await { visible().filterIsInstance<TextView>().none { it.text.toString() == "Public first reference" } }
-        onMain { assertFalse(textButton(UiR.string.ai_insert).isEnabled) }
+        onMain { assertFalse(checkNotNull(panelOrNull()).findViewById<TextView>(UiR.id.ai_insert_result).isEnabled) }
     }
 
     @Test fun changedSourceAndDisabledOptInRejectCapture() = withFixture {

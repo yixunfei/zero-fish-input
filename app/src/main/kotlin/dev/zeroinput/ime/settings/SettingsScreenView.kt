@@ -42,6 +42,7 @@ data class SettingsScreenState(
     val aiThinkingVisible: Boolean = true,
     val interfaceLanguageTag: String = "",
     val learnFromCommittedText: Boolean = false,
+    val personalPromotionThreshold: Int = 3,
 )
 
 data class LanguagePackScreenState(
@@ -59,6 +60,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onSwitchRequested: () -> Unit = {}
     var onLearningChanged: (Boolean) -> Unit = {}
     var onLearnFromCommittedTextChanged: (Boolean) -> Unit = {}
+    var onPersonalPromotionThresholdRequested: () -> Unit = {}
     var onIncognitoChanged: (Boolean) -> Unit = {}
     var onSecureClipboardChanged: (Boolean) -> Unit = {}
     var onHapticsChanged: (Boolean) -> Unit = {}
@@ -119,6 +121,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val committedLearningSwitch = settingSwitch(context.getString(R.string.setting_learn_from_committed_text)) {
         onLearnFromCommittedTextChanged(it)
     }
+    private lateinit var promotionThreshold: MaterialButton
     private val modelSwitch = settingSwitch(context.getString(R.string.experimental_model_ranking)) { onModelRankingChanged(it) }
     private val incognitoSwitch = settingSwitch(context.getString(R.string.setting_incognito)) { onIncognitoChanged(it) }
     private val secureClipboardSwitch = settingSwitch(context.getString(R.string.secure_clipboard)) { onSecureClipboardChanged(it) }
@@ -133,9 +136,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val interfaceLanguage = com.google.android.material.button.MaterialButtonToggleGroup(context).apply {
         isSingleSelection = true
         isSelectionRequired = true
-        addView(languageChoice("system", R.string.language_follow_system))
-        addView(languageChoice("zh", R.string.language_simplified_chinese))
-        addView(languageChoice("en", R.string.language_english))
+        addWrappingModeButton(languageChoice("system", R.string.language_follow_system))
+        addWrappingModeButton(languageChoice("zh", R.string.language_simplified_chinese))
+        addWrappingModeButton(languageChoice("en", R.string.language_english))
         addOnButtonCheckedListener { _, checkedId, checked ->
             if (checked && !suppressSwitchCallbacks) {
                 val value = findViewById<MaterialButton>(checkedId).tag as String
@@ -160,6 +163,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         enabledStatus.setText(if (state.isEnabled) R.string.setting_enabled else R.string.setting_disabled)
         currentStatus.setText(if (state.isCurrent) R.string.setting_current else R.string.setting_not_selected)
         engineStatus.text = state.engineStatus
+        promotionThreshold.text = context.getString(R.string.user_dictionary_threshold_value, state.personalPromotionThreshold)
+        promotionThreshold.contentDescription = promotionThreshold.text
         aiStatus.text = when {
             !state.aiEnabled -> context.getString(R.string.ai_disabled)
             !state.aiNetworkAllowed -> context.getString(R.string.ai_network_disabled)
@@ -226,6 +231,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         section(context.getString(R.string.section_privacy))
         content.addView(learningSwitch)
         content.addView(committedLearningSwitch)
+        promotionThreshold = command(context.getString(R.string.user_dictionary_threshold)) { onPersonalPromotionThresholdRequested() }
         content.addView(incognitoSwitch)
         content.addView(secureClipboardSwitch)
         command(context.getString(R.string.clipboard_guard_title)) { onClipboardGuardRequested() }
@@ -288,34 +294,38 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     }
 
     private fun quickNavigation(): View = LinearLayout(context).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(52))
+        orientation = LinearLayout.VERTICAL
+        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         val entries = listOf(
             R.string.section_input to R.string.section_input,
             R.string.section_privacy to R.string.section_privacy,
             R.string.ai_title to R.string.settings_nav_ai,
             R.string.section_data to R.string.section_data,
         )
-        entries.forEach { (key, label) ->
-            addView(MaterialButton(context).apply {
-                id = View.generateViewId()
-                setText(label)
-                isAllCaps = false
-                minWidth = 0
-                minimumWidth = 0
-                setPadding(dp(2), dp(4), dp(2), dp(4))
-                minHeight = dp(44)
-                textSize = 13f
-                layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply {
-                    marginEnd = dp(4)
-                }
-                setOnClickListener {
-                    sectionAnchors[context.getString(key)]?.let { target ->
-                        post { smoothScrollTo(0, target.top) }
-                    }
-                }
+        val columns = if (resources.configuration.fontScale >= 1.3f) 2 else 4
+        entries.chunked(columns).forEach { row ->
+            addView(LinearLayout(context).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                isBaselineAligned = false
+                minimumHeight = dp(52)
+                layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+                row.forEach { (key, label) -> addView(navigationButton(key, label)) }
             })
+        }
+    }
+
+    private fun navigationButton(key: Int, label: Int) = MaterialButton(context).apply {
+        id = View.generateViewId()
+        setText(label)
+        isAllCaps = false
+        minWidth = 0
+        minimumWidth = 0
+        setPadding(dp(2), dp(4), dp(2), dp(4))
+        minHeight = dp(48)
+        textSize = 13f
+        layoutParams = LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(4) }
+        setOnClickListener {
+            sectionAnchors[context.getString(key)]?.let { target -> post { smoothScrollTo(0, target.top) } }
         }
     }
 
@@ -323,18 +333,19 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48))
+            minimumHeight = dp(48)
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             addView(TextView(context).apply {
                 text = label
                 textSize = 16f
                 layoutParams = LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
             })
-            addView(value)
+            addView(value, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         })
     }
 
-    private fun command(label: String, callback: () -> Unit) {
-        content.addView(MaterialButton(context).apply {
+    private fun command(label: String, callback: () -> Unit): MaterialButton =
+        MaterialButton(context).apply {
             text = label
             contentDescription = label
             textSize = 14f
@@ -349,14 +360,14 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             minHeight = dp(52)
             layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             setOnClickListener { callback() }
-        })
-    }
+        }.also(content::addView)
 
     private fun commandRow(vararg buttons: View) {
         content.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(52))
+            minimumHeight = dp(52)
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             buttons.forEach(::addView)
         })
     }
@@ -366,7 +377,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         isAllCaps = false
         letterSpacing = 0f
         cornerRadius = dp(6)
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)).apply {
+        minHeight = dp(48)
+        setPadding(dp(8), dp(4), dp(8), dp(4))
+        layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
             marginStart = dp(8)
         }
         setOnClickListener { callback() }
@@ -381,7 +394,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         applySettingsModeStyle()
         setPadding(dp(2), 0, dp(2), 0)
         minHeight = dp(48)
-        layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+        layoutParams = LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
     }
 
     private fun renderLanguagePacks(packs: List<LanguagePackScreenState>) {
@@ -435,6 +448,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private fun settingSwitch(label: String, callback: (Boolean) -> Unit) = MaterialSwitch(context).apply {
         text = label
         textSize = 16f
+        setSingleLine(false)
+        maxLines = Int.MAX_VALUE
+        ellipsize = null
         gravity = Gravity.CENTER_VERTICAL
         minHeight = dp(56)
         setPadding(0, dp(8), 0, dp(8))

@@ -112,8 +112,9 @@
     <string name="user_dictionary_search">Search pinyin, initials, input code or phrase</string>
     <string name="user_dictionary_previous">Previous page</string>
     <string name="user_dictionary_next">Next page</string>
-    <string name="user_dictionary_threshold">Suggestion promotion threshold</string>
-    <string name="user_dictionary_threshold_message">Start increasing ranking at this weight. Input matching and default order still apply; phrases are never pinned. Current: %1$d</string>
+    <string name="user_dictionary_threshold">Personal ranking confidence</string>
+    <string name="user_dictionary_threshold_value">Personal ranking confidence (selections): %1$d</string>
+    <string name="user_dictionary_threshold_message">Default: 3 selections. Range: 1–100. Selecting a candidate increases its frequency; ranking increases after this threshold. Manually edited weights also count. Input matching and default order still apply; phrases are never pinned. Current threshold: %1$d</string>
     <string name="user_dictionary_threshold_invalid">Enter an integer from 1 to 100</string>
     <plurals name="user_dictionary_imported">
         <item quantity="one">Imported %1$d phrase</item>

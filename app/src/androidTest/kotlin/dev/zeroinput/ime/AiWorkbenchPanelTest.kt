@@ -92,7 +92,7 @@ class AiWorkbenchPanelTest {
         val result = visible(panel).filterIsInstance<TextView>().single { it.id == dev.zeroinput.ime.ui.R.id.ai_result_text }
         assertEquals(context.getString(dev.zeroinput.ime.ui.R.string.ai_response_invalid), result.text.toString())
         assertFalse(visible(panel).filterIsInstance<TextView>().single {
-            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+            it.id == dev.zeroinput.ime.ui.R.id.ai_insert_result
         }.isEnabled)
     }
 
@@ -161,8 +161,9 @@ class AiWorkbenchPanelTest {
         panel.render(AiStreamEvent.Started)
         panel.renderConversation(dev.zeroinput.ai.api.AiConversation(title = "public fixture"))
         panel.render(AiStreamEvent.Completed("public response"))
+        panel.findViewById<View>(dev.zeroinput.ime.ui.R.id.ai_result_sections_toggle).performClick()
         val insertButton = visible(panel).filterIsInstance<TextView>().first {
-            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+            it.id == dev.zeroinput.ime.ui.R.id.ai_insert_result
         }
         assertFalse(insertButton.isEnabled)
         insertButton.performClick()
@@ -171,7 +172,7 @@ class AiWorkbenchPanelTest {
             it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_select_all)
         }.performClick()
         visible(panel).filterIsInstance<TextView>().first {
-            it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+            it.id == dev.zeroinput.ime.ui.R.id.ai_insert_result
         }.performClick()
         assertEquals("public response", inserted)
     }
@@ -213,6 +214,8 @@ class AiWorkbenchPanelTest {
             assertEquals(0, inserts)
             measure(panel, configuration.screenWidthDp, configuration.screenHeightDp)
             captureAndCheck(panel, configuration, night, "result")
+            workbench.findViewById<View>(dev.zeroinput.ime.ui.R.id.ai_result_sections_toggle).performClick()
+            measure(panel, configuration.screenWidthDp, configuration.screenHeightDp)
             val response = visible(workbench).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>().single {
                 it.text == "public response"
             }
@@ -221,7 +224,7 @@ class AiWorkbenchPanelTest {
             assertTrue(workbench.height > 0)
             assertTrue(panel.measuredHeight <= (configuration.screenHeightDp * context.resources.displayMetrics.density).toInt())
             val insertButton = visible(workbench).filterIsInstance<TextView>().first {
-                it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+                it.id == dev.zeroinput.ime.ui.R.id.ai_insert_result
             }
             assertFalse(insertButton.isEnabled)
             insertButton.performClick()
@@ -230,7 +233,7 @@ class AiWorkbenchPanelTest {
                 it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_select_all)
             }.performClick()
             visible(workbench).filterIsInstance<TextView>().first {
-                it.text == context.getString(dev.zeroinput.ime.ui.R.string.ai_insert)
+                it.id == dev.zeroinput.ime.ui.R.id.ai_insert_result
             }.performClick()
             assertEquals(1, inserts)
             panel.renderSession(InputSessionState(privacy = SessionPrivacy(false, true, false, PrivacyReason.INCOGNITO_MODE)))
@@ -306,10 +309,12 @@ class AiWorkbenchPanelTest {
             selectedAction.currentTextColor, container) >= 4.5)
         val labels = if (stage == "page") listOf(dev.zeroinput.ime.ui.R.string.ai_page_add,
             dev.zeroinput.ime.ui.R.string.ai_page_cancel, dev.zeroinput.ime.ui.R.string.ai_new_conversation)
-        else listOf(dev.zeroinput.ime.ui.R.string.ai_submit, dev.zeroinput.ime.ui.R.string.ai_insert,
+        else listOf(dev.zeroinput.ime.ui.R.string.ai_submit, dev.zeroinput.ime.ui.R.string.ai_insert_all,
             dev.zeroinput.ime.ui.R.string.ai_new_conversation,
             if (panel.isAiEditing) dev.zeroinput.ime.ui.R.string.ai_read else dev.zeroinput.ime.ui.R.string.ai_edit)
-        for (label in labels) {
+        val headerLabels = if (stage == "draft" || stage == "result")
+            listOf(dev.zeroinput.ime.ui.R.string.ai_show_thinking_short) else emptyList()
+        for (label in labels + headerLabels) {
             val button = visible(workbench).filterIsInstance<TextView>().first { it.text == it.context.getString(label) }
             val rect = Rect().also { button.getDrawingRect(it); workbench.offsetDescendantRectToMyCoords(button, it) }
             assertTrue("$stage command '${button.text}' is outside workbench at ${configuration.screenWidthDp}x${configuration.screenHeightDp} scale ${configuration.fontScale}: $rect / ${workbench.width}x${workbench.height}",
@@ -317,6 +322,19 @@ class AiWorkbenchPanelTest {
             assertTrue("Command must remain a full touch target", button.height >= 48 * button.resources.displayMetrics.density)
             val layout = checkNotNull(button.layout)
             assertTrue("Command text must fit: ${button.text} at ${configuration.screenWidthDp}dp / ${configuration.fontScale}", (0 until layout.lineCount).all { layout.getEllipsisCount(it) == 0 })
+            assertEquals(button.text.length, layout.getLineEnd(layout.lineCount - 1))
+            assertTrue("Command text must fit horizontally: ${button.text}",
+                (0 until layout.lineCount).all {
+                    layout.getLineMax(it) <= button.width - button.compoundPaddingLeft - button.compoundPaddingRight + 1
+                })
+            if (button.id == dev.zeroinput.ime.ui.R.id.ai_thinking_toggle) {
+                assertEquals(1, layout.lineCount)
+                val toggle = button as androidx.appcompat.widget.SwitchCompat
+                assertNotNull("Thinking toggle must render its thumb", toggle.thumbDrawable)
+                assertNotNull("Thinking toggle must render its track", toggle.trackDrawable)
+            }
+            assertTrue("Command text must fit vertically: ${button.text}",
+                layout.height <= button.height - button.compoundPaddingTop - button.compoundPaddingBottom)
         }
         visible(panel).forEach { it.viewTreeObserver.dispatchOnPreDraw() }
         val image = Bitmap.createBitmap(panel.width, panel.height, Bitmap.Config.ARGB_8888)
@@ -330,7 +348,7 @@ class AiWorkbenchPanelTest {
             val pixels = IntArray(radius * radius * 4)
             image.getPixels(pixels, 0, radius * 2, rect.centerX() - radius, rect.centerY() - radius, radius * 2, radius * 2)
             assertTrue("More command must render a visible icon", pixels.distinct().size > 1)
-            val folder = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
+            val folder = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
                 "ai-interaction-fixtures").apply { mkdirs() }
             java.io.File(folder, "ai-$stage-${configuration.screenWidthDp}-${configuration.fontScale}-${if (night) "dark" else "light"}.png")
                 .outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }

@@ -934,6 +934,14 @@ are screened before entering a snapshot or result, and an incomplete snapshot
 cannot drive a coordinate swipe. Stage 6 provider work uses a separate bounded
 executor so a blocked content provider cannot stall accessibility observation.
 
+Stage 6 record queries use `DeviceStage6Queries`, an operation-scoped owner of
+the Android cancellation signal. It rechecks validity before every lookup and
+unregisters on completion. Sensor cancellation wakes bounded capture waits;
+the capture worker retains cleanup ownership. Android writes without a cancel
+API remain in flight until the provider returns; cancellation discards their
+results and forbids later steps, without retrying or claiming rollback. See
+ADR 0026 for the remaining non-cooperative provider boundary.
+
 The accessibility action catalog contains bounded navigation, pointer, waiting
 and non-sensitive text-editor operations. `open_app` is constrained to the
 explicitly selected target package. Stage 6 is a separate `ai-api` tool catalog
@@ -971,6 +979,8 @@ remain behind the selected target app while that app stays foreground; leaving
 that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.md).
 
 ### Personal suggestion learning and management
+
+Composing candidates also consult the prepared exact-word frequency mirror in batches of eight (at most 60 already-produced native candidates). This preserves accumulated usage across full pinyin and initials: selecting `ceshi -> 测试` promotes the native `测试` candidate under both `ceshi` and `cs`. The total and the matching input-code frequency are combined by maximum, never added twice. Native selection routes, readings and base order remain intact. No private vocabulary is enumerated or added by this lookup, and no storage format changes. The confidence threshold and its current count are directly available beside learning settings and above the personal phrase list.
 
 Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, exact versus completion match, and a logarithmic frequency bonus starting at a configurable threshold (default 3). No word is pinned. The same policy reranks the bounded public next-word list. Worker completions emit a content-free notification; the platform checks session identity and current privacy before refreshing the composition or a still-visible association round. Hidden rounds never reappear. English private suggestions are merged only in the controller, avoiding a second engine-side ranking that bypasses the threshold.
 

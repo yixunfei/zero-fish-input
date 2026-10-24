@@ -1,5 +1,11 @@
 # Security policy
 
+Composing-candidate personalization uses only bounded exact-word lookups of
+already-produced native candidates in the prepared frequency mirror. It reuses
+existing encrypted usage across input codes without enumerating private words,
+changing the stored format or adding input-thread I/O. The existing editor
+privacy gate applies before both prefix suggestions and frequency reads.
+
 Pinyin cursor and range editing use only the current engine's bounded raw input.
 The focus-free composition view does not expose clipboard/text menus, save view
 text, or enable autofill/content capture. Stale input and invalid offsets are
@@ -359,3 +365,12 @@ merged manifests, qualified resource overrides and accessibility key filtering.
 Resource publication uses hash-pinned wheels, reviewed main ancestry, and separate
 read-only build/write publication jobs. See [threat model](docs/threat-model.md) and
 the [review resolution](CODE_REVIEW_RESOLUTION_2026-10-17.md) for verification limits.
+
+## Stage 6 cancellation clarification (2026-10-24)
+
+Record reads propagate Android cancellation signals. Cancellation prevents
+later accesses and stale result delivery, but cannot roll back an already
+dispatched provider write, SMS or call, or forcibly interrupt a provider that
+ignores cancellation. Such operations are never automatically retried. Contact
+rename/delete refuses aggregates with multiple raw contacts rather than
+selecting an account implicitly. See `docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md`.

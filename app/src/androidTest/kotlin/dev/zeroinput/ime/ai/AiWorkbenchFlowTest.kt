@@ -44,17 +44,13 @@ class AiWorkbenchFlowTest {
             onMain {
                 assertEquals(action, f.provider.request?.action)
                 assertTrue(f.inserted.isEmpty())
-                assertFalse(f.button(UiR.string.ai_insert).isEnabled)
+                assertFalse(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled)
                 f.provider.emit(AiStreamEvent.Delta("public "))
                 f.provider.emit(AiStreamEvent.Completed("public answer"))
             }
-            await { hasButton(f.panel, UiR.string.ai_select_all) }
-            onMain {
-                assertFalse(f.button(UiR.string.ai_insert).isEnabled)
-                f.button(UiR.string.ai_select_all).performClick()
-            }
-            await { f.button(UiR.string.ai_insert).isEnabled }
-            DeviceTouch.tap { f.button(UiR.string.ai_insert) }
+            await { f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled }
+            onMain { assertTrue("Completion must not insert automatically", f.inserted.isEmpty()) }
+            DeviceTouch.tap { f.panel.findViewById<TextView>(UiR.id.ai_insert_result) }
             onMain {
                 assertEquals(listOf("public answer"), f.inserted)
                 assertNull(f.controller.consumeResult())
@@ -72,7 +68,7 @@ class AiWorkbenchFlowTest {
         DeviceTouch.tap { f.button(UiR.string.ai_cancel) }
         onMain { cancelled(AiStreamEvent.Completed("late public response")) }
         instrumentation.waitForIdleSync()
-        onMain { assertFalse(f.button(UiR.string.ai_insert).isEnabled); assertNull(f.controller.consumeResult()) }
+        onMain { assertFalse(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled); assertNull(f.controller.consumeResult()) }
         DeviceTouch.tap { f.button(UiR.string.ai_submit) }
         val oldEditor = onMain { checkNotNull(f.provider.listener) }
         onMain {
@@ -89,15 +85,17 @@ class AiWorkbenchFlowTest {
         onMain { f.panel.renderAiDraft("public question", ready) }
         DeviceTouch.tap { f.button(UiR.string.ai_submit) }
         onMain { f.provider.emit(AiStreamEvent.Completed("first section\n\nsecond section\n\nthird section")) }
+        await { f.panel.findViewById<View>(UiR.id.ai_result_sections_toggle).isShown }
+        onMain { f.panel.findViewById<View>(UiR.id.ai_result_sections_toggle).performClick() }
         await { visible(f.panel).filterIsInstance<MaterialCheckBox>().size == 4 }
         onMain {
             val sections = visible(f.panel).filterIsInstance<MaterialCheckBox>()
             assertEquals("Select-all plus three answer sections", 4, sections.size)
-            assertFalse(f.button(UiR.string.ai_insert).isEnabled)
+            assertFalse(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled)
             sections[2].performClick()
             sections[3].performClick()
-            assertTrue(f.button(UiR.string.ai_insert).isEnabled)
-            f.button(UiR.string.ai_insert).performClick()
+            assertTrue(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled)
+            f.panel.findViewById<TextView>(UiR.id.ai_insert_result).performClick()
             assertEquals(listOf("second section\n\nthird section"), f.inserted)
         }
     }

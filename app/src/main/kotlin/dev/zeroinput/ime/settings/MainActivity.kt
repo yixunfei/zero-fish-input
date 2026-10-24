@@ -23,6 +23,7 @@ import dev.zeroinput.languagepack.LanguagePackLanguage
 import dev.zeroinput.userdata.AiConfiguration
 
 class MainActivity : AppCompatActivity() {
+    private var personalRankingDialog: androidx.appcompat.app.AlertDialog? = null
     private val graph by lazy { (application as ZeroInputApplication).graph }
     private val worker = BoundedExecutors.singleThread(
         name = "zeroinput-settings",
@@ -132,6 +133,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        personalRankingDialog?.dismiss()
+        personalRankingDialog = null
         deletionObserver?.close()
         deletionObserver = null
         aiDialog?.dismiss()
@@ -159,6 +162,10 @@ class MainActivity : AppCompatActivity() {
         }
         screen.onLearningChanged = { graph.settings.learningEnabled = it; render() }
         screen.onLearnFromCommittedTextChanged = { graph.settings.learnFromCommittedText = it; render() }
+        screen.onPersonalPromotionThresholdRequested = {
+            personalRankingDialog?.dismiss()
+            personalRankingDialog = PersonalRankingSettings.show(this, graph.settings, ::render)
+        }
         screen.onIncognitoChanged = { graph.settings.incognitoMode = it; render() }
         screen.onSecureClipboardChanged = ::setSecureClipboardEnabled
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
@@ -409,6 +416,7 @@ class MainActivity : AppCompatActivity() {
                 isCurrent = current == component.flattenToShortString() || current == component.flattenToString(),
                 learningEnabled = graph.settings.learningEnabled,
                 learnFromCommittedText = graph.settings.learnFromCommittedText,
+                personalPromotionThreshold = graph.settings.personalAssociationPromotionThreshold,
                 incognitoMode = graph.settings.incognitoMode,
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,

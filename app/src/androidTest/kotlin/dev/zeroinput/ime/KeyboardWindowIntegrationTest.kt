@@ -118,8 +118,12 @@ class KeyboardWindowIntegrationTest {
                     val view = requireNotNull(host())
                     assertTrue(view.height < activity.window.decorView.height)
                     assertTrue(view.inputBounds().right <= view.width)
-                    assertEquals("Docked and one-hand panels must not reserve the navigation bar twice",
-                        view.height, view.inputBounds().bottom)
+                    // The IME navigation bar can be taller than the editor's
+                    // gesture bar. Validate against the window hosting the panel.
+                    val hostBars = WindowInsetsCompat.toWindowInsetsCompat(requireNotNull(view.rootWindowInsets))
+                        .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                    assertEquals("Docked and one-hand panels must reserve the IME bottom inset exactly once",
+                        hostBars.bottom, view.height - view.inputBounds().bottom)
                     val key = views(view).filterIsInstance<android.widget.TextView>().first { it.text.toString() == "q" && it.isShown }
                     key.performClick()
                 }

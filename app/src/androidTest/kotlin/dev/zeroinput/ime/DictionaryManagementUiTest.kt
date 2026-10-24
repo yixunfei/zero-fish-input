@@ -55,24 +55,25 @@ class DictionaryManagementUiTest {
                         assertTrue(activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
                         val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
                         assertTrue(views(root).filterIsInstance<EditText>().all { !it.isSaveEnabled })
-                        for ((width, height) in listOf(320 to 600, 800 to 320)) {
-                            val scale = activity.resources.displayMetrics.density
-                            val w = (width * scale).toInt(); val h = (height * scale).toInt()
-                            // Each manual viewport needs a fresh software draw; retained
-                            // dirty flags can otherwise produce an empty second bitmap.
-                            views(root).forEach { it.forceLayout(); it.invalidate() }
-                            root.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
-                            root.layout(0, 0, w, h)
-                            views(root).filterIsInstance<EditText>().forEach { assertTrue(it.width > 0 && it.width <= w) }
-                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                            root.draw(Canvas(bitmap))
-                            val colors = (0 until w step 16).flatMap { x -> (0 until h step 16).map { y -> bitmap.getPixel(x, y) } }.toSet()
-                            assertTrue("Fixture screenshot contains rendered controls", colors.size > 8)
-                            File(context.cacheDir, "dictionary-fixture-$language-$mode-$width.png").outputStream().use {
-                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                        // Render a detached hierarchy: attached hardware display lists are not a
+                        // reliable software screenshot source after a manual viewport change.
+                        val parent = root.parent as ViewGroup
+                        val index = parent.indexOfChild(root)
+                        val params = root.layoutParams
+                        val padding = intArrayOf(root.paddingLeft, root.paddingTop, root.paddingRight, root.paddingBottom)
+                        parent.removeView(root)
+                        // Synthetic viewport dimensions exclude the original window's system/IME
+                        // insets, which may exceed the height of the landscape fixture.
+                        root.setPadding(0, 0, 0, 0)
+                        try {
+                            for ((width, height) in listOf(320 to 600, 800 to 320)) {
+                                captureViewport(root, width, height, language, mode)
                             }
-                            bitmap.recycle()
+                        } finally {
+                            root.setPadding(padding[0], padding[1], padding[2], padding[3])
+                            parent.addView(root, index, params)
                         }
+
                     }
                 } finally { instrumentation.runOnMainSync { activity.finish() }; instrumentation.waitForIdleSync() }
             }
@@ -84,6 +85,53 @@ class DictionaryManagementUiTest {
             }
         }
     }
+    private fun captureViewport(root: View, width: Int, height: Int, language: String, mode: Int) {
+        val scale = root.resources.displayMetrics.density
+        val w = (width * scale).toInt()
+        val h = (height * scale).toInt()
+        views(root).forEach { it.forceLayout(); it.invalidate() }
+        root.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+        root.layout(0, 0, w, h)
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        try {
+            root.draw(Canvas(bitmap))
+            File(root.context.cacheDir, "dictionary-fixture-$language-$mode-$width.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally { bitmap.recycle() }
+        val diagnostic = "Dictionary fixture: $language/$mode/${width}x$height"
+        val controls = views(root).filterIsInstance<TextView>().filter {
+            it is EditText || it.text == root.context.getString(R.string.dictionary_search) ||
+                it.text.startsWith("公开管理测试")
+        }
+        assertEquals(diagnostic, 3, controls.size)
+        for (control in controls) {
+            val rect = android.graphics.Rect()
+            control.getDrawingRect(rect)
+            (root as ViewGroup).offsetDescendantRectToMyCoords(control, rect)
+            assertTrue(diagnostic, rect.left >= 0 && rect.right <= w && rect.top >= 0 && rect.bottom <= h)
+            var ancestor = control.parent
+            while (ancestor is ViewGroup && ancestor !== root) {
+                val viewport = android.graphics.Rect()
+                ancestor.getDrawingRect(viewport)
+                root.offsetDescendantRectToMyCoords(ancestor, viewport)
+                assertTrue("$diagnostic ${control.javaClass.simpleName} $rect must fit " +
+                    "${ancestor.javaClass.simpleName} $viewport", viewport.contains(rect))
+                ancestor = ancestor.parent
+            }
+            assertTrue("$diagnostic ${control.javaClass.simpleName} enabled=${control.isEnabled} " +
+                "clickable=${control.isClickable} height=${control.height} target=${48 * scale}",
+                control.isEnabled && control.isClickable && control.height >= (48 * scale).toInt())
+            val layout = checkNotNull(control.layout)
+            assertTrue(diagnostic, layout.height <= control.height - control.compoundPaddingTop - control.compoundPaddingBottom)
+            for (line in 0 until layout.lineCount) {
+                assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
+                assertTrue(diagnostic, layout.getLineWidth(line) <= control.width - control.compoundPaddingLeft - control.compoundPaddingRight + 1)
+            }
+        }
+    }
+
     private fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)
         (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
 }
