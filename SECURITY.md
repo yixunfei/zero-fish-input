@@ -366,6 +366,13 @@ Resource publication uses hash-pinned wheels, reviewed main ancestry, and separa
 read-only build/write publication jobs. See [threat model](docs/threat-model.md) and
 the [review resolution](CODE_REVIEW_RESOLUTION_2026-10-17.md) for verification limits.
 
+## Reviewed Rime cache verification (2026-10-26)
+
+Reviewed Rime artifact build checks use explicit failures, including under Python
+optimization. Missing default shared build directories are recovered from checked
+APK assets before native verification; a surviving installation marker alone does
+not validate the cache. These changes add no download or personal-data access.
+
 ## Stage 6 cancellation clarification (2026-10-24)
 
 Record reads propagate Android cancellation signals. Cancellation prevents

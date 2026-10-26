@@ -5,6 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 . (Join-Path $PSScriptRoot 'lib/TestApkArtifact.ps1')
+. (Join-Path $PSScriptRoot 'lib/JavaToolchain.ps1')
 $sdkSetting = Get-Content (Join-Path $repositoryRoot "local.properties") |
     Where-Object { $_ -match '^sdk\.dir=' } | Select-Object -First 1
 if (-not $sdkSetting) { throw "Configure sdk.dir in local.properties before running device tests." }
@@ -28,24 +29,7 @@ if ($Serial -notin $devices) { throw "The selected device is not connected and a
 $abi = @(Invoke-Adb @("shell", "getprop", "ro.product.cpu.abi"))[0].Trim()
 if ($abi -notin @("arm64-v8a", "armeabi-v7a", "x86_64")) { throw "Unsupported test ABI." }
 
-$compilerJdk = $null
-$jdkCandidates = if ($Jdk17Path) { @($Jdk17Path) } else {
-    @($env:JDK17_HOME)
-    if ($env:JAVA_HOME) { $jdkCandidates += Join-Path (Split-Path $env:JAVA_HOME -Parent) "jdk17" }
-    $jdkCandidates
-}
-foreach ($candidate in $jdkCandidates) {
-    if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
-    $jdkHome = [IO.Path]::GetFullPath($candidate)
-    $release = Join-Path $jdkHome "release"
-    if ((Test-Path -LiteralPath (Join-Path $jdkHome "bin/javac.exe")) -and
-        (Test-Path -LiteralPath $release) -and
-        @(Get-Content -LiteralPath $release | Where-Object { $_ -match '^JAVA_VERSION="17\.' }).Count -eq 1) {
-        $compilerJdk = $jdkHome
-        break
-    }
-}
-if ($Jdk17Path -and -not $compilerJdk) { throw "Jdk17Path must contain a JDK 17 release and javac." }
+$compilerJdk = Resolve-Java17Home -ExplicitPath $Jdk17Path -EnvironmentPath $env:JDK17_HOME -JavaHome $env:JAVA_HOME
 
 Push-Location $repositoryRoot
 try {

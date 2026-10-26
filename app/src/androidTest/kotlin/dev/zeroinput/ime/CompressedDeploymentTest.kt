@@ -120,6 +120,27 @@ class CompressedDeploymentTest {
                 shared.name.replace("shared-", "user-") + "/build/zeroinput_public.table.bin").length() > 70_000_000)
     }
 
+    @Test fun missingPrebuiltDirectoryIsRedeployedWithoutCompilingTheDefaultDictionary() = withFixture { factory, root, _ ->
+        check(factory.warmUp()) { "Public fixture deployment failed" }
+        val shared = File(root, "rime").listFiles().orEmpty().single { it.name.startsWith("shared-") }
+        val build = File(shared, "build")
+        val user = File(shared.parentFile, shared.name.replace("shared-", "user-"))
+        factory.close()
+        check(build.deleteRecursively()) // disposable public fixture only
+        assertTrue("The generation marker must survive the simulated cache loss", File(shared, ".installed").isFile)
+
+        check(factory.warmUp()) { "Missing default cache must recover" }
+        assertTrue("Missing prebuilt data must be restored from reviewed APK assets",
+            File(build, "zeroinput_public.table.bin").length() > 70_000_000)
+        assertFalse("Recovery must not compile the default dictionary into user storage",
+            File(user, "build/zeroinput_public.table.bin").exists())
+        requireNotNull(factory.createNativeOrNull()).use { engine ->
+            engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
+            "nihao".forEach { engine.handle(EngineKey.Character(it.toString())) }
+            assertTrue(engine.snapshot.candidates.any { it.text == "你好" })
+        }
+    }
+
     @Test fun changedDictionaryUsesItsOwnGenerationAndNativeCompilation() = withFixture { factory, root, base ->
         val extra = File(root, "fixture.dict.yaml").apply {
             writeText("---\nname: fixture\nversion: '1'\nsort: by_weight\nuse_preset_vocabulary: false\n...\n" +

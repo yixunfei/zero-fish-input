@@ -96,8 +96,11 @@ class PersonalLearningControllerTest {
             val store = Store().apply { count = 3; personalOnly = true }
             val controller = controller(store, optIn = optIn)
             controller.handle(InputCommand.Text("cs"))
+            assertEquals("personal:test", controller.state.snapshot.candidates.first().id)
             controller.handle(InputCommand.Space)
             assertEquals(if (optIn) 1 else 0, store.writes)
+            assertEquals(if (optIn) listOf("test") else emptyList<String>(), store.usedIds)
+            controller.close()
         }
     }
 
@@ -170,7 +173,7 @@ class PersonalLearningControllerTest {
         val usedIds = mutableListOf<String>()
         override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int): List<PersonalSuggestion> {
             reads++
-            if (personalOnly) return emptyList()
+            if (personalOnly) return listOf(PersonalSuggestion("test", "私有词", count, "cs"))
             return if (count > 0 && prefix == "cs") listOf(PersonalSuggestion("test", "测试", count, "cs")) else emptyList()
         }
         override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) {

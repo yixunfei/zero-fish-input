@@ -177,7 +177,8 @@ internal class RimeAssetInstaller(
         val prebuilt = readPrebuiltManifest()
         return prebuilt.getString("sourceIdentity") == assetIdentity(
             context.assets.open("rime/public-dictionaries.json").bufferedReader().use { JSONObject(it.readText()) }) &&
-            sha256(context.assets.open("rime/default.yaml")) == prebuilt.getJSONObject("sourceFiles").getString("default.yaml")
+            context.assets.open("rime/default.yaml").use(::sha256) ==
+                prebuilt.getJSONObject("sourceFiles").getString("default.yaml")
     }
 
     private fun readPrebuiltManifest(): JSONObject = prebuiltManifest.also { manifest ->
@@ -227,7 +228,7 @@ internal class RimeAssetInstaller(
 
     private fun prebuiltMatches(directories: Directories, manifest: JSONObject? = null): Boolean {
         val build = File(directories.shared, "build")
-        if (!build.isDirectory) return true
+        if (!build.isDirectory) return false
         val expected = manifest ?: readPrebuiltManifest()
         val files = expected.getJSONObject("files")
         return PREBUILT_FILES.all { name ->

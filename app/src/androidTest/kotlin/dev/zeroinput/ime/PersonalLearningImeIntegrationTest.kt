@@ -39,6 +39,7 @@ class PersonalLearningImeIntegrationTest {
         val options = graph.settings.chineseInputOptions
         val model = graph.settings.experimentalModelRanking
         val language = graph.settings.lastLanguage
+        val threshold = graph.settings.personalPromotionThreshold
         var activity: InputFixtureActivity? = null
         try {
             graph.engineExecutor.submit {}.get(60, TimeUnit.SECONDS)
@@ -48,6 +49,7 @@ class PersonalLearningImeIntegrationTest {
                 graph.settings.experimentalModelRanking = false
                 graph.settings.chineseInputOptions = ChineseInputOptions()
                 graph.settings.lastLanguagePackKey = null
+                graph.settings.personalPromotionThreshold = 3
             }
             (graph.personalization as QueuedPersonalizationStore).clearAndAwait()
             val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
@@ -92,6 +94,7 @@ class PersonalLearningImeIntegrationTest {
                 graph.settings.lastLanguage = language
                 graph.settings.lastLanguagePackKey = pack
                 graph.settings.chineseInputOptions = options
+                graph.settings.personalPromotionThreshold = threshold
             }
             if (original.isNotBlank() && original != "null") shell("ime set $original")
         }

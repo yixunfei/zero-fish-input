@@ -968,6 +968,13 @@ it does not search or delete user-generation content. Compromise of the
 APK/build toolchain remains a supply-chain review boundary; asset hashes are not
 an authenticity mechanism against a fully modified installed package.
 
+The build gate's manifest and archive checks remain active with `python -O` or
+`PYTHONOPTIMIZE`; they do not rely on removable assertions. Negative tests reject
+an unreviewed runtime commit and an archive hash mismatch in optimized mode.
+Loss of the entire default shared build directory invalidates the cache even
+when `.installed` survives. Recovery redeploys reviewed assets before native
+verification and preserves the user-generation boundary.
+
 ## Review hardening (2026-10-10)
 
 - A compromised generated runtime AAR plus a matching generated verification stamp

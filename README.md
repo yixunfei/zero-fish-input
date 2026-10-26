@@ -577,6 +577,8 @@ APK、第三方许可证、手写模型对应源码压缩包及 SHA-256 清单�
 
 ```powershell
 ./tools/test-test-apk-artifact.ps1
+./tools/test-java-toolchain.ps1
+python tools/rime-prebuilt/test_verify.py
 ./tools/test-input-experience.ps1 -Serial emulator-5554 `
   -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.7.0-debug-universal.apk' `
   -TestClass 'dev.zeroinput.ime.AiProviderManagementTest,dev.zeroinput.ime.AiSettingsFailureTest,dev.zeroinput.ime.AiImeInteractionTest'
@@ -656,7 +658,7 @@ Debug 测试包会在候选栏持续显示一行诊断信息，覆盖输入前�
 
 ## 真机验收清单
 
-连接 Android Studio 模拟器后，可运行实际 Rime 和输入面板的设备回归测试：
+连接 Android Studio 模拟器后，先唤醒并解锁设备，确认没有系统凭据页遮挡，再运行实际 Rime 和输入面板的设备回归测试：
 
 ```powershell
 ./tools/test-input-experience.ps1

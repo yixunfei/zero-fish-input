@@ -860,8 +860,11 @@ validates the source-bound manifest, bounded XZ streams, both hashes and binary
 formats before unpublished shared-build activation. This is a build cache, not a
 second dictionary owner: all 16 source tables remain bundled, changed/custom and
 grammar-bearing generations retain worker-owned native compilation, and native
-conversion still gates `READY`. Default recovery may redeploy these artifacts;
-custom recovery does not apply their hashes. Generic source deployment skips
+conversion still gates `READY`. Default recovery redeploys missing or damaged
+artifacts even when the generation marker remains; a missing shared build
+directory is not a valid cache hit. Custom recovery does not apply their hashes.
+The build verifier uses explicit failures that remain active under Python
+optimization. Generic source deployment skips
 `rime/prebuilt`; after conversion verification, cleanup reclaims the exact
 app-owned base/shared archive copies made by older builds without entering user
 generations. See [ADR 0027](adr/0027-reviewed-default-rime-artifacts.md).
