@@ -31,8 +31,10 @@ From the repository root, run:
 ```
 
 Use `./tools/test-input-experience.ps1 -Serial <device-serial>` for connected
-device tests. It installs test APKs and temporarily changes the selected keyboard,
-restoring it on exit. Use a development device with synthetic data.
+device tests. With a JDK 21 host, also pass `-Jdk17Path <JDK17_HOME>` or set
+`JDK17_HOME` for the compiler toolchain. It installs test APKs and temporarily
+changes the selected keyboard, restoring it on exit. Use a development device
+with synthetic data.
 
 For all ABIs and distribution checks, run `./tools/package-test-apk.ps1` and
 `./gradlew.bat :app:assembleRelease -PrequireRime=true --no-parallel`.

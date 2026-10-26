@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Serial, [string]$TestClass, [string]$ApkPath)
+param([string]$Serial, [string]$TestClass, [string]$ApkPath, [string]$Jdk17Path)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -28,11 +28,32 @@ if ($Serial -notin $devices) { throw "The selected device is not connected and a
 $abi = @(Invoke-Adb @("shell", "getprop", "ro.product.cpu.abi"))[0].Trim()
 if ($abi -notin @("arm64-v8a", "armeabi-v7a", "x86_64")) { throw "Unsupported test ABI." }
 
+$compilerJdk = $null
+$jdkCandidates = if ($Jdk17Path) { @($Jdk17Path) } else {
+    @($env:JDK17_HOME)
+    if ($env:JAVA_HOME) { $jdkCandidates += Join-Path (Split-Path $env:JAVA_HOME -Parent) "jdk17" }
+    $jdkCandidates
+}
+foreach ($candidate in $jdkCandidates) {
+    if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+    $jdkHome = [IO.Path]::GetFullPath($candidate)
+    $release = Join-Path $jdkHome "release"
+    if ((Test-Path -LiteralPath (Join-Path $jdkHome "bin/javac.exe")) -and
+        (Test-Path -LiteralPath $release) -and
+        @(Get-Content -LiteralPath $release | Where-Object { $_ -match '^JAVA_VERSION="17\.' }).Count -eq 1) {
+        $compilerJdk = $jdkHome
+        break
+    }
+}
+if ($Jdk17Path -and -not $compilerJdk) { throw "Jdk17Path must contain a JDK 17 release and javac." }
+
 Push-Location $repositoryRoot
 try {
     $tasks = @(':app:assembleDebugAndroidTest')
     if (-not $ApkPath) { $tasks += ':app:assembleDebug' }
-    & ./gradlew.bat @tasks -PrequireRime=true --no-parallel "-Pandroid.injected.build.abi=$abi"
+    $gradleArguments = @("-PrequireRime=true", "--no-parallel", "-Pandroid.injected.build.abi=$abi")
+    if ($compilerJdk) { $gradleArguments += "-Porg.gradle.java.installations.paths=$($compilerJdk.Replace('\', '/'))" }
+    & ./gradlew.bat @tasks @gradleArguments
     if ($LASTEXITCODE -ne 0) { throw "Device test APK build failed." }
     $testDirectory = Join-Path $repositoryRoot "app/build/intermediates/apk/androidTest/debug"
     $testMetadata = Get-Content (Join-Path $testDirectory "output-metadata.json") -Raw | ConvertFrom-Json

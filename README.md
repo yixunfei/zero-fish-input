@@ -532,7 +532,10 @@ cd zero-fish-input
 ```
 
 配置 `JAVA_HOME` 指向 JDK 17，`ANDROID_SDK_ROOT` 指向 Android SDK，或在本机
-`local.properties` 中设置 `sdk.dir`。不要提交本机 SDK 路径或签名文件。
+`local.properties` 中设置 `sdk.dir`。使用 JDK 21 宿主运行 Robolectric 验证时，保留独立的
+JDK 17 编译工具链并传入 `"-Porg.gradle.java.installations.paths=<JDK17_HOME>"`。
+设备测试脚本可通过 `-Jdk17Path <path>` 或 `JDK17_HOME` 发现该工具链，也会检查当前 JDK
+同级的 `jdk17`。不要提交本机 SDK 路径或签名文件。
 先获取固定版本及校验和的 librime 1.13.1 与依赖，然后用 Android Studio 打开仓库根目录：
 
 ```powershell

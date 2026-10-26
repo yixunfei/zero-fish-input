@@ -1,5 +1,6 @@
 package dev.zeroinput.ime.clipboard
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -99,8 +100,9 @@ open class ClipboardImportActivity : AppCompatActivity() {
         receiveIncoming(intent)
     }
 
+    @SuppressLint("MissingSuperCall") // This private page deliberately persists no state.
     override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
+        // Drafts, grant-dependent views and framework state are all discarded on recreation.
         outState.clear()
     }
 
