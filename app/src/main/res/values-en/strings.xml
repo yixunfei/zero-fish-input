@@ -112,9 +112,9 @@
     <string name="user_dictionary_search">Search pinyin, initials, input code or phrase</string>
     <string name="user_dictionary_previous">Previous page</string>
     <string name="user_dictionary_next">Next page</string>
-    <string name="user_dictionary_threshold">Personal ranking confidence</string>
-    <string name="user_dictionary_threshold_value">Personal ranking confidence (selections): %1$d</string>
-    <string name="user_dictionary_threshold_message">Default: 3 selections. Range: 1–100. Selecting a candidate increases its frequency; ranking increases after this threshold. Manually edited weights also count. Input matching and default order still apply; phrases are never pinned. Current threshold: %1$d</string>
+    <string name="user_dictionary_threshold">Personal frequency promotion threshold</string>
+    <string name="user_dictionary_threshold_value">Personal frequency promotion threshold: %1$d</string>
+    <string name="user_dictionary_threshold_message">Default: 3. Range: 1–100. Personal frequency or a manual weight promotes existing typing candidates and public next-word suggestions only after reaching this threshold. Input matching and default order still apply; no candidate is pinned. This controls ranking, not which words are suggested. Current threshold: %1$d</string>
     <string name="user_dictionary_threshold_invalid">Enter an integer from 1 to 100</string>
     <plurals name="user_dictionary_imported">
         <item quantity="one">Imported %1$d phrase</item>
@@ -172,7 +172,7 @@
     <string name="setting_switch">Switch</string>
     <string name="section_privacy">Privacy</string>
     <string name="section_data">Data</string>
-    <string name="setting_user_phrases">Manage personal suggestions</string>
+    <string name="setting_user_phrases">Manage personal phrases</string>
     <string name="section_language_packs">Language packs</string>
     <string name="setting_import_pack">Import language pack</string>
     <string name="language_pack_imported">Imported %1$s</string>

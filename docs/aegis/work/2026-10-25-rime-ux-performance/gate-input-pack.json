@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "baselineRefs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "impactStatement": "docs/aegis/work/2026-10-25-rime-ux-performance/impact-statement-draft.json",
+  "compatPlan": "Prebuilt artifacts apply only to the exact managed/no-grammar default generation. Source dictionaries, custom native compilation, conversion-before-READY, fallback and encrypted personalization remain authoritative. Cleanup is bounded to app-owned base/shared archive caches.",
+  "retirementPlan": "Only duplicate public archive caches removed; required source compiler retained with changed-dictionary evidence",
+  "evidenceBundle": [
+    "docs/aegis/work/2026-10-25-rime-ux-performance/evidence-bundle-draft-final-input-experience.json",
+    "docs/aegis/work/2026-10-25-rime-ux-performance/evidence-bundle-draft-jvm-privacy-build.json",
+    "docs/aegis/work/2026-10-25-rime-ux-performance/evidence-bundle-draft-runtime-cache-and-readiness.json"
+  ]
+}

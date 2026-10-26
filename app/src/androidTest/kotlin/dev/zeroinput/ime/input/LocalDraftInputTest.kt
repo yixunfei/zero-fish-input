@@ -9,6 +9,7 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.core.InputSessionState
 import dev.zeroinput.ime.ui.KeyboardAction
+import dev.zeroinput.userdata.UserTerm
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
@@ -197,6 +198,48 @@ class LocalDraftInputTest {
             draft.start(InputLanguage.ENGLISH)
             assertEquals("", value)
         } finally { draft.close() }
+    }
+
+    @Test fun englishDraftNeitherPromotesNorLearnsPersonalCandidates() {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val previous = graph.engineExecutor.submit<UserTerm?> {
+            graph.userLexicon.list().singleOrNull {
+                it.language == InputLanguage.ENGLISH && it.shortcut == "th" && it.value == "there"
+            }
+        }.get(60, TimeUnit.SECONDS)
+        graph.engineExecutor.submit {
+            if (previous == null) graph.userLexicon.addPhrase("th", "there", InputLanguage.ENGLISH, 100)
+            else graph.userLexicon.updatePhrase(previous.id, "th", "there", InputLanguage.ENGLISH, 100)
+        }.get(60, TimeUnit.SECONDS)
+        var committed = ""
+        var state = InputSessionState()
+        val draft = LocalDraftInput({ graph }, { false }, {}, { text, _, next -> committed = text; state = next }, maxChars = 64)
+        try {
+            onMain {
+                draft.start(InputLanguage.ENGLISH)
+                typePinyin(draft, "th")
+                assertFalse(state.privacy.learningAllowed)
+                assertFalse(state.privacy.personalizationAllowed)
+                assertEquals("th", state.snapshot.candidates.first().text)
+                assertFalse(state.snapshot.candidates.any { it.id.startsWith("personal:") })
+                val choice = state.snapshot.candidates.indexOfFirst { it.text == "there" }
+                draft.command(dev.zeroinput.ime.core.InputCommand.SelectCandidate(choice))
+                assertEquals("there ", committed)
+            }
+            graph.engineExecutor.submit {}.get(60, TimeUnit.SECONDS)
+            assertEquals(100, graph.userLexicon.list().single { it.value == "there" && it.shortcut == "th" }.frequency)
+        } finally {
+            onMain { draft.close() }
+            graph.engineExecutor.submit {
+                if (previous == null) {
+                    graph.userLexicon.list().filter { it.shortcut == "th" && it.value == "there" }
+                        .forEach { graph.userLexicon.remove(it.id) }
+                } else {
+                    graph.userLexicon.updatePhrase(previous.id, previous.shortcut, previous.value, previous.language, previous.frequency)
+                }
+                Unit
+            }.get(60, TimeUnit.SECONDS)
+        }
     }
 
     @Test fun draftRendersCommittedTextAndPreeditSeparately() = onMain {

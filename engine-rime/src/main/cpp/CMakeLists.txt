@@ -78,6 +78,7 @@ set(X11Keysym "${RIME_ROOT}/include")
 add_subdirectory("${RIME_ROOT}" "${CMAKE_BINARY_DIR}/librime" EXCLUDE_FROM_ALL)
 target_compile_options(rime-static PRIVATE -Wno-error=deprecated-declarations)
 
+if(NOT ZEROINPUT_RIME_DEPENDENCIES_ONLY)
 add_library(zeroinput_rime SHARED zero_rime_jni.cpp)
 set(OCTAGRAM_ROOT "${RIME_DEPS_ROOT}/librime-octagram")
 if(NOT EXISTS "${OCTAGRAM_ROOT}/src/octagram.cc")
@@ -108,3 +109,4 @@ target_compile_options(zeroinput_rime PRIVATE
   -fvisibility=hidden
 )
 target_link_options(zeroinput_rime PRIVATE "LINKER:--gc-sections")
+endif()

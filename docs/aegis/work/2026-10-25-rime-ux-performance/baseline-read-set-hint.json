@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "candidateDocs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "whyRelevant": "Rime timeout diagnosis and pre-existing personalization changes must be preserved.",
+  "missingAuthority": []
+}

@@ -29,6 +29,33 @@ class ChineseInputAvailabilityTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val graph get() = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
 
+    @Test fun firstInputFrameUsesConvertibleFallbackWithoutNativeWork() {
+        val times = mutableListOf<Long>()
+        var creationMs = 0L
+        onMain {
+            val started = System.nanoTime()
+            graph.createImmediateEngine(dev.zeroinput.engine.api.InputLanguage.CHINESE).use { engine ->
+                creationMs = (System.nanoTime() - started) / 1_000_000
+                assertTrue(engine.descriptor.isFallback)
+                engine.start(dev.zeroinput.engine.api.EditorContext(
+                    dev.zeroinput.engine.api.InputLanguage.CHINESE, false, false, null))
+                "nihao".forEach { character ->
+                    val keyStarted = System.nanoTime()
+                    engine.handle(dev.zeroinput.engine.api.EngineKey.Character(character.toString()))
+                    times += System.nanoTime() - keyStarted
+                }
+                assertTrue(engine.snapshot.candidates.any { it.text == "你好" })
+                assertEquals("你好", engine.selectCandidate(engine.snapshot.candidates.indexOfFirst { it.text == "你好" })
+                    .committedText)
+            }
+        }
+        instrumentation.sendStatus(0, android.os.Bundle().apply {
+            putLong("first_fallback_creation_ms", creationMs)
+            putLong("first_fallback_key_max_us", times.max() / 1_000)
+            putLong("first_fallback_key_total_us", times.sum() / 1_000)
+        })
+    }
+
     @Test fun delayedNativePreparationKeepsFallbackSelectableThenAdoptsRime() {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)

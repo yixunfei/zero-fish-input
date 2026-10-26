@@ -81,6 +81,16 @@ class PersonalLearningRimeTest {
             assertEquals(4, worker.submit<Int> {
                 UserLexiconRepository(disk).frequenciesFor(listOf("测试"), InputLanguage.CHINESE)["测试"] ?: 0
             }.get(10, TimeUnit.SECONDS))
+
+            worker.submit { repository.addPhrase("nihao", "你", InputLanguage.CHINESE, 3) }
+                .get(10, TimeUnit.SECONDS)
+            type("nihao")
+            controller.handle(InputCommand.SelectSyllable)
+            assertEquals("你", controller.state.snapshot.candidates.first().text)
+            controller.handle(InputCommand.SelectCandidate(0))
+            assertTrue("Segment state: composing=${controller.state.snapshot.isComposing} " +
+                "undo=${controller.state.snapshot.canUndoSelection} count=${controller.state.snapshot.candidates.size}",
+                controller.state.snapshot.canUndoSelection)
         } finally {
             controller.close()
             store.close()

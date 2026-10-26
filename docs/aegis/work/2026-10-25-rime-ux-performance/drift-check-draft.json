@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-10-25-rime-ux-performance",
+  "taskIntentRef": "docs/aegis/work/2026-10-25-rime-ux-performance/task-intent-draft.json",
+  "baselineRefs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "scopeStatus": "Completed Rime deployment, bounded cache repair and measured UX assessment; personalization changes preserved",
+  "compatStatus": "Conversion-before-READY, fallback, source compiler, custom generations and privacy preserved",
+  "retirementStatus": "Only duplicate public archive caches removed; required source compiler retained with changed-dictionary evidence",
+  "newRiskSignals": [],
+  "decision": "continue"
+}

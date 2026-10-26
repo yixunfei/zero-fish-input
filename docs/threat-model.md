@@ -947,6 +947,27 @@ scorer on its owner worker. Native code remains bundled; compressed APK librarie
 are extracted by Android, not a custom loader. Negative tests cover decoder bounds,
 corruption, cancellation, graph rejection, missing-model retry and stale results.
 
+## Reviewed default Rime build artifacts (ADR 0027)
+
+Prebuilt table/prism/reverse data is generated from locked public sources using
+the pinned host librime deployer. Its manifest binds exact source/generation
+identity, normalized schema and primary dictionary header bytes, grammar absence,
+runtime version/commit, formats, lengths and hashes. These are data caches, not a
+new dictionary source or executable/native loader. The app retains all source
+tables and has no new network or personal-data input.
+
+Only the exact managed/no-grammar default generation uses this path. Bounded XZ
+reads, archive/original SHA-256 checks, format validation and unpublished staging
+precede atomic activation. Native maintenance, session creation and fixed public
+conversion still precede `READY`. Corruption can cause bounded redeployment,
+source recompilation or readiness failure with the existing fallback; a marker
+alone is not proof of conversion. Custom generations retain their compiled data
+and do not use the default artifact hashes. Archive cache cleanup is limited to
+canonical app-owned base/shared `prebuilt` directories after native conversion;
+it does not search or delete user-generation content. Compromise of the
+APK/build toolchain remains a supply-chain review boundary; asset hashes are not
+an authenticity mechanism against a fully modified installed package.
+
 ## Review hardening (2026-10-10)
 
 - A compromised generated runtime AAR plus a matching generated verification stamp

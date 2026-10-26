@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "runtime-cache-and-readiness",
+  "type": "device-regression",
+  "source": "build/deployment-cache-green.txt; build/readiness-cache-green.txt; build/ai-ime-cache-final.txt",
+  "summary": "APK 7d06cb28 passed deployment 4/4, readiness 5/5, AI/IME 5/5; source-bound prebuilt cold-start below 60 seconds, custom/corrupt recovery and user-cache boundary preserved.",
+  "verifier": "api36-x86_64-userdebug-emulator",
+  "sliceId": "runtime-cache-and-readiness",
+  "evidenceStatus": "evidence-finalized",
+  "updatedAt": "2026-10-25"
+}

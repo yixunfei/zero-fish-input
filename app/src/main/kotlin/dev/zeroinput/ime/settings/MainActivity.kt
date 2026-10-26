@@ -416,7 +416,7 @@ class MainActivity : AppCompatActivity() {
                 isCurrent = current == component.flattenToShortString() || current == component.flattenToString(),
                 learningEnabled = graph.settings.learningEnabled,
                 learnFromCommittedText = graph.settings.learnFromCommittedText,
-                personalPromotionThreshold = graph.settings.personalAssociationPromotionThreshold,
+                personalPromotionThreshold = graph.settings.personalPromotionThreshold,
                 incognitoMode = graph.settings.incognitoMode,
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,

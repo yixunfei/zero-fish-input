@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-10-25-rime-ux-performance",
+  "currentTodo": "None; implementation, measured UX assessment and bounded verification are complete.",
+  "completedTodos": [
+    "Source-bound prebuilt deployment below unchanged 60-second readiness budget with real Chinese conversion.",
+    "Lifecycle, corruption, changed-dictionary, cancellation, close/retry, fallback and cache/user-boundary regressions passed.",
+    "370 JVM tests with 2 skips, privacyCheck, lintDebug, requireRime three-ABI and focused final-device checks passed.",
+    "Measured UX report, ADR, architecture/threat-model and evidence/reflection completed; no commit requested."
+  ],
+  "activeSlice": "Completed; only future profiling of real-window p95 UI/candidate scheduling remains outside this scope.",
+  "evidenceRefs": [
+    "docs/rime-ux-performance-2026-10-25.md",
+    "docs/aegis/work/2026-10-25-rime-ux-performance/90-evidence.md"
+  ],
+  "blockedOn": null,
+  "nextStep": "No required next step for this scope. Use the report to choose a separately measured UI-tail profiling task.",
+  "updatedAt": "2026-10-25"
+}

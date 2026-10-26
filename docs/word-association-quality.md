@@ -32,7 +32,10 @@ at most 32 UTF-16 units, probes a bounded set of suffixes, and returns at most
 eight entries. Resource limits remain 4,096 rows and 128 characters per row.
 The larger resource is not scanned or loaded on the key path. Context remains
 session-local and wipeable; no editor surrounding text, personal history or
-association-learning storage is added.
+separate association-learning storage is added. This corpus-expansion change
+predates ADR 0014: current explicit association clicks reuse the existing
+privacy-gated encrypted frequency store, and personal frequency only reorders
+the existing public rows.
 
 Evaluation and editor tests exposed three concrete gaps:
 

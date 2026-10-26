@@ -20,13 +20,22 @@ the initial artifact, not the latest file at that path.
   output. Unknown contexts produce no predictions.
 - Context is limited to 32 UTF-16 units in the active controller. It is neither
   persisted nor learned, and no surrounding editor text or private history is
-  queried. Candidate selection does not record personal frequency.
+  queried. ~~Candidate selection does not record personal frequency.~~
 - Failed commits cannot enter context or learning. Session, view, cursor,
   settings/privacy, language/engine and direct insertion boundaries clear it.
   A reproduced fallback bug was fixed: an unconsumed key committed directly by
   the editor now also breaks association context.
 
 Implementation decisions and limits: [ADR 0013](adr/0013-offline-word-associations.md).
+
+Current behavior note (2026-10-25): the struck-through original statement above
+was superseded by
+[ADR 0014](adr/0014-candidate-association-synergy.md). Public phrase pairs
+supply next-word candidates; personal frequency only reorders those existing
+rows. An explicit accepted association click records usage through the existing
+privacy-gated encrypted store. Chinese rows keep their text as the shortcut, so
+this does not invent a pinyin reading. The remaining verification results below
+belong to the original implementation run and are not claims of a new full run.
 
 ## Automated verification
 

@@ -10,6 +10,7 @@ class PersonalCandidateFrequencyTest {
 
     @Test fun `full pinyin history promotes the matching initial candidate and highlights its native route`() {
         val store = Store()
+        store.personal = listOf(PersonalSuggestion("term", "测试", 3, "ceshi"))
         val paging = PersonalCandidatePaging()
         val result = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
         assertEquals(listOf("b", "a"), result.candidates.map { it.id })
@@ -37,13 +38,14 @@ class PersonalCandidateFrequencyTest {
     private class Store : PersonalFrequencyStore {
         var reads = 0
         var fail = false
+        var personal = emptyList<PersonalSuggestion>()
         override fun frequenciesFor(words: List<String>, language: InputLanguage): Map<String, Int> {
             reads++
             check(!fail)
             assertTrue(words.size <= PersonalFrequencyStore.MAX_LOOKUP)
             return if ("测试" in words) mapOf("测试" to 3) else emptyMap()
         }
-        override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = emptyList<PersonalSuggestion>()
+        override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = personal
         override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
         override fun recordUse(id: String, learningAllowed: Boolean) = Unit
     }

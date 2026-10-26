@@ -214,7 +214,7 @@ class UserDictionaryActivity : AppCompatActivity() {
 
     private fun renderThreshold() {
         promotionThreshold.text = getString(R.string.user_dictionary_threshold_value,
-            graph.settings.personalAssociationPromotionThreshold)
+            graph.settings.personalPromotionThreshold)
     }
 
     private fun dictionaryField(hint: Int, maxLength: Int, maxLines: Int) =

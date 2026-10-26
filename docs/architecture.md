@@ -852,6 +852,20 @@ in `tools/onnxruntime/runtime.lock.json`; ONNX/XZ checks resolve the matching bu
 variant. Public-resource publication builds Mini from pinned upstream inputs and
 compares against the reviewed catalog without fetching the Release being created.
 
+The exact managed/no-grammar default Rime generation also carries three reviewed
+prebuilt public artifacts (table, prism and reverse) under `assets/rime/prebuilt`.
+`tools/rime-prebuilt` uses the pinned host deployer and reproduces the installer's
+normalized schema and generation-specific dictionary header. `RimeAssetInstaller`
+validates the source-bound manifest, bounded XZ streams, both hashes and binary
+formats before unpublished shared-build activation. This is a build cache, not a
+second dictionary owner: all 16 source tables remain bundled, changed/custom and
+grammar-bearing generations retain worker-owned native compilation, and native
+conversion still gates `READY`. Default recovery may redeploy these artifacts;
+custom recovery does not apply their hashes. Generic source deployment skips
+`rime/prebuilt`; after conversion verification, cleanup reclaims the exact
+app-owned base/shared archive copies made by older builds without entering user
+generations. See [ADR 0027](adr/0027-reviewed-default-rime-artifacts.md).
+
 ## Dictionary management
 
 ADR [0023](adr/0023-dictionary-management.md) extends public dictionaries with
@@ -980,8 +994,8 @@ that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.m
 
 ### Personal suggestion learning and management
 
-Composing candidates also consult the prepared exact-word frequency mirror in batches of eight (at most 60 already-produced native candidates). This preserves accumulated usage across full pinyin and initials: selecting `ceshi -> 测试` promotes the native `测试` candidate under both `ceshi` and `cs`. The total and the matching input-code frequency are combined by maximum, never added twice. Native selection routes, readings and base order remain intact. No private vocabulary is enumerated or added by this lookup, and no storage format changes. The confidence threshold and its current count are directly available beside learning settings and above the personal phrase list.
+Composing candidates also consult the prepared exact-word frequency mirror in batches of eight (at most 60 already-produced native candidates). This preserves accumulated usage across full pinyin and initials: selecting `ceshi -> 测试` promotes the native `测试` candidate under both `ceshi` and `cs`. The total and the matching input-code frequency are combined by maximum, never added twice. Native selection routes, readings and base order remain intact. No private vocabulary is enumerated or added by this lookup, and no storage format changes. The personal-frequency promotion threshold and its current value are directly available beside learning settings and above the personal phrase list. The setting changes ranking only; the independent association switch controls next-word availability.
 
-Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, exact versus completion match, and a logarithmic frequency bonus starting at a configurable threshold (default 3). No word is pinned. The same policy reranks the bounded public next-word list. Worker completions emit a content-free notification; the platform checks session identity and current privacy before refreshing the composition or a still-visible association round. Hidden rounds never reappear. English private suggestions are merged only in the controller, avoiding a second engine-side ranking that bypasses the threshold.
+Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, exact versus completion match, and a logarithmic frequency bonus starting at a configurable threshold (default 3). No word is pinned. The same policy reranks the bounded public next-word list. Worker completions emit a content-free notification; the platform checks session identity and current privacy before refreshing the composition or a still-visible association round. Hidden rounds never reappear. The English engine produces only public prefix completions. It has no personal-source constructor or scoring path; the controller alone merges personal suggestions and applies the shared threshold, so a second engine-side ranking cannot bypass it.
 
 Explicit candidate selection records usage by default. Learning from implicit commits is an independent, opt-in setting and remains subject to editor acceptance and privacy. Enter keeps its literal-input behavior and never invents a Chinese conversion. The manager exposes 50-row pages, searches code/text prefixes and pinyin (including polyphones and initials), and edits phrase, language and weight while retaining repository identity. Pinyin matching uses a worker-loaded verified public character table; it caches no private words. Private searches scan at most the repository's existing 20,000-term bound on a worker, and never hand the entire dictionary to the UI. The encrypted format is unchanged.

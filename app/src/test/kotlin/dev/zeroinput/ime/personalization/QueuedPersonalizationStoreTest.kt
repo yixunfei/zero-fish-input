@@ -382,6 +382,28 @@ class QueuedPersonalizationStoreTest {
     }
 
     @Test
+    fun `successful learning publishes frequency only after its durable write completes`() {
+        val executor = TestExecutorService()
+        val delegate = MutableFrequencyStore()
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        var changes = 0
+        try {
+            store.warmFrequencyLookup()
+            executor.runNext() // preload
+            store.observeChanges { changes++ }
+            store.learn("shijie", "世界", InputLanguage.CHINESE, learningAllowed = true)
+            assertEquals(mapOf("世界" to 7), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+            assertEquals(1, changes) // The current round observes the invalidation.
+            executor.runNext() // learn + snapshot publication
+
+            assertEquals(mapOf("世界" to 9), store.frequenciesFor(listOf("世界"), InputLanguage.CHINESE))
+            assertEquals("A consumer that already refreshed must be notified again", 2, changes)
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
     fun `a rejected learning task keeps the last usable frequency snapshot`() {
         val executor = TestExecutorService()
         val delegate = MutableFrequencyStore()

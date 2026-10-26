@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "final-input-experience",
+  "type": "device-regression",
+  "source": "build/availability-cache-final.txt; build/pipeline-cache-final.txt; build/latency-cache-final.txt",
+  "summary": "Final source APK c484e01d passed fallback/panel 4/4, real-IME pipeline 2/2 and latency 3/3; final measured metrics recorded in UX report, without causal UI-improvement claim.",
+  "verifier": "api36-x86_64-userdebug-emulator",
+  "sliceId": "final-input-experience",
+  "evidenceStatus": "evidence-finalized",
+  "updatedAt": "2026-10-25"
+}

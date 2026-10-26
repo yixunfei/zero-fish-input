@@ -41,6 +41,24 @@ class XzDictionaryReaderTest {
         }
     }
 
+    @Test fun rejectsMalformedHashMetadataAndRetainsLargeDefaultBudget() {
+        val archive = archive()
+        for (invalid in listOf(spec(archive).copy(sha256 = "not-hex"),
+            spec(archive).copy(archiveSha256 = "0".repeat(63)))) {
+            assertThrows(IllegalArgumentException::class.java) {
+                XzDictionaryReader.copy(archive.inputStream(), ByteArrayOutputStream(), invalid)
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            XzDictionaryReader.copy(archive.inputStream(), ByteArrayOutputStream(),
+                spec(archive).copy(bytes = 100_000_001))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            XzDictionaryReader.copy(archive.inputStream(), ByteArrayOutputStream(),
+                spec(archive).copy(archiveBytes = 50_000_001))
+        }
+    }
+
     @Test fun rejectsExcessiveDecoderMemoryAndCancellation() {
         // Fixed public fixture advertising a 32 MiB dictionary; do not allocate a large encoder in tests.
         val largeDictionary = java.util.Base64.getDecoder().decode(

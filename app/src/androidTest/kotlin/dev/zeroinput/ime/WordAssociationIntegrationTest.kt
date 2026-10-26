@@ -15,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
 import dev.zeroinput.engine.api.InputLanguage
+import dev.zeroinput.ime.personalization.QueuedPersonalizationStore
 import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.ZeroInputView
@@ -89,6 +90,20 @@ class WordAssociationIntegrationTest {
             await { words().isEmpty() }
         }
 
+    @Test fun repeatedAssociationClicksPromoteFrequencyThroughTheLiveImeQueue() =
+        withEditor(InputLanguage.CHINESE, clearLearning = true) { activity ->
+            repeat(3) {
+                type("nihao")
+                choose("你好")
+                await { "世界" in words() && "朋友" in words() }
+                choose("朋友")
+                await { activity.editor.text.toString() == "你好朋友".repeat(it + 1) }
+            }
+            type("nihao")
+            choose("你好")
+            await { "朋友" == words().firstOrNull() }
+        }
+
     @Test fun traditionalSuggestionsMatchTheActiveChineseScript() =
         withEditor(InputLanguage.CHINESE, ChineseScript.TRADITIONAL) { activity ->
             type("shengri")
@@ -125,7 +140,7 @@ class WordAssociationIntegrationTest {
         }
 
     private fun withEditor(language: InputLanguage, script: ChineseScript = ChineseScript.SIMPLIFIED,
-        action: (InputFixtureActivity) -> Unit) {
+        clearLearning: Boolean = false, action: (InputFixtureActivity) -> Unit) {
         val original = shell("settings get secure default_input_method").trim()
         val settings = graph.settings
         val privacy = settings.privacyConfiguration()
@@ -143,6 +158,7 @@ class WordAssociationIntegrationTest {
                 settings.chineseInputOptions = ChineseInputOptions(script = script)
                 settings.lastLanguagePackKey = null
             }
+            if (clearLearning) (graph.personalization as QueuedPersonalizationStore).clearAndAwait()
             val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
             shell("ime enable $method"); shell("ime set $method")
             val editor = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
@@ -172,6 +188,7 @@ class WordAssociationIntegrationTest {
             action(editor)
         } finally {
             activity?.let { onMain { it.finish() } }
+            if (clearLearning) runCatching { (graph.personalization as QueuedPersonalizationStore).clearAndAwait() }
             onMain {
                 settings.learningEnabled = privacy.learningEnabled; settings.incognitoMode = privacy.incognitoMode
                 settings.wordAssociationsEnabled = enabled; settings.experimentalModelRanking = model

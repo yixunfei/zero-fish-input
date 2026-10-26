@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "jvm-privacy-build",
+  "type": "build-and-test",
+  "source": "build/jvm-cache-final.txt; build/privacy-lint-build-cache-final.txt",
+  "summary": "370 JVM tests, 0 failures/errors, 2 skipped on JDK21 runtime/JDK17 compiler; privacyCheck, lintDebug, requireRime three-ABI and test packaging passed.",
+  "verifier": "local-gradle-and-xml-reports",
+  "sliceId": "jvm-privacy-build",
+  "evidenceStatus": "evidence-finalized",
+  "updatedAt": "2026-10-25"
+}

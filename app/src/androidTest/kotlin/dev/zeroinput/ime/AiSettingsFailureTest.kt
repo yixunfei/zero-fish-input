@@ -177,8 +177,12 @@ class AiSettingsFailureTest {
             }
             onMain {
                 val switches = foreground().filterIsInstance<MaterialSwitch>().filter { it.isShown }
-                assertFalse(switches.single { it.text == activity.getString(R.string.ai_enabled) }.isChecked)
-                assertFalse(switches.single { it.text == activity.getString(R.string.ai_network) }.isChecked)
+                val enabled = switches.single { it.text == activity.getString(R.string.ai_enabled) }
+                val network = switches.single { it.text == activity.getString(R.string.ai_network) }
+                assertFalse("AI toggle state: enabled=${enabled.isChecked}, network=${network.isChecked}, " +
+                    "controlsEnabled=${enabled.isEnabled}, activityWindow=${foreground().contains(activity.window.decorView)}",
+                    enabled.isChecked)
+                assertFalse(network.isChecked)
             }
         } finally {
             activity?.let { onMain { it.finish() } }

@@ -176,8 +176,11 @@ initial-code candidates and vice versa. These counts are combined by maximum,
 not summed twice, and the shared word lookup keeps native selection routes.
 Lookups cover at most 60 already-produced candidates in batches of eight under
 the same privacy gate. No on-key dictionary scan or format migration is needed.
-The current confidence threshold is directly visible in Settings and the phrase
-manager, with one shared editor for its 1–100 range and default of 3.
+The personal-frequency promotion threshold is directly visible in Settings and
+the phrase manager, with one shared editor for its 1–100 range and default of 3.
+It is a count/weight cutoff, not a probabilistic confidence score. The same
+setting promotes composing candidates and reorders the bounded public next-word
+set; it does not choose association content or enable that independent feature.
 
 Personal candidates keep their input-code dimension and frequency. A configurable threshold (default 3, range 1–100) enables a logarithmic frequency bonus, combined with a stable engine rank prior and a lower bonus for prefix completions. Below-threshold entries retain the native position if duplicated, or follow native entries otherwise. Repeated choices and manual weight changes can change the winner; no fixed pin is introduced. Next-word suggestions use the same bonus within the public eight-word set. Settings exposes weight editing (1–1,000,000), input-code/text/pinyin search, and 50-row paging.
 

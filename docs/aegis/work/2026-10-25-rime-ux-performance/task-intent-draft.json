@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "requestedOutcome": "Repair Rime readiness recovery, reduce measured cold-start cost, and assess user-facing performance with fresh regression evidence.",
+  "goal": "Repair Rime readiness recovery, reduce measured cold-start cost, and assess user-facing performance with fresh regression evidence.",
+  "successEvidence": [],
+  "stopCondition": "Stop when success evidence is satisfied or a blocker/risk requires pause.",
+  "nonGoals": [
+    "No unrelated personalization edits; no timeout-only workaround; no release claim."
+  ],
+  "scope": "engine-rime startup/lifecycle and asset deployment; focused measured UX hot paths; relevant tests and documentation.",
+  "changeKinds": [
+    "bugfix"
+  ],
+  "riskHints": []
+}

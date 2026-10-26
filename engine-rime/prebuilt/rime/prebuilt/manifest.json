@@ -1,0 +1,40 @@
+{
+  "format": 1,
+  "assetVersion": "11",
+  "sourceIdentity": "2d8ce9b008aa87fe4a77f0c5",
+  "grammar": "none",
+  "generation": "ae165bd3c065ad102852eda9",
+  "rime": "1.13.1",
+  "publicDictionaryMetadataSha256": "6e9cc9b7038698ad500fe75657bd7083cd148baac9261ed9d0703a31b539547f",
+  "rimeCommit": "1c23358157934bd6e6d6981f0c0164f05393b497",
+  "binaryFormats": {
+    "zeroinput_public.table.bin": "Rime::Table/4.0",
+    "zeroinput_pinyin.prism.bin": "Rime::Prism/3.0",
+    "zeroinput_public.reverse.bin": "Rime::Reverse/3.1"
+  },
+  "sourceFiles": {
+    "default.yaml": "062305b44bd744437e19785d796de8b58b6f9ee956c9fb95a179f4a9a58ff84b",
+    "zeroinput_pinyin.schema.yaml": "559da5c64d27f57f1823226cc981550bebf0883d0a78e36907383c385aebfa3f",
+    "zeroinput_public.dict.yaml": "a24d250eda453f097d0b8bce51d2c670d9422efdc8cb38399683115ad4cb3156"
+  },
+  "files": {
+    "zeroinput_public.table.bin.xz": {
+      "bytes": 74179788,
+      "sha256": "b71b535aee82b92a8da5bb45938868b8de486dacf9327e1db7f867f6d61227cb",
+      "archiveBytes": 25464232,
+      "archiveSha256": "9dccacda92ea8a72bae1df956cb7fe741df8d01a5b71086931a4e4ca3a471978"
+    },
+    "zeroinput_pinyin.prism.bin.xz": {
+      "bytes": 22192,
+      "sha256": "38366d7c2988fb201ef7de9f228496f1d1d19245d97536a5c26c1e4aabb1c893",
+      "archiveBytes": 3460,
+      "archiveSha256": "aa4b703adb320158bcdfd2b550a1612876feff9d86fa137dc5967a0d63852b00"
+    },
+    "zeroinput_public.reverse.bin.xz": {
+      "bytes": 263796,
+      "sha256": "a2f1298e25f9f313689668191b8969746344c7f40437f112ad691692dfa53e7f",
+      "archiveBytes": 77240,
+      "archiveSha256": "b5d7d50ddca4daeff579f907edb477d109660b58cdb2490f08dd3993991cec3f"
+    }
+  }
+}

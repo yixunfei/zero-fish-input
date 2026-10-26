@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-10-25-rime-ux-performance",
+  "requiredBaselineRefs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "deliveredContextRefs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "acknowledgedBeforePlanRefs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "citedInPlanRefs": [
+    "HEAD=e0a9cb81f06291a004be9de7845e7b06cdd84201"
+  ],
+  "missingRefs": [],
+  "decision": "continue"
+}

@@ -28,9 +28,9 @@ RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI
 
 ## 安装与启用
 
-当前源码的个人联想默认从候选点击学习；累计词频达到 3 后开始提升排序，仍结合默认顺序和输入匹配，不固定置顶。同一词在不同输入码下的使用记录共同影响已有候选：例如用 `ceshi` 点击“测试”，累计词频也会影响 `cs` 下的“测试”。设置的“管理用户联想”支持拼音、简拼、输入码或词语搜索，按页查看、新增、编辑及删除词语和权重。“用户联想排序置信度”直接显示在学习设置旁和管理页顶部，默认 3 次，可调整为 1–100 次。需要从空格等提交结果学习时，可额外开启“从提交结果学习”；只处理本输入法成功提交的内容，不读取编辑器已有正文。回车保持原始输入提交行为。
+个人词频默认从候选点击学习；达到提权阈值后开始提升已有候选的排序，仍结合默认顺序和输入匹配，不固定置顶。同一词在不同输入码下的使用记录共同影响已有候选：例如用 `ceshi` 点击“测试”，累计词频也会影响 `cs` 下的“测试”。设置的“管理个人词组”支持拼音、简拼、输入码或词语搜索，按页查看、新增、编辑及删除词语和权重。“个人词频提权阈值”直接显示在学习设置旁和管理页顶部，默认 3，可调整为 1–100；手动权重与点击累计的词频都参与比较，阈值不是概率置信度。需要从空格等提交结果学习时，可额外开启“从提交结果学习”；只处理本输入法成功提交的内容，不读取编辑器已有正文。回车保持原始输入提交行为。
 
-验收可用 `ceshi` 连续三次点选“测试”，检查词频逐次增加，并分别输入 `ceshi`、`cs` 检查排序；将该词累计权重调低或提高阈值后检查默认候选恢复。关闭提交学习时，空格提交不增加权重；敏感输入框或隐私模式下既不读取也不更新个人联想。
+验收可用 `ceshi` 连续三次点选“测试”，检查词频逐次增加，并分别输入 `ceshi`、`cs` 检查排序；将该词累计权重调低或提高阈值后检查默认候选恢复。关闭提交学习时，空格提交不增加权重；敏感输入框或隐私模式下既不读取也不更新个人词频。
 
 v0.7.0 包含个人联想权重学习与管理、多协议 AI Provider、词库本地编辑与撤销、拼音组合光标编辑、候选连续浏览和 full/lite 公开资源包，
 并补充了本轮审查后的隐私、并发、错误处理和中文草稿转换修复。完整变化见 [发布说明](docs/releases/v0.7.0.md)。
@@ -180,10 +180,16 @@ Emoji 面板内使用随包图形，首次后台准备完成后可离线显示�
 
 当前内置 1,728 组自编公开词对，覆盖问候、日程、工作、出行、餐饮、学习和健康等常用场景，
 支持“联系 → 方式”和 `could → you → please → help` 等连续点选。覆盖仍有限，不是自由续写
-或训练好的语言模型。它只使用本次
-输入法成功上屏的短上下文，不读输入框已有正文或私人历史，也不记录点选频率。密码、邮箱、
-网址、隐身、关闭学习等场景禁用；切换输入框、移动光标、删除、切换面板或设置会清空上下文。
-关闭再开启不会恢复旧联想。实现与验收见[词联想验证](docs/word-association-validation.md)。
+或训练好的语言模型。它只使用本次输入法成功上屏的短上下文和公开词对生成候选，不读取
+输入框已有正文或私人历史；个人词频只重排这些公开候选，不注入个人词库中的新词。
+**“个人词频提权阈值”同时作用于输入候选和这里最多 8 条的公开联想，独立的“词联想”开关
+控制是否显示下一词。**显式点击联想词成功后，会通过既有加密学习通道记录该词的词频；
+空格、回车不会自动接受联想或触发这条回写。中文联想没有可靠读音时以词语本身作为输入码，
+不编造拼音，因此该记录只影响词频排序和词组管理，不会按拼音前缀生成个人候选。
+密码、邮箱、网址、隐身、关闭学习等场景禁用；切换输入框、移动光标、删除、切换面板或设置
+会清空上下文。关闭再开启不会恢复旧联想。当前语义见
+[ADR 0014](docs/adr/0014-candidate-association-synergy.md)，实现与验收见
+[词联想验证](docs/word-association-validation.md)。
 新增[固定样例效果评估](docs/word-association-quality.md)，分别记录覆盖、首选命中及误触发；
 这些是公开构造的开发验收样例，不能代替真实输入效果评测。
 
@@ -778,9 +784,24 @@ python tools/dictionaries/verify.py
 
 Python 3.11+ is required. Gradle verifies the reviewed hashes and never fetches
 dictionary data. The reviewed LTS grammar is a download-only public resource;
-the APK keeps the 16 core tables and ordinary offline pinyin input. First
-preparation on the device can take minutes; typing uses the existing fallback
-until ready. The model ranks the current composition; cross-commit contextual
+the APK keeps the 16 core tables and ordinary offline pinyin input. The exact
+default/no-grammar generation includes reviewed prebuilt public table/prism/
+reverse assets; dictionary changes, optional grammar and other generations keep
+background native compilation. Typing uses the existing fallback until ready.
+
+When those default sources, schema normalization or the pinned Rime runtime change,
+regenerate and review the artifacts with Docker before building:
+
+```powershell
+python tools/rime-prebuilt/generate.py
+python tools/rime-prebuilt/verify.py
+```
+
+The generator reproduces Android's normalized schema and generation-specific
+primary dictionary header; do not substitute a generic host dictionary build.
+The [measured performance report](docs/rime-ux-performance-2026-10-25.md) and
+[ADR 0027](docs/adr/0027-reviewed-default-rime-artifacts.md) record the size/startup
+tradeoff and device-verification boundary. The model ranks the current composition; cross-commit contextual
 suggestions and Rime's own user dictionary remain disabled.
 
 `.github/workflows/public-dictionaries.yml` checks weekly (Monday 02:17 UTC) and

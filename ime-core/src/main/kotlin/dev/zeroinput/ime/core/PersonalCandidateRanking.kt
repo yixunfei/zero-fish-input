@@ -11,7 +11,9 @@ internal object PersonalCandidateRanking {
             rows.maxWith(compareBy<Candidate> { it.input == input }.thenBy { it.score })
         }
         val nativeRanks = native.mapIndexed { index, candidate -> candidate.text to index }.toMap()
-        return (native + personal).distinctBy(Candidate::text).map { learned[it.text] ?: it }
+        // A text match deduplicates the row, not its selection ownership. Keep the
+        // engine identity so selection retains the reading and native editing route.
+        return (native + personal).distinctBy(Candidate::text)
             .sortedByDescending { candidate ->
                 val prior = nativeRanks[candidate.text]?.let { 1.0 / (it + 1) } ?: 0.0
                 val learnedCandidate = learned[candidate.text]

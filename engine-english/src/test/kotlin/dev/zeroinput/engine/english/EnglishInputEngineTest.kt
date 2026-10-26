@@ -3,7 +3,6 @@ package dev.zeroinput.engine.english
 import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.EngineKey
 import dev.zeroinput.engine.api.InputLanguage
-import dev.zeroinput.engine.api.LearnedSuggestionSource
 import dev.zeroinput.engine.api.PageDirection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,10 +23,8 @@ class EnglishInputEngineTest {
         assertFalse(engine.handle(EngineKey.Enter).consumed)
     }
 
-    @Test fun `disabled prediction preserves editing without querying personal words`() {
-        val engine = EnglishInputEngine(learnedSuggestions = LearnedSuggestionSource { _, _ ->
-            error("Personal words must not be queried")
-        })
+    @Test fun `disabled prediction preserves editing and learning settings keep public words`() {
+        val engine = EnglishInputEngine()
         engine.start(context.copy(predictionsAllowed = false))
         "help".forEach { engine.handle(EngineKey.Character(it.toString())) }
         engine.handle(EngineKey.Backspace)
@@ -80,32 +77,8 @@ class EnglishInputEngineTest {
     }
 
     @Test
-    fun `disabled learning does not query or expose learned suggestions`() {
-        var queried = false
-        val engine = EnglishInputEngine(
-            learnedSuggestions = LearnedSuggestionSource { _, _ ->
-                queried = true
-                listOf(dev.zeroinput.engine.api.WeightedTerm("private", 100))
-            },
-        )
-        engine.start(context.copy(learningAllowed = false))
-
-        "pri".forEach { engine.handle(EngineKey.Character(it.toString())) }
-
-        assertFalse(queried)
-        assertTrue(engine.snapshot.candidates.none { it.text == "private" })
-    }
-
-    @Test
-    fun `snapshot keeps first case insensitive occurrence and stable score order`() {
-        val engine = EnglishInputEngine(
-            learnedSuggestions = LearnedSuggestionSource { _, _ ->
-                listOf(
-                    dev.zeroinput.engine.api.WeightedTerm("HELLO", 100),
-                    dev.zeroinput.engine.api.WeightedTerm("hello", 99),
-                )
-            },
-        )
+    fun `duplicate public words keep their first stable occurrence`() {
+        val engine = EnglishInputEngine(lexicon = listOf("hello", "HELLO", "help"))
         engine.start(context)
 
         "hel".forEach { engine.handle(EngineKey.Character(it.toString())) }

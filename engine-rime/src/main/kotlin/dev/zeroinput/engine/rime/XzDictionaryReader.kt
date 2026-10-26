@@ -12,7 +12,10 @@ internal object XzDictionaryReader {
     data class Spec(val bytes: Long, val sha256: String, val archiveBytes: Long, val archiveSha256: String)
 
     fun copy(source: InputStream, destination: OutputStream, spec: Spec) {
-        require(spec.bytes in 1..50_000_000 && spec.archiveBytes in 1..50_000_000)
+        // The reviewed public table is 74,179,788 bytes. Keep a tight ceiling
+        // for that larger artifact rather than accepting unbounded XZ output.
+        require(spec.bytes in 1..100_000_000 && spec.archiveBytes in 1..50_000_000)
+        require(spec.sha256.matches(Regex("[a-f0-9]{64}")) && spec.archiveSha256.matches(Regex("[a-f0-9]{64}")))
         val archiveHash = MessageDigest.getInstance("SHA-256")
         var archiveCount = 0L
         val bounded = object : FilterInputStream(source) {

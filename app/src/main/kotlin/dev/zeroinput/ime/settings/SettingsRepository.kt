@@ -127,7 +127,7 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_WORD_ASSOCIATIONS, true)
         set(value) = edit(KEY_WORD_ASSOCIATIONS, value)
 
-    var personalAssociationPromotionThreshold: Int
+    var personalPromotionThreshold: Int
         get() = preferences.getInt(KEY_PERSONAL_PROMOTION_THRESHOLD, DEFAULT_PERSONAL_PROMOTION_THRESHOLD)
             .coerceIn(1, MAX_PERSONAL_PROMOTION_THRESHOLD)
         set(value) = preferences.edit().putInt(KEY_PERSONAL_PROMOTION_THRESHOLD, value.coerceIn(1, MAX_PERSONAL_PROMOTION_THRESHOLD)).apply()

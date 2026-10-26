@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-10-25-rime-ux-performance",
+  "lastCheckpointRef": "docs/aegis/work/2026-10-25-rime-ux-performance/todo-checkpoint-draft.json",
+  "resumeInstruction": "Read final performance report and 90-evidence. Final code was tested on API36 x86_64 emulator. Preserve unrelated user changes; no commit was requested.",
+  "knownPartialWork": [
+    "Source-bound prebuilt deployment below unchanged 60-second readiness budget with real Chinese conversion.",
+    "Lifecycle, corruption, changed-dictionary, cancellation, close/retry, fallback and cache/user-boundary regressions passed.",
+    "370 JVM tests with 2 skips, privacyCheck, lintDebug, requireRime three-ABI and focused final-device checks passed.",
+    "Measured UX report, ADR, architecture/threat-model and evidence/reflection completed; no commit requested."
+  ],
+  "mustReadBeforeContinuing": [
+    "docs/aegis/work/2026-10-25-rime-ux-performance/10-intent.md",
+    "docs/aegis/work/2026-10-25-rime-ux-performance/20-checkpoint.md",
+    "docs/aegis/work/2026-10-25-rime-ux-performance/todo-checkpoint-draft.json"
+  ],
+  "unsafeToAssume": [
+    "Do not infer original-incident root cause, physical ARM performance, release signing, warm-improvement percentage or complete device-suite coverage."
+  ]
+}

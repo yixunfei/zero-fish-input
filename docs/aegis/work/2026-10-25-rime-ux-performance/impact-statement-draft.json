@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "affectedLayers": [
+    "engine-rime deployment",
+    "build artifact generation",
+    "focused device verification",
+    "architecture and UX documentation"
+  ],
+  "owners": [
+    "RimeRuntime and RimeAssetInstaller"
+  ],
+  "invariants": [
+    "No IME-thread native initialization; conversion, privacy and session ownership remain correct."
+  ],
+  "compatBoundary": "Prebuilt artifacts apply only to the exact managed/no-grammar default generation. Source dictionaries, custom native compilation, conversion-before-READY, fallback and encrypted personalization remain authoritative. Cleanup is bounded to app-owned base/shared archive caches.",
+  "nonGoals": [
+    "No unrelated personalization edits; no timeout-only workaround; no release claim."
+  ]
+}

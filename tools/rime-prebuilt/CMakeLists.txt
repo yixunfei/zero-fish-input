@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(zeroinput_rime_prebuilt LANGUAGES C CXX)
+if(NOT DEFINED ZEROINPUT_ROOT)
+  get_filename_component(ZEROINPUT_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+endif()
+# Reuse the proven pinned dependency and librime source targets, without JNI.
+set(ZEROINPUT_RIME_DEPENDENCIES_ONLY ON)
+include("${ZEROINPUT_ROOT}/engine-rime/src/main/cpp/CMakeLists.txt")
+add_executable(rime_deployer "${RIME_ROOT}/tools/rime_deployer.cc")
+target_link_libraries(rime_deployer PRIVATE rime-static)
+target_include_directories(rime_deployer PRIVATE "${RIME_ROOT}/src" "${RIME_ROOT}/include" "${CMAKE_BINARY_DIR}/librime/src")
+target_compile_options(rime_deployer PRIVATE -Wno-error=deprecated-declarations)

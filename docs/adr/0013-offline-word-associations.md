@@ -84,7 +84,7 @@ suffixes and English word boundaries retain their existing matching semantics.
 See [quality evaluation](../word-association-quality.md).
 
 Unit tests cover lookup boundaries, longest matches, English spacing, script
-normalization, failed commits, no learning on selection, stale identities,
+normalization, failed commits, explicit-click learning as amended by ADR 0014, stale identities,
 privacy revocation, memory clearing and late provider readiness. Android tests
 cover actual Rime/English editor round trips, cursor/settings/restart invalidation
 and stable candidate layouts. See [validation](../word-association-validation.md).

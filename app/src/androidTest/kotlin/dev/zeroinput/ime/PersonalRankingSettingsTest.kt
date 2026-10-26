@@ -28,7 +28,7 @@ class PersonalRankingSettingsTest {
                 scenario.onActivity { activity ->
                     descendants(activity.window.decorView).filterIsInstance<TextView>().single {
                         it.text.toString().startsWith(activity.getString(R.string.user_dictionary_threshold_value,
-                            SettingsRepository(activity).personalAssociationPromotionThreshold))
+                            SettingsRepository(activity).personalPromotionThreshold))
                     }.performClick()
                     dialogRoot = WindowInspector.getGlobalWindowViews().single { root ->
                         descendants(root).filterIsInstance<EditText>().any {
@@ -49,12 +49,12 @@ class PersonalRankingSettingsTest {
         }
     }
 
-    @Test fun confidenceIsDirectlyAccessibleValidatedAndSharedByBothSettingsScreens() {
+    @Test fun promotionThresholdIsDirectlyAccessibleValidatedAndSharedByBothSettingsScreens() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val settings = SettingsRepository(instrumentation.targetContext)
-        val previous = settings.personalAssociationPromotionThreshold
+        val previous = settings.personalPromotionThreshold
         try {
-            settings.personalAssociationPromotionThreshold = 3
+            settings.personalPromotionThreshold = 3
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
                     val label = activity.getString(R.string.user_dictionary_threshold_value, 3)
@@ -72,10 +72,10 @@ class PersonalRankingSettingsTest {
                     field.setText("0")
                     root.findViewById<View>(android.R.id.button1).performClick()
                     assertNotNull(field.error)
-                    assertEquals(3, settings.personalAssociationPromotionThreshold)
+                    assertEquals(3, settings.personalPromotionThreshold)
                     field.setText("5")
                     root.findViewById<View>(android.R.id.button1).performClick()
-                    assertEquals(5, settings.personalAssociationPromotionThreshold)
+                    assertEquals(5, settings.personalPromotionThreshold)
                     assertTrue(descendants(activity.window.decorView).filterIsInstance<TextView>().any {
                         it.text == activity.getString(R.string.user_dictionary_threshold_value, 5)
                     })
@@ -88,7 +88,7 @@ class PersonalRankingSettingsTest {
                     })
                 }
             }
-        } finally { settings.personalAssociationPromotionThreshold = previous }
+        } finally { settings.personalPromotionThreshold = previous }
     }
 
     private fun descendants(view: View): List<View> = listOf(view) +

@@ -28,9 +28,23 @@ val compressDictionaryAssets = tasks.register<Exec>("compressDictionaryAssets") 
 }
 val baseRimeAssets = layout.buildDirectory.dir("generated/baseRimeAssets")
 val packageBaseRimeAssets = tasks.register<Sync>("packageBaseRimeAssets") {
+    inputs.property("excludePrebuiltForBenchmark",
+        providers.gradleProperty("excludePrebuiltForBenchmark").orNull == "true")
     from("src/main/assets")
     exclude("rime/luna_pinyin.dict.yaml", "rime/essay.txt")
     into(baseRimeAssets)
+    // Generated reviewed outputs sit outside src/main/assets; preserve their
+    // asset-relative rime/prebuilt path rather than shortening it to prebuilt.
+    if (providers.gradleProperty("excludePrebuiltForBenchmark").orNull != "true") from("prebuilt")
+    inputs.dir("prebuilt")
+    doLast {
+        val present = baseRimeAssets.get().file("rime/prebuilt/manifest.json").asFile.isFile
+        if (providers.gradleProperty("excludePrebuiltForBenchmark").orNull == "true") {
+            check(!present) { "The size-comparison APK must not contain prebuilt assets" }
+        } else {
+            check(present) { "Prebuilt artifacts must retain the rime/prebuilt asset path" }
+        }
+    }
 }
 val glideAssets = layout.buildDirectory.dir("generated/glideAssets")
 val prepareGlideAssets = tasks.register<Exec>("prepareGlideAssets") {
@@ -139,6 +153,18 @@ fun registerXzVerification(variant: String) = tasks.register("verify${variant.re
     }
 }
 
+val verifyPrebuiltAssets = tasks.register<Exec>("verifyPrebuiltAssets") {
+    enabled = providers.gradleProperty("excludePrebuiltForBenchmark").orNull != "true"
+    inputs.files(fileTree("prebuilt/rime/prebuilt"), publicDictionaryAssets,
+        rootProject.file("tools/rime-prebuilt/generate.py"), rootProject.file("tools/rime-prebuilt/verify.py"),
+        file("src/main/assets/rime/default.yaml"), file("src/main/assets/rime/zeroinput_pinyin.schema.yaml"),
+        file("src/main/kotlin/dev/zeroinput/engine/rime/RimeAssetInstaller.kt"),
+        file("src/main/kotlin/dev/zeroinput/engine/rime/NativeRimeBridge.kt"))
+    if (providers.gradleProperty("excludePrebuiltForBenchmark").orNull != "true") {
+        commandLine("python", rootProject.file("tools/rime-prebuilt/verify.py").absolutePath)
+    }
+}
+
 android {
     sourceSets["main"].assets.setSrcDirs(listOf(baseRimeAssets, glideAssets))
     sourceSets.getByName("main").assets.srcDir(packagedDictionaryAssets)
@@ -208,7 +234,7 @@ compressDictionaryAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
 packageDictionaryAssets.configure { dependsOn(compressDictionaryAssets) }
 prepareGlideAssets.configure { dependsOn(verifyPublicDictionaryAssets) }
 tasks.named("preBuild").configure { dependsOn(verifyOpenCcAssets, prepareOpenCcAssets, prepareSyllableAssets,
-    packageDictionaryAssets, packageBaseRimeAssets, prepareGlideAssets) }
+    packageDictionaryAssets, packageBaseRimeAssets, prepareGlideAssets, verifyPrebuiltAssets) }
 
 val verifyXzRuntime = tasks.register("verifyXzRuntime")
 androidComponents.onVariants { variant ->

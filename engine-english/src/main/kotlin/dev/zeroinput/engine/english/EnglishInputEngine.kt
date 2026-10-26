@@ -8,13 +8,11 @@ import dev.zeroinput.engine.api.EngineSnapshot
 import dev.zeroinput.engine.api.EngineUpdate
 import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.InputLanguage
-import dev.zeroinput.engine.api.LearnedSuggestionSource
 import dev.zeroinput.engine.api.PageDirection
 import java.util.Locale
 
 /** Deterministic offline English word completion. */
 class EnglishInputEngine(
-    private val learnedSuggestions: LearnedSuggestionSource = LearnedSuggestionSource { _, _ -> emptyList() },
     lexicon: List<String> = DefaultEnglishLexicon.words,
 ) : InputEngine {
     override val descriptor = Descriptor
@@ -27,7 +25,6 @@ class EnglishInputEngine(
     private val prefixIndex: Map<String, List<IndexedWord>> = buildPrefixIndex(lexiconWords)
     private val buffer = StringBuilder()
     private var currentSnapshot = EngineSnapshot.Empty
-    private var learnedSuggestionsAllowed = true
     private var predictionsAllowed = true
     private var page = 0
     private var allCandidates: List<ScoredWord> = emptyList()
@@ -39,7 +36,6 @@ class EnglishInputEngine(
 
     override fun start(context: EditorContext): EngineSnapshot {
         predictionsAllowed = context.predictionsAllowed && !context.isSensitive
-        learnedSuggestionsAllowed = context.learningAllowed && predictionsAllowed
         return reset()
     }
 
@@ -128,14 +124,6 @@ class EnglishInputEngine(
         // Keep the literal input available as a deterministic fallback. This
         // preserves editing even when the word is absent from the seed data.
         collect(typed, EXACT_INPUT_SCORE)
-        if (learnedSuggestionsAllowed) {
-            val learned = learnedSuggestions.suggestions(normalized, MAX_LEARNED_SUGGESTIONS)
-            for (term in learned) {
-                val score = (LEARNED_SCORE_BASE.toLong() + term.weight.toLong())
-                    .coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
-                collect(term.text, score)
-            }
-        }
         for (indexed in prefixIndex[normalized].orEmpty()) {
             collect(indexed.word, LEXICON_SCORE_BASE - indexed.index)
         }
@@ -175,9 +163,7 @@ class EnglishInputEngine(
     companion object {
         private const val PAGE_SIZE = 8
         private const val LEXICON_PAGE_SIZE = PAGE_SIZE
-        private const val MAX_LEARNED_SUGGESTIONS = 32
         private const val EXACT_INPUT_SCORE = Int.MAX_VALUE
-        private const val LEARNED_SCORE_BASE = 1_000_000
         private const val LEXICON_SCORE_BASE = 100_000
         private const val MAX_BUFFER_LENGTH = 64
 

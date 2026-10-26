@@ -26,12 +26,24 @@ class PersonalCandidateRankingTest {
             listOf(Candidate("personal:b", "测试", score = count, input = "cs")), "cs", 3)
         assertEquals("产生", ranked(2).first().text)
         assertEquals("测试", ranked(3).first().text)
-        assertEquals("personal:b", ranked(3).first().id)
+        assertEquals("b", ranked(3).first().id)
     }
 
     @Test fun `raising threshold and lowering a weight restore the default order`() {
         val personal = listOf(Candidate("personal:b", "测试", score = 3, input = "cs"))
         assertEquals("产生", PersonalCandidateRanking.merge(native, personal, "cs", 4).first().text)
+    }
+
+    @Test fun `English candidates share the same threshold and preserve their engine route`() {
+        val native = listOf(Candidate("english:0:th", "th"), Candidate("english:1:the", "the"),
+            Candidate("english:2:there", "there"), Candidate("english:3:their", "their"))
+        val personal = listOf(Candidate("personal:their", "their", score = 2, input = "th"))
+        fun ranked(count: Int) = PersonalCandidateRanking.merge(native,
+            personal.map { it.copy(score = count) }, "th", 3)
+
+        assertEquals(native, ranked(2))
+        assertEquals("their", ranked(3).first().text)
+        assertEquals("english:3:their", ranked(3).first().id)
     }
 
     @Test fun `completion match does not pin above a stronger exact habit`() {

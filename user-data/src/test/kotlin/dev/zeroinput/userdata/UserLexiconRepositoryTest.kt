@@ -96,6 +96,17 @@ class UserLexiconRepositoryTest {
         assertEquals("\uD83D\uDE00", repository.list().single().value)
     }
 
+    @Test fun `repeated learning survives repository reconstruction with exact frequency intact`() {
+        val store = MemoryStore()
+        val repository = UserLexiconRepository(store)
+        repeat(3) { repository.learn("ceshi", "测试", InputLanguage.CHINESE, learningAllowed = true) }
+
+        val reloaded = UserLexiconRepository(store)
+        assertEquals(3, reloaded.suggestionsFor("ceshi", InputLanguage.CHINESE, 8).single().frequency)
+        assertEquals(mapOf("测试" to 3),
+            reloaded.frequencyLookupSnapshot().frequenciesFor(listOf("测试"), InputLanguage.CHINESE))
+    }
+
     @Test
     fun `prepared frequency lookup aggregates exact values within each language and stays bounded`() {
         val repository = UserLexiconRepository(MemoryStore())

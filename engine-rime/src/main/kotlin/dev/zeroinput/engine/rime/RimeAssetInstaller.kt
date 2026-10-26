@@ -17,6 +17,11 @@ internal class RimeAssetInstaller(
             JSONObject(reader.readText()).also { require(it.getInt("format") == 1) }.getJSONObject("files")
         }
     }
+    private val prebuiltManifest by lazy {
+        context.assets.open("rime/prebuilt/manifest.json").bufferedReader().use {
+            JSONObject(it.readText())
+        }
+    }
     data class Directories(
         val shared: File,
         val user: File,
@@ -33,8 +38,9 @@ internal class RimeAssetInstaller(
                 String(bytes, 0, count, Charsets.US_ASCII)
             }
             require(version.matches(Regex("[a-f0-9]{24}")))
-            Directories(File(root, "shared-$version"), File(root, "user-$version"))
-                .takeIf { File(it.shared, ".installed").isFile && it.user.isDirectory }
+            val directories = Directories(File(root, "shared-$version"), File(root, "user-$version"))
+            directories.takeIf { File(it.shared, ".installed").isFile && it.user.isDirectory &&
+                (!isDefaultGeneration(version) || File(it.shared, "build").isDirectory && prebuiltMatches(it)) }
         }.getOrNull()
     }
 
@@ -71,7 +77,15 @@ internal class RimeAssetInstaller(
             .joinToString("") { "%02x".format(it) }.take(24)
         val shared = File(root, "shared-$version")
         val user = File(root, "user-$version").apply(File::mkdirs)
+        val prebuilt = if (isDefaultGeneration(snapshot, version)) readPrebuiltManifest() else null
+        // The base schema still contains the optional grammar. Verify the exact
+        // generation-specific staging bytes after that field is normalized.
         val marker = File(shared, ".installed")
+        if (marker.isFile && prebuilt != null && !prebuiltMatches(Directories(shared, user), prebuilt)) {
+            File(shared, "build").deleteRecursively()
+            marker.delete()
+            shared.deleteRecursively()
+        }
         if (!marker.isFile) {
             val staging = java.nio.file.Files.createTempDirectory(root.toPath(), "prepare-").toFile()
             try {
@@ -103,6 +117,7 @@ internal class RimeAssetInstaller(
                 // Replace the reference before writing generation-specific metadata.
                 check(dictionary.delete())
                 dictionary.writeText("---\n$metadata\n...\n")
+                prebuilt?.let { installPrebuilt(staging, it) }
                 File(staging, ".installed").writeText(version)
                 check(staging.renameTo(shared)) { "Unable to activate public dictionary generation" }
             } finally { staging.deleteRecursively() }
@@ -152,6 +167,76 @@ internal class RimeAssetInstaller(
         return base
     }
 
+    private fun isDefaultGeneration(version: String): Boolean =
+        runCatching { readPrebuiltManifest().getString("generation") == version }.getOrDefault(false)
+
+    private fun isDefaultGeneration(snapshot: dev.zeroinput.engine.api.PublicDictionarySnapshot, version: String): Boolean {
+        if (snapshot.extraFiles.isNotEmpty() || snapshot.disabledBuiltInTables.isNotEmpty() ||
+            snapshot.builtInReplacements.isNotEmpty() || !managedResources || grammar != null ||
+            !isDefaultGeneration(version)) return false
+        val prebuilt = readPrebuiltManifest()
+        return prebuilt.getString("sourceIdentity") == assetIdentity(
+            context.assets.open("rime/public-dictionaries.json").bufferedReader().use { JSONObject(it.readText()) }) &&
+            sha256(context.assets.open("rime/default.yaml")) == prebuilt.getJSONObject("sourceFiles").getString("default.yaml")
+    }
+
+    private fun readPrebuiltManifest(): JSONObject = prebuiltManifest.also { manifest ->
+        require(manifest.getInt("format") == 1 && manifest.getString("assetVersion") == ASSET_VERSION)
+        require(manifest.getString("grammar") == "none" && manifest.getString("rime") == "1.13.1")
+        require(manifest.getString("rimeCommit") == "1c23358157934bd6e6d6981f0c0164f05393b497")
+        val files = manifest.getJSONObject("files")
+        require(files.length() == 3 && files.keys().asSequence().toSet() == PREBUILT_FILES)
+        val formats = manifest.getJSONObject("binaryFormats")
+        PREBUILT_FILES.forEach { name ->
+            val binary = name.removeSuffix(".xz")
+            val format = when (binary) {
+                "zeroinput_public.table.bin" -> "Rime::Table/4.0"
+                "zeroinput_pinyin.prism.bin" -> "Rime::Prism/3.0"
+                else -> "Rime::Reverse/3.1"
+            }
+            require(formats.getString(binary) == format)
+        }
+    }
+
+    private fun installPrebuilt(staging: File, manifest: JSONObject) {
+        val build = File(staging, "build").apply { mkdirs() }
+        val files = manifest.getJSONObject("files")
+        PREBUILT_FILES.forEach { name ->
+            val record = files.getJSONObject(name)
+            val spec = XzDictionaryReader.Spec(record.getLong("bytes"), record.getString("sha256"),
+                record.getLong("archiveBytes"), record.getString("archiveSha256"))
+            val target = File(build, name.removeSuffix(".xz"))
+            val temporary = File.createTempFile("${target.name}-", ".tmp", build)
+            try {
+                context.assets.open("rime/prebuilt/$name").use { input ->
+                    temporary.outputStream().buffered().use { output -> XzDictionaryReader.copy(input, output, spec) }
+                }
+                require(sha256(temporary) == spec.sha256 && temporary.length() == spec.bytes)
+                val expected = manifest.getJSONObject("binaryFormats").getString(target.name).toByteArray(Charsets.US_ASCII)
+                val actual = ByteArray(expected.size)
+                temporary.inputStream().use { check(it.read(actual) == actual.size) }
+                require(actual.contentEquals(expected))
+                check(temporary.renameTo(target)) { "Unable to publish compiled public dictionary" }
+            } finally { temporary.delete() }
+        }
+        val sources = manifest.getJSONObject("sourceFiles")
+        listOf("zeroinput_pinyin.schema.yaml", "zeroinput_public.dict.yaml").forEach { name ->
+            require(sha256(File(staging, name)) == sources.getString(name)) { "Default Rime source mismatch" }
+        }
+    }
+
+    private fun prebuiltMatches(directories: Directories, manifest: JSONObject? = null): Boolean {
+        val build = File(directories.shared, "build")
+        if (!build.isDirectory) return true
+        val expected = manifest ?: readPrebuiltManifest()
+        val files = expected.getJSONObject("files")
+        return PREBUILT_FILES.all { name ->
+            val file = File(build, name.removeSuffix(".xz"))
+            val record = files.getJSONObject(name)
+            file.isFile && file.length() == record.getLong("bytes") && sha256(file) == record.getString("sha256")
+        }
+    }
+
     private fun assetIdentity(manifest: JSONObject): String {
         val files = manifest.getJSONObject("files")
         val identity = files.keys().asSequence().sorted().joinToString { it + files.getString(it) }
@@ -179,6 +264,18 @@ internal class RimeAssetInstaller(
         // Android may expose noBackupFilesDir through /data/user/0 while
         // canonical symlink targets use /data/data. Compare canonical roots.
         val root = File(context.noBackupFilesDir, "rime").canonicalFile
+        // Older releases copied packaged archives into app-owned base/shared
+        // caches. They are recoverable from the APK after native verification;
+        // never search for or remove similarly named data in user generations.
+        root.listFiles().orEmpty().filter { directory ->
+            (directory.name.startsWith("base-") || directory.name.startsWith("shared-")) &&
+                directory.isDirectory && directory.canonicalFile.parentFile == root
+        }.forEach { directory ->
+            val archives = File(directory, "prebuilt")
+            if (archives.isDirectory && archives.canonicalFile.parentFile == directory.canonicalFile) {
+                archives.deleteRecursively()
+            }
+        }
         root.listFiles().orEmpty().filter {
             (it.name.startsWith("shared-") || it.name.startsWith("user-")) && it.name !in keep
         }.forEach { it.deleteRecursively() }
@@ -193,6 +290,10 @@ internal class RimeAssetInstaller(
     }
 
     private fun copyAssetTree(assetPath: String, destination: File, skipped: Set<String>) {
+        // Compressed prebuilt archives are decompressed by installPrebuilt into
+        // the unpublished generation; copying them into base/shared only doubles
+        // private storage without providing another dictionary source.
+        if (assetPath == "rime/prebuilt") return
         if (managedResources && assetPath.endsWith(".gram")) return
         if (assetPath.startsWith("rime/dicts/") &&
             assetPath.removePrefix("rime/dicts/").removeSuffix(".xz").removeSuffix(".dict.yaml") in skipped) return
@@ -225,20 +326,22 @@ internal class RimeAssetInstaller(
 
     private companion object {
         const val ASSET_ROOT = "rime"
-        const val ASSET_VERSION = "10"
+        const val ASSET_VERSION = "11"
+        val PREBUILT_FILES = setOf("zeroinput_public.table.bin.xz",
+            "zeroinput_pinyin.prism.bin.xz", "zeroinput_public.reverse.bin.xz")
     }
 
     private fun grammarIdentity(): String = if (managedResources) grammar?.sha256 ?: "none" else "bundled"
 
-    private fun sha256(file: File): String {
+    private fun sha256(file: File): String = file.inputStream().use(::sha256)
+
+    private fun sha256(input: java.io.InputStream): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(65536)
-            while (true) {
-                val size = input.read(buffer)
-                if (size < 0) break
-                digest.update(buffer, 0, size)
-            }
+        val buffer = ByteArray(65536)
+        while (true) {
+            val size = input.read(buffer)
+            if (size < 0) break
+            digest.update(buffer, 0, size)
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }

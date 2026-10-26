@@ -458,7 +458,7 @@ class ZeroInputService : InputMethodService() {
             wordAssociationsEnabled = { inputViewActive && configuredWordAssociations &&
                 configuredPrivacy.learningEnabled && !configuredPrivacy.incognitoMode &&
                 activeSession?.token == token && connectionBinding.resolve(currentInputConnection) != null },
-            personalPromotionThreshold = { graph.settings.personalAssociationPromotionThreshold },
+            personalPromotionThreshold = { graph.settings.personalPromotionThreshold },
             learnFromCommittedText = { graph.settings.learnFromCommittedText },
         )
         val session = InputSession(token, newController, connectionBinding, attribute.packageName)
