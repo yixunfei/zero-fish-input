@@ -145,9 +145,18 @@ class AndroidEditorConnection(
             return
         }
         val before = platformCall {
-            connection.getTextBeforeCursor(UnicodeDeletionBoundary.LOOKBEHIND_LIMIT, 0)
-        }?.toString() ?: return
+            connection.getTextBeforeCursor(UnicodeDeletionBoundary.LOOKBEHIND_LIMIT, InputConnection.GET_TEXT_WITH_STYLES)
+        } ?: return
+        if (current() !== connection) return
         val deleteLength = UnicodeDeletionBoundary.precedingLength(before)
+        if (deleteLength == 1 && UnicodeDeletionBoundary.prefersEditorDelete(before)) {
+            // A true result (or exception after an uncertain edit) must not be
+            // followed by a second deletion. Only explicit rejection falls back.
+            if (sendKey(connection, KeyEvent.KEYCODE_DEL) != false) return
+            if (current() !== connection) return
+            platformCall { connection.deleteSurroundingText(1, 0) }
+            return
+        }
         if (platformCall { connection.deleteSurroundingText(deleteLength, 0) } == false) sendKey(connection, KeyEvent.KEYCODE_DEL)
     }
 
@@ -165,9 +174,11 @@ class AndroidEditorConnection(
         current()?.let { sendKey(it, KeyEvent.KEYCODE_ENTER) }
     }
 
-    private fun sendKey(connection: InputConnection, keyCode: Int) {
-        if (platformCall { connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode)) } != true) return
+    private fun sendKey(connection: InputConnection, keyCode: Int): Boolean? {
+        val accepted = platformCall { connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode)) }
+        if (accepted != true) return accepted
         platformCall { connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode)) }
+        return true
     }
 
     private fun invalidateContext() {

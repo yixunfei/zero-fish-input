@@ -11,6 +11,16 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AndroidEditorConnectionTest {
+    @Test fun backspaceDeletesAnEditorProvidedImageSpanAsOneUnit() = onMain {
+        val editor = editor("a[微笑]z")
+        val drawable = android.graphics.drawable.ColorDrawable(android.graphics.Color.BLUE).apply { setBounds(0, 0, 20, 20) }
+        editor.text.setSpan(android.text.style.ImageSpan(drawable), 1, 5, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        editor.setSelection(5)
+        val connection = checkNotNull(editor.onCreateInputConnection(EditorInfo()))
+        AndroidEditorConnection(5, 5) { connection }.deleteBeforeCursor()
+        assertEquals("az", editor.text.toString())
+    }
+
     @Test fun backspaceDeletesWholeEmojiSequencesAndCombiningCharacters() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val ready = java.util.concurrent.CountDownLatch(1)

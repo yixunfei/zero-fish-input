@@ -1218,3 +1218,27 @@ approval. Approval/status overlays set `FLAG_SECURE` to exclude their target and
 operation details from ordinary screen capture.
 
 The personal suggestion manager uses `FLAG_SECURE`, disables autofill/content capture and saved field state, and returns at most 50 rows per worker query. Pinyin matching loads only the verified public character dictionary, with bounded reading alternatives; private words and search strings are never persisted outside the existing encrypted lexicon. Queries may inspect at most the repository's 20,000 terms off the input thread. Editing/deleting invalidates queued learning, preserves repository generation checks, and rejects duplicate identities, invalid weights and deleted edit targets. Worker callbacks use immutable form values rather than reading Views. Personalization notifications contain no phrase data; the IME checks captured session identity and reevaluates privacy before refreshing. Hidden association rounds cannot be resurrected. Implicit commit learning is opt-in and disabled for restricted editors; rejected editor commits never learn.
+
+## Interaction repair review (2026-10-30)
+
+The prominent private-copy toolbar button grants no new read authority. It uses
+the existing bounded selection reader, session/connection/settings generations,
+non-sensitive editor gate and authenticated save confirmation. Incognito remains
+compatible with explicit private import but never enables personal learning.
+
+Deletion style metadata comes only from the existing 64-unit cursor-local read.
+Formatting spans and plain bracketed text cannot authorize larger deletion. A
+possible textual label only delegates one Delete gesture to its host; false
+positives therefore use host editing semantics. Explicit rejection alone permits
+a one-character fallback. A connection change after the read, or an uncertain
+key exception, must not cause a second edit. Replacement spans touching the left
+read boundary are not expanded because they may have been truncated. No cursor
+text or span is cached, learned, logged, persisted or transmitted. Host editors
+may omit spans or ignore key events, so universal custom-label deletion cannot
+be guaranteed.
+
+Dictionary replacement learning rejects disabled/removed entries and respects
+the existing learning flag and queued-write generations. Tests cover persistence,
+unchanged public weights, disabled learning and stale selection IDs. Existing
+queue/privacy/clear regressions continue to apply; no format, permission or
+authentication change is introduced.

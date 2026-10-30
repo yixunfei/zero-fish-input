@@ -6,7 +6,42 @@ import dev.zeroinput.userdata.*
 import org.junit.Assert.*
 import org.junit.Test
 
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [28])
 class DictionaryPersonalizationStoreTest {
+    @Test fun replacementClicksLearnPersistAndPromoteWithoutChangingPublicWeights() {
+        val disk = MemoryStore()
+        val lexicon = UserLexiconRepository(disk)
+        val edits = DictionaryEditRepository(MemoryStore())
+        edits.save(DictionaryEdit("ice_fixture", null, DictionaryWord("测试", "ce shi", 1)))
+        edits.save(DictionaryEdit("ice_fixture", null, DictionaryWord("测式", "ce shi", 2)))
+        val store = DictionaryPersonalizationStore(lexicon, edits, { setOf("ice_fixture") }, { ChineseInputOptions() })
+        val id = store.suggestionPage("ceshi", InputLanguage.CHINESE, 0, 8).items.single { it.text == "测试" }.id
+        repeat(3) { store.recordUse(id, true) }
+        assertEquals(mapOf("测试" to 3), UserLexiconRepository(disk).frequenciesFor(listOf("测试"), InputLanguage.CHINESE))
+        val rows = store.suggestionPage("ceshi", InputLanguage.CHINESE, 0, 8).items
+        assertEquals("测试", rows.first().text)
+        assertEquals(3, rows.first().frequency)
+        assertEquals(1, edits.read().entries.single { it.replacement?.text == "测试" }.replacement?.weight)
+        store.recordUse(id, false)
+        assertEquals(3, lexicon.frequenciesFor(listOf("测试"), InputLanguage.CHINESE)["测试"])
+    }
+
+    @Test fun disabledOrRemovedReplacementDoesNotLearnFromOldSelectionId() {
+        val lexicon = UserLexiconRepository(MemoryStore())
+        val edits = DictionaryEditRepository(MemoryStore())
+        edits.save(DictionaryEdit("ice_fixture", null, DictionaryWord("测试", "ce shi", 1)))
+        var active = setOf("ice_fixture")
+        val store = DictionaryPersonalizationStore(lexicon, edits, { active }, { ChineseInputOptions() })
+        val id = store.suggestionPage("ceshi", InputLanguage.CHINESE, 0, 8).items.single().id
+        active = emptySet()
+        store.recordUse(id, true)
+        active = setOf("ice_fixture")
+        edits.clear()
+        store.recordUse(id, true)
+        assertTrue(lexicon.list().isEmpty())
+    }
+
     @Test fun disabledDictionariesContributeNeitherReplacementsNorTombstones() {
         val lexicon = UserLexiconRepository(MemoryStore())
         val edits = DictionaryEditRepository(MemoryStore())

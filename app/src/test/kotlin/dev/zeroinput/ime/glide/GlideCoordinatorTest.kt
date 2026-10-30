@@ -10,6 +10,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GlideCoordinatorTest {
+    @Test fun closingReleasesDecoderOnItsWorkerExactlyOnce() {
+        val released = CountDownLatch(1)
+        var decodeThread: Thread? = null
+        var closeThread: Thread? = null
+        val closes = java.util.concurrent.atomic.AtomicInteger()
+        val decoder = object : GlideDecoder {
+            override fun decode(request: GlideRequest, isCancelled: () -> Boolean): List<GlideCandidate> {
+                decodeThread = Thread.currentThread()
+                return listOf(candidate)
+            }
+            override fun close() {
+                closeThread = Thread.currentThread()
+                closes.incrementAndGet()
+                released.countDown()
+            }
+        }
+        val test = Harness(decoder)
+        test.coordinator.request(request(), GlideLetterCase.LOWER)
+        test.complete()
+        test.close()
+        test.close()
+        assertTrue(released.await(5, TimeUnit.SECONDS))
+        assertSame(decodeThread, closeThread)
+        assertEquals(1, closes.get())
+        assertTrue(test.callbacks.isEmpty())
+    }
+
     private val candidate = GlideCandidate("hello", "hello", 0.9f)
     private fun request() = GlideRequest(GlideLayout.ENGLISH_QWERTY,
         listOf(GlidePoint(0.1f, 0.1f, 0), GlidePoint(0.9f, 0.1f, 100)),

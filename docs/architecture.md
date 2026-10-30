@@ -1002,3 +1002,24 @@ Composing candidates also consult the prepared exact-word frequency mirror in ba
 Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, exact versus completion match, and a logarithmic frequency bonus starting at a configurable threshold (default 3). No word is pinned. The same policy reranks the bounded public next-word list. Worker completions emit a content-free notification; the platform checks session identity and current privacy before refreshing the composition or a still-visible association round. Hidden rounds never reappear. The English engine produces only public prefix completions. It has no personal-source constructor or scoring path; the controller alone merges personal suggestions and applies the shared threshold, so a second engine-side ranking cannot bypass it.
 
 Explicit candidate selection records usage by default. Learning from implicit commits is an independent, opt-in setting and remains subject to editor acceptance and privacy. Enter keeps its literal-input behavior and never invents a Chinese conversion. The manager exposes 50-row pages, searches code/text prefixes and pinyin (including polyphones and initials), and edits phrase, language and weight while retaining repository identity. Pinyin matching uses a worker-loaded verified public character table; it caches no private words. Private searches scan at most the repository's existing 20,000-term bound on a worker, and never hand the entire dictionary to the UI. The encrypted format is unchanged.
+
+## Input interaction repairs (2026-10-30)
+
+The UI owns eight bounded offline symbol pages with explicit page navigation and
+horizontal swipe cancellation. Shift in the Chinese full keyboard renders and
+commits half-width punctuation through the literal command; unshifted punctuation
+retains the engine route. The first toolbar control reuses explicit private
+selection import, including its existing session, sensitivity and authentication
+checks. Android/host text-menu ordering is outside the IME's control.
+
+Backspace requests at most 64 UTF-16 units with style metadata. Complete visible
+replacement spans with a known left boundary can be deleted as one unit. Bounded
+label-like suffixes without a usable span are dispatched as a Delete key to the
+host, never deleted by guessed label length. Explicit key rejection falls back
+to one character; exceptions and accepted keys are never replayed.
+
+Dictionary replacement selections now resolve their opaque ID against current
+active edits on the existing personalization worker and learn into the encrypted
+lexicon. Their displayed frequency uses the maximum of the public weight and
+learned word frequency. Public dictionary weights and persisted formats do not
+change.

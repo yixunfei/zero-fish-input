@@ -112,13 +112,13 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
                 isPressed = true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (event.x < 0 || event.y < 0 || event.x >= width || event.y >= height) {
+                if (!inside(event)) {
                     holding = false
                     isPressed = false
                 }
             }
             MotionEvent.ACTION_UP -> {
-                val click = holding
+                val click = holding && inside(event)
                 holding = false
                 isPressed = false
                 if (click) performClick()
@@ -132,6 +132,9 @@ internal class CandidateItemView(context: Context) : AppCompatTextView(context) 
         }
         return true
     }
+
+    private fun inside(event: MotionEvent): Boolean = event.x >= 0 && event.y >= 0 &&
+        event.x < width && event.y < height
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

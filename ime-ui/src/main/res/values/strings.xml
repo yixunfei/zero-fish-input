@@ -211,4 +211,6 @@
     <string name="language_short_english">En</string>
     <string name="language_short_pack">包</string>
     <string name="ai_page_reference_item">引用 %1$d（%2$d 字符）：%3$s</string>
+    <string name="symbol_page">%1$d/%2$d ›</string>
+    <string name="secure_clipboard_copy_short">私密复制</string>
 </resources>

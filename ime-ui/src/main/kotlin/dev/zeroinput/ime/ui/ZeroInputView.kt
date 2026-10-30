@@ -234,6 +234,10 @@ class ZeroInputView @JvmOverloads constructor(
     private val secondaryTools = mutableListOf<View>()
     private val toolsButton = toolbarButton("☰", context.getString(R.string.keyboard_tools), ::showTools)
     private val numbersButton = toolbarButton("123", context.getString(R.string.key_numbers)) { keyboard.showNumbers() }
+    private val copySelectionButton = toolbarButton(context.getString(R.string.secure_clipboard_copy_short),
+        context.getString(R.string.secure_clipboard_copy_selection)) {
+        onCopySelectionRequested()
+    }.apply { visibility = GONE; layoutParams = LayoutParams(dp(96), dp(48)) }
     private val toolbar = android.widget.HorizontalScrollView(context).apply {
         isHorizontalScrollBarEnabled = false
         isFillViewport = true
@@ -718,7 +722,10 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun renderAiConversation(value: AiConversation?) { ai.renderConversation(value) }
 
-    fun renderCopySelectionAvailable(available: Boolean) { secureClipboard.renderCopyAvailable(available) }
+    fun renderCopySelectionAvailable(available: Boolean) {
+        secureClipboard.renderCopyAvailable(available)
+        copySelectionButton.visibility = if (available) VISIBLE else GONE
+    }
 
     fun renderPasteConfirmation(visible: Boolean) {
         secureClipboard.renderPasteConfirmation(visible)
@@ -749,6 +756,7 @@ class ZeroInputView @JvmOverloads constructor(
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(48))
+        addView(copySelectionButton)
         addView(toolsButton)
         addView(numbersButton)
         addView(aiButton)

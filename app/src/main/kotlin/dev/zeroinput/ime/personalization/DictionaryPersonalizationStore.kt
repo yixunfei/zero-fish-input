@@ -38,11 +38,14 @@ internal class DictionaryPersonalizationStore(
         val hidden = originals.filter { (word, _) -> word.reading.isEmpty() || DictionaryEditReading.matches(word.reading, prefix, configuration) }
             .mapTo(HashSet()) { it.second }
         val hiddenEntries = originals.mapTo(HashSet()) { (word, text) -> "$text\t${word.reading.replace(" ", "")}" }
+        val frequencies = lexicon.frequencyLookupSnapshot()
         val replacements = selected.mapNotNull { entry ->
             val word = entry.replacement ?: return@mapNotNull null
             if (!DictionaryEditReading.matches(word.reading, prefix, configuration)) return@mapNotNull null
+            val text = DictionaryEditReading.displayText(word.text, configuration.script)
+            val learnedFrequency = frequencies.frequenciesFor(listOf(text), language)[text] ?: 0
             PersonalSuggestion("dictionary:${entry.dictionaryId}:${entry.key}",
-                DictionaryEditReading.displayText(word.text, configuration.script), word.weight, word.reading.replace(" ", ""))
+                text, maxOf(word.weight, learnedFrequency), word.reading.replace(" ", ""))
         }
         val learned = lexicon.list(language).filter { it.shortcut.startsWith(prefix) }.mapNotNull { term ->
             val text = DictionaryEditReading.displayText(term.value, configuration.script)
@@ -58,7 +61,19 @@ internal class DictionaryPersonalizationStore(
     override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) =
         lexicon.learn(shortcut, value, language, learningAllowed)
     override fun recordUse(id: String, learningAllowed: Boolean) {
-        if (!id.startsWith("dictionary:")) lexicon.recordUse(id, learningAllowed)
+        if (!learningAllowed) return
+        if (!id.startsWith("dictionary:")) {
+            lexicon.recordUse(id, learningAllowed = true)
+            return
+        }
+        // Resolve the opaque route against current active edits on the existing
+        // serialized worker. Never mutate public dictionary weights to learn.
+        val active = activeIds()
+        val word = edits.read().entries.firstOrNull {
+            it.dictionaryId in active && "dictionary:${it.dictionaryId}:${it.key}" == id
+        }?.replacement ?: return
+        lexicon.learn(word.reading.replace(" ", "").replace("'", ""),
+            DictionaryEditReading.displayText(word.text, options().script), InputLanguage.CHINESE, learningAllowed = true)
     }
     override fun frequenciesFor(words: List<String>, language: InputLanguage) = lexicon.frequenciesFor(words, language)
     override fun frequencyLookupSnapshot() = lexicon.frequencyLookupSnapshot()

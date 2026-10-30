@@ -97,8 +97,14 @@ internal class GlideCoordinator(
     fun revoke() { generation.incrementAndGet() }
 
     override fun close() {
+        if (closed) return
         closed = true
         invalidate()
-        worker.shutdownNow()
+        // Destruction belongs to the same worker as decode. Enqueue it after
+        // cancellation so an in-flight decode cannot race its own resource close.
+        try {
+            worker.execute { runCatching { decoder?.close() }; decoder = null }
+        } catch (_: RejectedExecutionException) { /* The owning worker has already stopped. */ }
+        worker.shutdown()
     }
 }

@@ -121,12 +121,35 @@ class KeyboardExperienceTest {
         assertNotNull(key(panel, panel.context.getString(UiR.string.key_enter)))
         click(panel, UiR.string.key_symbols)
         measure(panel)
-        click(panel, UiR.string.key_more_symbols)
-        measure(panel)
         var deleted = false
         panel.onKeyboardAction = { if (it == KeyboardAction.Backspace) deleted = true }
-        click(panel, UiR.string.key_backspace)
-        assertTrue(deleted)
+        repeat(8) {
+            click(panel, UiR.string.key_more_symbols)
+            measure(panel)
+            deleted = false
+            click(panel, UiR.string.key_backspace)
+            assertTrue(deleted)
+        }
+    }
+
+    @Test fun shiftedChinesePunctuationIsLiteralAndPrivateCopyIsInTheFirstToolbarPosition() = onMain {
+        val panel = panel()
+        panel.renderCopySelectionAvailable(true)
+        measure(panel)
+        var copied = false
+        panel.onCopySelectionRequested = { copied = true }
+        val copy = key(panel, panel.context.getString(UiR.string.secure_clipboard_copy_selection))
+        assertTrue(copy.width >= dp(panel, 48))
+        copy.performClick()
+        assertTrue(copied)
+        var action: KeyboardAction? = null
+        panel.onKeyboardAction = { action = it }
+        click(panel, UiR.string.key_shift)
+        assertEquals(",", (key(panel, panel.context.getString(UiR.string.key_comma)) as TextView).text.toString())
+        click(panel, UiR.string.key_comma)
+        assertEquals(KeyboardAction.LiteralText(","), action)
+        assertEquals("，", (key(panel, panel.context.getString(UiR.string.key_comma)) as TextView).text.toString())
+        panel.release()
     }
 
     @Test fun pairedSymbolsCanBeDisabledWithoutRebuildingTheKeyboard() = onMain {

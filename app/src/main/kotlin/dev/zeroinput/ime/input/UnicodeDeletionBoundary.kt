@@ -7,8 +7,23 @@ import java.util.Locale
 /** Bounded cursor-local grapheme deletion; the bundled RGI trie covers newer emoji than system ICU. */
 internal object UnicodeDeletionBoundary {
     const val LOOKBEHIND_LIMIT = 64
+    private val possibleLabel = Regex("""(?:\[[^\[\]\r\n]{1,32}]|【[^【】\r\n]{1,32}】|<[^<>\r\n]{1,32}>|:[\p{L}\p{N}_+\-]{1,32}:|/:[^\s]{1,32})$""")
 
-    fun precedingLength(text: String): Int {
+    // This is only a dispatch hint, never permission to erase the matched text.
+    // The host owns its custom label syntax and decides what a Delete key does.
+    fun prefersEditorDelete(text: CharSequence): Boolean =
+        possibleLabel.containsMatchIn(text.takeLast(LOOKBEHIND_LIMIT))
+
+    fun precedingLength(value: CharSequence): Int {
+        // Only an editor-provided replacement is atomic. Brackets and formatting
+        // alone do not authorize deleting a larger piece of ordinary text.
+        if (value is android.text.Spanned && value.isNotEmpty()) {
+            val length = value.getSpans(value.length - 1, value.length, android.text.style.ReplacementSpan::class.java)
+                .filter { value.getSpanEnd(it) == value.length && value.getSpanStart(it) > 0 }
+                .maxOfOrNull { value.length - value.getSpanStart(it) }
+            if (length != null) return length
+        }
+        val text = value.toString()
         if (text.isEmpty()) return 1
         val last = text.last()
         if (last.code in 0x20..0x7e && (text.length < 2 || text[text.lastIndex - 1] != '\r')) return 1

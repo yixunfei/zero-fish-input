@@ -2,6 +2,29 @@
 
 Date: 2026-09-06
 
+## User-reported input repairs (2026-10-30)
+
+Approved scope: symbol navigation/coverage, prominent private selection copy,
+custom emoji deletion, Chinese Shift punctuation and personal frequency defects.
+Implementation and automated verification are complete: 901 JVM tests passed
+(two live-provider tests skipped), privacyCheck, Lint, real-Rime x86_64 Debug/test
+APK builds and 40 emulator tests passed. Fixed-fixture layout images were checked
+at narrow/regular/landscape sizes in light and dark themes. Earlier uncommitted
+audit fixes remain intact. Next: physical-device and real social-editor custom
+label acceptance; host-menu ordering and editors that omit spans/ignore Delete
+remain platform limits. See [repair validation](input-bugs-2026-10-30.md).
+
+## Current audit (2026-10-30)
+
+Approved scope: repair reproduced input/interaction defects without new features,
+data format changes or changes to the security model. Four defect categories
+have fixes and six initially failing regression tests. Final checks passed:
+890 JVM tests passed (two credential-dependent live tests skipped), privacyCheck,
+Lint, requireRime Debug/test APK builds, and 34 x86_64 emulator tests. No Release
+or physical ARM acceptance was performed. Next: maintainer physical-device/editor
+acceptance; no known reproduced defect remains in this audit scope. See
+[audit record](code-audit-2026-10-30.md) for commands, results and remaining limits.
+
 ## v0.3.0 testing prerelease (2026-09-23)
 
 The release includes verified Chinese-engine readiness, persistent preparation

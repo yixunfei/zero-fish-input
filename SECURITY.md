@@ -381,3 +381,13 @@ dispatched provider write, SMS or call, or forcibly interrupt a provider that
 ignores cancellation. Such operations are never automatically retried. Contact
 rename/delete refuses aggregates with multiple raw contacts rather than
 selecting an account implicitly. See `docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md`.
+
+### Cursor-local deletion and private-copy access
+
+The keyboard's private-copy shortcut uses the same explicit, bounded selection
+import and authentication flow as the clipboard panel. It does not read the
+system clipboard. Backspace may inspect up to 64 UTF-16 units and their supplied
+style metadata to preserve emoji boundaries. Textual custom-label patterns only
+delegate Delete to the host; they never authorize guessed multi-character
+deletion. Editors that omit boundaries or ignore Delete may still require more
+than one press. Cursor text is not retained or used for learning.

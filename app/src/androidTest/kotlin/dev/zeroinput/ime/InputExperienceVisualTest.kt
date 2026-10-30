@@ -44,6 +44,7 @@ class InputExperienceVisualTest {
                 instrumentation.runOnMainSync { result = runCatching {
                     val panel = ZeroInputView(context)
                     activity.setContentView(panel)
+                    panel.renderCopySelectionAvailable(true)
                     try {
                         assertTrue(panel.isAttachedToWindow)
                         verifyPages(panel, width, height, if (night) "dark" else "light")
@@ -77,6 +78,9 @@ class InputExperienceVisualTest {
         assertEquals(originalHeight, panel.height)
         click(UiR.string.key_symbols)
         capture("symbols")
+        assertEquals(originalHeight, panel.height)
+        repeat(2) { click(UiR.string.key_more_symbols) }
+        capture("symbols-chinese")
         assertEquals(originalHeight, panel.height)
         click(UiR.string.key_letters)
         click(UiR.string.keyboard_tools)

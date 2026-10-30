@@ -207,4 +207,6 @@
     <string name="language_short_pack">Pack</string>
     <string name="ai_page_reference_item">Reference %1$d (characters: %2$d): %3$s</string>
     <string name="secure_clipboard_load_failed">Unable to load snippets. Retry or open Manage and authenticate to recover.</string>
+    <string name="symbol_page">%1$d/%2$d ›</string>
+    <string name="secure_clipboard_copy_short">Copy privately</string>
 </resources>

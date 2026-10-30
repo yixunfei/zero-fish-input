@@ -25,6 +25,90 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InputSessionControllerTest {
+    @Test fun `declined character update cannot clear editor preedit before a rejected flush`() {
+        var preedit = ""
+        val connection = object : EditorConnection by RecordingConnection() {
+            override fun setComposingText(text: String) { preedit = text }
+            override fun commitText(text: String) = false
+        }
+        val controller = InputSessionController(connection, { ClearingUnconsumedEngine() }, RecordingPersonalization())
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        val before = controller.state.snapshot
+        controller.handle(InputCommand.Text("¥"))
+        assertEquals("ni", preedit)
+        assertEquals(before, controller.state.snapshot)
+        controller.close()
+    }
+
+    @Test fun `rejected enter preserves preedit and allows retry`() {
+        var accept = false
+        var preedit = ""
+        val commits = mutableListOf<String>()
+        val connection = object : EditorConnection by RecordingConnection() {
+            override fun setComposingText(text: String) { preedit = text }
+            override fun commitText(text: String): Boolean {
+                if (!accept) return false
+                commits += text
+                preedit = ""
+                return true
+            }
+        }
+        val controller = InputSessionController(connection, { TestEngine() }, RecordingPersonalization())
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        val before = controller.state.snapshot
+        controller.handle(InputCommand.Enter)
+        assertEquals("ni", preedit)
+        assertEquals(before, controller.state.snapshot)
+        accept = true
+        controller.handle(InputCommand.Text("hao"))
+        controller.handle(InputCommand.Enter)
+        assertEquals(listOf("nihao"), commits)
+        assertFalse(controller.state.snapshot.isComposing)
+        controller.close()
+    }
+
+    @Test fun `rejected fallback composition does not delete editor text or append a key`() {
+        for (command in listOf(InputCommand.Backspace, InputCommand.Space, InputCommand.LiteralText("4"))) {
+            val attempts = mutableListOf<String>()
+            var deletes = 0
+            val connection = object : EditorConnection by RecordingConnection() {
+                override fun commitText(text: String): Boolean { attempts += text; return false }
+                override fun deleteBeforeCursor() { deletes++ }
+            }
+            val controller = InputSessionController(connection, { UnconsumingEngine("ni") }, RecordingPersonalization())
+            controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+            controller.handle(InputCommand.Text("ni"))
+            val before = controller.state.snapshot
+            controller.handle(command)
+            assertEquals(listOf("ni"), attempts)
+            assertEquals(0, deletes)
+            assertEquals(before, controller.state.snapshot)
+            controller.close()
+        }
+    }
+
+    @Test fun `model winner observer failure keeps conversion available`() {
+        val engine = object : InputEngine by TestEngine() {
+            override fun handle(key: EngineKey) = EngineUpdate(EngineSnapshot("nihao", "nihao", listOf(
+                Candidate("one", "你好", input = "nihao"), Candidate("two", "拟好", input = "nihao"))))
+        }
+        var fail = false
+        val connection = RecordingConnection()
+        val controller = InputSessionController(connection, { engine }, RecordingPersonalization(),
+            onStateChanged = { if (fail) error("Fixture renderer failure") })
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("nihao"))
+        fail = true
+        assertTrue(controller.applyModelWinner(controller.state.candidateRevision, 1))
+        assertEquals("拟好", controller.state.snapshot.candidates.first().text)
+        controller.handle(InputCommand.Text("x"))
+        assertTrue(connection.commits.isEmpty())
+        assertTrue(controller.state.snapshot.isComposing)
+        controller.close()
+    }
+
     @Test fun `rejected explicit language commit keeps composition and language`() {
         val connection = object : EditorConnection by RecordingConnection() {
             override fun commitText(text: String) = false

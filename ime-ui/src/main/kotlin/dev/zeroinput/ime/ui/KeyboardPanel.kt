@@ -34,6 +34,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     var onClearComposition: () -> Boolean = { false }
     private var backspaceRepeater: BackspaceRepeater? = null
     private var page = KeyboardPage.LETTERS
+    private var symbolPage = 0
     private var shift = Shift.OFF
     private var language = KeyboardLanguage(InputLanguage.CHINESE)
     private val languageLabel: String get() = context.getString(language.labelResource)
@@ -52,6 +53,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var symbolSwipeStartX = 0f
     private var symbolSwipeStartY = 0f
     private var symbolSwipeActive = false
+    private var symbolSwipeCancelled = false
     private var geometry = emptyList<List<Float>>()
     private val keys = mutableListOf<KeyboardKeyView>()
     private val glide = GlideTouchTracker(this, ::glideKeys)
@@ -106,6 +108,12 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS) {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) symbolSwipeCancelled = false
+            if (event.pointerCount > 1) {
+                symbolSwipeCancelled = true
+                cancelPendingGestures()
+            }
+            if (symbolSwipeCancelled) return true
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     symbolSwipeStartX = event.x
@@ -127,7 +135,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
                 MotionEvent.ACTION_UP -> {
                     if (symbolSwipeActive) {
                         val direction = event.x - symbolSwipeStartX
-                        changePage(if (direction < 0) KeyboardPage.MORE_SYMBOLS else KeyboardPage.SYMBOLS)
+                        if (kotlin.math.abs(direction) > dp(48)) showSymbolPage(symbolPage + if (direction < 0) 1 else -1)
                         symbolSwipeActive = false
                         return true
                     }
@@ -249,7 +257,16 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun showNumbers() = changePage(KeyboardPage.NUMERIC)
 
+    private fun showSymbolPage(index: Int) {
+        onUserInteraction()
+        symbolPage = Math.floorMod(index, SymbolPages.pages.size)
+        page = if (symbolPage == 0) KeyboardPage.SYMBOLS else KeyboardPage.MORE_SYMBOLS
+        render()
+        onPageChanged()
+    }
+
     private fun changePage(target: KeyboardPage) {
+        if (target == KeyboardPage.SYMBOLS) symbolPage = 0
         if (page == target) return
         onUserInteraction()
         page = target
@@ -284,9 +301,10 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private fun specs(): List<List<KeySpec>> = (when (page) {
         KeyboardPage.LETTERS -> if (keyboardLayout == ChineseKeyboardLayout.NINE_KEY)
             KeyboardLayouts.nineKey(context, languageLabel) else KeyboardLayouts.letters(context, shift != Shift.OFF,
-                languageLabel, language.usesChinesePunctuation, doublePinyinScheme == DoublePinyinScheme.MICROSOFT)
-        KeyboardPage.SYMBOLS -> KeyboardLayouts.symbols(context, languageLabel)
-        KeyboardPage.MORE_SYMBOLS -> KeyboardLayouts.moreSymbols(context, languageLabel)
+                languageLabel, language.usesChinesePunctuation && shift == Shift.OFF,
+                doublePinyinScheme == DoublePinyinScheme.MICROSOFT,
+                literalPunctuation = language.usesChinesePunctuation && shift != Shift.OFF)
+        KeyboardPage.SYMBOLS, KeyboardPage.MORE_SYMBOLS -> KeyboardLayouts.symbols(context, symbolPage)
         KeyboardPage.NUMERIC -> NumericKeyboardLayout.rows(context, editor)
     }).let { if (compact) CompactKeyboardLayout.rows(it) else it }
 
@@ -475,11 +493,15 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             KeyboardAction.Shift -> { onUserInteraction(); shift = if (shift == Shift.OFF) Shift.ON else Shift.OFF; render() }
             KeyboardAction.ShowLetters -> showLetters()
             KeyboardAction.ShowNumbers -> showNumbers()
-            KeyboardAction.ShowSymbols -> changePage(KeyboardPage.SYMBOLS)
-            KeyboardAction.ShowMoreSymbols -> changePage(KeyboardPage.MORE_SYMBOLS)
+            KeyboardAction.ShowSymbols -> showSymbolPage(if (page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS) symbolPage - 1 else 0)
+            KeyboardAction.ShowMoreSymbols -> showSymbolPage(symbolPage + 1)
             is KeyboardAction.Text -> {
                 onAction(action)
                 if (shift == Shift.ON) { shift = Shift.OFF; render(preserveCaseGestures = true) }
+            }
+            is KeyboardAction.LiteralText -> {
+                onAction(action)
+                if (page == KeyboardPage.LETTERS && shift == Shift.ON) { shift = Shift.OFF; render() }
             }
             is KeyboardAction.PairedText -> {
                 // An apostrophe inside an active Chinese composition is the

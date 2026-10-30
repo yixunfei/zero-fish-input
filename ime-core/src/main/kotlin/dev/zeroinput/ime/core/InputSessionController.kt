@@ -317,7 +317,7 @@ class InputSessionController(
         val promoted = ModelRankingPolicy.promote(state.snapshot, candidate.id) ?: return false
         rebuildRoutes(promoted)
         state = state.copy(snapshot = promoted, modelRanked = true, candidateRevision = state.candidateRevision + 1)
-        onStateChanged(state)
+        runCatching { onStateChanged(state) }
         return true
     }
 
@@ -564,16 +564,22 @@ class InputSessionController(
         val before = state.snapshot
         val learningShortcut = before.rawInput.ifBlank { before.composition }
         val update = activeEngine.handle(key)
-        apply(update, learningShortcut, allowLearning)
-        if (update.consumed || update.committedText.isNotEmpty()) return
+        if (update.consumed || update.committedText.isNotEmpty()) {
+            apply(update, learningShortcut, allowLearning)
+            return
+        }
 
         if (fallbackBackspace) {
-            if (reflectsBackspace(before, update.snapshot)) return
+            if (reflectsBackspace(before, update.snapshot)) {
+                apply(update, learningShortcut, allowLearning)
+                return
+            }
             // Do not leave an unconsumed pre-edit span attached to the
             // editor.  Commit the raw composition first, then route the
             // backspace to the editor just like any other unconsumed key.
-            flushUnconsumedComposition(activeEngine, update.snapshot, before)
+            if (!flushUnconsumedComposition(activeEngine, update.snapshot, before)) return
             connection.deleteBeforeCursor()
+            publish(rawEngineSnapshot)
             return
         }
 
@@ -582,7 +588,13 @@ class InputSessionController(
             EngineKey.Space -> " "
             else -> null
         } ?: return
-        if (key is EngineKey.Character && reflectsCharacter(before, update.snapshot, key.text)) return
+        if (key is EngineKey.Character && reflectsCharacter(before, update.snapshot, key.text)) {
+            apply(update, learningShortcut, allowLearning)
+            return
+        }
+        // An unconsumed update can already have cleared the engine snapshot.
+        // Publishing it before flushing would erase the editor preedit even
+        // when the editor subsequently rejects the raw replacement.
         commitUnconsumedKey(activeEngine, update.snapshot, before, fallbackText)
     }
 
@@ -639,9 +651,12 @@ class InputSessionController(
         }
 
         val rawComposition = before.rawInput.ifBlank { before.composition }
+        // Keep both engine state and the editor's composing span until the
+        // editor accepts the replacement, so a rejected Enter can be retried.
+        val committed = commitRawComposition(rawComposition)
+        if (!committed) return
         runCatching { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
-        val committed = commitRawComposition(rawComposition)
         if (committed && allowLearning && privacy.learningAllowed && privacy.personalizationAllowed &&
             (language == InputLanguage.ENGLISH || rawComposition.all { it.code in 0x3400..0x9fff })) {
             runCatching {
@@ -659,7 +674,7 @@ class InputSessionController(
             if (before.candidates.isNotEmpty()) {
                 selectCandidate(activeEngine, before.highlightedIndex, learn = learnFromCommittedText())
             }
-            flushUnconsumedComposition(activeEngine, state.snapshot)
+            if (!flushUnconsumedComposition(activeEngine, state.snapshot)) return
         }
         connection.commitText(text)
         associations.clear()
@@ -672,7 +687,7 @@ class InputSessionController(
         if (state.snapshot.isComposing) {
             val before = state.snapshot
             if (before.candidates.isNotEmpty()) selectCandidate(activeEngine, before.highlightedIndex, learn = learnFromCommittedText())
-            flushUnconsumedComposition(activeEngine, state.snapshot)
+            if (!flushUnconsumedComposition(activeEngine, state.snapshot)) return
         }
         connection.commitPairedText(opening + closing, opening.length)
         associations.clear()
@@ -833,23 +848,25 @@ class InputSessionController(
         val snapshot = updateSnapshot.takeIf(EngineSnapshot::isComposing)
             ?: beforeSnapshot.takeIf(EngineSnapshot::isComposing)
         associations.clear()
-        flushUnconsumedComposition(activeEngine, snapshot, beforeSnapshot)
+        if (!flushUnconsumedComposition(activeEngine, snapshot, beforeSnapshot)) return
         connection.commitText(text)
+        publish(rawEngineSnapshot)
     }
 
     private fun flushUnconsumedComposition(
         activeEngine: InputEngine,
         snapshot: EngineSnapshot?,
         beforeSnapshot: EngineSnapshot = EngineSnapshot.Empty,
-    ) {
+    ): Boolean {
         val effectiveSnapshot = snapshot?.takeIf(EngineSnapshot::isComposing)
             ?: beforeSnapshot.takeIf(EngineSnapshot::isComposing)
-            ?: return
+            ?: return true
         val rawComposition = fallbackComposition(effectiveSnapshot)
+        if (!commitRawComposition(rawComposition)) return false
         runCatching { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
-        commitRawComposition(rawComposition)
         publish(EngineSnapshot.Empty)
+        return true
     }
 
     private fun reflectsCharacter(
@@ -875,10 +892,8 @@ class InputSessionController(
 
     private fun commitRawComposition(rawComposition: String): Boolean {
         associations.clear()
-        // Clear the composing span first so finishComposingText cannot commit
-        // the preedit a second time when the raw text is submitted explicitly.
-        connection.setComposingText("")
-        connection.finishComposingText()
+        // commitText replaces the composing span atomically. Clearing it first
+        // destroys the unfinished input even when the replacement is rejected.
         return rawComposition.isNotEmpty() && connection.commitText(rawComposition)
     }
 
