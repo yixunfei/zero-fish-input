@@ -6,7 +6,10 @@ Date: 2026-09-06
 
 Approved: named symbol groups, expanded catalog, commit/push and testing prerelease.
 Implemented 12 groups with 1336 curated symbol entries and bounded pages.
-Validation and publication in progress; see releases/v0.7.1-validation.md.
+Packaging tests, privacyCheck, Lint, universal APK signature/ABI/permission checks
+and 21 emulator tests passed. Code and testing-prerelease publication authorized;
+see [v0.7.1 verification](releases/v0.7.1-validation.md). Physical ARM/OEM font
+acceptance remains open.
 
 ## User-reported input repairs (2026-10-30)
 
