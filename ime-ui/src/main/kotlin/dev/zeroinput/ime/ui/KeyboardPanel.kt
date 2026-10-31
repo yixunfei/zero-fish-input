@@ -38,6 +38,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     private var shift = Shift.OFF
     private var language = KeyboardLanguage(InputLanguage.CHINESE)
     private val languageLabel: String get() = context.getString(language.labelResource)
+    private var symbolGroupsPopup: android.widget.PopupMenu? = null
     private var alternativesPopup: PopupWindow? = null
     private var keyboardLayout = ChineseKeyboardLayout.FULL
     private var doublePinyinScheme = DoublePinyinScheme.OFF
@@ -257,6 +258,17 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun showNumbers() = changePage(KeyboardPage.NUMERIC)
 
+    private fun showSymbolGroups() {
+        val anchor = keys.firstOrNull { it.boundAction == KeyboardAction.ShowSymbolGroups } ?: return
+        onUserInteraction()
+        symbolGroupsPopup?.dismiss()
+        symbolGroupsPopup = android.widget.PopupMenu(context, anchor).apply {
+            SymbolPages.groups.forEachIndexed { index, group -> menu.add(0, index, index, group.label) }
+            setOnMenuItemClickListener { item -> showSymbolPage(SymbolPages.firstPage(item.itemId)); true }
+            show()
+        }
+    }
+
     private fun showSymbolPage(index: Int) {
         onUserInteraction()
         symbolPage = Math.floorMod(index, SymbolPages.pages.size)
@@ -405,6 +417,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     private fun showAlternatives(anchor: View, values: List<String>) {
         onUserInteraction()
+        symbolGroupsPopup?.dismiss()
+        symbolGroupsPopup = null
         alternativesPopup?.dismiss()
         var popup: PopupWindow? = null
         val row = LinearLayout(context).apply {
@@ -494,6 +508,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             KeyboardAction.ShowLetters -> showLetters()
             KeyboardAction.ShowNumbers -> showNumbers()
             KeyboardAction.ShowSymbols -> showSymbolPage(if (page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS) symbolPage - 1 else 0)
+            KeyboardAction.ShowSymbolGroups -> showSymbolGroups()
             KeyboardAction.ShowMoreSymbols -> showSymbolPage(symbolPage + 1)
             is KeyboardAction.Text -> {
                 onAction(action)
@@ -520,6 +535,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     fun cancelPendingGestures() {
+        symbolGroupsPopup?.dismiss()
+        symbolGroupsPopup = null
         alternativesPopup?.dismiss()
         alternativesPopup = null
         glide.cancel()

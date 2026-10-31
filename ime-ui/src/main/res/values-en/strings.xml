@@ -209,4 +209,17 @@
     <string name="secure_clipboard_load_failed">Unable to load snippets. Retry or open Manage and authenticate to recover.</string>
     <string name="symbol_page">%1$d/%2$d ›</string>
     <string name="secure_clipboard_copy_short">Copy privately</string>
+    <string name="symbol_groups">Choose symbol group</string>
+    <string name="symbol_group_chinese">Chinese</string>
+    <string name="symbol_group_english">English</string>
+    <string name="symbol_group_math">Mathematics</string>
+    <string name="symbol_group_greek">Greek</string>
+    <string name="symbol_group_arrows">Arrows</string>
+    <string name="symbol_group_icons">Icons</string>
+    <string name="symbol_group_shapes">Shapes</string>
+    <string name="symbol_group_units">Units &amp; currency</string>
+    <string name="symbol_group_numbers">Numbers</string>
+    <string name="symbol_group_phonetic">Phonetics</string>
+    <string name="symbol_group_latin">Latin</string>
+    <string name="symbol_group_box">Box drawing</string>
 </resources>

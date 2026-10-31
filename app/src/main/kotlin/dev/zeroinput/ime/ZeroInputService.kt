@@ -1237,6 +1237,7 @@ class ZeroInputService : InputMethodService() {
             KeyboardAction.ShowSymbols,
             KeyboardAction.ShowNumbers,
             KeyboardAction.ShowMoreSymbols,
+            KeyboardAction.ShowSymbolGroups,
             -> Unit
         }
         retryEngineWarmupIfIdle()

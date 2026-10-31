@@ -24,6 +24,8 @@ sealed interface KeyboardAction {
 
     data object ShowNumbers : KeyboardAction
 
+    data object ShowSymbolGroups : KeyboardAction
+
     data object ShowMoreSymbols : KeyboardAction
 
     data object ShowEmoji : KeyboardAction

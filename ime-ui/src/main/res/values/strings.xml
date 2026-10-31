@@ -213,4 +213,17 @@
     <string name="ai_page_reference_item">引用 %1$d（%2$d 字符）：%3$s</string>
     <string name="symbol_page">%1$d/%2$d ›</string>
     <string name="secure_clipboard_copy_short">私密复制</string>
+    <string name="symbol_groups">选择符号分组</string>
+    <string name="symbol_group_chinese">中文常用</string>
+    <string name="symbol_group_english">英文常用</string>
+    <string name="symbol_group_math">数学常用</string>
+    <string name="symbol_group_greek">希腊符号</string>
+    <string name="symbol_group_arrows">箭头符号</string>
+    <string name="symbol_group_icons">图标符号</string>
+    <string name="symbol_group_shapes">几何图形</string>
+    <string name="symbol_group_units">单位货币</string>
+    <string name="symbol_group_numbers">数字序号</string>
+    <string name="symbol_group_phonetic">拼音注音</string>
+    <string name="symbol_group_latin">拉丁字母</string>
+    <string name="symbol_group_box">制表符号</string>
 </resources>

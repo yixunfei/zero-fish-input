@@ -1023,3 +1023,10 @@ active edits on the existing personalization worker and learn into the encrypted
 lexicon. Their displayed frequency uses the maximum of the public weight and
 learned word frequency. Public dictionary weights and persisted formats do not
 change.
+
+## Symbol groups (2026-10-31)
+
+The UI owns a curated offline catalog of 12 named symbol groups. Each group is
+chunked into pages of at most 27 symbols. A lifecycle-dismissed popup selects the
+group directly; page controls and horizontal swipes preserve continuous browsing.
+No personal data, new dependency or runtime network access is involved.

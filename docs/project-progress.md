@@ -2,6 +2,12 @@
 
 Date: 2026-09-06
 
+## Symbol groups and v0.7.1 (2026-10-31)
+
+Approved: named symbol groups, expanded catalog, commit/push and testing prerelease.
+Implemented 12 groups with 1336 curated symbol entries and bounded pages.
+Validation and publication in progress; see releases/v0.7.1-validation.md.
+
 ## User-reported input repairs (2026-10-30)
 
 Approved scope: symbol navigation/coverage, prominent private selection copy,

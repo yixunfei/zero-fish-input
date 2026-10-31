@@ -43,6 +43,7 @@ internal object KeyboardLayouts {
     }
 
     fun symbols(context: android.content.Context, page: Int): List<List<KeySpec>> {
+        val entry = SymbolPages.entries[page]
         val values = SymbolPages.pages[page].map(::symbolKey)
         return listOf(
             values.take(10),
@@ -51,7 +52,9 @@ internal object KeyboardLayouts {
                 1.2f, KeyStyle.MODIFIER)) + values.drop(20) +
                 KeySpec("⌫", context.getString(R.string.key_backspace), KeyboardAction.Backspace, 1.2f, KeyStyle.MODIFIER),
             symbolBottomRow(context).toMutableList().apply {
-                this[1] = KeySpec(context.getString(R.string.symbol_page, page + 1, SymbolPages.pages.size),
+                this[2] = KeySpec(context.getString(SymbolPages.groups[entry.group].label),
+                    context.getString(R.string.symbol_groups), KeyboardAction.ShowSymbolGroups, 2.6f, KeyStyle.MODIFIER)
+                this[1] = KeySpec(context.getString(R.string.symbol_page, entry.number, entry.count),
                     context.getString(R.string.key_more_symbols), KeyboardAction.ShowMoreSymbols, 1.6f, KeyStyle.MODIFIER)
             },
         )

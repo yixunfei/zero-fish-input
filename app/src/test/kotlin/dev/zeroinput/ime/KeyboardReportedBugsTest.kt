@@ -20,6 +20,18 @@ import dev.zeroinput.ime.ui.R as UiR
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class KeyboardReportedBugsTest {
+    @Test fun visibleGroupSelectorJumpsToMathematics() = withActivity { activity ->
+        val panel = KeyboardPanel(activity)
+        activity.setContentView(panel)
+        key(panel, UiR.string.key_symbols).performClick()
+        key(panel, UiR.string.symbol_groups).performClick()
+        val popup = org.robolectric.shadows.ShadowPopupMenu.getLatestPopupMenu()
+        assertNotNull(popup)
+        assertEquals(12, popup.menu.size())
+        popup.menu.performIdentifierAction(2, 0)
+        assertTrue(descendants(panel).filterIsInstance<TextView>().any { it.text.toString() == "∫" })
+    }
+
     @Test fun englishPunctuationKeepsItsEngineRoute() = withActivity { activity ->
         val panel = KeyboardPanel(activity)
         panel.setLanguage(dev.zeroinput.engine.api.InputLanguage.ENGLISH)
@@ -60,11 +72,11 @@ class KeyboardReportedBugsTest {
         assertEquals(second, labels())
         assertEquals(0, commits)
         val pages = mutableSetOf<List<String>>()
-        repeat(8) {
+        repeat(60) {
             pages += labels()
             key(panel, UiR.string.key_more_symbols).performClick()
         }
-        assertEquals(8, pages.size)
+        assertTrue(pages.size >= 30)
         assertTrue(pages.flatten().containsAll(listOf("【", "∫", "→", "℃", "ǜ")))
     }
 
