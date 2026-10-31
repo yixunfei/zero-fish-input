@@ -2,6 +2,28 @@
 
 Date: 2026-09-06
 
+## Private-copy bounded second round (2026-10-31)
+
+The user approved one additional optimization/validation round and independent
+sub-agents. Work follows the [second-round plan](clipboard-product-repair-plan.md)
+on `zn/private-copy-prototype` after `c563fb6`. The implementation and API 37
+emulator experiments are complete; see the
+[second-round report](private-copy-round2-validation-2026-10-31.md).
+Normal APK launches verified immediate return and a hidden, bound IME's delayed
+15-second return after projection stopped. Default/previously enabled IMEs were
+restored through system UI. A nominal six-action IME flow is possible in this
+implementation; IME navigation and OCR end-to-end were tested separately.
+
+Public-model reuse retains size/SHA-256 checks and removes 16,608,794 bytes of
+rewrites per hot request. On 128 fixed public strings the experimental geometry
+candidate improved exact results from 37 to 77, but lost two previously exact
+cases and still failed all whitespace/emoji/multiline group cases. Default
+preprocessing remains unchanged. No model replacement, detector, persistent
+session cache or production integration was added. Stop further general-purpose
+exact-copy OCR integration at this gate; ARM/OriginOS and production typing
+latency remain unverified. Gradle/device access was serialized; negative-path,
+build/Lint/privacy and the real captured-OCR UI checks passed.
+
 ## Isolated private-copy acquisition prototype (2026-10-31)
 
 Approved: commit/push the current baseline (`3cbfaa1` on `main`), create

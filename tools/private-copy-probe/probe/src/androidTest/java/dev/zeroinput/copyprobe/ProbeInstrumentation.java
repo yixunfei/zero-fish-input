@@ -43,6 +43,8 @@ public final class ProbeInstrumentation extends Instrumentation {
             else if ("lock".equals(arguments.getString("mode"))) report = new ProbeUiChecks(this).draftInvalidation(false);
             else if ("expiry".equals(arguments.getString("mode"))) report = new ProbeUiChecks(this).draftInvalidation(true);
             else if ("drag".equals(arguments.getString("mode"))) report = new ProbeUiChecks(this).drag();
+            else if ("return-guards".equals(arguments.getString("mode"))) report = new ProbeReturnChecks(this).run();
+            else if ("ocr-round2".equals(arguments.getString("mode"))) report = new OcrRoundTwoChecks(this).run();
             else report = boundaries();
             report.put("assertions", assertions).put("api", android.os.Build.VERSION.SDK_INT);
             result.putString("stream", "\n" + report.toString(2) + "\n"); finish(Activity.RESULT_OK, result);

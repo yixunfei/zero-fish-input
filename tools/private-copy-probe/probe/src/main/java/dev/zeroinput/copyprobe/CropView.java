@@ -34,7 +34,7 @@ final class CropView extends View {
         }
     }
     @Override public boolean onTouchEvent(MotionEvent event) {
-        if (bitmap == null) return false;
+        if (bitmap == null || !isEnabled()) return false;
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             if (!fitted.contains(event.getX(), event.getY())) return false;
             startX = event.getX(); startY = event.getY(); selected = true;

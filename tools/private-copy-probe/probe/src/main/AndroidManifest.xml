@@ -14,6 +14,11 @@
         <activity android:name=".DropActivity" android:exported="false" android:taskAffinity="${applicationId}.drop"
             android:resizeableActivity="true" android:label="@string/drop_title" />
         <service android:name=".CaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name=".ResearchIme" android:exported="true" android:permission="android.permission.BIND_INPUT_METHOD"
+            android:label="@string/ime_name">
+            <intent-filter><action android:name="android.view.InputMethod" /></intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/research_ime" />
+        </service>
         <service android:name=".CaptureTile" android:exported="true" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:label="@string/tile_label" android:icon="@drawable/ic_probe">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>

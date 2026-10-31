@@ -6,7 +6,11 @@
 `fixture` supplies only constructed public content; `probe` receives explicit
 plain-text handoffs or a single MediaProjection frame. Plain and OCR flavors
 separate capture cost from recognizer/runtime cost. It is not a production module
-or dependency and adds no IME work, app permissions, vault writes or AI path.
+or dependency and adds no production IME work, app permissions, vault writes or AI path.
+The second round adds a minimal research-only IME for capture-to-review navigation
+experiments. It does not read editor content or replace the production input
+engine. Current-IME launch eligibility and pixel access remain separate: the
+latter still requires explicit system MediaProjection consent per session.
 The prototype owns bounded memory drafts, capture/review generations and one
 nonqueued background recognition worker. Model sessions close per request and
 the idle worker exits; system/private clipboard adapters are not used.

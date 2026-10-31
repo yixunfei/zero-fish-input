@@ -1,2 +1,3 @@
 # Keep the exact Unicode/whitespace fixture reproducible across host platforms.
 common/assets/public-fixture.txt text eol=lf
+probe/src/androidTestOcr/java/dev/zeroinput/copyprobe/PublicOcrCorpus.java text eol=lf

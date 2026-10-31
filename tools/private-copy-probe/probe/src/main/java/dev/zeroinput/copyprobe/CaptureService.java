@@ -23,7 +23,7 @@ import android.widget.Toast;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-/** No recording, file output, audio, overlay or background Activity launch. */
+/** One frame only. Projection is stopped before any optional protected-review launch. */
 public final class CaptureService extends Service {
     private HandlerThread thread;
     private Handler worker;
@@ -127,7 +127,7 @@ public final class CaptureService extends Service {
         thread.quitSafely();
     }
     @Override public void onDestroy() {
-        if (worker != null) worker.post(() -> end(null));
+        if (worker != null && thread.isAlive()) worker.post(() -> end(null));
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }

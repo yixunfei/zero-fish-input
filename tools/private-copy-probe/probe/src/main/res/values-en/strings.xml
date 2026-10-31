@@ -8,13 +8,12 @@
     <string name="drop_title">Open split-screen receiver</string>
     <string name="drop_setup">Use Recents to pair this empty receiver with the public fixture. After a drop, this task is removed and protected review opens.</string>
     <string name="invalid_payload">Invalid, oversized or non-plain-text payload</string>
-    <string name="capture_disclosure">Next, choose an app or screen in the system dialog. This grants more access than the region you crop later.
-After acquiring one frame, sharing stops immediately. No image file is saved. Return to the source, then tap Review capture draft in Quick Settings. Drafts expire in 60 seconds.</string>
+    <string name="capture_disclosure">Choose a public fixture app or screen. Authorization exceeds the later crop. Sharing stops after one frame; no image file is saved. Direct review may be blocked; use Quick Settings to return manually. The draft still expires in 60 seconds. Changing the input method cancels it.</string>
     <string name="system_consent">Choose sharing scope</string><string name="capture_channel">Single-frame capture</string>
     <string name="capturing">Acquiring one frame</string><string name="capture_notification">Stops after acquisition; 10 seconds maximum</string>
     <string name="frame_ready">Sharing stopped. Open the draft from Quick Settings.</string><string name="capture_failed">No frame acquired. Start again.</string>
     <string name="review_hint">Check and adjust the text. Confirmation discards this test draft.</string>
-    <string name="crop_hint">Drag a rectangle around one line. This only crops the acquired image locally.</string>
+    <string name="crop_hint">Drag around one line; release to recognize automatically in the OCR build. This only crops the acquired image locally.</string>
     <string name="frame_metrics">Frame %1$d × %2$d; %3$d ms after consent. Check the source page first.</string>
     <string name="dark_text">Light text on dark background</string><string name="recognize">Recognize selected line</string>
     <string name="no_ocr">This build verifies capture only and contains no OCR model.</string>
@@ -24,4 +23,11 @@ After acquiring one frame, sharing stops immediately. No image file is saved. Re
     <string name="ocr_metrics">Local recognition: %1$d ms. Check spaces, numbers and symbols.</string>
     <string name="no_draft">No pending draft. It may have expired or been cancelled.</string>
     <string name="confirm_discard">Confirm and end test</string><string name="confirmed_discarded">Confirmed. Test content discarded.</string>
+<string name="ime_name">Public fixture research keyboard</string>
+<string name="ime_notice">Public fixtures only. This keyboard neither reads nor enters text. Capture still needs system consent every time.</string>
+<string name="ime_settings">Enable research keyboard in Settings</string>
+<string name="choose_ime">Choose or restore keyboard</string>
+<string name="return_manual">Open review manually from Quick Settings</string>
+<string name="return_now">Try direct review after sharing stops</string>
+<string name="return_delayed">Public-fixture control: try review after 15 seconds</string>
 </resources>

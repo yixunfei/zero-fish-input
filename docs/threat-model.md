@@ -8,6 +8,15 @@ APK IDs and lack of INTERNET permission isolate public acquisition experiments
 from the production IME, AI adapters, private vault and editor sessions. This is
 not approval for production capture permissions or a new private-vault ingress.
 
+The authorized second round adds a minimal research IME solely to test an
+explicit capture-to-review return. It is bound only by the system through
+BIND_INPUT_METHOD, selected via normal emulator UI, and must not read editor
+text. IME status grants no arbitrary-page read capability: MediaProjection still
+requires separate per-session consent and is stopped before review. No broader
+background launch permission is requested. Tests must distinguish current IME
+eligibility from instrumentation privileges and recent-Activity launch grace.
+The prior selected IME is restored after the public-fixture experiment.
+
 The probe's new surfaces are one launcher/plain-text handoff Activity and a
 system-bound Quick Settings tile. Text is untrusted and bounded to one plain
 8192-unit payload; URI/HTML/stream/multiple-item, malformed and stale requests

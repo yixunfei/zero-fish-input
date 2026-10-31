@@ -25,6 +25,8 @@ public final class EntryActivity extends ProtectedActivity {
         button(root, R.string.start_capture, () -> { startActivity(new Intent(this, ConsentActivity.class)); finish(); });
         button(root, R.string.open_draft, this::review);
         button(root, R.string.drop_title, () -> startActivity(new Intent(this, DropActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        button(root, R.string.ime_settings, () -> startActivity(new Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)));
+        button(root, R.string.choose_ime, () -> getSystemService(android.view.inputmethod.InputMethodManager.class).showInputMethodPicker());
         button(root, R.string.cancel, () -> { app().clear(); finish(); });
     }
     private void review() {

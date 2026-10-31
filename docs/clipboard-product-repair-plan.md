@@ -1,5 +1,34 @@
 # Clipboard product repair plan
 
+## Approved bounded second round (2026-10-31)
+
+The user approved one further optimization/validation round, with independent
+sub-agents, after reviewing the first prototype's limits. Work stays on
+`zn/private-copy-prototype`, after `c563fb6`, outside production modules.
+
+1. Test a minimal research IME, protected by BIND_INPUT_METHOD and selected
+   through normal emulator settings, solely to evaluate returning from an
+   explicit one-frame capture to protected review. It must not read editor text
+   or clipboard data. Compare current/hidden/switched IME states and reject
+   cancelled, locked or expired returns. Normal noninstrumented launches and
+   controls must distinguish IME eligibility from recent-Activity grace periods.
+2. Compare the existing recognizer against at most two explained preprocessing
+   candidates on at least 100 fixed public strings, including unsupported
+   character/whitespace cases. Preserve all cases and report exact matches and
+   character errors separately. Remove repeated public-model writes only with
+   integrity checks intact; do not keep native sessions permanently resident.
+3. Keep only measured improvements. Run privacy, lifecycle, Lint and build
+   checks; quantify interaction and OCR results without claiming physical-device
+   acceptance. No large-model replacement, full-page detector, production vault
+   integration or wider permissions are authorized by this round.
+
+File ownership: the IME agent owns main probe UI/lifecycle, existing device tests
+and isolated build/manifest rules; the OCR agent owns OCR flavor implementation
+and new flavor-specific comparison tests; the primary agent owns documentation,
+integration and final acceptance. Gradle/emulator operations are serialized.
+The independent reviewer is read-only. Only the API 37 x86_64 emulator is
+currently connected; target ARM/OriginOS acceptance remains outstanding.
+
 ## Approved isolated acquisition prototype (2026-10-31)
 
 The user authorized committing/pushing the existing work, creating an implementation

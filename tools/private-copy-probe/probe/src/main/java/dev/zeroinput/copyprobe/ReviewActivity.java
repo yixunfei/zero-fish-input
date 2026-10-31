@@ -31,11 +31,15 @@ public final class ReviewActivity extends ProtectedActivity {
     };
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        token = app().gate.token();
+        token = getIntent().getLongExtra("return_token", app().gate.token());
+        if (getIntent().hasExtra("return_token") && !app().canReturn(getIntent().getLongExtra("return_token", -1))) {
+            finish(); return;
+        }
         if (state != null || app().locked() || !app().gate.claim(token, ProbeApp.now())) {
             app().clear(); empty(); return;
         }
         app().invalidated = () -> { detach(); finish(); };
+        app().diagnostic("review_claimed");
         LinearLayout root = column();
         status = label(root, R.string.review_hint);
         if (app().frame != null) frameControls(root);
@@ -50,6 +54,7 @@ public final class ReviewActivity extends ProtectedActivity {
     private void frameControls(LinearLayout root) {
         status.setText(getString(R.string.frame_metrics, app().frame.getWidth(), app().frame.getHeight(), app().acquisitionMs));
         crop = new CropView(this, app().frame);
+        crop.setOnClickListener(view -> recognize());
         root.addView(crop, new LinearLayout.LayoutParams(-1, 0, 1));
         label(root, R.string.crop_hint);
         invert = new CheckBox(this); invert.setText(R.string.dark_text); root.addView(invert);
@@ -78,6 +83,7 @@ public final class ReviewActivity extends ProtectedActivity {
         Bitmap line = crop.crop();
         if (line == null) { status.setText(R.string.choose_region); return; }
         recognizing = true;
+        crop.setEnabled(false);
         boolean dark = invert.isChecked();
         status.setText(R.string.recognizing);
         WeakReference<ReviewActivity> owner = new WeakReference<>(this);
@@ -86,10 +92,11 @@ public final class ReviewActivity extends ProtectedActivity {
             if (activity == null || !activity.current()) { if (output != null) Arrays.fill(output, '\0'); return; }
             activity.recognitionReady(output, elapsed);
         });
-        if (!accepted) { recognizing = false; status.setText(R.string.recognizer_busy); }
+        if (!accepted) { recognizing = false; crop.setEnabled(true); status.setText(R.string.recognizer_busy); }
     }
     private void recognitionReady(char[] output, long elapsed) {
         recognizing = false;
+        if (crop != null) crop.setEnabled(true);
         if (output == null) { status.setText(R.string.recognition_failed); return; }
         LinearLayout root = (LinearLayout) crop.getParent();
         crop.detach(); root.removeView(crop); crop = null;

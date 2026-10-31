@@ -7,6 +7,8 @@ making an integration or OCR-adoption decision.
 
 Implementation authorization and gates: [project plan](../../docs/clipboard-product-repair-plan.md).
 Current project status: [project-progress.md](../../docs/project-progress.md).
+Measured second-round results and stop decision:
+[validation report](../../docs/private-copy-round2-validation-2026-10-31.md).
 
 ## Components and boundaries
 
@@ -26,7 +28,12 @@ The receiver has only `FOREGROUND_SERVICE` and
 `BIND_QUICK_SETTINGS_TILE` permission; the projection service and review/consent
 Activities are not exported. Only the launcher/plain-text receiver is exported.
 No INTERNET, storage, notification, overlay, accessibility, assistant role or
-default-IME change is requested. Installing a tile does not authorize capture.
+privileged helper is requested. Installing a tile does not authorize capture.
+The second round additionally offers a research navigation IME under
+`BIND_INPUT_METHOD`, solely for public-fixture return-to-preview experiments.
+Enable/select it only through normal system UI on the test emulator and restore
+the previous IME and enabled list afterward. It cannot replace a daily keyboard;
+application code does not read its InputConnection or editor contents.
 
 The system grants a window/display stream for a session. The service acquires
 one ImageReader image and then closes the reader/display and stops projection.
@@ -41,7 +48,8 @@ coordinates; the user must check the frozen preview. `FLAG_SECURE` remains bindi
 1. Install the fixture and one probe flavor. In the probe, add its Quick Settings
    tile through the system confirmation UI; put it near the start if desired.
 2. Open the public fixture. No editor focus, keyboard or default-IME identity is
-   needed for these routes.
+   needed for explicit text handoff or manual capture/review. Automatic return
+   eligibility is a separate research experiment involving the current IME.
 3. For exact text, use **Share text**, a standard editor's PROCESS_TEXT action, or
    (with both apps in split screen) drag the explicitly offered text into the
    probe's **Open split-screen receiver** area. Its empty, protected task can be
@@ -51,20 +59,33 @@ coordinates; the user must check the frozen preview. `FLAG_SECURE` remains bindi
 4. For pixels, expand Quick Settings and tap **Capture once**. Read the short
    disclosure, choose sharing scope, then select the public fixture in the
    **system** dialog. Sharing stops after a frame. Expand Quick Settings again
-   and tap **Review capture draft**.
+   and tap **Review capture draft** for the manual control path. The consent page
+   also offers immediate return and a 15-second delayed diagnostic return. Delay
+   exists only to distinguish platform eligibility from recent-Activity grace;
+   it is not a normal-use requirement. A return attempt is not proof that Android
+   displayed review. Neither return mode extends the draft deadline.
 5. Drag a rectangle around one line in the protected preview. In the OCR flavor,
-   tap **Recognize selected line**, correct the result if needed, then
+   releasing the crop starts recognition; **Recognize selected line** also allows
+   an explicit retry. The crop is locked while recognition is running. Correct
+   the result if needed, then
    **Confirm and end test**. This clears the draft; it does not claim a vault save.
    The plain flavor validates the crop without running recognition.
 6. Cancel, leave review, recreate/rotate review, lock/screen off, or allow the
    deadline to expire to discard. A new operation invalidates older callbacks.
 
-Typical projection interaction: expand Quick Settings (1-2 swipes), tile (1),
+The first-round manual projection interaction was: expand Quick Settings (1-2 swipes), tile (1),
 disclosure action (1), system Next (1), target (1), expand again (1-2 swipes),
 review tile (1), crop gesture (1), recognize (1), confirm (1): **10-12 actions**
 when the tile is on the first page; paging adds actions. Setup, editing and any
 future vault authentication are extra. This is feasible acquisition but has
 not met the original “copy one sentence directly” usability goal.
+
+Second-round immediate return from an already visible research keyboard takes
+six actions: start, disclosure, system Next, source, crop, confirm. The QS entry
+retains its manual default for comparison; choosing immediate return there takes
+8-9 actions on the first tile page. Keyboard setup/showing, corrections and any
+future vault authentication remain additional. These counts are emulator flows,
+not a guarantee about a particular manufacturer's picker or launch rules.
 
 Exact share commonly takes 3-5 actions; PROCESS_TEXT depends on source selection
 and overflow placement. Drag adds split-screen setup. Those routes are useful
@@ -94,6 +115,10 @@ where the source cooperates, not replacements for missing source handoff.
 - The OCR flavor writes only hash-verified **public models/dictionary** to
   `noBackupFilesDir`; app-managed content never goes there. Models are bundled,
   not downloaded by the APK. There is no AI or network path.
+  Reuse checks size and SHA-256 on every request. Missing or invalid public files
+  are staged, verified and atomically replaced; cancellation removes staging
+  files. A valid hit avoids rewriting the model/table without skipping integrity
+  checks. Native sessions still close on every recognition request.
 - Owned arrays/bitmaps are cleared and references released. Framework immutable
   strings, native allocator pages and OS-owned projection buffers cannot be
   promised forensic zeroization. Closing a native session is not proof of an
@@ -117,7 +142,8 @@ The existing reduced-runtime Maven artifact must be prepared as documented in
 python tools/prepare-ocr-evaluation.py
 
 ./gradlew.bat -g ./build/verification-gradle-home -p tools/private-copy-probe `
-  :probe:testPlainDebugUnitTest :probe:assemblePlainDebug :probe:assembleOcrDebug `
+  :probe:testPlainDebugUnitTest :probe:testOcrDebugUnitTest `
+  :probe:assemblePlainDebug :probe:assembleOcrDebug `
   :probe:assemblePlainDebugAndroidTest :probe:assembleOcrDebugAndroidTest `
   :fixture:assembleDebug :probe:lintPlainDebug :probe:lintOcrDebug :fixture:lintDebug `
   verifyProbePrivacy --no-parallel
@@ -134,6 +160,8 @@ After explicitly installing the matching APK/test APK and fixture on an emulator
 adb -s emulator-5554 shell am instrument -w `
   dev.zeroinput.copyprobe.test/dev.zeroinput.copyprobe.ProbeInstrumentation
 adb -s emulator-5554 shell am instrument -w -e mode ocr -e samples stress `
+  dev.zeroinput.copyprobe.ocr.test/dev.zeroinput.copyprobe.ProbeInstrumentation
+adb -s emulator-5554 shell am instrument -w -e mode ocr-round2 `
   dev.zeroinput.copyprobe.ocr.test/dev.zeroinput.copyprobe.ProbeInstrumentation
 adb -s emulator-5554 shell am instrument -w -e mode capture `
   dev.zeroinput.copyprobe.ocr.test/dev.zeroinput.copyprobe.ProbeInstrumentation
@@ -157,6 +185,15 @@ never an APK permission dependency. No screenshot protection is disabled.
 Tests report counts, geometry, exact-match booleans and resource samples, never
 acquired text/image payloads. `am instrument` can exit zero after a test failure:
 require the expected JSON success fields and absence of `Probe failed`.
+
+`ocr-round2` compares the unchanged default preprocessing with one experimental
+vertical-trim/wider-input combination on 128 fixed public strings. Both see the
+same image; order alternates, warmup is separate, and unsupported cases remain
+in the totals. Only edit positions/types are reported, never recognized text.
+The candidate is not enabled by default. The model-write timing comparison uses
+the new atomic/fsync writer, so it is not a direct speedup estimate against the
+first-round implementation. Noninstrumented IME return trials are documented
+separately because instrumentation itself can change Activity launch eligibility.
 
 Before adoption, validate rotation, landscape/split screen, source changes,
 screen lock, expiry, revocation and rapid repeated requests. Check

@@ -1,5 +1,9 @@
 # Private-copy acquisition prototype validation
 
+This records the first round. Later optimizations, controlled IME return trials
+and the larger fixed OCR corpus are recorded in the
+[second-round report](private-copy-round2-validation-2026-10-31.md).
+
 Scope: independent research APKs on `zn/private-copy-prototype`, after baseline
 `3cbfaa1` was committed and pushed to `main`. No production source, manifest,
 vault schema or IME behavior changed. Confirmation in the probe discards data.

@@ -8,13 +8,12 @@
     <string name="drop_title">打开分屏接收区</string>
     <string name="drop_setup">在最近任务中将此空白接收区与公开样本应用分屏。接收文字后，此任务会移除并打开受保护的预览。</string>
     <string name="invalid_payload">内容无效、超长或并非单条纯文本</string>
-    <string name="capture_disclosure">下一步由系统让你选择共享应用或屏幕。授权范围大于稍后的框选区域。
-取得一帧后立即停止共享，不保存图片。返回原页面后，再点一次快捷设置中的“预览取字草稿”。草稿 60 秒后清除。</string>
+    <string name="capture_disclosure">选择公开样本应用或屏幕。授权范围大于稍后的框选区域。取得一帧后立即停止共享，不保存图片。可尝试自动打开预览；未打开时从快捷设置手动返回。草稿仍在 60 秒后清除，切换输入法会取消。</string>
     <string name="system_consent">选择共享范围</string><string name="capture_channel">单次取图</string>
     <string name="capturing">正在取得一帧</string><string name="capture_notification">取得后立即停止，最长 10 秒</string>
     <string name="frame_ready">已停止共享，请从快捷设置打开草稿</string><string name="capture_failed">未取得可用画面，请重新开始</string>
     <string name="review_hint">检查原文并按需调整，确认后本次测试丢弃内容</string>
-    <string name="crop_hint">在画面中拖出一行文字的矩形范围；框选只是本地裁剪</string>
+    <string name="crop_hint">拖出一行文字的矩形范围，含 OCR 的版本松手后自动识别；框选只是本地裁剪。</string>
     <string name="frame_metrics">画面 %1$d × %2$d；授权返回至取图 %3$d ms。请先核对页面。</string>
     <string name="dark_text">白字深色背景</string><string name="recognize">识别所选的一行</string>
     <string name="no_ocr">此版本只验证取图，未包含 OCR 模型。</string>
@@ -24,4 +23,11 @@
     <string name="ocr_metrics">本地识别完成：%1$d ms。请逐字核对空格、数字和符号。</string>
     <string name="no_draft">没有待确认的草稿，可能已取消或超时。</string>
     <string name="confirm_discard">确认并结束测试</string><string name="confirmed_discarded">已确认，本次测试内容已丢弃</string>
+<string name="ime_name">公开样本研究键盘</string>
+<string name="ime_notice">仅用于公开样本：本键盘不读取或输入正文。取图仍须每次系统授权。</string>
+<string name="ime_settings">在系统中启用研究键盘</string>
+<string name="choose_ime">选择或恢复输入法</string>
+<string name="return_manual">手动从快捷设置打开预览</string>
+<string name="return_now">停止共享后尝试直接预览</string>
+<string name="return_delayed">公开样本对照：15 秒后尝试预览</string>
 </resources>

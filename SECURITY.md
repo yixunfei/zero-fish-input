@@ -391,6 +391,11 @@ one-image acquisition and later cropping are application restrictions. Capture
 is stopped before protected review. No acquired content is persisted, imported
 into the production vault or sent to AI. This experiment does not modify the
 production application's security boundary or authorize production adoption.
+The second round's research IME is system-bound through BIND_INPUT_METHOD and
+uses no editor-text read calls. Its Activity-launch experiment grants no page
+read access. Return requests expire and are revoked on screen-off or IME change;
+public model reuse retains per-request hash checks. The geometry candidate
+remains experimental after correctness regressions in the fixed public corpus.
 
 Incognito enablement requires confirmation of system Copy/Cut limitations.
 It does not block other apps from using the system clipboard or add collection.

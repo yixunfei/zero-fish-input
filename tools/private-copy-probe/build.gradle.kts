@@ -32,15 +32,29 @@ tasks.register("verifyProbePrivacy") {
                 check(app.getAttributeNS(androidNs, "usesCleartextTraffic") == "false")
                 if (file.path.contains("Release", true)) check(app.getAttributeNS(androidNs, "debuggable") != "true")
                 val services = document.getElementsByTagName("service")
-                check(services.length == if (project.name == "probe") 2 else 0)
+                check(services.length == if (project.name == "probe") 3 else 0)
                 for (index in 0 until services.length) {
                     val service = services.item(index) as org.w3c.dom.Element
-                    when (service.getAttributeNS(androidNs, "name").substringAfterLast('.')) {
-                        "CaptureService" -> {
+                    when (service.getAttributeNS(androidNs, "name")) {
+                        "dev.zeroinput.copyprobe.CaptureService" -> {
                             check(service.getAttributeNS(androidNs, "exported") == "false")
                             check(service.getAttributeNS(androidNs, "foregroundServiceType") == "mediaProjection")
                         }
-                        "CaptureTile" -> check(service.getAttributeNS(androidNs, "permission") == "android.permission.BIND_QUICK_SETTINGS_TILE")
+                        "dev.zeroinput.copyprobe.CaptureTile" -> {
+                            check(service.getAttributeNS(androidNs, "exported") == "true")
+                            check(service.getAttributeNS(androidNs, "permission") == "android.permission.BIND_QUICK_SETTINGS_TILE")
+                        }
+                        "dev.zeroinput.copyprobe.ResearchIme" -> {
+                            check(service.getAttributeNS(androidNs, "exported") == "true")
+                            check(service.getAttributeNS(androidNs, "permission") == "android.permission.BIND_INPUT_METHOD")
+                            val actions = service.getElementsByTagName("action")
+                            check(actions.length == 1 && (actions.item(0) as org.w3c.dom.Element)
+                                .getAttributeNS(androidNs, "name") == "android.view.InputMethod")
+                            val metadata = service.getElementsByTagName("meta-data")
+                            check(metadata.length == 1 && (metadata.item(0) as org.w3c.dom.Element)
+                                .getAttributeNS(androidNs, "name") == "android.view.im")
+                            check((metadata.item(0) as org.w3c.dom.Element).getAttributeNS(androidNs, "resource") == "@xml/research_ime")
+                        }
                         else -> error("Unexpected research service")
                     }
                 }

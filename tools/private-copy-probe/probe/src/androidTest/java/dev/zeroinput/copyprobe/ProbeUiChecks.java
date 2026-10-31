@@ -38,7 +38,6 @@ final class ProbeUiChecks {
         require(app.gate.state(ProbeApp.now()) == SessionGate.State.REVIEW);
         test.runOnMainSync(() -> cropPublicLine(review));
         if (RecognizerFactory.create() != null) {
-            test.runOnMainSync(() -> click(review.getWindow().getDecorView(), R.string.recognize));
             deadline = SystemClock.uptimeMillis() + 10_000;
             boolean[] ready = {false};
             do {
