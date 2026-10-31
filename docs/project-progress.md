@@ -7,7 +7,8 @@ Date: 2026-09-06
 Approved: named symbol groups, expanded catalog, commit/push and testing prerelease.
 Implemented 12 groups with 1336 curated symbol entries and bounded pages.
 Packaging tests, privacyCheck, Lint, universal APK signature/ABI/permission checks
-and 21 emulator tests passed. Code and testing-prerelease publication authorized;
+and 21 emulator tests passed. Published [v0.7.1 testing prerelease](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.1)
+with the universal APK, SHA-256 list, notices and corresponding sources;
 see [v0.7.1 verification](releases/v0.7.1-validation.md). Physical ARM/OEM font
 acceptance remains open.
 
