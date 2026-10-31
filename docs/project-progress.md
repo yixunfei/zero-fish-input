@@ -2,6 +2,43 @@
 
 Date: 2026-09-06
 
+## Remote dictionary PR review (2026-11-01)
+
+The only open PR was [#1](https://github.com/yixunfei/zero-fish-input/pull/1),
+the bot's Wanxiang v18.1.2/LTS update at
+`a924189d06056184ae9337e65806e052097b22ec`. Reviewed against main
+`2530a98869bc5241e0b66aaaef5e90d441db5176`; submitted
+[changes requested](https://github.com/yixunfei/zero-fish-input/pull/1#pullrequestreview-5725497704)
+with two blocking inline findings. The PR remains open and unmerged.
+
+- The proposed dictionary hashes require default generation
+  `adf830f1ce6f1d57a51d6fbb`, while the existing prebuilt manifest contains
+  `ae165bd3c065ad102852eda9`. Current main's
+  `python tools/rime-prebuilt/verify.py` passed (exit 0); the same verifier with
+  isolated metadata constructed from the PR lock failed (exit 1), reporting
+  `Invalid default generation`. The PR must rebuild/review matching artifacts.
+- The configured mutable upstream model URL returned HTTP 200 with 418078764
+  bytes, differing from the PR's 398357548-byte pin. The preparation script does
+  not use its recorded asset ID. Retrieval of the historical asset could not be
+  confirmed because the upstream API was rate-limited; no replacement digest
+  was accepted and existing dictionary/model caches were preserved.
+
+The reviewed head had no check-runs or commit statuses. Its Android/native/device
+and performance checks were not run: reproducible inputs and matching prebuilt
+artifacts must be established first. Evidence is under `.tmp-evidence/pr-1-*`.
+
+The October 19 and 26 scheduled update logs both show missing upstream
+`dicts/lianxiang.dict.yaml`; this is separate from the stale PR's verification.
+The workflow's expected bot commit subject also differs from its actual commit
+subject, creating another refresh blocker after preparation succeeds. Upstream
+table changes require an explicit mapping/coverage review, not silently omitting
+one of the required sixteen tables. The proposed resource ZIP returns 404;
+publication remains a separate explicit action after reviewed merge, as required
+by current ADR 0021. The PR's older before-merge publication text needs correction.
+No resources or APKs were published during review. Next: restore reproducible
+pinned inputs, rebuild default artifacts and complete native/device acceptance
+before reconsidering PR #1.
+
 ## Authentication deadline hardening (2026-11-01)
 
 This iteration preserves the existing uncommitted clipboard work and fixes the
