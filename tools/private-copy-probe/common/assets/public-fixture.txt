@@ -1,0 +1,4 @@
+订单 A-001：128.50 元；QQ / 微信 / LINE
+Hello  world	中英 mixed  words
+https://example.com/a?x=1&y=2
+空格 NBSP　全角；标点，。！？🙂👨‍👩‍👧‍👦🇨🇳

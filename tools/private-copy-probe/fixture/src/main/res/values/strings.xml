@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">公开文字样本</string>
+    <string name="fixture_notice">公开构造样本 A-001 · 不含真实聊天</string>
+    <string name="editor">输入框</string><string name="custom">自定义菜单</string>
+    <string name="canvas">自绘</string><string name="web">网页</string>
+    <string name="share">分享原文</string><string name="secure">截图保护</string>
+    <string name="secure_active">截图保护已开启 · FLAG_SECURE</string>
+    <string name="change_page">切换 A/B</string><string name="quote">引用（样本）</string><string name="react">回应（样本）</string>
+    <string name="drag">分屏后长按这里，将公开原文拖入取字原型</string>
+</resources>

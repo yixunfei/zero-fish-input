@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Public text fixture</string>
+    <string name="fixture_notice">Public fixture A-001 · No real conversations</string>
+    <string name="editor">Editor</string><string name="custom">Custom menu</string>
+    <string name="canvas">Canvas</string><string name="web">Web</string>
+    <string name="share">Share text</string><string name="secure">Secure window</string>
+    <string name="secure_active">Screen capture protection on · FLAG_SECURE</string>
+    <string name="change_page">Switch A/B</string><string name="quote">Quote (fixture)</string><string name="react">React (fixture)</string>
+    <string name="drag">In split screen, hold here and drag public text into the probe</string>
+</resources>

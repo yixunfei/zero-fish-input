@@ -1,6 +1,55 @@
 # Clipboard product repair plan
 
-## Revised entry design (2026-10-31, pending capture-boundary approval)
+## Approved isolated acquisition prototype (2026-10-31)
+
+The user authorized committing/pushing the existing work, creating an implementation
+branch, and developing and validating the recommended acquisition prototypes.
+Baseline: `3cbfaa1`; branch: `zn/private-copy-prototype`.
+This section supersedes the accessibility proposal below. Accessibility,
+clipboard-body reads, overlays, privileged helpers, network processing and AI
+are excluded. No production manifest, vault format or IME behavior changes.
+
+Implementation sequence and gates:
+
+The first prototype targets API 34+ (compile/target 36), aligning the experiment
+with per-session projection consent and the PendingIntent Quick Settings entry.
+Single-app sharing still depends on OS implementation (AOSP 14 QPR2+); older
+Android versions are outside this prototype's acceptance claim. This is not a
+change to the production application's minimum SDK.
+
+1. **Exact payloads.** Build two independent APKs under `tools/private-copy-probe`:
+   a public fixture source and a receiving probe. Exercise PROCESS_TEXT, SEND
+   and source-supported global drag. Bound incoming text, reject URI/HTML/extra
+   items, preserve Unicode exactly, and clear drafts on cancellation, lock,
+   recreation, leaving review or timeout. Existing IME selection copying remains
+   the editor route and is not reimplemented in the probe.
+2. **One acquired frame.** A user-installed Quick Settings tile opens the system
+   MediaProjection consent UI. A short-lived foreground service acquires one
+   ImageReader frame, immediately stops projection, and retains only a bounded
+   in-memory draft. The user returns through the tile/launcher to a protected
+   preview and explicitly crops. The system grant covers a window/display,
+   NOT the crop. No background Activity launch, screenshot file or clipboard
+   fallback. First prove the selected source is visible in the resulting frame.
+3. **Local line recognition.** Add a separate OCR build flavor using the already
+   pinned reduced runtime and recognizer only. Recognize a manually cropped
+   single line on one background worker, expose exact editable output, and
+   release native sessions after each request. Do not include the page detector
+   or silently normalize spacing, punctuation, numbers or emoji.
+4. **Evidence and decision.** Run boundary/state tests, strict merged-manifest
+   checks, Lint/builds and emulator flows with public content. Record payload
+   fidelity, actual interaction count, correct/incorrect capture targets,
+   cancellation/revocation/secure-window behavior, post-consent latency, memory
+   samples, APK costs and OCR errors separately. ARM/OEM/source-app acceptance
+   remains open unless a matching physical device is actually available.
+
+Exit criteria: reproducible public-content acquisition and negative-path evidence,
+not production adoption. If a route fails, record its actual failure and retain
+the passing routes; never relax the privacy boundary to make a test pass.
+Production integration requires a later decision based on these measurements.
+The implementation/runbook lives in [the probe README](../tools/private-copy-probe/README.md);
+current status remains in [project-progress.md](project-progress.md).
+
+## Superseded accessibility proposal (2026-10-31, not approved)
 
 The user requests OCR efficiency and package evaluation before choosing a capture
 strategy. See [measured feasibility](ocr-feasibility-2026-10-31.md); this is not

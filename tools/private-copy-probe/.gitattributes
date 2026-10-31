@@ -1,0 +1,2 @@
+# Keep the exact Unicode/whitespace fixture reproducible across host platforms.
+common/assets/public-fixture.txt text eol=lf

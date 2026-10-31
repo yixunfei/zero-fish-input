@@ -1,5 +1,19 @@
 # Architecture
 
+## Isolated acquisition research (2026-10-31)
+
+`tools/private-copy-probe` is a standalone Gradle build with two APK modules:
+`fixture` supplies only constructed public content; `probe` receives explicit
+plain-text handoffs or a single MediaProjection frame. Plain and OCR flavors
+separate capture cost from recognizer/runtime cost. It is not a production module
+or dependency and adds no IME work, app permissions, vault writes or AI path.
+The prototype owns bounded memory drafts, capture/review generations and one
+nonqueued background recognition worker. Model sessions close per request and
+the idle worker exits; system/private clipboard adapters are not used.
+See [implementation plan](clipboard-product-repair-plan.md) and
+[runbook](../tools/private-copy-probe/README.md). Production integration remains
+an explicit later adoption decision.
+
 The public project and application display name is `zero fish input`.
 `dev.zeroinput.ime`, Kotlin namespaces, engine resource identifiers, encrypted file
 names and Keystore aliases retain their existing identity. Debug uses the separate

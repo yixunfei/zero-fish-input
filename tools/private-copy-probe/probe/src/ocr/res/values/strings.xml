@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">私密取字原型 OCR</string>
+    <string name="tile_label">单次取字 OCR</string>
+</resources>

@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Private copy probe OCR</string>
+    <string name="tile_label">Capture once OCR</string>
+</resources>

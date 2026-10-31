@@ -1,5 +1,37 @@
 # Threat model
 
+## Isolated private-copy acquisition research (2026-10-31)
+
+The user authorized independent prototype development on `zn/private-copy-prototype`.
+`tools/private-copy-probe` is not included in the production build. Its separate
+APK IDs and lack of INTERNET permission isolate public acquisition experiments
+from the production IME, AI adapters, private vault and editor sessions. This is
+not approval for production capture permissions or a new private-vault ingress.
+
+The probe's new surfaces are one launcher/plain-text handoff Activity and a
+system-bound Quick Settings tile. Text is untrusted and bounded to one plain
+8192-unit payload; URI/HTML/stream/multiple-item, malformed and stale requests
+fail closed. The tile confers no content access. The nonexported capture service
+uses per-session MediaProjection consent, acquires one image, stops projection,
+and transfers the image only through process memory. Full authorized window
+pixels precede local crop selection; region-only authorization is not claimed.
+Same-app page changes and original-page identity cannot be authenticated from
+this API. Source secure-window protection remains binding.
+
+Projection/review deadlines, generation checks, screen-off invalidation, review
+exit/recreation cleanup and one nonqueued recognition worker bound resource and
+late-result lifetimes. Every negative test uses public constructed content.
+Draft text/images/results are not persisted or sent anywhere; notifications and
+test reports contain no acquired payload. Backup/transfer are excluded and review
+windows use FLAG_SECURE, exclude recents and disable content capture/autofill.
+The OCR flavor writes only verified public models to noBackupFilesDir. Framework
+strings, OS buffers and native allocator pages cannot be promised forensic
+erasure; closing native sessions does not guarantee baseline memory residency.
+The research correction editor can expose its public draft to the active IME;
+its no-learning flag is not an access boundary. Private-content editing requires
+a separate trusted-IME or app-owned editing decision before production use.
+See [prototype boundaries and runbook](../tools/private-copy-probe/README.md).
+
 ## Protected assets
 
 - 用户输入习惯、词组、词频和 emoji 最近使用记录。

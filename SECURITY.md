@@ -384,6 +384,14 @@ selecting an account implicitly. See `docs/adr/0026-ai-device-agent-stage6-minim
 
 ### Cursor-local deletion and private-copy access
 
+The separately authorized `tools/private-copy-probe` research APKs use public
+fixtures, request no network/accessibility/overlay/storage permissions, and do
+not access the system clipboard. User-confirmed MediaProjection is scoped to a window/display stream;
+one-image acquisition and later cropping are application restrictions. Capture
+is stopped before protected review. No acquired content is persisted, imported
+into the production vault or sent to AI. This experiment does not modify the
+production application's security boundary or authorize production adoption.
+
 Incognito enablement requires confirmation of system Copy/Cut limitations.
 It does not block other apps from using the system clipboard or add collection.
 Private editor-selection drafts cannot be forwarded to the AI inbox; their

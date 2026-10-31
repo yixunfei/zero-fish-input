@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">私密取字原型</string><string name="tile_label">单次取字</string>
+    <string name="research_notice">仅用公开测试样本。当前原型验证内容获取，确认后丢弃，不保存到私有库。草稿最多保留 60 秒。</string>
+    <string name="add_tile">添加快捷设置入口</string>
+    <string name="start_capture">开始单次取图</string><string name="open_draft">预览取字草稿</string>
+    <string name="cancel">取消并清除</string><string name="close">关闭</string>
+    <string name="drag_hint">将另一应用主动提供的文字拖入这里</string>
+    <string name="drop_title">打开分屏接收区</string>
+    <string name="drop_setup">在最近任务中将此空白接收区与公开样本应用分屏。接收文字后，此任务会移除并打开受保护的预览。</string>
+    <string name="invalid_payload">内容无效、超长或并非单条纯文本</string>
+    <string name="capture_disclosure">下一步由系统让你选择共享应用或屏幕。授权范围大于稍后的框选区域。
+取得一帧后立即停止共享，不保存图片。返回原页面后，再点一次快捷设置中的“预览取字草稿”。草稿 60 秒后清除。</string>
+    <string name="system_consent">选择共享范围</string><string name="capture_channel">单次取图</string>
+    <string name="capturing">正在取得一帧</string><string name="capture_notification">取得后立即停止，最长 10 秒</string>
+    <string name="frame_ready">已停止共享，请从快捷设置打开草稿</string><string name="capture_failed">未取得可用画面，请重新开始</string>
+    <string name="review_hint">检查原文并按需调整，确认后本次测试丢弃内容</string>
+    <string name="crop_hint">在画面中拖出一行文字的矩形范围；框选只是本地裁剪</string>
+    <string name="frame_metrics">画面 %1$d × %2$d；授权返回至取图 %3$d ms。请先核对页面。</string>
+    <string name="dark_text">白字深色背景</string><string name="recognize">识别所选的一行</string>
+    <string name="no_ocr">此版本只验证取图，未包含 OCR 模型。</string>
+    <string name="choose_region">请先框选一行文字</string><string name="recognizing">正在本地识别</string>
+    <string name="recognition_failed">未识别出文字，请调整框选后重试</string>
+    <string name="recognizer_busy">上一次识别正在结束，请稍后重试</string>
+    <string name="ocr_metrics">本地识别完成：%1$d ms。请逐字核对空格、数字和符号。</string>
+    <string name="no_draft">没有待确认的草稿，可能已取消或超时。</string>
+    <string name="confirm_discard">确认并结束测试</string><string name="confirmed_discarded">已确认，本次测试内容已丢弃</string>
+</resources>

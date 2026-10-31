@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">Private copy probe</string><string name="tile_label">Capture once</string>
+    <string name="research_notice">Use public fixtures only. This probe verifies acquisition. Confirming discards content; it does not save to the vault. Drafts expire after 60 seconds.</string>
+    <string name="add_tile">Add Quick Settings tile</string>
+    <string name="start_capture">Start one-frame capture</string><string name="open_draft">Review capture draft</string>
+    <string name="cancel">Cancel and clear</string><string name="close">Close</string>
+    <string name="drag_hint">Drop text explicitly offered by another app here</string>
+    <string name="drop_title">Open split-screen receiver</string>
+    <string name="drop_setup">Use Recents to pair this empty receiver with the public fixture. After a drop, this task is removed and protected review opens.</string>
+    <string name="invalid_payload">Invalid, oversized or non-plain-text payload</string>
+    <string name="capture_disclosure">Next, choose an app or screen in the system dialog. This grants more access than the region you crop later.
+After acquiring one frame, sharing stops immediately. No image file is saved. Return to the source, then tap Review capture draft in Quick Settings. Drafts expire in 60 seconds.</string>
+    <string name="system_consent">Choose sharing scope</string><string name="capture_channel">Single-frame capture</string>
+    <string name="capturing">Acquiring one frame</string><string name="capture_notification">Stops after acquisition; 10 seconds maximum</string>
+    <string name="frame_ready">Sharing stopped. Open the draft from Quick Settings.</string><string name="capture_failed">No frame acquired. Start again.</string>
+    <string name="review_hint">Check and adjust the text. Confirmation discards this test draft.</string>
+    <string name="crop_hint">Drag a rectangle around one line. This only crops the acquired image locally.</string>
+    <string name="frame_metrics">Frame %1$d × %2$d; %3$d ms after consent. Check the source page first.</string>
+    <string name="dark_text">Light text on dark background</string><string name="recognize">Recognize selected line</string>
+    <string name="no_ocr">This build verifies capture only and contains no OCR model.</string>
+    <string name="choose_region">Select one line first</string><string name="recognizing">Recognizing locally</string>
+    <string name="recognition_failed">No text recognized. Adjust the crop and retry.</string>
+    <string name="recognizer_busy">The previous recognition is finishing. Try again shortly.</string>
+    <string name="ocr_metrics">Local recognition: %1$d ms. Check spaces, numbers and symbols.</string>
+    <string name="no_draft">No pending draft. It may have expired or been cancelled.</string>
+    <string name="confirm_discard">Confirm and end test</string><string name="confirmed_discarded">Confirmed. Test content discarded.</string>
+</resources>

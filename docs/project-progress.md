@@ -2,6 +2,33 @@
 
 Date: 2026-09-06
 
+## Isolated private-copy acquisition prototype (2026-10-31)
+
+Approved: commit/push the current baseline (`3cbfaa1` on `main`), create
+`zn/private-copy-prototype`, and implement/validate the acquisition prototypes.
+The [implementation plan](clipboard-product-repair-plan.md) supersedes the earlier
+accessibility proposal. Two independent research APKs use only public fixtures;
+production permissions, IME and vault behavior remain unchanged. Sequence:
+exact text handoff, one-frame system-authorized capture/crop, optional local
+single-line OCR, then evidence and adoption gates. Prototype implementation and
+API 37 x86_64 emulator validation are complete; see the
+[validation report](private-copy-prototype-validation-2026-10-31.md) and
+[build/run instructions](../tools/private-copy-probe/README.md).
+
+Exact SEND/PROCESS_TEXT handoffs and an actual cross-app split-screen drag
+preserved the full Unicode fixture. System-consented capture obtained the public
+Canvas page; a protected source produced an entirely black frame. The real tile
+round trip, crop gesture, local recognition, protected review and discard passed.
+Cancellation, recreation, screen-off, a real 60-second expiry and rejection of
+overlapping/late recognition results passed. Nine JVM tests, isolated Lint and
+strict Debug/Release manifests passed; production `privacyCheck` also passed.
+ARM64 research APKs were built, not run on a physical device.
+
+Adoption remains open: only 4/8 distinct OCR fixtures were exact (16/32 repeated
+cases), projection needs around 10-12 actions before any vault authentication,
+and no target ARM/OEM/app-version or typing-latency evidence exists. No production
+capture integration, automatic collection or system clipboard-body read was added.
+
 ## Private-copy entry follow-up (2026-10-31)
 
 The user retains independent private copying and requests confirmation before
@@ -20,15 +47,15 @@ was inspected. Logs: `.tmp-evidence/privacy-copy-validation.log` and
 
 Remaining product gap: noneditable pages with custom
 menus that expose neither PROCESS_TEXT nor text sharing have no private-copy
-entry. A separate default-off, user-triggered accessibility page-copy proposal
-is under design. The user requests local OCR efficiency/package evaluation before
+entry. An earlier accessibility page-copy proposal was superseded by the
+non-accessibility prototype above. The user requested local OCR efficiency/package evaluation before
 deciding on screenshot/OCR integration. Research uses a separate, permission-free
 benchmark app with generated public text; it does not authorize production capture.
 The [OCR feasibility study](ocr-feasibility-2026-10-31.md) is complete at emulator
 scope: single-line recognition works with the existing runtime; page detection
 requires a different operator set. Full-runtime detection has substantial memory
 and package costs. OCR has not passed the production-adoption gate; target ARM
-typing/page measurements and a bounded capture implementation remain open.
+typing/page measurements and production capture integration remain open.
 Do not describe this disclosure as resolving that gap. No system-body capture,
 new accessibility capability or permission has been added.
 

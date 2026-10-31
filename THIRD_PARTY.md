@@ -164,6 +164,14 @@ remain development references; production glide readings derive from Wanxiang.
 
 ## Compressed data and reduced runtime (2026-10-09)
 
+The independent `tools/private-copy-probe` OCR flavor reuses the existing pinned
+PP-OCRv5 recognizer (16,534,782 bytes; SHA-256
+`da72dc72ca4dc220df0dfde68c1dedc31c58d3e76a25871122e5056227d50092`), character
+table and reduced ONNX Runtime 1.26.0-zero1. Its build verifies both model/table
+and runtime hashes and packages the existing Apache-2.0, MIT and runtime notices.
+The plain capture flavor includes none of these OCR assets or native libraries.
+No detector, new runtime version or production dependency is added.
+
 Developer-only OCR research additionally stages the PP-OCRv5 mobile detector
 from RapidAI/RapidOCR v3.10.0, 4,819,576 bytes, SHA-256
 `4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae`.

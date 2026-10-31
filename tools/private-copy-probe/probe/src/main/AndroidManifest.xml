@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <application android:name=".ProbeApp" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false"
+        android:label="@string/app_name" android:icon="@drawable/ic_probe" android:theme="@style/ProbeTheme">
+        <activity android:name=".EntryActivity" android:exported="true" android:excludeFromRecents="true">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+            <intent-filter><action android:name="android.intent.action.SEND" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="text/plain" /></intent-filter>
+            <intent-filter><action android:name="android.intent.action.PROCESS_TEXT" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="text/plain" /></intent-filter>
+        </activity>
+        <activity android:name=".ConsentActivity" android:exported="false" android:excludeFromRecents="true" />
+        <activity android:name=".ReviewActivity" android:exported="false" android:excludeFromRecents="true" />
+        <activity android:name=".DropActivity" android:exported="false" android:taskAffinity="${applicationId}.drop"
+            android:resizeableActivity="true" android:label="@string/drop_title" />
+        <service android:name=".CaptureService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name=".CaptureTile" android:exported="true" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:label="@string/tile_label" android:icon="@drawable/ic_probe">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+    </application>
+</manifest>
