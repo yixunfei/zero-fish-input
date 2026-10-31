@@ -67,6 +67,7 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
   失效会话、过期条目、未知数据版本及写入/删除失败均不能绕过校验或恢复已删除的数据。
 - 安全剪贴板访问需要系统生物识别或设备凭据认证。
 - 认证成功已排队但尚未交付时，取消和超时仍使其失效，重复或迟到回调不能恢复授权。
+  交付时按包含设备休眠的单调时钟复核原请求的 30 秒期限，不依赖定时回调及时执行。
   安全剪贴板管理弹窗单独设置截屏保护，禁用状态保存、自动填充和内容捕获；
   关闭弹窗时清空输入草稿，离开页面时关闭私密弹窗。
 - 粘贴必须在系统认证后返回输入框，再点击“确认粘贴”。认证导航期间应用仅短时保留未消费
@@ -396,3 +397,17 @@ style metadata to preserve emoji boundaries. Textual custom-label patterns only
 delegate Delete to the host; they never authorize guessed multi-character
 deletion. Editors that omit boundaries or ignore Delete may still require more
 than one press. Cursor text is not retained or used for learning.
+
+## Isolated clipboard acquisition research
+
+The 2026-10-31 clipboard development plan's P1 prototype exists only in the
+androidTest APK. Its exact source exception permits fixed public samples on an
+explicitly selected disposable emulator; existing clipboard metadata causes the
+platform test to skip without reading, exporting or replacing the existing text.
+Production clipboard payload reads remain forbidden. No vault format, permission,
+AI access or unattended collection is enabled by this prototype.
+
+The audit hardens fixture cleanup against missing ownership/observed replacement
+and removes payload-bearing comparison diagnostics. Direct private-selection
+handoffs check their five-second monotonic deadline when consumed as well as
+scheduling cleanup; delayed main-thread callbacks cannot authorize stale tokens.

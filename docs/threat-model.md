@@ -132,6 +132,11 @@
   consumed. Cancelling or timing out after success was queued delivers denial
   once; duplicate or late completions cannot revive the grant. Regression tests
   exercise the real Android Handler without launching or bypassing authentication.
+  The original 30-second request lifetime is rechecked using elapsed realtime
+  at delivery, independently of the Handler timeout. Device sleep or a delayed
+  main-thread callback cannot turn an expired request into a fresh authorization.
+  Controlled-clock regressions cover fresh grants arriving at the deadline,
+  queued success delivered after expiry, timely success and normal timeout.
 - Private clipboard management dialogs protect their own windows with FLAG_SECURE;
   the Activity flag alone does not protect a dialog window. Dialogs and metadata
   views disable state saving, autofill and content capture. Dismissal clears editable
@@ -352,6 +357,31 @@
   remain outside ZeroInput's private storage boundary. See ADR 0006.
 
 ## Optional system clipboard cleanup boundary
+
+P1 (2026-10-31) permits body acquisition only in the exact androidTest source
+`SystemClipboardImportPrototypeTest`, using fixed public samples in a disposable
+emulator after explicit runner opt-in and metadata-only empty preflight. Tests
+never back up or restore an existing payload and have no vault or AI wiring.
+Negative scan checks reject moving/renaming the exception into production or
+other tests, and reject arbitrary fixture writes. Test-local action probes cover
+missing, cancelled, expired, repeated and mid-read revoked requests, null and
+SecurityException results; these are not evidence of production authorization or
+OEM permission behavior. P2 must establish the production runtime boundary before
+any product body-read entry can be introduced.
+
+The P1 self-audit adds live eligibility revalidation after acquisition and
+metadata-guarded cleanup only after fixture writes, never after empty preflight
+alone. The fixture refuses observed replacement between samples and restores
+IME enablement. Character-comparison failures must not print payloads. These
+controls do not make platform metadata an atomic ownership proof; tests remain
+restricted to disposable devices. Payload-token scans include spaced and
+receiver-free Kotlin property access, including in the approved metadata adapter.
+Fixture cleanup observations come from the returned and verified public snapshot;
+a later metadata read cannot attach another item's timestamp to that body.
+Platform parser-rejection tests fail if their fixed raw sample was never acquired.
+The direct-selection handoff independently checks its five-second monotonic
+deadline on consumption and wipes expired drafts, even when main-thread expiry
+callbacks have been delayed.
 
 - Monitoring and all active behaviors default off. Only the approved adapter may
   register callbacks, inspect timestamp/empty metadata and clear the clipboard.

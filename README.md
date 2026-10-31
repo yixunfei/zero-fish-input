@@ -422,6 +422,10 @@ ONNX Runtime 使用 MIT 许可；模型采用项目已确认的 UER Apache-2.0 �
 详细控制和限制见 [威胁模型](docs/threat-model.md)。
 当前接手评估、首轮修复与后续优先级见 [项目推进记录](docs/project-progress.md)。
 
+保留直接私密复制并增加主动系统导入的后续设计见 [安全剪贴板开发方案](docs/clipboard-product-repair-plan.md)。该方案包含认证保存、权限引导和尽力清理的边界，尚未实现为当前版本能力。
+
+P1 已建立仅限测试 APK 的公开样本取数原型，首轮模拟器结果及未验证范围见 [P1 验证记录](docs/clipboard-p1-validation.md)。主应用仍没有新的系统正文导入入口。
+
 ## 系统剪贴板防护
 
 每次从关闭状态开启隐私模式前，需要确认不使用其他应用的系统“复制”或“剪切”。

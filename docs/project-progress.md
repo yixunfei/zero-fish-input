@@ -2,7 +2,135 @@
 
 Date: 2026-09-06
 
+## Authentication deadline hardening (2026-11-01)
+
+This iteration preserves the existing uncommitted clipboard work and fixes the
+shared authentication broker's existing 30-second request limit. Its Handler
+timer used uptime, so device sleep or delayed owner-thread delivery could accept
+a success after the original request expired. Delivery now checks elapsed
+realtime, including sleep, before passing a grant to the caller. Cancellation,
+one-use delivery, storage formats and permissions are unchanged.
+
+Four controlled-clock regressions cover completion at the deadline, an earlier
+success delivered after expiry, success just before expiry and normal timeout.
+The first two failed before the fix (Gradle exit 1); all four passed afterwards.
+App Debug JVM regression: 393 passed, two credential-dependent live-provider
+skips, zero failures/errors. Module Debug tests, scanner negative self-tests,
+privacyCheck including both merged manifests, Lint and requireRime x86_64 main/test
+assembly passed (Gradle exit 0). The isolated API 37 x86_64 emulator passed all
+16 selected authentication/import/confirmation regressions, with no skips.
+The authentication tests use synthetic grants and intercepted Activity launches;
+they do not validate an actual biometric or device-credential prompt.
+
+Evidence: `.tmp-evidence/auth-deadline-before.log`,
+`.tmp-evidence/auth-deadline-after.log`,
+`.tmp-evidence/auth-deadline-final-checks.log` and
+`.tmp-evidence/auth-deadline-device.log`. Verification commands:
+
+```powershell
+./gradlew.bat :app:testDebugUnitTest --tests dev.zeroinput.ime.auth.AuthenticationBrokerDeadlineTest "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+./gradlew.bat testDebugUnitTest testPrivacyBoundary privacyCheck :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+adb -s emulator-5580 shell am instrument -w -r -e class dev.zeroinput.ime.auth.AuthenticationBrokerTest,dev.zeroinput.ime.clipboard.ClipboardImportIntentTest,dev.zeroinput.ime.clipboard.ClipboardRepeatedImportTest,dev.zeroinput.ime.clipboard.ClipboardImportPanelTest,dev.zeroinput.ime.clipboard.SecurePasteConsentTest dev.zeroinput.ime.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The device command requires the matching main/test APKs installed on the isolated
+AVD first. Its verdict was `OK (16 tests)`, not merely the ADB exit status.
+
+`./tools/package-test-apk.ps1 -Abi arm64-v8a` subsequently passed with all checks
+enabled (exit 0): 1750 passing module test executions, four live-provider skips,
+zero failures/errors; privacyCheck, Lint, requireRime assembly and APK
+signature/ABI/permission validation passed. Log:
+`.tmp-evidence/auth-deadline-arm64-package.log`. Updated manual-test artifact:
+`app/build/outputs/test-apk/20261101-014244/zero-fish-input-0.7.1-debug-arm64-v8a.apk`.
+SHA-256: `50e973358eedc9e4277804aff35de4c34c968bce408b0f2b903257c738d31f1f`.
+The directory includes its hash list, notices and corresponding-source archives.
+This Debug package includes the prior clipboard fixes and this broker repair;
+it supersedes the previous package for their manual regression. Native stripping
+still warns about two packaged libraries; no size improvement is claimed.
+
+Physical ARM/OEM behavior, actual system authentication and the remaining P1
+baseline/source matrix are still unverified. P2/P3 production import is pending.
+Release APK assembly, formal signing and publication were not performed.
+Next: complete the P1 baseline/source matrix before production boundary changes.
+
+## Clipboard self-audit follow-up (2026-10-31)
+
+The user requested a self-audit and fixes before further feature development.
+Scope: the P1 acquisition prototype, privacy scan, status layout and adjacent
+direct-selection/import lifecycle. Existing uncommitted work is preserved.
+
+Confirmed defects: cleanup ownership was granted by empty preflight without a
+write; live acquisition eligibility was not rechecked after read; spaced and
+receiver-free payload properties bypassed the scan; direct-selection handoff
+expiry relied only on Handler delivery. New regression tests reproduced the
+cleanup/eligibility failures, the scanner self-test failure and the overdue-token
+acceptance before fixes. The audit also removed payload-printing comparisons,
+restored test IME enablement, and bound cleanup metadata to the same verified
+public snapshot. Parser-rejection tests now require actual sample acquisition.
+
+Final emulator regression: all 18 cases passed; without opt-in, seven pure cases
+passed and four platform cases skipped. App Debug JVM: 389 passed, two skipped,
+including three new handoff tests. privacyCheck, negative scanner tests, Lint and
+requireRime x86_64 main/test builds passed. The updated ARM64 Debug package was
+rebuilt with the full-check script: 1742 passing module test executions, four
+skips; privacy/Lint, requireRime assembly and signature/ABI/permission checks
+passed. Artifact directory: `app/build/outputs/test-apk/20261031-230720`; the
+P1 audit report records its SHA-256. It supersedes the prior package for manual
+testing of the handoff-expiry fix; no physical ARM run has been performed.
+
+See the [P1 validation audit section](clipboard-p1-validation.md#self-audit-follow-up)
+for evidence. P2/P3 remain unimplemented; no production system-body read, new
+permission, vault format/key change or actual-device acceptance is introduced.
+
+## Clipboard strategy development plan (2026-10-31)
+
+The user selected a dual-path strategy for subsequent development: retain direct
+private copying, and add explicit import of the current system clipboard followed
+by authenticated encrypted storage and best-effort current-item cleanup. Setup
+guides users to system permission controls; an ordinary IME cannot change other
+apps' clipboard permissions or guarantee atomic capture-and-clear.
+
+The [development plan](clipboard-product-repair-plan.md) now defines requirements,
+onboarding, entry flows, operation counts, data and authentication boundaries,
+lifecycle states, cleanup races, coordination with the existing automatic guard,
+module responsibilities, phased tasks, resource budgets and a 24-case acceptance
+matrix. Unattended import after arbitrary clipboard changes remains a separate
+extension; it is not silently included in the initial explicit-import scope.
+
+P1 now has an androidTest-only fixed-public-fixture acquisition prototype and an
+exact privacy-scanner exception with negative self-tests. Production payload
+reads, permissions and vault formats remain unchanged. A pre-existing large-font
+clipboard status clipping failure found by the new mdpi emulator was reproduced
+and fixed using wrap-content above the existing minimum height.
+
+Seven prototype tests and the final 14-test combined emulator suite passed on a
+fresh Android 17/API 37 x86_64 AVD. App JVM tests: 386 passed, two skipped; ime-ui:
+48 passed. privacyCheck (both merged manifests), its negative self-tests, Lint and
+real-Rime x86_64 Debug/main-test builds passed. Evidence, commands, initial
+failures and remaining gates are in [P1 validation](clipboard-p1-validation.md).
+No explicit runner opt-in skips the three platform cases (four pure cases pass).
+
+The user requests local Android Studio emulator validation first, then a new
+ARM64 Debug package for manual physical-device testing. The packaging script
+passed full tests (1736 passed executions, four skips), privacy/Lint, requireRime
+ARM64 assembly and signature/ABI/permission validation. The current-stage Debug
+APK and hash are recorded in the P1 report; it contains the layout repair but no
+new system-import product entry. It was not installed on a physical device.
+P1's API 26/27, 28, 29,
+33/36 and custom-source matrix remains open; API 37 does not replace it. Next:
+complete that coverage, then P2's precise production authorization/cancellation
+and cleanup coordination and P3's product flow. Exact target-device/OriginOS/app
+versions will be recorded during manual acceptance. No P2/P3 completion, physical
+OEM support or performance acceptance is claimed. Earlier accessibility/OCR
+entry proposals remain superseded; their dated evidence is preserved.
+
+P0 documentation verification: relative file links, command inputs, requirement/test
+IDs and fenced blocks checked; `git diff --check` passed. No build or device test
+was run for this documentation-only change.
+
 ## Private-copy entry follow-up (2026-10-31)
+
+This subsection records the earlier state before the strategy change above.
 
 The user retains independent private copying and requests confirmation before
 enabling incognito mode. System clipboard body collection is not authorized.

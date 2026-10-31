@@ -6,17 +6,20 @@ plugins {
 }
 
 fun systemClipboardViolation(path: String, text: String): String? {
-    if (Regex("\\bgetPrimaryClip\\b|\\.primaryClip\\b").containsMatchIn(text)) {
-        return "Reading system clipboard payloads is forbidden everywhere"
+    val prototype = "app/src/androidTest/kotlin/dev/zeroinput/ime/clipboard/SystemClipboardImportPrototypeTest.kt"
+    if (path != prototype && Regex("\\b(?:getPrimaryClip|primaryClip)\\b").containsMatchIn(text)) {
+        return "Reading system clipboard payloads is restricted to the isolated P1 public-fixture test"
     }
     val capabilities = Regex("\\bClipboardManager\\b|\\bCLIPBOARD_SERVICE\\b|\\b(?:add|remove)PrimaryClipChangedListener\\b|\\b(?:clear|set|has)PrimaryClip\\b|\\b(?:getPrimaryClipDescription|primaryClipDescription)\\b")
     if (!capabilities.containsMatchIn(text)) return null
     val adapter = "app/src/main/kotlin/dev/zeroinput/ime/clipboardguard/AndroidSystemClipboard.kt"
     val fixture = "app/src/androidTest/kotlin/dev/zeroinput/ime/clipboardguard/SystemClipboardPlatformTest.kt"
-    if (path != adapter && path != fixture) return "System clipboard capabilities are restricted to the approved adapter and fixture"
+    if (path != adapter && path != fixture && path != prototype) return "System clipboard capabilities are restricted to the approved adapter and fixtures"
     val writes = Regex("\\bsetPrimaryClip\\s*\\(").findAll(text).count()
     val allowedWrite = if (path == adapter) {
         Regex("setPrimaryClip\\(ClipData\\.newPlainText\\(\"\", \"\"\\)\\)")
+    } else if (path == prototype) {
+        Regex("setPrimaryClip\\(publicFixture\\(sample\\)\\)|setPrimaryClip\\(ClipData\\.newPlainText\\(\"\", \"\"\\)\\)")
     } else {
         Regex("setPrimaryClip\\(ClipData\\.newPlainText\\(\"\", \"public guard fixture\"\\)\\)")
     }
@@ -240,15 +243,27 @@ fun testManifestAndBackupBoundaries(root: File) {
 
 tasks.register("testPrivacyBoundary") {
     group = "verification"
-    description = "Checks that clipboard source exceptions cannot allow payload reads or arbitrary writes."
+    description = "Checks that clipboard payload reads stay in the isolated public prototype and rejects arbitrary writes."
     doLast {
         val adapter = "app/src/main/kotlin/dev/zeroinput/ime/clipboardguard/AndroidSystemClipboard.kt"
         val fixture = "app/src/androidTest/kotlin/dev/zeroinput/ime/clipboardguard/SystemClipboardPlatformTest.kt"
         val business = "app/src/main/kotlin/dev/zeroinput/ime/ZeroInputService.kt"
-        val reads = listOf("manager.getPrimaryClip()", "manager.primaryClip")
+        val prototype = "app/src/androidTest/kotlin/dev/zeroinput/ime/clipboard/SystemClipboardImportPrototypeTest.kt"
+        val reads = listOf("manager.getPrimaryClip()", "manager.primaryClip", "manager . primaryClip",
+            "with(manager) { primaryClip }", "manager\n    . primaryClip")
         for (path in listOf(adapter, fixture, business)) for (read in reads) {
             check(systemClipboardViolation(path, read) != null)
         }
+        for (read in reads) {
+            check(systemClipboardViolation(prototype, read) == null)
+            for (path in listOf("other/$prototype", prototype.replace("androidTest", "main"),
+                prototype.replace("PrototypeTest", "OtherTest"),
+                "app/src/main/kotlin/dev/zeroinput/ime/ai/Probe.kt")) {
+                check(systemClipboardViolation(path, read) != null)
+            }
+        }
+        check(systemClipboardViolation(prototype, "manager.setPrimaryClip(publicFixture(sample))") == null)
+        check(systemClipboardViolation(prototype, "manager.setPrimaryClip(value)") != null)
         for (capability in listOf("ClipboardManager", "CLIPBOARD_SERVICE", "manager.primaryClipDescription",
             "manager.hasPrimaryClip()", "manager.addPrimaryClipChangedListener(listener)", "manager.clearPrimaryClip()")) {
             check(systemClipboardViolation(business, capability) != null)

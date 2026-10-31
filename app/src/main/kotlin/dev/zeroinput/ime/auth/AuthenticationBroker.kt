@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import dev.zeroinput.ime.R
 import dev.zeroinput.security.AuthenticationGrant
 import java.util.UUID
@@ -51,7 +52,10 @@ object AuthenticationBroker {
         if (!mainHandler.post {
                 if (callbacks.remove(requestId, pending)) {
                     mainHandler.removeCallbacks(pending.timeout)
-                    pending.callback(grant)
+                    // Handler time excludes deep sleep and delivery can be delayed.
+                    // A queued success must still meet the original request deadline.
+                    val age = SystemClock.elapsedRealtime() - pending.createdAtMillis
+                    pending.callback(if (age in 0 until REQUEST_TIMEOUT_MILLIS) grant else null)
                 }
             }) {
             callbacks.remove(requestId, pending)
@@ -68,6 +72,7 @@ object AuthenticationBroker {
     private data class PendingRequest(
         val callback: (AuthenticationGrant?) -> Unit,
         val timeout: Runnable,
+        val createdAtMillis: Long = SystemClock.elapsedRealtime(),
         val completionQueued: AtomicBoolean = AtomicBoolean(false),
     )
 

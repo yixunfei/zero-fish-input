@@ -95,7 +95,8 @@ class SecureClipboardPanelView @JvmOverloads constructor(
             text = value
             gravity = Gravity.CENTER
             textSize = 15f
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(72))
+            minHeight = dp(72)
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         })
     }
 

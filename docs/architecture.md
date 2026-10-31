@@ -415,7 +415,9 @@ connection and interaction/settings generation are rechecked before accepting
 the result. `ClipboardSelectionTransfer` hands one frozen draft and its original
 vault deletion generation to the nonexported `ClipboardSelectionImportActivity`
 using a one-use token; text is not placed in the Intent. The transfer expires
-after five seconds. The internal page reuses the import authentication/save
+after five seconds. Consumption also checks a monotonic deadline; a delayed
+Handler callback cannot extend eligibility, and an expired handoff wipes its
+owned draft. The internal page reuses the import authentication/save
 flow and owns the draft after handoff; it never rereads the source editor.
 
 `SecurePasteCoordinator` owns a pending item ID, source editor metadata, deletion
@@ -439,7 +441,10 @@ so a successful prompt cannot bind a source editor while authentication navigati
 is still exiting. Cancellation and timeouts remain valid during that handoff.
 The broker retains the pending request until its owner-thread delivery is consumed.
 Cancellation removes that request even when success is already queued; duplicate
-completion cannot deliver a second result. Private management dialogs separately
+completion cannot deliver a second result. Delivery also checks the original
+30-second request lifetime against elapsed realtime, including device sleep;
+delayed Handler delivery cannot extend authentication eligibility.
+Private management dialogs separately
 protect their windows and discard editable drafts on dismissal.
 
 `user-data/SecureClipboardVault` owns the encrypted format and serializes reads
@@ -473,6 +478,14 @@ after restart a stale body-free index may need authenticated reconciliation, and
 a failed clear must be retried. See [storage validation](security-storage-validation.md).
 
 ## Opt-in system clipboard guard
+
+P1 acquisition research is isolated in the androidTest-only
+`SystemClipboardImportPrototypeTest`. Its fixed public fixtures exercise direct
+plain-text parsing without coercion, URI access, vault access or production
+wiring. Real clipboard tests require an explicit disposable-device runner flag
+and skip mutation when current-item metadata exists. The exact source exception
+in `privacyCheck` does not authorize any production payload read. See the
+[development plan](clipboard-product-repair-plan.md); P2/P3 remain pending.
 
 `app/clipboardguard` owns this platform-only feature, independently of the private
 vault. `ClipboardGuardOptions` and `ClipboardGuardSession` define a body-free
