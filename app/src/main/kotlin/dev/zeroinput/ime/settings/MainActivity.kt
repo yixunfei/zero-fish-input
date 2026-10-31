@@ -23,6 +23,7 @@ import dev.zeroinput.languagepack.LanguagePackLanguage
 import dev.zeroinput.userdata.AiConfiguration
 
 class MainActivity : AppCompatActivity() {
+    private var incognitoDialog: androidx.appcompat.app.AlertDialog? = null
     private var personalRankingDialog: androidx.appcompat.app.AlertDialog? = null
     private val graph by lazy { (application as ZeroInputApplication).graph }
     private val worker = BoundedExecutors.singleThread(
@@ -166,7 +167,7 @@ class MainActivity : AppCompatActivity() {
             personalRankingDialog?.dismiss()
             personalRankingDialog = PersonalRankingSettings.show(this, graph.settings, ::render)
         }
-        screen.onIncognitoChanged = { graph.settings.incognitoMode = it; render() }
+        screen.onIncognitoChanged = ::setIncognitoEnabled
         screen.onSecureClipboardChanged = ::setSecureClipboardEnabled
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
@@ -373,6 +374,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        incognitoDialog?.dismiss()
+        incognitoDialog = null
         deletionObserver?.close()
         deletionObserver = null
         aiDialog?.cancelTests()
@@ -380,6 +383,34 @@ class MainActivity : AppCompatActivity() {
         // another app. Explicit dismissal or destruction clears its fields.
         if (isFinishing) aiDialog?.dismiss()
         super.onStop()
+    }
+
+    private fun setIncognitoEnabled(enabled: Boolean) {
+        if (!enabled) {
+            incognitoDialog?.dismiss()
+            incognitoDialog = null
+            graph.settings.incognitoMode = false
+            render()
+            return
+        }
+        // Reflect persisted state until the user explicitly accepts the limitation.
+        render()
+        if (graph.settings.incognitoMode || incognitoDialog != null) return
+        incognitoDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.incognito_copy_title)
+            .setMessage(R.string.incognito_copy_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.incognito_copy_confirm) { _, _ ->
+                if (!isFinishing && !isDestroyed) {
+                    graph.settings.incognitoMode = true
+                    render()
+                }
+            }
+            .create().also { dialog ->
+                dialog.setOnDismissListener { incognitoDialog = null }
+                dialog.show()
+                dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).filterTouchesWhenObscured = true
+            }
     }
 
     private fun confirmClearAiData() {

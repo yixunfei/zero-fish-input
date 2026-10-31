@@ -9,6 +9,12 @@
 
 ## Enforced controls
 
+- Enabling incognito mode requires explicit acknowledgement that source-app Copy
+  and Cut still use the system clipboard. Cancellation and recreation do not
+  enable the setting. This disclosure does not intercept source menus or protect
+  system clipboard contents. Internal private-selection drafts deny AI extraction
+  independently of button visibility; only validated external imports may opt in.
+
 - Pinyin cursor/range editing is confined to current bounded engine input. Its
   focus-free view has no platform editing menus, clipboard access, saved view
   text, autofill or content capture. Input/selection changes cancel gestures;

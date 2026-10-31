@@ -55,7 +55,9 @@ open class ClipboardImportActivity : AppCompatActivity() {
             it.onCancel = ::discardAndFinish
             it.onAction = ::performAction
             it.onAiAction = ::importAiContext
-            it.showReview(requireNotNull(request).length, graph.settings.secureClipboardEnabled)
+            it.showReview(requireNotNull(request).length, graph.settings.secureClipboardEnabled,
+                allowsAiImport = requireNotNull(request).allowsAiImport &&
+                    graph.settings.learningEnabled && !graph.settings.incognitoMode)
             setContentView(it)
         }
         settingsListener = graph.settings.addChangeListener {

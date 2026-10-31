@@ -8,6 +8,25 @@ import org.junit.Test
 
 class ClipboardImportRequestTest {
     @Test
+    fun explicitExternalImportCanEnterAiOnlyWhileInReview() {
+        val request = checkNotNull(ClipboardImportText.parse("public shared fixture", allowsAiImport = true))
+        try {
+            assertEquals("public shared fixture", request.copyForAi())
+            request.beginAuthentication()
+            assertNull(request.copyForAi())
+            request.authorize()
+            assertNull(request.copyForAi())
+        } finally { request.close() }
+        assertNull(request.copyForAi())
+    }
+
+    @Test
+    fun privateSelectionDraftCannotBeCopiedIntoAiBeforeAuthentication() {
+        val request = checkNotNull(ClipboardImportText.parse("public selection fixture"))
+        try { assertNull(request.copyForAi()) } finally { request.close() }
+    }
+
+    @Test
     fun authenticationAloneNeverStartsSavingAndDuplicateActionsAreRejected() {
         val request = ClipboardImportRequest("public fixture".toCharArray())
         assertNull(request.copyText())

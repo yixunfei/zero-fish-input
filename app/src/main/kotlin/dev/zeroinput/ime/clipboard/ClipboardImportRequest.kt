@@ -1,7 +1,7 @@
 package dev.zeroinput.ime.clipboard
 
 /** Owns one transient draft. No callback or Android component is retained here. */
-internal class ClipboardImportRequest(private val text: CharArray) : AutoCloseable {
+internal class ClipboardImportRequest(private val text: CharArray, val allowsAiImport: Boolean = false) : AutoCloseable {
     enum class Phase { REVIEW, AUTHENTICATING, AUTHORIZED, SAVING, CLOSED }
 
     val length = text.size
@@ -33,7 +33,7 @@ internal class ClipboardImportRequest(private val text: CharArray) : AutoCloseab
 
     /** Copies the user-selected share text for the separate AI context confirmation. */
     @Synchronized
-    fun copyForAi(): String? = if (phase == Phase.REVIEW) String(text) else null
+    fun copyForAi(): String? = if (allowsAiImport && phase == Phase.REVIEW) String(text) else null
 
     fun isSaving(): Boolean = phase == Phase.SAVING
 

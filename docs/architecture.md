@@ -404,6 +404,11 @@ The existing AuthenticationBroker issues a one-use grant; a subsequent foregroun
 Save action schedules the addition on a bounded worker. No authentication callback
 persists data by itself, and callers receive no result data.
 
+AI context eligibility is carried by the in-memory import request and defaults
+to denied. Only validated external text imports opt in; internal private editor
+selection drafts reject AI extraction at the model boundary and hide that action.
+Incognito mode and disabled learning also hide and reject external AI imports.
+
 The keyboard's explicit copy-selection control reads the active editor through
 `ClipboardSelectionReader` on a bounded worker. Selection length, session,
 connection and interaction/settings generation are rechecked before accepting

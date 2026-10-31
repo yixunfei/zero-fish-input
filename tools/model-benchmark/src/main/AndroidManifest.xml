@@ -8,6 +8,10 @@
         android:label="@string/app_name"
         android:supportsRtl="true" />
     <instrumentation
+        android:name=".OcrBenchmarkInstrumentation"
+        android:targetPackage="dev.zeroinput.modelbenchmark"
+        android:functionalTest="true" />
+    <instrumentation
         android:name=".ModelBenchmarkInstrumentation"
         android:targetPackage="dev.zeroinput.modelbenchmark"
         android:functionalTest="true" />

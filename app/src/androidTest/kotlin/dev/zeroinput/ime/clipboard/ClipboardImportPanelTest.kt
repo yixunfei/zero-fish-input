@@ -43,7 +43,7 @@ class ClipboardImportPanelTest {
                     val view = ClipboardImportView(context)
                     for (authorized in listOf(false, true)) {
                         if (authorized) view.showAuthorized("Public fixture text. ".repeat(390))
-                        else view.showReview(8_192, enabled = false)
+                        else view.showReview(8_192, enabled = false, allowsAiImport = true)
                         measure(view, width, height)
                         val buttons = children(view).filterIsInstance<MaterialButton>()
                             .filter { it.visibility == View.VISIBLE }

@@ -31,6 +31,6 @@ internal object ClipboardImportIntent {
                 return null
             }
         }
-        return ClipboardImportText.parse(value)
+        return ClipboardImportText.parse(value, allowsAiImport = true)
     }
 }

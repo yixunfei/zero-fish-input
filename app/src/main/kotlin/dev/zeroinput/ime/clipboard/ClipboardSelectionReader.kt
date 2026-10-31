@@ -26,7 +26,7 @@ internal class ClipboardSelectionReader(
             request.task = worker.submit {
                 if (request.cancelled) return@submit
                 val value = try {
-                    selectedText()?.takeIf { it.length == length }?.let(ClipboardImportText::parse)
+                    selectedText()?.takeIf { it.length == length }?.let { ClipboardImportText.parse(it) }
                 } catch (_: RuntimeException) { null }
                 request.offer(value)
                 post {

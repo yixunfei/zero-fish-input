@@ -2,6 +2,38 @@
 
 Date: 2026-09-06
 
+## Private-copy entry follow-up (2026-10-31)
+
+The user retains independent private copying and requests confirmation before
+enabling incognito mode. System clipboard body collection is not authorized.
+Implemented an enable-time disclosure with explicit confirmation; cancellation
+or Activity recreation leaves the setting off. Private editor-selection drafts
+now deny AI extraction in the request model and hide the AI import action.
+The new negative regression failed before the fix.
+
+Immediate repairs validated: 386 app JVM tests passed (two live-provider tests
+skipped), privacyCheck including Debug/Release manifests, Lint and requireRime
+x86_64 Debug/test builds passed. Seven emulator tests passed, including consent
+cancellation/recreation and repeated private import. The consent dialog image
+was inspected. Logs: `.tmp-evidence/privacy-copy-validation.log` and
+`.tmp-evidence/privacy-copy-device.log`. No physical ARM or OEM app acceptance.
+
+Remaining product gap: noneditable pages with custom
+menus that expose neither PROCESS_TEXT nor text sharing have no private-copy
+entry. A separate default-off, user-triggered accessibility page-copy proposal
+is under design. The user requests local OCR efficiency/package evaluation before
+deciding on screenshot/OCR integration. Research uses a separate, permission-free
+benchmark app with generated public text; it does not authorize production capture.
+The [OCR feasibility study](ocr-feasibility-2026-10-31.md) is complete at emulator
+scope: single-line recognition works with the existing runtime; page detection
+requires a different operator set. Full-runtime detection has substantial memory
+and package costs. OCR has not passed the production-adoption gate; target ARM
+typing/page measurements and a bounded capture implementation remain open.
+Do not describe this disclosure as resolving that gap. No system-body capture,
+new accessibility capability or permission has been added.
+
+Validation command: `./gradlew.bat :app:testDebugUnitTest privacyCheck :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel`.
+
 ## Symbol groups and v0.7.1 (2026-10-31)
 
 Approved: named symbol groups, expanded catalog, commit/push and testing prerelease.

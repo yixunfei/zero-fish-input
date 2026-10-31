@@ -99,12 +99,12 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         }
     }
 
-    fun showReview(length: Int, enabled: Boolean) {
+    fun showReview(length: Int, enabled: Boolean, allowsAiImport: Boolean) {
         status.text = resources.getQuantityString(R.plurals.clipboard_import_received, length, length)
         action.setText(if (enabled) R.string.clipboard_import_authenticate else R.string.enable_secure_clipboard)
         aiAction.setText(R.string.clipboard_import_ai)
-        aiAction.visibility = VISIBLE
-        aiAction.isEnabled = true
+        aiAction.visibility = if (allowsAiImport) VISIBLE else GONE
+        aiAction.isEnabled = allowsAiImport
     }
 
     fun showAuthorized(value: String) {

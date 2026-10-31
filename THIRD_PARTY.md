@@ -164,6 +164,14 @@ remain development references; production glide readings derive from Wanxiang.
 
 ## Compressed data and reduced runtime (2026-10-09)
 
+Developer-only OCR research additionally stages the PP-OCRv5 mobile detector
+from RapidAI/RapidOCR v3.10.0, 4,819,576 bytes, SHA-256
+`4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae`.
+PaddleOCR and RapidOCR use Apache-2.0 (`LICENSES/Apache-2.0.txt`);
+Copyright (c) 2021 RapidOCR Authors. It is not a production APK asset or runtime
+download. Preparation, provenance and remaining adoption review are recorded in
+`tools/prepare-ocr-evaluation.py` and `docs/ocr-feasibility-2026-10-31.md`.
+
 XZ for Java 1.10 (`org.tukaani:xz:1.10`) is 0BSD, with license in
 `LICENSES/xz-java-0BSD.txt`. JAR SHA-256:
 `95c63c1a55b22dd6453890a419cc1a640f790bbf7d8ae82db1e30aefefb08888`.

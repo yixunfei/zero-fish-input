@@ -150,6 +150,9 @@
     <string name="setting_learning">本地词频学习</string>
     <string name="setting_learn_from_committed_text">从提交结果学习（空格、回车等）</string>
     <string name="setting_incognito">隐私模式</string>
+    <string name="incognito_copy_title">开启隐私模式前请确认</string>
+    <string name="incognito_copy_message">请勿使用其他应用菜单中的“复制”或“剪切”：它们通常仍写入系统剪贴板，隐私模式无法拦截，也无法阻止其他应用读取或保存副本。\n\n输入框选区请使用键盘工具栏“私密复制”；其他文字请使用“复制到 ZeroInput”或文本分享入口，并在认证后确认保存。\n\n部分应用使用自定义选字菜单，不提供这些入口。此时该页面暂不支持私密复制，请勿用系统“复制”代替。隐私模式仍会关闭本输入法的学习和个性化读取。</string>
+    <string name="incognito_copy_confirm">确认并开启</string>
     <string name="setting_haptics">按键振动</string>
     <string name="setting_sound_effects">按键音</string>
     <string name="setting_enabled">已启用</string>

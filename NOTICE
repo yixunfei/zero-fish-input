@@ -84,3 +84,8 @@ XZ for Java 1.10: Copyright The XZ for Java authors and contributors; 0BSD.
 See LICENSES/xz-java-0BSD.txt.
 ONNX Runtime 1.26.0 is rebuilt with a reduced CPU operator configuration.
 Build recipe, source revision and dependency hashes: tools/onnxruntime/.
+
+Developer-only OCR evaluation may stage a PP-OCRv5 mobile detector converted by
+RapidAI/RapidOCR (v3.10.0). PaddleOCR and RapidOCR are Apache-2.0;
+Copyright (c) 2021 RapidOCR Authors. See LICENSES/Apache-2.0.txt and
+docs/ocr-feasibility-2026-10-31.md. This detector is not included in the keyboard.

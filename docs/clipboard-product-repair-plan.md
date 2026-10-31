@@ -1,5 +1,54 @@
 # Clipboard product repair plan
 
+## Revised entry design (2026-10-31, pending capture-boundary approval)
+
+The user requests OCR efficiency and package evaluation before choosing a capture
+strategy. See [measured feasibility](ocr-feasibility-2026-10-31.md); this is not
+approval to implement production screenshots/OCR.
+
+The current user request retains private copying and rejects system clipboard
+body collection. QQ, WeChat, LINE, social feeds, messages and web/article bodies
+are primary target scenarios, not optional edge cases. Their customized menus
+make PROCESS_TEXT alone inadequate. An incognito warning is an immediate repair,
+not acceptance of the page-copy requirement.
+
+Proposed replacement interaction:
+
+1. After dedicated setup, provide a persistent private-copy accessibility overlay
+   button while the user has enabled the tool. Do not wait for selection events,
+   read selection events, click the source Copy command or inspect the clipboard.
+2. A tap binds a single foreground application window and starts one bounded
+   capture. Collect exposed, visible, noneditable and nonsensitive text only on
+   that explicit request. Show a protected ZeroInput selection surface where the
+   user chooses the actual range; source selection menus play no role.
+3. For self-drawn pages, offer an explicit single-frame target-window capture and
+   local OCR path within the same tool. Do not silently capture when node reading
+   fails. This is a new capture boundary awaiting explicit approval, not part of
+   the existing AI page-reference authorization. No network OCR, image persistence,
+   clipboard fallback or AI access. System secure-window protection remains binding.
+4. Authenticate and save through the existing vault flow. Read no existing vault
+   text merely to collect a new draft. Capture buffers, nodes and recognition
+   results have bounded lifetimes and clear on cancellation, lock, timeout,
+   configuration change or target-window invalidation.
+
+Keep this independent of AI page references/device-agent authorization and the
+metadata-only clipboard guard. A new accessibility capability needs a dedicated
+disclosure, ADR, manifest/privacyCheck review and negative tests. Evaluate a
+fixed-version offline OCR model and its license, accuracy, resource cost and
+runtime behavior before selecting a dependency; existing ONNX infrastructure is
+not evidence that a suitable OCR model is already included.
+
+Acceptance must include a fixture app with custom menus that omit PROCESS_TEXT,
+an exposed-text page and a self-drawn text page. Test prompt availability without
+an IME/editor, no selection notification, repeated captures, cancellation, secure
+windows and changed windows. Then validate actual target app/version/device
+combinations using public fixtures. No physical target or exact OEM build has
+yet been supplied; an emulator fixture cannot establish QQ/WeChat/LINE support.
+
+Immediate implemented subset: incognito enable confirmation and denial of AI
+extraction from private editor-selection drafts. Progress and validation are
+tracked in `project-progress.md`. The broader entry redesign remains unimplemented.
+
 Status: ordinary-app repairs and approved two-stage paste implemented and emulator-validated.
 Vendor history deletion remains unresolved. The user allows supported vendor
 interfaces but excludes root, Shizuku and system-permission workarounds.

@@ -1,5 +1,33 @@
 # Android model benchmark
 
+## OCR research (2026-10-31)
+
+`OcrBenchmarkInstrumentation` is a separate public-fixture experiment. It draws
+fixed text locally; it cannot capture a screen, read an editor or access the
+clipboard. It compares single-line CTC decoding of the already pinned optional
+PP-OCRv5 recognition graph and kernel-only detection at two page resolutions.
+It does not implement detection postprocessing, page segmentation, ordering or
+a production OCR entry. Queue-delay probes are NOT measured keyboard latency.
+
+```powershell
+python tools/prepare-ocr-evaluation.py
+./gradlew.bat -p tools/model-benchmark assembleDebug lintDebug verifyBenchmarkPrivacy -PocrResearch=true -PreducedRuntime=true --no-parallel
+adb install -r build/model-benchmark/outputs/apk/debug/ZeroInputModelBenchmark-debug.apk
+adb shell am instrument -w dev.zeroinput.modelbenchmark/.OcrBenchmarkInstrumentation
+```
+
+Omit `-PreducedRuntime=true` to compare the pinned full runtime. The research
+asset set replaces the language-model assets only for `-PocrResearch=true`.
+The detector is fixed to RapidAI/RapidOCR v3.10.0 with SHA-256 validation;
+recognition/dictionary files reuse the existing pinned PaddlePaddle resources.
+These locally staged public models are evaluation artifacts, not production
+dependency additions or approved redistribution. Results and limitations are
+tracked in `docs/clipboard-product-repair-plan.md`.
+
+On this host the global recovery Gradle init script incorrectly injects project
+repositories into this nested build. Use `-g K:/zeroInput/build/verification-gradle-home`
+for isolated verification; no repository enforcement rule was weakened.
+
 This is a separate developer application, not an IME module. It uses only the
 repository's constructed public fixtures, has no permissions or editor APIs,
 and is not included in root `settings.gradle.kts`. Model files/results live in

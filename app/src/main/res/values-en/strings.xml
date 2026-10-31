@@ -155,6 +155,9 @@
     <string name="setting_learning">Local learning</string>
     <string name="setting_learn_from_committed_text">Learn from commits (space, enter, etc.)</string>
     <string name="setting_incognito">Incognito mode</string>
+    <string name="incognito_copy_title">Before enabling incognito mode</string>
+    <string name="incognito_copy_message">Avoid Copy and Cut in other apps: these usually write to the system clipboard. Incognito mode cannot intercept them or prevent other apps from reading or retaining copies.\n\nFor selected text in an input field, use Private copy in the keyboard toolbar. For other text, use Copy to ZeroInput or text sharing, then authenticate and confirm Save.\n\nSome apps use custom selection menus without these actions. Private copying is currently unavailable on those pages; do not substitute system Copy. Incognito mode still disables learning and personalized reads in this keyboard.</string>
+    <string name="incognito_copy_confirm">Confirm and enable</string>
     <string name="setting_haptics">Key vibration</string>
     <string name="setting_sound_effects">Key sounds</string>
     <string name="setting_enabled">Enabled</string>
