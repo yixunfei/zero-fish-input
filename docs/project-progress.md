@@ -17,8 +17,9 @@ Source/license/scope checks and staged publication preserve existing pins on
 handled failure. The update job rebuilds and verifies the matching default Rime
 artifacts before proposing a bot PR; Android/device acceptance remains separate.
 
-Three regressions failed before the preparation fixes. Local failure/provenance
-and disposable-remote branch ownership regressions pass; current reviewed
+Three regressions failed before the preparation fixes. All eighteen local
+failure/provenance and disposable-remote branch ownership regressions pass,
+as do three resource integrity regressions; current reviewed
 dictionary preparation, dictionary verification and default prebuilt verification
 pass. An isolated real-upstream candidate at
 `68522110ff3f5c845a7f47cc3ac32793cde5ffef` prepared and verified all eighteen
@@ -27,9 +28,23 @@ retained tables from `26a9efeb18e604c091f4d3890d00bec723fe755f`.
 Current main data pins are unchanged. privacyCheck, both merged manifests and
 scanner self-tests passed. Logs: `.tmp-evidence/dictionary-task-*.log`.
 
-Next: push the task repair and explicitly dispatch the updated weekly workflow;
-record the real run and refreshed PR outcome. No resource/APK publication or
-data-PR merge is included in this repair.
+The repair was pushed as `8294b31c97ffac78a14ddcbf48dc5cf4a728913e`.
+[Manual run 41255227389](https://github.com/yixunfei/zero-fish-input/actions/runs/41255227389)
+completed successfully, including source/model preparation, deterministic checks,
+LTS packaging, pinned native bootstrap, default artifact regeneration/verification
+and bot PR refresh. PR #1 now points to
+`afd68911f2340d0e24c845b1355d8d60fad03576` with six changed data/artifact files.
+Independent local inspection matched its lock to the isolated upstream candidate
+and verified all three XZ/raw sizes, hashes and binary formats. The new default
+generation is `5fdb4830385efde59685ee04`; other optional pack records are unchanged.
+Evidence includes `.tmp-evidence/dictionary-task-refreshed-pr-check.log` and the
+downloaded run/job records. [PR follow-up](https://github.com/yixunfei/zero-fish-input/pull/1#issuecomment-6551007777)
+records the resolved original blockers and remaining acceptance gates.
+
+Task recovery is verified. New-data Android/Rime contract/device, cold deployment,
+package and performance acceptance remain for data-PR review; host success does
+not establish those outcomes. No resource/APK publication or data-PR merge was
+performed. Next: complete that acceptance before deciding whether to merge #1.
 
 ## Remote dictionary PR review (2026-11-01)
 
