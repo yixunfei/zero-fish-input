@@ -887,6 +887,14 @@ optimization. Generic source deployment skips
 app-owned base/shared archive copies made by older builds without entering user
 generations. See [ADR 0027](adr/0027-reviewed-default-rime-artifacts.md).
 
+Weekly dictionary proposals follow [ADR 0028](adr/0028-dictionary-source-split.md):
+fourteen tables resolve to a pinned rime-wanxiang-data archive, while lianxiang
+and renming retain explicitly recorded reviewed sources. Table ownership is
+complete and unique. Preparation stages and verifies the entire candidate before
+publishing its lock/output; the bot job regenerates matching default artifacts
+before opening/updating the review PR. Android runtime/category contracts remain
+unchanged, and host verification does not replace device acceptance.
+
 ## Dictionary management
 
 ADR [0023](adr/0023-dictionary-management.md) extends public dictionaries with

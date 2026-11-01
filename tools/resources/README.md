@@ -74,6 +74,16 @@ download failure leaves the currently installed offline resources unchanged.
 Resource updates require review of data compatibility, source license, attribution,
 hashes and regression results. Weekly dictionary PRs never automatically merge.
 
+Dictionary refresh preserves all sixteen output categories. Fourteen tables track
+the pinned `amzxyz/rime-wanxiang-data` commit; lianxiang and renming keep their
+reviewed source in the lock's `retainedSources`. New LTS pins use an immutable
+asset-ID URL with size and SHA-256 verification. Source resolution is read-only;
+failed preparation preserves existing lock/generated data. The weekly job also
+regenerates and verifies matching default Rime artifacts before proposing the
+update. Run `python -m unittest discover -s tools/dictionaries -p 'test_*.py' -v`
+for failure/provenance and disposable-local-remote branch ownership regressions.
+See [ADR 0028](../../docs/adr/0028-dictionary-source-split.md).
+
 - Mini INT8 and vocabulary: UER roberta-mini-wwm-chinese-cluecorpussmall,
   revision `5e567169018f5cf84cf1d85a2b391c8d51211eda`, Apache-2.0 under the
   existing reviewed UER licensing basis. Companion sources include attribution,

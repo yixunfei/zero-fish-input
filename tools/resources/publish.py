@@ -67,7 +67,10 @@ def sources(pack):
                   ROOT / 'tools/export-model-benchmark.py', ROOT / 'docs/small-model-evaluation.md',
                   ROOT / 'docs/model-integration.md', ROOT / 'NOTICE']
     else:
-        paths += [ROOT / 'LICENSES/wanxiang-CC-BY-4.0.txt']
+        paths += [ROOT / 'LICENSES/wanxiang-CC-BY-4.0.txt',
+                  ROOT / 'LICENSES/wanxiang-data-LICENSE-SCOPE.md',
+                  ROOT / 'tools/dictionaries/sources.lock.json',
+                  ROOT / 'tools/dictionaries/prepare.py']
     with zipfile.ZipFile(target, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
         for path in paths:
             info = zipfile.ZipInfo(path.relative_to(ROOT).as_posix(), (2026, 1, 1, 0, 0, 0))

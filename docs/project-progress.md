@@ -2,6 +2,35 @@
 
 Date: 2026-09-06
 
+## Dictionary update task repair (2026-11-01)
+
+The user selected preserving all sixteen tables after the upstream source split:
+fourteen tables follow the pinned data repository, while lianxiang and renming
+retain the existing reviewed source. [ADR 0028](adr/0028-dictionary-source-split.md)
+records provenance, license scope and the unchanged Android/category contract.
+
+Fixed candidate resolution writing the lock before preparation, preparation
+overwriting verified output before detecting a missing table/hash failure, the
+bot subject mismatch, missing prebuilt regeneration and obsolete publication
+instructions. Model proposals now use a fixed asset-ID URL with size/hash checks.
+Source/license/scope checks and staged publication preserve existing pins on
+handled failure. The update job rebuilds and verifies the matching default Rime
+artifacts before proposing a bot PR; Android/device acceptance remains separate.
+
+Three regressions failed before the preparation fixes. Local failure/provenance
+and disposable-remote branch ownership regressions pass; current reviewed
+dictionary preparation, dictionary verification and default prebuilt verification
+pass. An isolated real-upstream candidate at
+`68522110ff3f5c845a7f47cc3ac32793cde5ffef` prepared and verified all eighteen
+expected files, including the 418078764-byte model asset 676604065 and the two
+retained tables from `26a9efeb18e604c091f4d3890d00bec723fe755f`.
+Current main data pins are unchanged. privacyCheck, both merged manifests and
+scanner self-tests passed. Logs: `.tmp-evidence/dictionary-task-*.log`.
+
+Next: push the task repair and explicitly dispatch the updated weekly workflow;
+record the real run and refreshed PR outcome. No resource/APK publication or
+data-PR merge is included in this repair.
+
 ## Remote dictionary PR review (2026-11-01)
 
 The only open PR was [#1](https://github.com/yixunfei/zero-fish-input/pull/1),

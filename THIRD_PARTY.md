@@ -141,6 +141,7 @@ exception are in [model evaluation](docs/small-model-evaluation.md),
 | --- | --- | --- | --- |
 | amzxyz/rime-wanxiang | reviewed sources.lock.json | CC-BY-4.0 | All 16 core tables; tone marks normalized |
 | amzxyz/RIME-LMDG | reviewed LTS asset/hash | CC-BY-4.0 | Simplified Chinese grammar model |
+| amzxyz/rime-wanxiang-data | reviewed source commit and asset IDs in update proposals | CC-BY-4.0 (data only) | Fourteen current tables and LTS; upstream program code is excluded |
 | lotem/librime-octagram | 57d18b9f58e5284bd891d559f6bdd16cf60341e9 | BSD-3-Clause | Static grammar reader |
 | org.yaml:snakeyaml | 2.4 | Apache-2.0 | Bounded safe dictionary header parsing |
 | org.jsoup:jsoup | 1.18.3 | MIT | Nonexecuting public HTML catalog parsing |
@@ -151,6 +152,14 @@ in the application's explicit transport. Full source/model checksums are pinned;
 weekly updates remain review PRs. Ice, zhwiki, QQ and Sogou are device-only
 opt-in sources, not APK data. Ice repository licensing and per-file notices and
 Wikimedia data attribution must not be confused with generator licensing.
+
+The 2026-11-01 approved source split retains the independently pinned historical
+lianxiang and renming tables rather than dropping categories. See
+[ADR 0028](docs/adr/0028-dictionary-source-split.md) and
+[upstream license scope](LICENSES/wanxiang-data-LICENSE-SCOPE.md). The new
+repository's original program code is not licensed by its data grant and is not
+copied or executed. Existing main pins remain authoritative until a data PR is
+reviewed and merged; this source policy does not itself update bundled data.
 
 
 ## Resource delivery variants

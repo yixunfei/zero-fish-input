@@ -411,3 +411,14 @@ The audit hardens fixture cleanup against missing ownership/observed replacement
 and removes payload-bearing comparison diagnostics. Direct private-selection
 handoffs check their five-second monotonic deadline when consumed as well as
 scheduling cleanup; delayed main-thread callbacks cannot authorize stale tokens.
+
+## Dictionary source updates
+
+The approved 2026-11-01 source split preserves sixteen dictionary categories:
+fourteen data-only upstream tables and two explicitly retained reviewed tables.
+Proposals pin source revisions, archives, normalized outputs and fixed model asset
+IDs. License/scope changes, missing/duplicate tables and hash/size mismatches fail
+closed. Staged preparation and rollback protect existing reviewed inputs from
+handled failures. The bot rebuilds matching default Rime artifacts, verifies
+branch ownership and uses an exact lease; merge and publication remain explicit.
+See docs/adr/0028-dictionary-source-split.md.

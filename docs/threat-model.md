@@ -36,6 +36,17 @@
   verified generation (also recorded for subsequent process starts); if none is
   usable, the existing fallback remains available.
 
+- Dictionary update proposals preserve sixteen named tables across the upstream
+  source split: fourteen pinned data-repository inputs and two explicitly retained
+  reviewed tables. Missing/duplicate ownership, empty tables, symlinks, changed
+  license bytes, oversized files and digest/size mismatches fail closed. Upstream
+  programs are never executed. Candidate resolution cannot overwrite the lock;
+  handled preparation/publication failures retain or restore existing generated
+  data. Interrupted directory/lock publication still requires all existing build
+  verifiers. Fixed asset-ID URLs avoid silently following replaced LTS files.
+  The update job verifies matching prebuilt artifacts, checks bot ownership and an
+  exact Git lease, and has no approval/merge or resource-publication step.
+
 - Manifest 为用户主动开启的 AI 网络工作台及显式公开词库下载声明 `INTERNET`；CI 扫描项目源码中的联网权限和
   系统剪贴板 API，并解析 Debug/Release 合并清单执行权限白名单校验，防止依赖间接引入网络、
   存储或其他敏感权限。AI 网络传输仅允许 `OpenAiCompatibleProvider`，只接受 HTTPS、禁止明文、

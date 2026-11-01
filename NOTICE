@@ -72,6 +72,9 @@ files and the format-adaptation scripts. See SOURCES.md for replacement steps.
 Wanxiang dictionaries and the RIME-LMDG simplified Chinese grammar model are
 created by amzxyz and upstream contributors, distributed under CC BY 4.0.
 Source links and reviewed hashes: tools/dictionaries/sources.lock.json.
+Update proposals track amzxyz/rime-wanxiang-data for fourteen tables and LTS;
+lianxiang and renming retain their independently pinned reviewed source.
+Only upstream data is used, not program code. See LICENSES/wanxiang-data-LICENSE-SCOPE.md.
 Dictionary reading tone marks are removed for ZeroInput full-pinyin conversion;
 words and frequencies are retained. See LICENSES/wanxiang-CC-BY-4.0.txt.
 Octagram is developed by the RIME Developers under BSD-3-Clause.
