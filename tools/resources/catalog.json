@@ -53,16 +53,16 @@
     },
     {
       "id": "wanxiang-lts",
-      "version": "010390b381352733",
+      "version": "68ea1ce263b643a9",
       "license": "CC-BY-4.0",
-      "url": "https://github.com/yixunfei/zero-fish-input/releases/download/resources-010390b381352733/wanxiang-lts-010390b381352733.zip",
-      "bytes": 352323465,
-      "sha256": "dfa0c24914e200d0f2f229d4e600d3a32ca5d048fb1f805cf0d667d50ba2239e",
+      "url": "https://github.com/yixunfei/zero-fish-input/releases/download/resources-68ea1ce263b643a9/wanxiang-lts-68ea1ce263b643a9.zip",
+      "bytes": 369991385,
+      "sha256": "9e737afa98cd22fcdbb08bea1b975e8c46d62e55cdfec271cc8938b9bf3fc1a7",
       "files": [
         {
           "name": "rime/wanxiang-lts-zh-hans.gram",
-          "bytes": 398309420,
-          "sha256": "c330bca73a4102b097fd6b239e6d10097a41995864f13004dec06e8cec98f2cc"
+          "bytes": 418078764,
+          "sha256": "e34500ab44626dc039a0641792ecba98ab63307646eb3d29186be56608ffe094"
         }
       ]
     }

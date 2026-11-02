@@ -1,11 +1,11 @@
 {
   "format": 1,
   "assetVersion": "11",
-  "sourceIdentity": "2d8ce9b008aa87fe4a77f0c5",
+  "sourceIdentity": "ccc226a475170d0eadcfc0a7",
   "grammar": "none",
-  "generation": "ae165bd3c065ad102852eda9",
+  "generation": "643d23d80c2b446b0eafb17b",
   "rime": "1.13.1",
-  "publicDictionaryMetadataSha256": "6e9cc9b7038698ad500fe75657bd7083cd148baac9261ed9d0703a31b539547f",
+  "publicDictionaryMetadataSha256": "16b94637665dc1b889bee8e54f89a30ad3925abe936aae399bc0667eecd196e6",
   "rimeCommit": "1c23358157934bd6e6d6981f0c0164f05393b497",
   "binaryFormats": {
     "zeroinput_public.table.bin": "Rime::Table/4.0",
@@ -15,26 +15,26 @@
   "sourceFiles": {
     "default.yaml": "062305b44bd744437e19785d796de8b58b6f9ee956c9fb95a179f4a9a58ff84b",
     "zeroinput_pinyin.schema.yaml": "559da5c64d27f57f1823226cc981550bebf0883d0a78e36907383c385aebfa3f",
-    "zeroinput_public.dict.yaml": "a24d250eda453f097d0b8bce51d2c670d9422efdc8cb38399683115ad4cb3156"
+    "zeroinput_public.dict.yaml": "1cd0d91dff0982e232749153f7bca8faf478e1986a7e65f4641f53abeb3cf643"
   },
   "files": {
     "zeroinput_public.table.bin.xz": {
-      "bytes": 74179788,
-      "sha256": "b71b535aee82b92a8da5bb45938868b8de486dacf9327e1db7f867f6d61227cb",
-      "archiveBytes": 25464232,
-      "archiveSha256": "9dccacda92ea8a72bae1df956cb7fe741df8d01a5b71086931a4e4ca3a471978"
+      "bytes": 76787144,
+      "sha256": "86dedf409653e04d196147d1ed2176e786e307b60d0e55f847d23eb0520cba2f",
+      "archiveBytes": 25524536,
+      "archiveSha256": "8c70c392de77a8ccc600398d81a4308028d1b01a83cf6eed0dca55d7f1454b8f"
     },
     "zeroinput_pinyin.prism.bin.xz": {
-      "bytes": 22192,
-      "sha256": "38366d7c2988fb201ef7de9f228496f1d1d19245d97536a5c26c1e4aabb1c893",
-      "archiveBytes": 3460,
-      "archiveSha256": "aa4b703adb320158bcdfd2b550a1612876feff9d86fa137dc5967a0d63852b00"
+      "bytes": 22232,
+      "sha256": "0705919fa856a15fadc21a3bcb296d77a5725634cc4a13a1f4d1628f433cbdc6",
+      "archiveBytes": 3352,
+      "archiveSha256": "e2679dd8571fe95a8353a45e14d50e19c40d8b475416b0dbc5203ee47a112a78"
     },
     "zeroinput_public.reverse.bin.xz": {
-      "bytes": 263796,
-      "sha256": "a2f1298e25f9f313689668191b8969746344c7f40437f112ad691692dfa53e7f",
-      "archiveBytes": 77240,
-      "archiveSha256": "b5d7d50ddca4daeff579f907edb477d109660b58cdb2490f08dd3993991cec3f"
+      "bytes": 263820,
+      "sha256": "d69b7bc5f6846a214a0309941c66e1fb40984b855117e90ca308257d54dcc7e5",
+      "archiveBytes": 77244,
+      "archiveSha256": "4bb0b2fbe6d051c6e91cc8dc6f5f67f468f556c972a0931d2f73d5e86128543a"
     }
   }
 }
