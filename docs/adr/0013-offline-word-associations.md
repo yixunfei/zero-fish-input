@@ -87,5 +87,5 @@ Unit tests cover lookup boundaries, longest matches, English spacing, script
 normalization, failed commits, explicit-click learning as amended by ADR 0014, stale identities,
 privacy revocation, memory clearing and late provider readiness. Android tests
 cover actual Rime/English editor round trips, cursor/settings/restart invalidation
-and stable candidate layouts. See [validation](../word-association-validation.md).
+and stable candidate layouts. See [validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/word-association-validation.md).
 Personal frequencies are also used to rerank the bounded next-word list. The input-code personal candidate path and next-word association path share the encrypted local store but keep separate session and privacy gates. Asynchronous store readiness emits an in-process change signal so the active composition can refresh without blocking the input thread.

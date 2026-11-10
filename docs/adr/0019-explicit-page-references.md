@@ -7,7 +7,8 @@ Status: accepted by the user on 2026-10-07; screenshot/OCR amendment accepted on
 The user needs to select text from another application's current page while using
 the AI keyboard, without replacing the question. Ordinary IMEs cannot enumerate
 arbitrary page text. The user approved the reviewed plan in
-`docs/ai-page-context-plan.md`, including a separately enabled accessibility service.
+[page-reference plan](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/ai-page-context-plan.md),
+including a separately enabled accessibility service.
 
 ## Decision
 

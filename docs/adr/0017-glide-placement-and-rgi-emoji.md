@@ -47,4 +47,4 @@ the user's complete offline display requirement. The receiving application's
 font still controls the appearance of inserted text.
 
 Desktop and emulator results, distribution artifacts and untested platforms are
-recorded in [feature validation](../input-feature-completion-validation.md).
+recorded in [feature validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/input-feature-completion-validation.md).

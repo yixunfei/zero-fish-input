@@ -190,7 +190,7 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   before replacing saved data, matching the transport validation. A rejected edit
   retains saved credentials while the UI keeps activation switches off. Empty or
   oversized completion events cannot become insertable results. Regression
-  coverage is recorded in [the code audit](code-audit-2026-09-28.md).
+  coverage is recorded in [the code audit](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/code-audit-2026-09-28.md).
 - Debug-only 输入诊断只显示编辑器包名、公开 `EditorInfo` 类型/选项、subtype 及当前会话的
   隐私、语言和引擎状态；不显示输入文本、拼音、候选词、周边文本或异常堆栈，不写入日志/文件，
   会话结束时清除。Release 构建不渲染该诊断。
@@ -271,7 +271,7 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   commits/deletes, buffer cleanup, grant races, failed clear/retry and concurrent
   clear against metadata/removal. Only public fixtures and test-only key aliases
   are used. API 26 AtomicFile behavior, physical biometric/key invalidation and
-  power-loss recovery remain unverified. See [validation](security-storage-validation.md).
+  power-loss recovery remain unverified. See [validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/security-storage-validation.md).
 
 ## Input configuration and interaction controls
 
@@ -695,7 +695,7 @@ logged, backed up or transmitted; temporary JVM lookup strings remain subject to
 garbage collection, and JSON decoding necessarily creates JVM `String` copies
 that cannot be reliably zeroed. No new permission, exported component, dependency or stored
 personal format is added. Unit and device regressions use constructed public
-phrases. See ADR 0013, ADR 0014 and `word-association-validation.md`.
+phrases. See ADR 0013, ADR 0014 and the [word-association quality report](word-association-quality.md).
 
 ## Offline glide, placement and RGI additions
 
@@ -980,7 +980,7 @@ Tests use fixed public content from a separate-UID test Activity, which is absen
 from the main APK. Unit tests cover bounds, cancellation, unchecked data, context
 roles, stale revisions, failed rename and clear/delete races. Platform verification
 covers actual node filtering, opt-in/disconnection, keyboard layout and draft
-isolation. Validation outcomes are recorded in `ai-page-context-validation.md`.
+isolation. See the [historical page-reference validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/ai-page-context-validation.md).
 Screenshot broker tests cover disabled policy, detached sources and generation
 invalidation; full-page OCR accuracy remains unverified until a fixed public model
 and its licence/hash are added.
@@ -1019,7 +1019,7 @@ and its licence/hash are added.
 Negative tests cover deletion failures and retries, old generations, draft expiry,
 malformed/changed/missing package payloads, ZIP special types and corrupt enablement,
 storage errors and delayed page delivery. Platform results and remaining physical
-acceptance are recorded in `review-round2-validation.md`.
+acceptance are recorded in the [historical review validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/review-round2-validation.md).
 
 Conversation-storage failure reports only a fixed message or list error state;
 it cannot erase a valid completed answer. This does not extend result lifetime:
@@ -1346,7 +1346,7 @@ emulator tests exercise the public fixture, snapshot redaction, screenshot bound
 one-use approval/click, screen-off, foreground switching and service revocation.
 Physical-device behavior, Activity recreation and live-provider acceptance remain
 separate and are not implied by unit, privacy or lint checks. See [ADR 0025](adr/0025-ai-device-agent-boundary.md)
-and [the implementation plan](ai-device-agent-plan.md).
+and [the implementation plan](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/ai-device-agent-plan.md).
 
 ### Stage 6 direct-capability boundary
 

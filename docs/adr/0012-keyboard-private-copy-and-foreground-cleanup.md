@@ -113,4 +113,4 @@ system authentication, return, explicit confirmation and insertion. Negative
 cases cover cancellation, source edits, a different editor, settings/deletion,
 duplicate callbacks, unused grants and expiry. The physical iQOO build, biometrics
 and vendor history need separate device acceptance. Current validation evidence
-is recorded in [clipboard-device-validation.md](../clipboard-device-validation.md).
+is recorded in [clipboard-device-validation.md](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/clipboard-device-validation.md).

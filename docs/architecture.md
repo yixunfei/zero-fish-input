@@ -275,12 +275,12 @@ new selection. This handoff reads no surrounding text and retains no old connect
 
 ## Optional AI workbench
 
-See [assessment and implementation plan](ai-workbench-plan.md) and
-[ADR 0015](adr/0015-ai-workbench-boundary.md).
+See [ADR 0015](adr/0015-ai-workbench-boundary.md) for the workbench boundary and
+[ADR 0033](adr/0033-explicit-remote-tools.md) for the separate remote-tool adapter.
 
 `ai-api` contains the platform-free request, action, policy, stream-event and conversation
-contracts. `app` owns the Android composition root, `AiCoordinator` and the only network
-adapter, `OpenAiCompatibleProvider`; `user-data` owns separately encrypted AI configuration
+contracts. `app` owns the Android composition root, `AiCoordinator` and the
+model-provider adapter `OpenAiCompatibleProvider`. `user-data` owns separately encrypted AI configuration
 and optional conversation history. The provider accepts only HTTPS endpoints, disables redirects,
 uses bounded timeouts and response sizes, and sends data only after the user submits text from
 the keyboard AI panel or explicitly tests the selected model or fetches the model catalog in settings. The latter
@@ -514,7 +514,7 @@ checks detect silent rename/delete failures; they do not prove power-loss
 durability. Vault body and index remain independently atomic files. Repair and
 deletion-pending flags are process-local, not a persisted transaction journal:
 after restart a stale body-free index may need authenticated reconciliation, and
-a failed clear must be retried. See [storage validation](security-storage-validation.md).
+a failed clear must be retried. See [storage validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/security-storage-validation.md).
 
 ## Opt-in system clipboard guard
 

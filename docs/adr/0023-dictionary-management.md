@@ -71,4 +71,4 @@ A full encrypted replacement of millions of public entries would add unnecessary
 startup work. A local overlay gives explicit undo without redownloading data.
 
 Validation and remaining device checks are recorded in
-[the management validation report](../dictionary-management-validation.md).
+[the management validation report](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/dictionary-management-validation.md).

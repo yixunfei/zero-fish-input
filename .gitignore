@@ -1,6 +1,7 @@
 .gradle/
 .gradle-user/
 .tmp-evidence/
+/.codex/LOCAL_ENVIRONMENT.md
 .kotlin/
 __pycache__/
 *.py[cod]

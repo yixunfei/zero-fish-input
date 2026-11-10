@@ -154,9 +154,9 @@ budget for the bounded short-word workload. It does not meet the original qualit
 gate, and it cannot score long phrases within the latency limit. The user has
 explicitly accepted the measured regression rate for a separately enabled
 experiment. The original results and frozen threshold are preserved.
-See [the concrete integration plan](mini-model-integration-plan.md) and
+See [the concrete integration plan](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/mini-model-integration-plan.md) and
 [production integration](model-integration.md).
-See [integration validation](model-integration-validation.md) for the shipped
+See [integration validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/model-integration-validation.md) for the shipped
 experimental implementation and its separate production measurements.
 
 Earlier screening excluded UER Tiny Word (53,538,951-byte checkpoint plus

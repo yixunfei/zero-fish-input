@@ -160,6 +160,6 @@ remain diagnostic only. The original historical measurements above are retained.
 - [Accepted resource delivery](adr/0021-optional-public-resources.md)
 - [Bounded compression and reduced runtime](adr/0022-compressed-resources-and-reduced-runtime.md)
 - [Accepted default prebuilt artifacts](adr/0027-reviewed-default-rime-artifacts.md)
-- [Historical package measurements](package-compression-validation.md)
+- [Historical package measurements](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/package-compression-validation.md)
 - [Android APK size guidance](https://developer.android.com/topic/performance/reduce-apk-size)
 - [Separate native debug symbols](https://developer.android.com/build/include-native-symbols)

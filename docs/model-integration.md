@@ -88,4 +88,4 @@ three supported ABIs with real Rime and inspect Debug/Release manifests and APKs
 See [evaluation](small-model-evaluation.md) for the frozen research measurements
 and [ADR 0011](adr/0011-experimental-model-ranking.md) for ownership boundaries.
 Production measurements, test results, artifacts and the resolved clipboard
-fixture failures are in [integration validation](model-integration-validation.md).
+fixture failures are in [integration validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/model-integration-validation.md).

@@ -67,4 +67,4 @@ sources must exercise recovery, not just successful reuse. Warm reuse is not
 claimed to be faster without comparable measurements.
 
 See [architecture](../architecture.md#compressed-deployment-and-reduced-inference-adr-0022)
-and the measured [UX performance report](../rime-ux-performance-2026-10-25.md).
+and the measured [UX performance report](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/rime-ux-performance-2026-10-25.md).

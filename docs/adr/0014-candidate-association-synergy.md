@@ -9,7 +9,7 @@ it. One scope adjustment is recorded under Part 3 below.
 
 Candidate generation and next-word association are today two isolated
 pipelines (evidence in
-[word generation and association evaluation](../word-generation-association-evaluation.md)).
+[word generation and association evaluation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/word-generation-association-evaluation.md)).
 Three consequences follow:
 
 1. Association order is static editorial priority. The encrypted personal

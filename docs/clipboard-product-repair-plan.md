@@ -2,7 +2,7 @@
 
 更新日期：2026-10-31。源码基线：`3cbfaa1`。状态：开发设计，尚未实现新的系统正文导入能力。
 
-实施进度：已开始 P1，仅测试 APK 中存在固定公开样本取数原型；API 37 独立模拟器首轮验证与原有面板回归已通过，基线版本和来源矩阵尚未完成。详见 [P1 验证记录](clipboard-p1-validation.md)；生产导入功能和 P2/P3 仍未实现，持续进度仍以项目推进记录为准。
+实施进度：已开始 P1，仅测试 APK 中存在固定公开样本取数原型；API 37 独立模拟器首轮验证与原有面板回归已通过，基线版本和来源矩阵尚未完成。详见 [P1 验证记录](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/clipboard-p1-validation.md)；生产导入功能和 P2/P3 仍未实现，持续进度仍以项目推进记录为准。
 
 本轮选定的路线是：保留不经过系统剪贴板的直接私密复制；对只提供普通复制的应用，增加用户主动读取系统当前项、认证并加密保存、随后尽力清理当前项的入口。启用时说明系统暴露及清理限制，并引导用户调整其他应用的读取权限。
 
@@ -488,7 +488,7 @@ P1 是隔离的能力验证，不把测试许可扩散到生产源码；P2 的�
 
 ## 13 历史证据和版本适用范围
 
-- [剪贴板设备验证](clipboard-device-validation.md) 与 [模型集成验证](model-integration-validation.md) 保留原有普通应用修复和两阶段粘贴的测试事实；它们不证明新系统正文导入、当前 OriginOS 行为或厂商历史删除。
+- [剪贴板设备验证](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/clipboard-device-validation.md) 与 [模型集成验证](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/model-integration-validation.md) 保留原有普通应用修复和两阶段粘贴的测试事实；它们不证明新系统正文导入、当前 OriginOS 行为或厂商历史删除。
 - [OCR 可行性实验](ocr-feasibility-2026-10-31.md) 的 API 37 x86_64 数据仅限当时样本和运行库。当前选择不引入 OCR，不把该实验解释为所有局部 OCR 都不可行。
 - 历史问题涉及 iQOO Neo9／Android 16，但当前机型、系统构建、历史界面归属和应用版本需要在 P1／P4 重新记录。
 - 旧计划中的厂商历史删除调查不再是本期交付目标；调查未建立可用公共删除接口的事实不能写成“已删除”或“所有厂商永远不支持”。

@@ -216,7 +216,7 @@ Reproduce with an available API 36 emulator:
 `WordAssociationIntegrationTest` requires API 30 or newer. The emulator smoke
 test does not establish physical-device latency or energy improvements. No
 layout or theme changes were made in this follow-up; the earlier visual
-acceptance remains documented in [initial validation](word-association-validation.md).
+acceptance remains documented in [initial validation](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/word-association-validation.md).
 
 ### Local artifacts
 
@@ -253,5 +253,5 @@ ARM devices and API 26 were not exercised in this iteration because only the
 API 36 x86_64 emulator was available. Release and three-ABI packaging were not
 rerun; this follow-up changes no JNI, CMake or ABI configuration. Cold-start
 memory, physical-device input latency and energy still need measurements. The
-broader deficiencies in the [comprehensive review](analysis-2026-09-21-comprehensive-review.md)
+broader deficiencies in the [comprehensive review](https://github.com/yixunfei/zero-fish-input/blob/379a463d8e5e2207815cd289c5c532d7211b99c2/docs/analysis-2026-09-21-comprehensive-review.md)
 remain open where those independent or device-level results are missing.

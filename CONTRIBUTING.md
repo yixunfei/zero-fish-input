@@ -21,11 +21,10 @@ offline operation and maintainable module boundaries.
 
 ## Build and verification
 
-Follow [README.md](README.md) for the Windows toolchain and pinned Rime bootstrap.
-From the repository root, run:
+Prepare the Windows toolchain, Rime and build assets using the
+[build instructions](README.md#从源码构建). From the repository root, run:
 
 ```powershell
-./tools/bootstrap-rime.ps1
 ./gradlew.bat :app:assembleDebug testDebugUnitTest privacyCheck :app:lintDebug `
   "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
 ```
@@ -36,14 +35,16 @@ device tests. With a JDK 21 host, also pass `-Jdk17Path <JDK17_HOME>` or set
 changes the selected keyboard, restoring it on exit. Use a development device
 with synthetic data.
 
-For all ABIs and distribution checks, run `./tools/package-test-apk.ps1` and
+For all ABIs and distribution checks, run
+`./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000` and
 `./gradlew.bat :app:assembleRelease -PrequireRime=true --no-parallel`.
 Release outputs are intentionally unsigned. Do not commit signing keys.
 
 Describe the behavior changed, verification performed and any tests not run in
 your pull request. Do not weaken privacyCheck, Lint, tests or native requirements
-to make a build pass. No runtime networking, telemetry or system clipboard access
-may be added, including optional or debug-only paths.
+to make a build pass. Follow the runtime network and clipboard boundaries in
+[AGENTS.md](AGENTS.md). Keep transient verification evidence in the ignored
+`.tmp-evidence/` directory.
 
 ## Assets and third-party code
 

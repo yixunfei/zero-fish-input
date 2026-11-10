@@ -120,7 +120,7 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
   继续读写，直到重新清除成功。索引更新失败时隐藏旧摘要，认证后再修复。
   正文与索引仍为两个独立原子文件，失败状态仅保存在进程内；进程重启后可能需要认证修复
   无正文索引或重新清除，不保证断电事务性。认证仍由现有应用层流程控制，本轮没有更改
-  Keystore 的认证绑定策略或持久化格式。验证范围见[安全存储验证](docs/security-storage-validation.md)。
+  Keystore 的认证绑定策略或持久化格式。相关测试与剩余限制见[威胁模型](docs/threat-model.md#encrypted-storage-failure-boundaries)。
 - 表情收藏与自定义颜文字使用独立加密文件及密钥，不参与词组导出。输入法在敏感编辑器、
   隐身或关闭学习时隐藏个人表情且不记录使用；自定义管理页禁止截屏与最近任务预览，离开时
   清空显示和草稿。清除个人数据会同时删除收藏、自定义内容、最近记录及各自密钥。
@@ -425,8 +425,8 @@ and unchanged dev/ino/size/mtime/ctime identity. Unsupported filesystems retain 
 hash checks; no persistent metadata-only trust is introduced. Privacy gates cover
 merged manifests, qualified resource overrides and accessibility key filtering.
 Resource publication uses hash-pinned wheels, reviewed main ancestry, and separate
-read-only build/write publication jobs. See [threat model](docs/threat-model.md) and
-the [review resolution](CODE_REVIEW_RESOLUTION_2026-10-17.md) for verification limits.
+read-only build/write publication jobs. See the [threat model](docs/threat-model.md)
+for verification limits.
 
 ## Reviewed Rime cache verification (2026-10-26)
 
