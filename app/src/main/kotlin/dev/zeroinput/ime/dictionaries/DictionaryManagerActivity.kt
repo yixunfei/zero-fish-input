@@ -1,5 +1,7 @@
 package dev.zeroinput.ime.dictionaries
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
@@ -9,6 +11,7 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.net.toUri
 import com.google.android.material.appbar.MaterialToolbar
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
@@ -173,18 +176,29 @@ class DictionaryManagerActivity : AppCompatActivity() {
             DictionarySource.ZHWIKI -> R.string.public_dictionary_license_wiki
             else -> R.string.public_dictionary_license_website
         }))
+        command(getString(R.string.public_dictionary_visit_source)) { visitSource(source) }
         command(getString(R.string.public_dictionary_categories)) { history.clear(); browse(source, null, false) }
         if (offset > 0) command(getString(R.string.public_dictionary_previous_page)) {
             renderCatalog(source, rows, offset - CATALOG_PAGE_SIZE)
         }
-        rows.subList(offset, minOf(offset + CATALOG_PAGE_SIZE, rows.size)).forEach { item -> command(item.title) {
-            if (item.category) browse(source, item.address) else confirmInstall(source, item)
-        } }
+        rows.subList(offset, minOf(offset + CATALOG_PAGE_SIZE, rows.size)).forEach { item ->
+            if (item.category) command(item.title) { browse(source, item.address) }
+            else command(getString(R.string.public_dictionary_download_item, item.title)) { confirmInstall(source, item) }
+        }
         if (offset + CATALOG_PAGE_SIZE < rows.size) command(getString(R.string.public_dictionary_next_page)) {
             renderCatalog(source, rows, offset + CATALOG_PAGE_SIZE)
         }
         scroll.scrollTo(0, 0)
         status.show(getString(R.string.public_dictionary_choose))
+    }
+
+    private fun visitSource(source: DictionarySource) {
+        val uri = DictionaryDownloadTransport.validate(source.website).toASCIIString().toUri()
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+        } catch (_: ActivityNotFoundException) {
+            status.show(getString(R.string.public_dictionary_browser_unavailable))
+        }
     }
 
     private fun confirmInstall(source: DictionarySource, item: CatalogItem) {
@@ -195,7 +209,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
 
     private fun install(source: DictionarySource, item: CatalogItem) {
         val progress = downloadProgress()
-        runTask({ downloads.install(source, item, progress) }, failure = R.string.public_dictionary_failed) { changed(); showInstalled() }
+        runTask({ downloads.install(source, item, progress) }, failure = R.string.public_dictionary_failed,
+            loading = R.string.public_dictionary_importing) { changed(); showInstalled() }
     }
 
     private fun downloadProgress(): (Long, Long) -> Unit {
@@ -216,13 +231,14 @@ class DictionaryManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun <T> runTask(work: () -> T, failure: Int = R.string.management_operation_failed, complete: (T) -> Unit) {
+    private fun <T> runTask(work: () -> T, failure: Int = R.string.management_operation_failed,
+        loading: Int = R.string.public_dictionary_working, complete: (T) -> Unit) {
         if (busy) return
         cancel()
         taskFailure = failure
         progress.isIndeterminate = true
         content.removeAllViews()
-        status.show(getString(R.string.public_dictionary_working))
+        status.show(getString(loading))
         tasks.execute({ work() }, complete)
     }
 

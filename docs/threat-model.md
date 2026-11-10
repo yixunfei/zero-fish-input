@@ -79,8 +79,10 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
 
 - Explicit public dictionary downloads are the separately approved network
   exception in [ADR 0020](adr/0020-public-dictionaries.md). Catalog HTML is parsed
-  without execution. Every redirect remains HTTPS on the source host allowlist;
-  bounded responses, strict format validation, SQLite size limits and atomic
+  without execution. The separate browser action opens a fixed source page.
+  All file requests use HTTPS on the source host allowlist. The QQ download
+  endpoint's legacy HTTP address is upgraded only for its known CDN package path.
+  Bounded responses, strict format validation, SQLite size limits and atomic
   registry publication protect against malformed downloads. No editor or private
   data is available to the transport. The source observes IP/file choices.
   Runtime imports cannot load schemas, executable code or grammar binaries.

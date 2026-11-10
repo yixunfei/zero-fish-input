@@ -3,6 +3,7 @@ package dev.zeroinput.ime.dictionaries
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
+import java.net.URI
 
 class DictionaryCatalogTest {
     private val catalog = DictionaryCatalog(File("unused"), DictionaryDownloadTransport())
@@ -31,6 +32,43 @@ class DictionaryCatalogTest {
         assertEquals(3, rows.size)
         assertTrue(rows[1].category)
         assertEquals("154343", rows.last().id)
+    }
+
+    @Test fun qqDownloadUsesTheSelectedIdAndUpgradesOnlyItsOfficialLegacyFileRedirect() {
+        val detail = "https://cdict.qq.pinyin.cn/detail?dict_id=s332"
+        val item = CatalogItem("s332", "fixture", detail, format = "qq")
+        val endpoint = URI(catalog.resolve(DictionarySource.QQ, item))
+        assertEquals("https://cdict.qq.pinyin.cn/download?dict_id=s332", endpoint.toString())
+        assertThrows(IllegalArgumentException::class.java) {
+            catalog.resolve(DictionarySource.QQ, item.copy(id = "s333"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            catalog.resolve(DictionarySource.QQ, item.copy(format = "scel"))
+        }
+        val path = "/dict/package/73/aa5141ef807c87363acee63c96d8b9fc.qcel"
+        val advertised = "http://dl.qqpy.sogou.com$path"
+        assertEquals("https://dl.qqpy.sogou.com$path", DictionaryDownloadTransport.redirect(endpoint, advertised).toString())
+        for (address in listOf("http://elsewhere.example$path", "http://dl.qqpy.sogou.com/other.qcel",
+            "$advertised?extra=1", "$advertised#fragment", "http://user@dl.qqpy.sogou.com$path")) {
+            assertThrows(IllegalArgumentException::class.java) { DictionaryDownloadTransport.redirect(endpoint, address) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            DictionaryDownloadTransport.redirect(URI(detail), advertised)
+        }
+    }
+
+    @Test fun sogouResolvesOnlyTheSelectedFileAndKeepsTheRequiredNameParameter() {
+        val item = CatalogItem("15206", "fixture", "https://pinyin.sogou.com/dict/detail/index/15206", format = "scel")
+        val unrelated = """
+            <a href="/d/dict/download_cell.php?id=71952&amp;name=Other">Recommended</a>
+            <a href="/d/dict/download_cell.php?id=15206">Missing name</a>
+            <a href="https://github.com/d/dict/download_cell.php?id=15206&amp;name=Other">Other host</a>
+        """.trimIndent()
+        assertThrows(IllegalStateException::class.java) { catalog.resolveSogou(item) { unrelated } }
+        val resolved = catalog.resolveSogou(item) { unrelated +
+            """<a href="/d/dict/download_cell.php?id=15206&amp;name=公开 词库&amp;f=detail">Download</a>""" }
+        assertEquals("https://pinyin.sogou.com/d/dict/download_cell.php?id=15206&name=%E5%85%AC%E5%BC%80%20%E8%AF%8D%E5%BA%93&f=detail",
+            resolved)
     }
 
     @Test fun transportRejectsUnsafeDestinationsIncludingRedirectTargets() {
@@ -80,6 +118,16 @@ class DictionaryCatalogTest {
         assertEquals(1024, catalog.parseZhwiki(release.toString()).size)
         assets.put(org.json.JSONObject().put("name", "overflow.dict.yaml").put("browser_download_url", "https://github.com/a"))
         assertThrows(IllegalArgumentException::class.java) { catalog.parseZhwiki(release.toString()) }
+    }
+
+    @Test fun zhwikiDoesNotAdvertiseBinaryOrOverLimitAssetsForImport() {
+        val assets = org.json.JSONArray()
+        for ((name, size) in listOf("text.dict.yaml" to 400L, "binary.dict" to 200L, "oversized.dict.yaml" to 195530063L)) {
+            assets.put(org.json.JSONObject().put("name", name).put("size", size)
+                .put("browser_download_url", "https://github.com/a/$name"))
+        }
+        val release = org.json.JSONObject().put("tag_name", "test").put("assets", assets)
+        assertEquals(listOf("text.dict.yaml"), catalog.parseZhwiki(release.toString()).map { it.title })
     }
 
     @Test fun websiteCatalogsUseTheSame1024RowLimit() {

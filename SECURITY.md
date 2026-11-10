@@ -359,8 +359,10 @@ See [ADR 0025](docs/adr/0025-ai-device-agent-boundary.md).
 # Public dictionaries
 
 Foreground dictionary settings have a separately approved HTTPS download boundary
-(docs/adr/0020-public-dictionaries.md). Only public catalogs/files are requested;
-input, learning and clipboard data remain offline. Downloaded data is bounded and
+(docs/adr/0020-public-dictionaries.md). File downloads use HTTPS throughout,
+including QQ packages advertised with a legacy HTTP address on its official CDN.
+Only public catalogs and files are requested. Input, learning and clipboard data
+remain offline. Downloaded data is bounded and
 parsed before atomic publication. QQ/Sogou user uploads are never bundled.
 Only reviewed, pinned Wanxiang data/model assets enter the APK. Weekly updates
 require a reviewed PR and never merge automatically.

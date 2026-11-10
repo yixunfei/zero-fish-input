@@ -1,29 +1,105 @@
 package dev.zeroinput.ime.dictionaries
 
+import android.content.ContextWrapper
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.dictionary.importer.CellDictionaryParser
 import dev.zeroinput.engine.dictionary.importer.PublicDictionaryEntry
 import dev.zeroinput.engine.dictionary.importer.RimeTextDictionaryParser
+import dev.zeroinput.languagepack.BuiltInDictionaryStore
+import dev.zeroinput.languagepack.PublicDictionaryStore
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * Device-side checks use bounded local fixtures so a connected test run does not
- * depend on GitHub or a public dictionary site being reachable. Live downloads
- * remain an explicit opt-in operation and are covered by the transport tests.
+ * The default device checks use local fixtures. The live import requires an
+ * explicit test-runner argument and uses a separate public dictionary store.
  */
 class PublicDictionaryCatalogDeviceTest {
     private val catalog = DictionaryCatalog(
         InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
         DictionaryDownloadTransport(),
     )
+
+    @Test
+    fun nativeDownloadImportsEachSupportedFormatIntoThePublicStore() {
+        val rimeAddress = "https://raw.githubusercontent.com/iDvel/rime-ice/fixture/cn_dicts/fixture.dict.yaml"
+        val responses = mapOf(
+            "https://cdict.qq.pinyin.cn/download?dict_id=s332" to
+                cellFixture(CellDictionaryParser.Source.QQ),
+            sogou.address to
+                """<a href="/d/dict/download_cell.php?id=15206&amp;name=Fixture&amp;f=detail">download</a>""".toByteArray(),
+            "https://pinyin.sogou.com/d/dict/download_cell.php?id=15206&name=Fixture&f=detail" to
+                cellFixture(CellDictionaryParser.Source.SOGOU),
+            rimeAddress to rimeFixture.toByteArray(),
+        )
+        val requested = mutableListOf<String>()
+        val transport = object : DictionaryFileDownload {
+            override fun download(address: String, target: File, limit: Long, timeoutMillis: Long,
+                progress: (Long, Long) -> Unit) {
+                val data = responses.getValue(address)
+                assertTrue(data.size <= limit)
+                requested += address
+                target.writeBytes(data)
+            }
+        }
+        withDownloads(transport) { downloads, _, store ->
+            downloads.install(DictionarySource.QQ, qq) { _, _ -> }
+            downloads.install(DictionarySource.SOGOU, sogou) { _, _ -> }
+            downloads.install(DictionarySource.ICE, CatalogItem("fixture", "fixture", rimeAddress)) { _, _ -> }
+            assertEquals(setOf("QQ", "SOGOU", "ICE"), store.list().map { it.source }.toSet())
+            assertTrue(store.list().all { it.enabled && it.entries == 1L })
+            assertEquals(responses.keys.toList(), requested)
+        }
+    }
+
+    @Test fun liveQqFileDownloadsAndImports() = withLiveDownload(DictionarySource.QQ) { qq }
+
+    @Test fun liveSogouFileDownloadsAndImports() = withLiveDownload(DictionarySource.SOGOU) { sogou }
+
+    @Test fun liveZhwikiFileDownloadsAndImports() = withLiveDownload(DictionarySource.ZHWIKI) {
+        it.list(DictionarySource.ZHWIKI).first { item -> item.id.startsWith("web-slang-") }
+    }
+
+    private fun withLiveDownload(source: DictionarySource, choose: (DictionaryCatalog) -> CatalogItem) {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("livePublicDictionary") == "true")
+        withDownloads(DictionaryDownloadTransport()) { downloads, liveCatalog, store ->
+            downloads.install(source, choose(liveCatalog)) { _, _ -> }
+            val imported = store.list().single { it.source == source.name }
+            assertTrue(imported.enabled && imported.entries > 0)
+        }
+    }
+
+    private fun withDownloads(transport: DictionaryFileDownload,
+        work: (DictionaryDownloads, DictionaryCatalog, PublicDictionaryStore) -> Unit) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File.createTempFile("public-import-", ".test", context.cacheDir)
+        check(root.delete() && root.mkdir())
+        try {
+            val isolated = object : ContextWrapper(context) {
+                override fun getNoBackupFilesDir() = root
+            }
+            val store = PublicDictionaryStore(isolated)
+            val liveCatalog = DictionaryCatalog(isolated.cacheDir, transport)
+            val downloads = DictionaryDownloads(isolated, transport, liveCatalog, store, BuiltInDictionaryStore(isolated, store))
+            work(downloads, liveCatalog, store)
+        } finally { root.deleteRecursively() }
+    }
+
+    private val qq = CatalogItem("s332", "成语俗语大全",
+        "https://cdict.qq.pinyin.cn/detail?dict_id=s332", format = "qq")
+    private val sogou = CatalogItem("15206", "动物词汇大全",
+        "https://pinyin.sogou.com/dict/detail/index/15206", format = "scel")
+    private val rimeFixture = "---\nname: fixture\ncolumns: [text, code, weight]\n...\n测试\tce shi\t12\n"
+
 
     @Test
     fun publicCatalogFixturesResolveAndParseRows() {
@@ -86,11 +162,7 @@ class PublicDictionaryCatalogDeviceTest {
     }
 
     private fun parseRimeFixture(): List<PublicDictionaryEntry> = buildList {
-        RimeTextDictionaryParser().parse(
-            "---\nname: fixture\ncolumns: [text, code, weight]\n...\n测试\tce shi\t12\n"
-                .byteInputStream(),
-            ::add,
-        )
+        RimeTextDictionaryParser().parse(rimeFixture.byteInputStream(), ::add)
     }
 
     private fun parseCellFixture(source: CellDictionaryParser.Source): List<PublicDictionaryEntry> = buildList {

@@ -13,12 +13,24 @@ installation in the foreground. QQ/Sogou use native category and pagination rows
 there is no arbitrary URL input or WebView. Leaving the page cancels unfinished
 work. Publication already committed to disk is retained.
 
+The download confirmation fetches the selected file and imports it in the
+app. A separate source link can open the public catalog in a browser.
+QQ resolves the selected identifier against its download endpoint. Sogou
+retains the official file link parameters and matches its identifier to the
+selected detail page. GitHub catalog entries above the existing text download
+limit are omitted.
+
 The dedicated `app/dictionaries/DictionaryDownloadTransport` is the additional
 network adapter. It accepts HTTPS on named source/file hosts, rejects credentials,
 fragments and nonstandard ports, validates every redirect, and bounds time and
 response size. Requests contain only public catalog/file identifiers. They never
 read editor text, learning data, clipboard, package identity or AI credentials.
 Sources can observe the network address and selected dictionary.
+
+The QQ download endpoint may advertise a legacy HTTP `.qcel` package address.
+Only the known package path on its official CDN is rewritten to HTTPS before
+validation. The transport makes HTTPS requests throughout and rejects other
+HTTP redirect targets.
 
 Downloaded Rime YAML and QQ/Sogou cell data pass bounded parsers and become
 uniform text/code/weight entries. Safe YAML loads only header data; no tags,

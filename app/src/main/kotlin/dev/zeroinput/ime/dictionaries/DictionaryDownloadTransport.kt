@@ -5,10 +5,15 @@ import java.net.URI
 import javax.net.ssl.HttpsURLConnection
 import java.util.concurrent.CancellationException
 
-/** Explicit public catalog/download requests only. No credentials, cookies, editor or personal data. */
-internal class DictionaryDownloadTransport {
+internal interface DictionaryFileDownload {
     fun download(address: String, target: File, limit: Long, timeoutMillis: Long = 300_000,
-        progress: (Long, Long) -> Unit = { _, _ -> }) {
+        progress: (Long, Long) -> Unit = { _, _ -> })
+}
+
+/** Explicit public catalog/download requests only. No credentials, cookies, editor or personal data. */
+internal class DictionaryDownloadTransport : DictionaryFileDownload {
+    override fun download(address: String, target: File, limit: Long, timeoutMillis: Long,
+        progress: (Long, Long) -> Unit) {
         require(timeoutMillis in 1..1_800_000)
         val deadline = System.nanoTime() + timeoutMillis * 1_000_000
         var uri = validate(address)
@@ -30,7 +35,7 @@ internal class DictionaryDownloadTransport {
                     val status = connection.responseCode
                     if (status in listOf(301, 302, 303, 307, 308)) {
                         val location = connection.getHeaderField("Location") ?: error("Missing download location")
-                        uri = validate(uri.resolve(location).toASCIIString())
+                        uri = redirect(uri, location)
                         return@repeat
                     }
                     check(status == 200) { "Public source unavailable" }
@@ -68,6 +73,18 @@ internal class DictionaryDownloadTransport {
         private val hosts = setOf("api.github.com", "github.com", "raw.githubusercontent.com",
             "codeload.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com",
             "cdict.qq.pinyin.cn", "pinyin.sogou.com", "download.pinyin.sogou.com", "dl.qqpy.sogou.com")
+        private val qqPackage = Regex("/dict/package/[0-9]{1,10}/[0-9a-f]{32}\\.qcel")
+
+        internal fun redirect(from: URI, location: String): URI {
+            val target = from.resolve(location)
+            // QQ advertises this legacy URL. Its official file CDN serves the same path over HTTPS.
+            if (from.host == "cdict.qq.pinyin.cn" && from.path == "/download" &&
+                target.scheme == "http" && target.rawAuthority == "dl.qqpy.sogou.com" &&
+                target.rawQuery == null && target.rawFragment == null && qqPackage.matches(target.rawPath)) {
+                return validate("https://dl.qqpy.sogou.com${target.rawPath}")
+            }
+            return validate(target.toASCIIString())
+        }
 
         fun validate(address: String): URI {
             val uri = URI(address)

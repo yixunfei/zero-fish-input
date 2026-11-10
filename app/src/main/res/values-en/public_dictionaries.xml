@@ -21,9 +21,13 @@
     <string name="public_dictionary_license_ice">Rime Ice: upstream declares GPL-3.0; data retains its source notices.</string>
     <string name="public_dictionary_license_wiki">Wiki dictionaries: generated data has a separate license from the generator and follows Wikimedia source terms.</string>
     <string name="public_dictionary_license_website">Uploaded dictionaries belong to their authors. Downloads are for local use and are not redistributed with this app.</string>
-    <string name="public_dictionary_choose">Choose a category or dictionary</string>
+    <string name="public_dictionary_choose">Choose a category or download a dictionary to import</string>
     <string name="public_dictionary_install_notice">Download, validate and install this public dictionary? An existing copy will be replaced only after successful conversion. Dictionary content may affect candidate order.</string>
-    <string name="public_dictionary_download">Download and install</string>
+    <string name="public_dictionary_download">Download and import</string>
+    <string name="public_dictionary_download_item">Download and import · %1$s</string>
+    <string name="public_dictionary_importing">Downloading and importing the dictionary…</string>
+    <string name="public_dictionary_visit_source">Visit source website</string>
+    <string name="public_dictionary_browser_unavailable">No browser is available to open the website.</string>
     <string name="public_dictionary_progress">Downloaded %1$d KB</string>
     <string name="public_dictionary_working">Working…</string>
     <string name="public_dictionary_failed">Unable to complete. The source may be unavailable, the download restricted, or the format unsupported. Try again later.</string>

@@ -15,7 +15,7 @@ import java.util.zip.ZipFile
 /** Foreground downloads only. Receipts contain public source metadata, never local names or entries. */
 internal class DictionaryDownloads(
     private val context: Context,
-    private val transport: DictionaryDownloadTransport,
+    private val transport: DictionaryFileDownload,
     private val catalog: DictionaryCatalog,
     private val store: PublicDictionaryStore,
     private val bundled: BuiltInDictionaryStore,
@@ -23,11 +23,11 @@ internal class DictionaryDownloads(
     fun install(source: DictionarySource, item: CatalogItem, progress: (Long, Long) -> Unit) {
         val file = File.createTempFile("public-download-", ".tmp", context.cacheDir)
         try {
-            transport.download(catalog.resolve(source, item), file, 128L * 1024 * 1024, progress = progress)
-            val parser = when (item.format) {
-                "qq" -> CellDictionaryParser(CellDictionaryParser.Source.QQ)
-                "scel" -> CellDictionaryParser(CellDictionaryParser.Source.SOGOU)
-                else -> RimeTextDictionaryParser()
+            transport.download(catalog.resolve(source, item), file, source.downloadLimit, progress = progress)
+            val parser = when (source) {
+                DictionarySource.QQ -> CellDictionaryParser(CellDictionaryParser.Source.QQ)
+                DictionarySource.SOGOU -> CellDictionaryParser(CellDictionaryParser.Source.SOGOU)
+                DictionarySource.WANXIANG, DictionarySource.ICE, DictionarySource.ZHWIKI -> RimeTextDictionaryParser()
             }
             val installed = file.inputStream().use { store.install(identity(source, item), item.title, source.name, item.version, it, parser) }
             saveReceipt(source, item, installed.sha256)

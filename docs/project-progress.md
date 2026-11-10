@@ -6,6 +6,24 @@ Updated 2026-11-10.
 
 [v0.7.2](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.2) is the current Debug-signed testing prerelease. It includes the mixed-pinyin and symbol keyboard fixes, dictionary management improvements and opt-in AI additions. The published universal APK passed an in-place installation over v0.7.1 and 56 emulator tests. See [release notes](releases/v0.7.2.md) and [release validation](releases/v0.7.2-validation.md).
 
+## Public dictionary import
+
+The catalog now distinguishes download and import from visiting the source
+website. QQ resolves the selected identifier directly and upgrades only the
+known legacy CDN package URL to HTTPS. Sogou matches the selected item and
+keeps its required download parameters. Oversized GitHub files are omitted.
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest `
+  :engine-dictionary:test :language-pack:testDebugUnitTest privacyCheck :app:lintDebug `
+  "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+```
+
+The build and checks passed. Isolated API 37 emulator tests passed with local
+import fixtures and with real QQ, Sogou and Chinese Wikipedia source files.
+The online cases require the explicit instrumentation argument
+`-e livePublicDictionary true`.
+
 ## Next verification
 
 - Validate installation and input on a physical ARM device. The existing device run used an API 37 x86_64 emulator.
