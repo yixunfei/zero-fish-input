@@ -42,7 +42,6 @@
     <string name="ai_device_agent_task_failed">Device task stopped: %1$s</string>
     <string name="ai_device_agent_activity_title">Standalone device task</string>
     <string name="ai_device_agent_activity_description">Enter a task and the target application package. The task runs only while the target is foreground, the device is unlocked, and accessibility is connected. You may choose one file or media attachment for this task; it remains in memory and is sent only to the configured AI service, never to agent history.</string>
-    <string name="ai_device_agent_target_package">Target application package</string>
     <string name="ai_device_agent_target_package_hint">For example, com.example.app</string>
     <string name="ai_device_agent_activity_task">Device task</string>
     <string name="ai_device_agent_activity_screenshot_confirm">Allow screenshots for this task</string>
@@ -54,10 +53,8 @@
     <string name="ai_device_agent_activity_file_selected">One attachment is selected for this task and may be sent to the configured AI service.</string>
     <string name="ai_device_agent_activity_file_removed">Remove selected attachment</string>
     <string name="ai_device_agent_activity_file_disabled">Consent to and enable the file capability separately in device agent settings first.</string>
-    <string name="ai_device_agent_activity_action">Action %1$s: %2$s</string>
     <string name="ai_device_agent_activity_ready">Ready to start a task</string>
     <string name="ai_device_agent_activity_complete">Task completed</string>
-    <string name="ai_device_agent_activity_failed">Task stopped: %1$s</string>
     <string name="ai_device_agent_activity_target_invalid">Invalid package name</string>
     <string name="ai_device_agent_activity_task_required">Enter a device task</string>
     <string name="ai_device_agent_activity_disclosure_required">Complete the device agent disclosure and settings first</string>

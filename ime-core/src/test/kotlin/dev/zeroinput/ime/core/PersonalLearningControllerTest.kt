@@ -8,9 +8,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalLearningControllerTest {
+    @Test fun `space uses the visible promoted native candidate`() {
+        val store = Store().apply { count = 3 }
+        val controller = controller(store, optIn = true)
+        controller.handle(InputCommand.Text("cs"))
+        assertEquals("测试", controller.state.snapshot.candidates.first().text)
+
+        controller.handle(InputCommand.Space)
+
+        assertEquals("测试", store.lastValue)
+        assertEquals(4, store.count)
+    }
+
     @Test fun `three explicit short code choices change the next candidate order`() {
         val store = Store()
-        val controller = controller(store)
+        val controller = controller(store, threshold = 3)
         repeat(3) {
             controller.handle(InputCommand.Text("cs"))
             assertEquals("产生", controller.state.snapshot.candidates.first().text)
@@ -20,6 +32,16 @@ class PersonalLearningControllerTest {
         controller.handle(InputCommand.Text("cs"))
         assertEquals("测试", controller.state.snapshot.candidates.first().text)
         assertEquals(3, store.count)
+    }
+
+    @Test fun `one explicit choice promotes at the default threshold`() {
+        val store = Store()
+        val controller = controller(store)
+        controller.handle(InputCommand.Text("cs"))
+        controller.handle(InputCommand.SelectCandidate(1))
+        controller.handle(InputCommand.Text("cs"))
+        assertEquals("测试", controller.state.snapshot.candidates.first().text)
+        assertEquals(1, store.count)
     }
 
     @Test fun `learned native candidate selection preserves the engine learning route`() {
@@ -149,7 +171,8 @@ class PersonalLearningControllerTest {
         }
     }
 
-    private fun controller(store: Store, optIn: Boolean = false, accepted: Boolean = true): InputSessionController {
+    private fun controller(store: Store, optIn: Boolean = false, accepted: Boolean = true,
+        threshold: Int = 1): InputSessionController {
         val connection = object : EditorConnection {
             override fun setComposingText(text: String) = Unit
             override fun finishComposingText() = Unit
@@ -158,7 +181,8 @@ class PersonalLearningControllerTest {
             override fun performEditorAction(actionId: Int) = false
             override fun sendEnterKey() = Unit
         }
-        return InputSessionController(connection, { Engine() }, store, learnFromCommittedText = { optIn }).apply {
+        return InputSessionController(connection, { Engine() }, store, learnFromCommittedText = { optIn },
+            personalPromotionThreshold = { threshold }).apply {
             start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, InputLanguage.CHINESE, PrivacyConfiguration())
         }
     }

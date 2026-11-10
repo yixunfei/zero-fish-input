@@ -1732,3 +1732,278 @@ zh	後天上午	見
 zh	後天上午	有空
 zh	後天下午	見
 zh	後天下午	有空
+# Everyday scene and explicit continuation-chain expansion (2026-11-05).
+zh	好久没有	联系
+zh	好久没有	见面
+zh	好久没有	聊天
+zh	等你有空	再聊
+zh	等你有空	联系我
+zh	会议改到	明天
+zh	会议改到	下午
+zh	会议改到	周五
+zh	时间确定	以后
+zh	时间确定	了
+zh	时间确定	再通知
+zh	到了以后	联系
+zh	文档已经	更新
+zh	文档已经	发送
+zh	文档已经	保存
+zh	收到请	回复
+zh	收到请	确认
+zh	收到请	告知
+zh	有问题随时	联系
+zh	有问题随时	沟通
+zh	有问题随时	提问
+zh	快递到了	取一下
+zh	快递到了	联系我
+zh	收货地址	发给我
+zh	收货地址	确认一下
+zh	预计明天	送达
+zh	预计明天	到达
+zh	预计明天	完成
+zh	包裹已经	发出
+zh	包裹已经	送达
+zh	包裹已经	签收
+zh	到站以后	联系
+zh	到站以后	告诉我
+zh	请问地铁站	在哪里
+zh	请问地铁站	怎么走
+zh	路上注意	安全
+zh	路上注意	休息
+zh	酒店已经	预订
+zh	酒店已经	确认
+zh	今天中午吃	什么
+zh	今天中午吃	面条
+zh	今天中午吃	米饭
+zh	少放一点	盐
+zh	少放一点	辣椒
+zh	少放一点	糖
+zh	不需要	餐具
+zh	不需要	了
+zh	一起去吃	饭
+zh	一起去吃	火锅
+zh	一起去吃	早餐
+zh	这道题怎么	做
+zh	这道题怎么	解
+zh	考试顺利	通过
+zh	考试顺利	加油
+zh	复习一下	重点
+zh	复习一下	内容
+zh	复习一下	笔记
+zh	作业已经	完成
+zh	作业已经	提交
+zh	作业已经	检查
+zh	记得按时	吃药
+zh	记得按时	休息
+zh	记得按时	吃饭
+zh	早点休息	吧
+zh	身体不舒服	休息一下
+zh	身体不舒服	去医院
+zh	检查结果	出来了
+zh	检查结果	正常
+zh	这个还有	货吗
+zh	这个还有	吗
+zh	可以帮我	看看
+zh	可以帮我	确认一下
+zh	退款已经	到账
+zh	退款已经	申请
+zh	退款已经	处理
+zh	发票抬头	发给我
+zh	发票抬头	确认一下
+zh	网络连接	失败
+zh	网络连接	正常
+zh	网络连接	中断
+zh	重新启动	试试
+zh	重新启动	应用
+zh	重新启动	设备
+zh	文件已经	保存
+zh	文件已经	上传
+zh	文件已经	发送
+zh	好久沒有	聯繫
+zh	好久沒有	見面
+zh	好久沒有	聊天
+zh	會議改到	明天
+zh	會議改到	下午
+zh	會議改到	週五
+zh	時間確定	以後
+zh	時間確定	了
+zh	時間確定	再通知
+zh	到了以後	聯繫
+zh	請確認一下	時間
+zh	請確認一下	資訊
+zh	文件已經	儲存
+zh	文件已經	上傳
+zh	文件已經	傳送
+zh	文檔已經	更新
+zh	文檔已經	傳送
+zh	文檔已經	儲存
+zh	收到請	回覆
+zh	收到請	確認
+zh	收到請	告知
+zh	有問題隨時	聯繫
+zh	有問題隨時	溝通
+zh	有問題隨時	提問
+zh	快遞到了	取一下
+zh	快遞到了	聯繫我
+zh	收貨地址	發給我
+zh	收貨地址	確認一下
+zh	預計明天	送達
+zh	預計明天	到達
+zh	預計明天	完成
+zh	包裹已經	發出
+zh	包裹已經	送達
+zh	包裹已經	簽收
+zh	到站以後	聯繫
+zh	到站以後	告訴我
+zh	請問地鐵站	在哪裡
+zh	請問地鐵站	怎麼走
+zh	酒店已經	預訂
+zh	酒店已經	確認
+zh	今天中午吃	什麼
+zh	這道題怎麼	做
+zh	這道題怎麼	解
+zh	考試順利	通過
+zh	考試順利	加油
+zh	複習一下	重點
+zh	複習一下	內容
+zh	複習一下	筆記
+zh	作業已經	完成
+zh	作業已經	提交
+zh	作業已經	檢查
+zh	記得按時	吃藥
+zh	記得按時	休息
+zh	記得按時	吃飯
+zh	早點休息	吧
+zh	身體不舒服	休息一下
+zh	身體不舒服	去醫院
+zh	檢查結果	出來了
+zh	檢查結果	正常
+zh	這個還有	貨嗎
+zh	這個還有	嗎
+zh	可以幫我	看看
+zh	可以幫我	確認一下
+zh	退款已經	到賬
+zh	退款已經	申請
+zh	退款已經	處理
+zh	發票抬頭	發給我
+zh	發票抬頭	確認一下
+zh	網路連線	失敗
+zh	網路連線	正常
+zh	網路連線	中斷
+zh	重新啟動	試試
+zh	重新啟動	應用程式
+zh	重新啟動	裝置
+en	thanks for your	help
+en	thanks for your	support
+en	thanks for your	patience
+en	thanks for your	time
+en	it was nice to	meet
+en	it was nice to	see
+en	it was nice to	hear
+en	hope you have a	great
+en	hope you have a	good
+en	hope you have a	wonderful
+en	looking forward to seeing	you
+en	can we meet	tomorrow
+en	can we meet	today
+en	can we meet	later
+en	please confirm the	time
+en	please confirm the	details
+en	please confirm the	address
+en	let me know when	you
+en	let me know when	it
+en	please review the	document
+en	please review the	changes
+en	please review the	proposal
+en	i have attached the	file
+en	i have attached the	document
+en	i have attached the	report
+en	i will get back to	you
+en	keep me updated	on
+en	the package has been	shipped
+en	the package has been	delivered
+en	please send me your	address
+en	please send me your	details
+en	please send me your	availability
+en	your order is	ready
+en	your order is	confirmed
+en	your order is	complete
+en	when will it	arrive
+en	when will it	ship
+en	when will it	start
+en	how do i get to	the
+en	where is the nearest	station
+en	where is the nearest	hotel
+en	where is the nearest	hospital
+en	i would like to book a	room
+en	i would like to book a	table
+en	i would like to book a	ticket
+en	what would you like to	eat
+en	what would you like to	drink
+en	what would you like to	order
+en	could i have some	water
+en	could i have some	coffee
+en	could i have some	tea
+en	a table for	two
+en	a table for	four
+en	a table for	six
+en	let us have	lunch
+en	let us have	dinner
+en	let us have	coffee
+en	could you explain	this
+en	could you explain	it
+en	could you explain	why
+en	i need to study	for
+en	i need to study	more
+en	good luck with your	exam
+en	good luck with your	studies
+en	good luck with your	interview
+en	i have finished my	homework
+en	i have finished my	assignment
+en	i have finished my	work
+en	i hope you feel	better
+en	remember to take your	medicine
+en	remember to take your	medication
+en	please get some	rest
+en	please get some	sleep
+en	please get some	water
+en	do you have this in	stock
+en	do you have this in	blue
+en	do you have this in	black
+en	how much does it	cost
+en	i would like a	refund
+en	i would like a	receipt
+en	i would like a	coffee
+en	can i pay by	card
+en	can i pay by	cash
+en	the connection has	failed
+en	the connection has	timed
+en	the file has been	saved
+en	the file has been	uploaded
+en	the file has been	deleted
+en	could you restart the	application
+en	could you restart the	device
+en	could you restart the	computer
+zh	收到请确认	时间
+zh	收到请确认	信息
+zh	收到請確認	時間
+zh	收到請確認	資訊
+zh	文档已经更新	完成
+zh	文档已经更新	了
+zh	文檔已經更新	完成
+zh	文檔已經更新	了
+zh	会议改到明天	下午
+zh	会议改到明天	上午
+zh	會議改到明天	下午
+zh	會議改到明天	上午
+en	can we meet tomorrow	morning
+en	can we meet tomorrow	afternoon
+en	how do i get	to
+en	how do i get to the	station
+en	how do i get to the	hotel
+en	how do i get to the	airport
+en	please review	the
+en	the file has been saved	successfully
+en	the file has been saved	locally
+en	remember to take your medicine	on
+en	take your medicine on	time

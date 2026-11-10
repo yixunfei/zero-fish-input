@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="management_loading">Loading…</string>
+    <string name="management_reload">Reload list</string>
+    <string name="management_load_failed">Could not load the list. Try again.</string>
+    <string name="management_operation_failed">The operation did not complete. Reload the list and check its current state before trying again.</string>
+    <string name="user_dictionary_empty">No personal phrases. Use Add to create one.</string>
+    <string name="user_dictionary_no_matches">No matching phrases</string>
+    <string name="user_dictionary_page_empty">No phrases on this page. Go to the previous page.</string>
+    <string name="user_dictionary_page_range">Entries %1$d–%2$d</string>
+    <string name="user_dictionary_delete_named">Delete phrase: %1$s</string>
+    <string name="secure_clipboard_load_failed">Could not load the private clipboard. Authenticate again to retry.</string>
+    <string name="secure_clipboard_operation_failed">The operation did not complete. Authenticate again and reload the list to check its current state.</string>
+    <string name="dictionary_source_other">Other public source</string>
+</resources>

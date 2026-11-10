@@ -22,10 +22,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.management.ManagementStatusView
+import dev.zeroinput.ime.management.ManagementTaskRunner
 import dev.zeroinput.userdata.UserTerm
 import dev.zeroinput.userdata.UserDictionaryException
 import dev.zeroinput.userdata.UserDictionaryFailure
-import java.util.concurrent.RejectedExecutionException
 
 class UserDictionaryActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
@@ -37,7 +38,11 @@ class UserDictionaryActivity : AppCompatActivity() {
     private var phraseDialog: androidx.appcompat.app.AlertDialog? = null
     private lateinit var toolbar: MaterialToolbar
     private var busy = false
-    private var operationGeneration = 0L
+    private var active = false
+    private lateinit var status: ManagementStatusView
+    private var loadingList = false
+    private val tasks by lazy { ManagementTaskRunner(worker, { runOnUiThread(it) },
+        { active && !isFinishing && !isDestroyed }, ::setBusy, ::showFailure) }
     private lateinit var searchField: EditText
     private val searchRefresh = Runnable { refresh() }
     private var searchRevision = 0L
@@ -75,11 +80,33 @@ class UserDictionaryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(createContent())
+    }
+
+    override fun onStart() {
+        super.onStart()
+        active = true
         refresh()
     }
 
+    override fun onStop() {
+        active = false
+        tasks.cancel()
+        phraseDialog?.dismiss()
+        phraseDialog = null
+        adapter.submit(emptyList())
+        searchField.text.clear()
+        searchField.removeCallbacks(searchRefresh)
+        status.clear()
+        super.onStop()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.clear()
+    }
+
     override fun onDestroy() {
-        operationGeneration++
+        tasks.close()
         phraseDialog?.dismiss()
         phraseDialog = null
         searchField.removeCallbacks(searchRefresh)
@@ -94,15 +121,26 @@ class UserDictionaryActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 30) importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         toolbar = createToolbar()
         addView(toolbar)
+        val body = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; isSaveEnabled = false }
         promotionThreshold = com.google.android.material.button.MaterialButton(context).apply {
             minHeight = dp(48)
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setOnClickListener { showThresholdDialog() }
         }
-        addView(promotionThreshold)
+        body.addView(promotionThreshold)
         renderThreshold()
-        searchField = dictionaryField(R.string.user_dictionary_search, maxLength = 64, maxLines = 1).apply {
-            setSingleLine(true)
+        searchField = dictionaryField(R.string.user_dictionary_search, maxLength = 64, maxLines = 3).apply {
+            setSingleLine(false)
+            maxLines = 3
+            setHorizontallyScrolling(false)
+            imeOptions = imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setOnEditorActionListener { _, action, _ ->
+                if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    removeCallbacks(searchRefresh)
+                    refresh()
+                    true
+                } else false
+            }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -115,19 +153,25 @@ class UserDictionaryActivity : AppCompatActivity() {
                 override fun afterTextChanged(s: Editable?) = Unit
             })
         }
-        addView(searchField)
+        body.addView(searchField)
+        status = ManagementStatusView(context)
+        body.addView(status)
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
-        addView(RecyclerView(this@UserDictionaryActivity).apply {
+        body.addView(RecyclerView(this@UserDictionaryActivity).apply {
             layoutManager = LinearLayoutManager(this@UserDictionaryActivity)
             adapter = this@UserDictionaryActivity.adapter
             itemAnimator = null
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            isSaveEnabled = false
+            isNestedScrollingEnabled = false
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         })
-        addView(createPaging())
+        body.addView(createPaging())
+        addView(androidx.core.widget.NestedScrollView(context).apply { addView(body) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
     }
 
     private fun createPaging() = LinearLayout(this).apply {
@@ -236,15 +280,25 @@ class UserDictionaryActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
+        if (!active) return
         if (busy) { searchPending = true; return }
         searchPending = false
         val prefix = searchField.text.toString()
         val revision = searchRevision
         val offset = pageOffset
-        runOperation({ graph.userLexicon.searchPage(prefix, offset = offset, limit = SEARCH_LIMIT) }) {
+        loadingList = true
+        adapter.submit(emptyList())
+        status.loading()
+        runOperation({ graph.userLexicon.searchPage(prefix, offset = offset, limit = SEARCH_LIMIT) }, listRead = true) {
             if (revision == searchRevision) {
                 adapter.submit(it.items)
                 hasMore = it.hasMore
+                status.show(when {
+                    it.items.isNotEmpty() -> getString(R.string.user_dictionary_page_range, offset + 1, offset + it.items.size)
+                    offset > 0 -> getString(R.string.user_dictionary_page_empty)
+                    prefix.isNotBlank() -> getString(R.string.user_dictionary_no_matches)
+                    else -> getString(R.string.user_dictionary_empty)
+                })
                 updatePaging()
             }
         }
@@ -255,23 +309,11 @@ class UserDictionaryActivity : AppCompatActivity() {
         refresh()
     }
 
-    private fun <T> runOperation(operation: () -> T, onSuccess: (T) -> Unit) {
-        if (isFinishing || isDestroyed) return
-        setBusy(true)
-        val generation = ++operationGeneration
-        try {
-            worker.execute {
-                val result = runCatching(operation)
-                runOnUiThread {
-                    if (generation != operationGeneration || isFinishing || isDestroyed) return@runOnUiThread
-                    setBusy(false)
-                    result.onSuccess(onSuccess).onFailure(::showFailure)
-                    if (searchPending && !busy) refresh()
-                }
-            }
-        } catch (_: RejectedExecutionException) {
-            setBusy(false)
-            showMessage(R.string.operation_failed)
+    private fun <T> runOperation(operation: () -> T, listRead: Boolean = false, onSuccess: (T) -> Unit) {
+        loadingList = listRead
+        tasks.execute({ operation() }) {
+            onSuccess(it)
+            if (searchPending && !busy) refresh()
         }
     }
 
@@ -292,8 +334,11 @@ class UserDictionaryActivity : AppCompatActivity() {
             UserDictionaryFailure.IMPORT_TOO_LARGE -> R.string.user_dictionary_too_large
             UserDictionaryFailure.INVALID_FORMAT -> R.string.user_dictionary_invalid
             UserDictionaryFailure.WRITE_FAILED -> R.string.user_dictionary_write_failed
-            null -> R.string.operation_failed
+            null -> if (loadingList) R.string.management_load_failed else R.string.management_operation_failed
         }
+        if (loadingList) { adapter.submit(emptyList()); hasMore = false; updatePaging() }
+        searchPending = false
+        status.failure(resource) { refresh() }
         showMessage(resource)
     }
 

@@ -47,7 +47,32 @@ try {
     if ($result.Path -ne (Join-Path $oldDirectory 'app.apk')) { throw 'Current locator was not followed after output relocation.' }
     Set-Content $locator 'listingFile=../../../../../../outside.json'
     Assert-Rejected { Resolve-TestApkArtifact $fixture 'universal' }
+    $nativeSentinel = Join-Path $fixture 'engine-rime/build/native-sentinel'
+    $deliverySentinel = Join-Path $fixture 'app/build/outputs/test-apk/sentinel'
+    foreach ($sentinel in @($nativeSentinel, $deliverySentinel)) {
+        New-Item -ItemType Directory -Path (Split-Path $sentinel -Parent) -Force | Out-Null
+        Set-Content -LiteralPath $sentinel 'preserve'
+    }
+    New-Item -ItemType Directory -Path (Join-Path $fixture 'app/build/intermediates/incremental/packageDebug') -Force | Out-Null
+    Reset-TestApkPackaging -RepositoryRoot $fixture
+    if ((Test-Path -LiteralPath $currentDirectory) -or (Test-Path -LiteralPath $oldDirectory)) {
+        throw 'Debug packaging output was not reset.'
+    }
+    foreach ($sentinel in @($nativeSentinel, $deliverySentinel)) {
+        if ((Get-Content -LiteralPath $sentinel -Raw).Trim() -ne 'preserve') { throw 'Unrelated build data changed.' }
+    }
+    $linkedOutput = Join-Path $fixture 'app/build/outputs/apk/debug'
+    New-Item -ItemType Directory -Path (Split-Path $linkedOutput -Parent) -Force | Out-Null
+    $linkTarget = Join-Path $fixture 'protected-link-target'
+    New-Item -ItemType Directory -Path $linkTarget -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $linkTarget 'sentinel') 'preserve'
+    New-Item -ItemType Junction -Path $linkedOutput -Target $linkTarget | Out-Null
+    Assert-Rejected { Reset-TestApkPackaging -RepositoryRoot $fixture }
+    if ((Get-Content -LiteralPath (Join-Path $linkTarget 'sentinel') -Raw).Trim() -ne 'preserve') {
+        throw 'Linked output target was modified.'
+    }
     Write-Output 'PASS: missing locator/listing rejected; stale output ignored; locator relocation followed; missing ABI, duplicate entries and path escapes rejected; universal selected.'
+    Write-Output 'PASS: packaging reset removes only Debug ZIP state, rejects links and preserves native caches and deliveries.'
 } finally {
     $resolved = [IO.Path]::GetFullPath($fixture)
     $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'

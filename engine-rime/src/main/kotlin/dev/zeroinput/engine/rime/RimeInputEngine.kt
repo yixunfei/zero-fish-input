@@ -18,6 +18,8 @@ import dev.zeroinput.engine.api.ReadingSelectionEngine
 import dev.zeroinput.engine.api.CompositionEditingEngine
 import dev.zeroinput.engine.api.CompositionCursorEngine
 import dev.zeroinput.engine.api.CompositionSelection
+import dev.zeroinput.engine.api.DoublePinyinScheme
+import dev.zeroinput.engine.api.PinyinCandidateMatch
 
 internal class RimeInputEngine(
     schemaId: String = "zeroinput_pinyin",
@@ -37,6 +39,8 @@ internal class RimeInputEngine(
     private var pageNumber = 0
     private var caretPosition = 0
     private var selectingSyllable = false
+    private val fullPinyin = options.keyboardLayout == ChineseKeyboardLayout.FULL &&
+        options.effectiveDoublePinyinScheme == DoublePinyinScheme.OFF
 
     override val descriptor = Descriptor
 
@@ -109,7 +113,7 @@ internal class RimeInputEngine(
         val absoluteIndex = pageNumber * options.candidatePageSize + index
         val reading = committedReading(index)
         val learningInput = learningInput(input, index)
-        val segment = SelectedSegment(absoluteIndex, caretPosition, canonicalReading(currentSnapshot.candidates[index].comment))
+        val segment = SelectedSegment(absoluteIndex, caretPosition, currentSnapshot.candidates[index].comment)
         val consumed = NativeRimeBridge.nativeSelectAbsoluteCandidate(sessionId, absoluteIndex)
         if (consumed) {
             selectingSyllable = false
@@ -189,8 +193,9 @@ internal class RimeInputEngine(
 
     private fun committedReading(index: Int): String {
         val suffix = currentSnapshot.candidates.getOrNull(index)?.comment?.let(::canonicalReading).orEmpty()
-        if (suffix.isEmpty() || selectedIndices.any { it.reading.isEmpty() }) return ""
-        return selectedIndices.joinToString("") { it.reading } + suffix
+        val prefix = selectedIndices.map { canonicalReading(it.reading) }
+        if (suffix.isEmpty() || prefix.any(String::isEmpty)) return ""
+        return prefix.joinToString("") + suffix
     }
 
     private fun learningInput(raw: String, index: Int): String {
@@ -281,6 +286,7 @@ internal class RimeInputEngine(
         val update = NativeRimeBridge.nativeReadUpdate(
             sessionId,
             options.script == ChineseScript.SIMPLIFIED,
+            includeSpelling = fullPinyin,
         )
         // Capture the old selection only on commit, before replacing it.
         val committed = learningRawInput != null && update.committedText.isNotEmpty()
@@ -299,7 +305,8 @@ internal class RimeInputEngine(
             composition = update.composition,
             candidates = update.candidates.mapIndexed { index, text ->
                 val comment = update.comments.getOrElse(index) { "" }
-                Candidate("rime:$index:$text", text, comment, input = canonicalReading(comment))
+                Candidate("rime:$index:$text", text, comment, input = canonicalReading(comment),
+                    pinyinMatch = pinyinMatch(update, index, comment))
             },
             highlightedIndex = update.highlightedIndex,
             hasPreviousPage = update.candidates.isNotEmpty() && update.pageNumber > 0,
@@ -313,6 +320,18 @@ internal class RimeInputEngine(
         return EngineUpdate(currentSnapshot, update.committedText, consumed || update.committedText.isNotEmpty(),
             committedInput = if (committed) reading.ifBlank { learningRawInput.orEmpty() } else "",
             learnable = !committed || reading.isNotEmpty(), learningInput = learning)
+    }
+
+    private fun pinyinMatch(update: NativeRimeUpdate, index: Int, reading: String): PinyinCandidateMatch? {
+        if (!fullPinyin || reading.isEmpty()) return null
+        val start = update.spellingRanges.getOrNull(index * 2) ?: return null
+        val end = update.spellingRanges.getOrNull(index * 2 + 1) ?: return null
+        val raw = update.rawInput
+        if (start < 0 || end <= start || end > raw.length) return null
+        val spelling = update.spellings.getOrNull(index).orEmpty()
+        if (spelling.replace(" ", "") != raw.substring(start, end)) return null
+        val exact = end == raw.length && spelling.replace('\'', ' ').trimEnd() == reading
+        return PinyinCandidateMatch(spelling, start, end, exact)
     }
 
     private inline fun <T> nativeCall(block: () -> T): T = try {

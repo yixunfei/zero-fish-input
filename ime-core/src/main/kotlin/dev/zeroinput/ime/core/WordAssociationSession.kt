@@ -10,7 +10,7 @@ import java.nio.CharBuffer
 /** One editor's successful commits. Only the bounded context buffer contains user text. */
 internal class WordAssociationSession(
     private val predictor: NextWordPredictor,
-    private val promotionThreshold: () -> Int = { 3 },
+    private val promotionThreshold: () -> Int = { 1 },
     /**
      * Read-only learned-frequency lookup evaluated once per commit with the
      * already normalized, at most eight suggestion texts.  The host wires the

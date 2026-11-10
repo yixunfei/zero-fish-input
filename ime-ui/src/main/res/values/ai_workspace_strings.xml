@@ -1,0 +1,12 @@
+<resources>
+    <string name="ai_tool_task">文件与工具任务</string>
+    <string name="ai_workspace_skills">选择 Skills</string>
+    <string name="ai_workspace_skill">Skill：%1$s</string>
+    <string name="ai_workspace_compact">压缩所选历史</string>
+    <string name="ai_workspace_undo">撤销压缩</string>
+    <string name="ai_workspace_summary_label">对话摘要</string>
+    <string name="ai_workspace_context">角色与记忆</string>
+    <string name="ai_workspace_memory">已选记忆 %1$d</string>
+    <string name="ai_workspace_default">无角色</string>
+    <string name="ai_workspace_summary">%1$s · 记忆：%2$d · Skills：%5$d · 上下文 %3$d/%4$d 字符</string>
+</resources>

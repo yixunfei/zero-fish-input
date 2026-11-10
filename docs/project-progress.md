@@ -2,6 +2,639 @@
 
 Date: 2026-09-06
 
+## v0.7.2 test prerelease (2026-11-10)
+
+The release includes the current workspace snapshot, including the input
+fixes, dictionary management, optional AI extensions and packaging changes.
+The same Debug-signed universal APK passed installation over v0.7.1 and 56
+emulator cases. See the [release notes](releases/v0.7.2.md) and
+[validation record](releases/v0.7.2-validation.md).
+
+## Mixed pinyin and symbol keyboard (2026-11-10)
+
+The first candidate page for `nmeng` includes both “柠檬” and “你们”.
+The literal mixed spelling stays first. The engine preserves the typed code
+for raw commit and uses the canonical reading for learning a recovered phrase.
+The memory fallback covers both phrases during native preparation.
+
+The symbol keyboard opens to 27 common symbols. Both paging directions are
+available through buttons and swipes, and `123` goes directly to the numeric
+keyboard. The existing default-on pairing setting controls insertion of the
+closing symbol. Caret placement uses the current editor connection and its
+tracked commit range.
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest `
+  :ai-api:test :engine-api:test :engine-english:test :engine-dictionary:test `
+  privacyCheck :app:lintDebug -PrequireRime=true --no-parallel --max-workers=2
+```
+
+The Gradle build, privacy checks and Debug Lint passed. 1,030 JVM tests passed,
+and two live-provider tests were skipped for lack of explicit temporary
+credentials. All three Debug APKs
+passed package, signature, native ABI and resource checks.
+On the isolated API 37 x86_64 emulator, 58 input and UI tests and five native
+readiness and recovery tests passed with both installed APK hashes verified.
+The 240dp light, 320dp dark and 720dp landscape symbol panels were inspected.
+Physical ARM acceptance remains pending.
+
+## Full-pinyin matching and personal ranking (2026-11-09)
+
+Full-pinyin candidate ordering now favors exact readings in the initial native
+window. Short unseparated inputs can surface a validated alternate split when
+the dictionary yields a synthesized sentence, a partial result or a fuzzy match.
+The public `kanga` fixture covers both `kang a` and `kan ga`. The `ng` fixture
+covers the collision between a literal syllable and initials. The composition
+editor shows the selected reading's boundaries and maps edits to raw offsets.
+The memory fallback covers common abbreviated phrases during native preparation.
+
+The personal promotion threshold defaults to 1 and uses any explicitly saved
+value. Space follows the visible Chinese candidate after a promotion. Learning
+from Space still follows the separate opt-in. Personal pages append without
+shifting earlier results, and previously selected segments retain their native
+routes with dictionary suppression applied.
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest `
+  :ai-api:test :engine-api:test :engine-english:test :engine-dictionary:test `
+  privacyCheck :app:lintDebug -PrequireRime=true --no-parallel
+```
+
+The build completed with 1,028 JVM tests passed and two credential-dependent
+skips. Privacy checks and Debug Lint passed. All three Debug APKs under
+`app/build/outputs/apk/debug/` passed package, signature, native Rime and
+resource checks. On the isolated API 37 x86_64 emulator, 58 input and UI cases
+passed with both installed APK hashes verified against the current outputs.
+Five native fault and retry cases passed, including a missing dictionary with
+fallback conversion. Eight rotated pinyin and window-theme cases passed.
+The 320dp portrait light and dark composition previews were visually checked.
+The separate landscape palette screenshot run stopped at the idle toolbar's
+pixel color assertion. Physical ARM acceptance remains pending.
+
+## ARM64 test package (2026-11-06)
+
+Built the current workspace as a full ARM64 Debug test package using
+`./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 95000000`.
+The resulting `app/build/outputs/test-apk/20261106-093552/zero-fish-input-0.7.1-debug-arm64-v8a.apk`
+is 91,622,157 bytes; SHA-256
+`18bbec4ad14da0474d1fc73fe9225ed428403afe0d8a10aab89dcf2b4af3c44d`.
+The selected delivery limit is 95,000,000 bytes, while the separate 80,000,000-byte
+target remains unmet. The size report, provenance, notices, corresponding
+handwriting sources and checksums are beside the APK.
+
+The packaging flow completed the Gradle tests, `privacyCheck`, Debug Lint and
+the real-Rime ARM64 build. The current JVM result files contain 1,963 cases
+across Debug and Release variants: 1,959 passed and four live-provider cases
+were skipped for lack of explicit temporary credentials. The APK signature,
+package identity, ABI, bundled resources and delivery checksums were verified.
+No physical ARM device installation or runtime acceptance was performed.
+The earlier management-validation x86_64 APK was preserved at
+`.tmp-evidence/management-final-x86_64-before-arm64-20261106/` before the
+script reset the reproducible Debug packaging output. Next: install and test
+the new package on an ARM64 device when available.
+
+## Management pages and offline association quality (2026-11-05, locally verified)
+
+The owner confirmed four management surfaces: personal phrases, public/local
+dictionaries, custom kaomoji and private clipboard. Implemented localized
+loading/empty/failure feedback and explicit list reload, shared bounded worker
+delivery with generation revocation, scrollable controls, adaptive row heights,
+two-line dictionary entries and localized dictionary sources/weight labels.
+Clipboard timestamps follow the page locale instead of the system language.
+Dictionary controls scroll with the list; expression feedback uses a RecyclerView
+header so large failure messages cannot hide reload actions in short windows.
+Reload never replays a mutation/import/download; private clipboard reload needs
+fresh authentication and clears old metadata after failure. Personal phrase
+pages clear stopped rows/search/forms and reject retired row clicks.
+
+Fixed expression rows disappearing when an unchanged refreshed snapshot was
+scrubbed without rebinding. The original adapter fails the new regression; the
+updated adapter passes. Added worker rejection, late delivery, cancellation,
+interrupted worker, localized feedback and stale row tests. A small-screen
+platform check caught overflowing dictionary button text; entries now use
+plain, multiline list rows. Negative reset/save rejection remains enforced.
+
+The public association corpus grows from 1,728 to 2,002 pairs, with 843 keys.
+A separately frozen, project-authored 100-case bilingual scene suite measured
+before curation improves positive Top-1 from 19/80 to 78/80 and Top-3 from 25/80
+to 80/80; all 20 abstention cases stay empty. The original 156-case suite keeps
+its accepted results, and eight explicit continuation chains have regressions.
+These visible synthetic labels are development acceptance, not independent
+natural-input accuracy. Details and pinned reports: [quality evaluation](word-association-quality.md).
+
+Verification: the broad JVM selection covers 1,024 cases (1,022 passed, two
+credential-dependent skips, zero failures/errors), excluding historical Release
+unit XML reports. After final dictionary navigation/revocation review, all 13
+focused management cases passed again. privacyCheck includes Debug/Release
+merged manifests; Lint reports no issues. Real-Rime x86_64 Debug main/test APKs
+build successfully. Commands from the root:
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest `
+  :ai-api:test :engine-api:test :engine-english:test :engine-dictionary:test `
+  :engine-dictionary:evaluateWordAssociations :engine-dictionary:evaluateAssociationScenarios `
+  privacyCheck :app:lintDebug "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+./tools/test-input-experience.ps1 -Serial emulator-5556 -TestClass 'dev.zeroinput.ime.ModelSessionPrivacyTest,dev.zeroinput.ime.ManagementFeedbackPlatformTest,dev.zeroinput.ime.PersonalSuggestionManagerTest,dev.zeroinput.ime.DictionaryManagementUiTest,dev.zeroinput.ime.DictionaryEntryInteractionTest,dev.zeroinput.ime.DictionaryManagementPlatformTest,dev.zeroinput.ime.ExpressionManagerTest,dev.zeroinput.ime.SecureClipboardManagerPrivacyTest,dev.zeroinput.ime.WordAssociationIntegrationTest'
+```
+
+The final-source selection passed all 28 platform cases on isolated API 37
+emulator-5556, including Chinese/English light/dark layouts, 200% font public
+row fixtures, portrait/landscape editor layouts, stopped phrase draft scrubbing,
+actual dictionary/expression reload controls in 320 x 600 and 800 x 320 viewports
+with doubled text sizes,
+rejected list reads, fresh authentication broker requests on clipboard retry,
+dictionary edit/reset rejection and actual IME association chains. The final
+public fixture images were inspected. An earlier combined run timed out waiting
+for the existing model fixture's ranking; its production request deadline is
+80 ms. Isolated model checks and two later complete selections passed without
+changing that deadline or weakening assertions. The timeout is retained as
+diagnostic evidence, not accepted success or a resolved latency guarantee.
+The landscape editor fixture also exposed a missing wait for Android's rotation
+configuration. It now waits at most five seconds for the actual landscape state
+and keeps the original layout assertions; the final selection passes.
+
+Final APK: `app/build/intermediates/apk/debug/app-x86_64-debug.apk`, 93,500,960
+bytes; SHA-256 `0d5832d45a688df9560b8d8c69492bb3984f7809bc2775e04450b9634adf5430`.
+The installed APK hash was checked, the bundled corpus matches source bytes and
+association test fixtures/reports are absent. Evidence: `.tmp-evidence/management-final-source-checks.log`,
+`management-final-app-checks.log`, `management-revocation-final-checks.log`,
+`management-scroll-final-checks.log`, `management-scroll-final-lint.log`,
+`management-scroll-platform-final.log`, `management-apk-audit.json` and
+`management-accepted-*.png` in the same folder. The original-adapter failure is
+`management-expression-before.log`; the frozen scene measurements are
+`association-scenarios-before.log` and the checked-in baseline report.
+
+The task-owned read-only emulator was stopped; emulator-5554 was not operated.
+Physical ARM/OEM/API 26 and real biometric/credential acceptance remain unverified.
+No Release build or new ARM64 delivery was produced here; this is an x86_64
+Debug testing artifact. Existing user changes are preserved and no commit was
+created. No persistent format, network path, permission or runtime dependency
+is changed. Independent public-corpus evaluation remains future work.
+
+## APK size optimization (2026-11-05, lossless changes verified; target gap remains)
+
+The owner approved the [APK size work plan](apk-size-optimization.md): prioritize
+the full ARM64 package at <=80,000,000 physical bytes while preserving all sixteen
+Wanxiang tables, complete Emoji, bundled Mini and accepted prebuilt startup
+acceleration. Measure Debug/unsigned Release/universal separately and add a
+repeatable delivery budget gate. Existing uncommitted work is preserved.
+
+Delivered baseline: ARM64 Debug 113,717,612 bytes (20261102-131603); earlier
+universal Debug 168,017,805 bytes (20261031-100310). Extracted-copy experiments
+identified about 22.4 MB / 66.4 MB of avoidable native symbols respectively;
+these are estimates, not new accepted APKs. First Release attempt found an old
+broken `.cxx/RelWithDebInfo` junction to absent D:/ZeroInputReleaseNativeCache.
+It was renamed in place, preserving the junction and other native caches.
+
+Implemented app NDK alignment, native symbol stripping, narrow generated Debug
+ZIP-state reset, physical-size/ELF/component reports and the default 80 MB gate.
+Reset rejects links and preserves native caches and historical deliveries.
+Final-ZIP verification additionally binds prebuilt startup assets and optional
+model hashes; checks remain active with Python optimization. Custom delivery
+limits keep the separate fixed target and `targetMet` status.
+
+Full ARM64 Debug is now 91,601,352 bytes, down 22,116,260 bytes (19.45%) from
+the last delivered build. The smallest verified full ARM64 Release is
+83,248,958 bytes (79.392 MiB), still **3,248,958 bytes above** the strict target.
+ARMv7/x86_64/universal unsigned Release measure 82,587,674 / 83,465,578 /
+92,487,766 bytes. All full resources and prebuilt startup acceleration remain.
+No 80 MB achievement is claimed. Bounded stronger XZ experiments were not useful;
+the extra Debug R8 experiment broke test-runner loading and was reverted.
+
+Verification: 1,934 JVM cases (1,930 passed, four live-provider skips), 13 Python
+gate/integrity cases, PowerShell locator/reset/link regressions, privacyCheck
+(Debug/Release merged manifests), Lint, three-ABI native and Release builds.
+Fifteen final-source platform tests passed on isolated API 37 emulator-5556:
+cold/reuse/corruption deployment, native pinyin, Mini ranking and editor input.
+Cold deployment was 6,751-7,363 ms, reuse 730-778 ms. The task-owned emulator
+was stopped; the owner's emulator was not operated. Each final APK retains all
+3,972 reviewed Emoji image hashes; Release is non-debuggable. Full Pillow image
+decoding was not repeated because the host Python lacks PIL; this iteration did
+not change artwork. Physical ARM/OEM acceptance and production signing remain
+unavailable; Release APKs are unsigned.
+
+Commands: `python -m unittest discover -s tools/resources -p 'test_*.py'`,
+`./tools/test-test-apk-artifact.ps1`, native Release builds with `-PrequireRime=true`,
+and `./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 95000000` (runs full
+`test`, privacy and Lint gates). The 95 MB limit was explicit only to produce the
+still-over-target test artifact; its report/provenance records `targetMet=false`.
+Default 80 MB rejection was verified separately, including with Python `-O`.
+
+Delivery: `app/build/outputs/test-apk/20261105-191408/zero-fish-input-0.7.1-debug-arm64-v8a.apk`;
+SHA-256 `008c57dc4906937a44be85712ccb52d706ba2d191635c2a669a44b7759289f43`.
+Notices, corresponding sources, APK-SIZE.json and provenance are beside it.
+Unsigned Release copies/reports/checksums: `build/apk-size-analysis/release-full/`.
+Evidence: `.tmp-evidence/apk-size-*`, including `apk-size-arm64-delivery.log` and
+`apk-size-final-platform.log`; detailed measurements and next options are in
+[the work plan](apk-size-optimization.md). Next: owner-managed ARM/OEM validation;
+further size work must demonstrate useful lossless savings or separately confirm
+a resource-delivery tradeoff. No personal data or resource contract was changed.
+
+## Keyboard continuity audit (2026-11-05)
+
+Scope: current input-page ownership, editor restart lifecycle, numeric/symbol
+navigation, existing keyboard integration tests, and repository-wide JVM/privacy/
+Lint checks. This is a bounded audit, not proof that every project defect is absent.
+Existing uncommitted AI expansion work is preserved.
+
+Fixed two confirmed page-reset paths: letter-layout changes during engine state
+refresh previously forced the letters page; Android input restarts unconditionally
+reset the manual numeric/symbol page. Layout refresh now retains the chosen page.
+Restarts retain it only for an existing same-application session, ordinary keyboard
+mode and unchanged editor options. New sessions/options reset normally. Every
+restart still retires the old controller, connection, authorization and pending
+work. Numeric deletion, space, Enter, symbol pagination and explicit return have
+regression coverage. A pre-fix regression failed when a layout refresh removed
+the numeric keys; all three new JVM regressions pass after the fix.
+
+Verification commands (from the repository root):
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest :ai-api:test :engine-api:test :engine-english:test :engine-dictionary:test privacyCheck :app:lintDebug "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --console=plain
+```
+
+JVM report inventory: 1,008 cases, 1,006 passed, two live-provider skips, zero
+failures/errors (Debug Android-module suites plus the four platform-free suites;
+unchanged tasks may be UP-TO-DATE). Privacy checks include merged Debug/Release
+manifests. Lint reports no issues. Evidence is under `.tmp-evidence/keyboard-audit-*`;
+the pre-fix failure is `keyboard-continuity-before.log`. Initial platform restart
+testing raced cross-process connection replacement; a bounded wait was added to
+the fixture test, and the editor integration class then passed all four cases.
+The complete keyboard platform selection passed 45 tests on the isolated
+read-only emulator-5556 (API 37): editor/toolbar/panel/navigation/interaction/
+experience/nine-key/window/appearance/material classes. Evidence:
+`keyboard-audit-platform-final.log`. Rotation and floating-window checks passed;
+public light/dark screenshots (`keyboard-audit-light.png`, `keyboard-audit-dark.png`)
+were visually inspected. The user's emulator-5554 was not changed.
+Final-source checks passed (`keyboard-audit-final-checks.log`), and the rebuilt
+APK passed all four editor integration cases again (`keyboard-audit-final-editor.log`).
+The task-owned emulator-5556 was stopped after verification. No Release build,
+physical-device acceptance or new ARM64 package was produced in this iteration.
+
+Remaining work, prioritized:
+
+1. Repeat continuous numeric/symbol input on physical ARM64/OEM devices and real
+   target apps, including host-triggered restart, focus changes, theme/rotation
+   and rapid typing. Measure key latency and native memory on hardware.
+2. Complete real biometric/device-credential and delayed-callback acceptance;
+   finish the clipboard P1 source/baseline matrix before separately authorized
+   P2/P3 production work. No production system-clipboard body import is added.
+3. Validate live model/MCP/Brave interoperability, native assistant integration
+   and background service behavior with real credentials and OEM devices.
+4. Management localization and worker-failure feedback are now covered above;
+   continue independent public-corpus and physical-device association evaluation.
+5. Before release: rerun all required ABI/native and Release gates, document
+   external document-provider overwrite behavior, and arrange owner-managed
+   production signing. This iteration builds an x86_64 Debug APK only.
+
+Public-API virtual-screen support remains a private public-sample preview;
+third-party background observation/control is an explicitly unsupported boundary,
+not a feature to enable by weakening security checks.
+
+## Assistant capability expansion (2026-11-02, accepted; E1-E7 locally verified)
+
+The owner requested background virtual screens, tools, MCP, Skills, role/memory
+management, context compaction, run notifications, web/file tools, native digital
+assistant integration and page improvements. Reviewed current sources, module
+configuration, existing boundaries and Eta's pinned virtual-display implementation.
+Its trusted-display backend depends on root/LSPosed; ordinary display creation
+does not establish third-party background automation support.
+
+A concrete seven-stage proposal, bounded data/network/permission contracts,
+page flows, acceptance criteria and official reference links are in the opening
+section of [the existing AI device-agent plan](ai-device-agent-plan.md).
+The owner confirmed the recommended phased implementation and public-Android-API
+virtual-display route. No privileged-backend investigation is authorized.
+
+Proposed default: public-API production path, separate encrypted opt-in context
+stores without existing-format migration, declarative Skills, selected-URI files,
+explicit public-HTTPS MCP/search, generic run notifications and optional native
+assistant entry. Any privileged virtual-display investigation remains a separate
+choice and cannot imply authorization to root a device or ship privileged code.
+
+E1 implementation now includes platform-free role/memory/projection contracts,
+strict atomic encrypted context storage with an independent key, revision/data
+generation checks, private management/review UI, explicit per-chat selection and
+structured user-context encoding for the existing protocols. AI clear includes
+the new store/key. ADR 0030 records the exact boundary; existing persisted formats
+are unchanged. E1 full JVM verification passed: 1,842 cases, 1,838 passed,
+4 credential-dependent skips, no failures/errors. privacyCheck, Lint and x86_64
+Debug/main test APK builds passed with requireRime=true. The isolated API 37 AVD
+passed all 41 non-live AI platform cases; after final preview/localization fixes,
+the 6 affected context/activity/layout/IME cases passed again. Public fixture
+layout screenshots were inspected. Evidence: `.tmp-evidence/ai-expansion-e1-complete.log`,
+`ai-expansion-e1-platform.log`, `ai-expansion-e1-final-platform.log` and
+`ai-expansion-e1-visuals.log` in the same directory. Stale migrated DEX transforms
+for ai-api/user-data were moved to scoped evidence backups; native caches and
+the user's emulator were preserved.
+
+E2 now implements a separately encrypted declarative Skill library, secure
+management/import/selection, bounded UTF-8 SAF reads and tool-prerequisite
+rejection in ordinary chat. Compaction has source preview, explicit generation,
+summary review/apply and transient undo without rewriting original messages.
+ADR 0031 records imports, storage, lifecycle and summary boundaries. Final E2
+verification passed: 1,870 JVM cases, 1,866 passed and 4 credential-dependent
+skips; privacyCheck, Lint and x86_64 Debug/main test APK builds passed with
+requireRime=true. The isolated API 37 AVD passed all 44 non-live AI platform
+cases, including bounded Skill reading, independent Keystore storage, private
+manager entry, layouts and actual IME insets. Evidence:
+`.tmp-evidence/ai-expansion-e2-accepted.log` and `ai-expansion-e2-platform.log`.
+Review also fixed retention of a dismissed summary proposal and replaced the
+tool-list parser with strict shallow JSON reading to reject nested/lenient input.
+E3 now has an independent task page, native tool protocol encoding through the
+existing provider, a bounded approval/cancellation loop, selected-URI read/search
+and reviewed Save As. ADR 0032 records this boundary. E3 verification passed:
+1,896 JVM cases, 1,892 passed and 4 credential-dependent skips; privacyCheck,
+Lint and x86_64 main/test APK builds passed with requireRime=true. All 48 non-live
+AI platform cases passed on the isolated API 37 AVD. Public light-landscape and
+dark-portrait fixtures at 200% font scale were visually checked. Evidence:
+`.tmp-evidence/ai-expansion-e3-accepted.log`, `ai-expansion-e3-platform-build.log`
+and `ai-expansion-e3-platform-accepted.log`. An initial platform assertion ran
+before Activity destruction; it now waits for the actual lifecycle callback.
+The final run verifies draft clearing after destruction.
+
+E4 implements independently encrypted MCP/Brave connections, explicit metadata
+discovery/review, bounded JSON/SSE, public-only socket DNS, per-call catalog
+revalidation, text resource/prompt tools and cited search snippets. The exact
+new transport and dependency review are recorded in ADR 0033. No redirects,
+cookies, proxies, background discovery or automatic retries are enabled; the
+network interceptor also rejects response-driven follow-ups such as 503 retries.
+Final checks passed: 1,914 JVM cases, 1,910 passed and 4 credential-dependent
+skips; privacyCheck, Lint and requireRime x86_64 main/test APK builds passed.
+All 51 non-live AI platform cases passed, including actual Android-client mixed
+DNS rejection, independent Keystore storage and cancelled manager reads.
+Evidence: `.tmp-evidence/ai-expansion-e4-accepted.log` and
+`ai-expansion-e4-platform.log`. Initial Lint findings were fixed in source and
+resources, without suppressions. Live MCP/Brave/provider credentials were not
+available, so real-service interoperability remains unverified.
+
+E5 adds an app-owned transient task runtime, nonce-bound generic notifications,
+optional 120-second non-GUI background work, foreground-only approvals and a
+system-bound private text assistant. Debug unit tests, privacyCheck, Lint and
+requireRime x86_64 main/test APK builds passed; all 54 non-live AI Android cases
+passed. Actual system ASSIST-key invocation on the isolated API 37 AVD opened
+the selected session with disabled context flags 3, empty assist/screenshot
+queues and FLAG_SECURE. The original assistant role was restored. Evidence:
+`.tmp-evidence/ai-expansion-e5-accepted.log`, `ai-expansion-e5-platform-accepted.log`,
+`e5-native-invocation.txt`, `e5-native-window.txt`. Earlier test-environment
+permission and Lint findings were corrected; failed/old-APK runs are not accepted
+evidence. Native OEM behavior and actual credential-backed background work are
+not yet verified.
+
+E6 implements an explicit ordinary-API private virtual-display public sample,
+local bounded preview and release lifecycle; no third-party launch/observation/
+input path exists. E7 collapses task configuration during execution and brings
+approval controls ahead of the timeline with a separately scrollable parameter
+preview. Integrated acceptance passed: 1,928 JVM cases (1,924 passed, four
+credential-dependent skips, zero failures/errors), privacyCheck (including Debug
+and Release merged manifests), Lint and requireRime x86_64 main/test APK builds.
+All 59 non-live AI platform cases passed on the isolated API 37 AVD, including
+actual public virtual-display rendering, foreign test-Activity launch eligibility
+rejection, invalid surfaces, explicit/surface-loss release and exiting the actual
+production capability dialog. Public 640 x 360 preview and 200% font-scale theme/
+orientation layouts were inspected. Background notification revocation now
+cancels outstanding work on its next one-second check, with a regression test.
+
+Final evidence: `.tmp-evidence/ai-expansion-e7-final.log`,
+`ai-expansion-e7-platform-final.log`, `ai-expansion-e7-arm64.log`,
+`e7-virtual-public.png`, `e7-tool-dark-portrait.png` and
+`e7-tool-light-landscape.png`. Initial failed runs are retained as diagnostic
+evidence, not acceptance. The final run fixes the English quantity label and
+validates the notification monitor included in the ARM64 package.
+
+Current tested ARM64 artifact:
+`app/build/outputs/test-apk/20261102-131603/zero-fish-input-0.7.1-debug-arm64-v8a.apk`.
+SHA-256: `1dd59ce44c5979c00958ba3437939822e809ea251ae0665290145c48d3ba2d5a`.
+The standard packaging script passed signature, permission, ABI, dictionary and
+requireRime checks; notices, corresponding handwriting sources and checksums are
+beside the APK. This is a Debug test build, not a signed production release.
+The 20261101 artifact below is retained as historical evidence and predates this
+expansion. Existing uncommitted user work was preserved; no commit was created.
+The task-owned emulator-5582 was stopped after acceptance; emulator-5554 was
+left untouched. The original system assistant selection had been restored.
+
+Remaining external validation: real model/MCP/Brave credentials, physical ARM64
+and OEM assistant/background-service behavior. Third-party background virtual
+screen observation/control is unavailable by design on this public-API route;
+the delivered preview does not establish that capability. Next work requires
+real-service/device evidence, not relaxing the existing gates.
+
+## Expanded AI platform acceptance (2026-11-01)
+
+Continued the accepted AI interaction work by closing local acceptance gaps,
+without expanding permissions, tools or network paths. Added
+`AiAssistantImeInsetsTest`: it opens the real standalone Activity, enters only a
+fixed public draft, requests the configured soft keyboard, requires actual IME
+visibility, and verifies that the full draft and Send control remain above its
+reported insets. It does not call a provider or capture the private window.
+
+The isolated read-only API 37 AVD passed all 39 non-live AI instrumentation cases
+in one run. This extends the earlier 21-case selection with Android protocol/SSE,
+attachment/content-import, page-reference and Stage 6 tests. The new actual-IME
+case passed with Gboard; a separate repeat also passed with ZeroInput selected
+(`OK (1 test)`). Thus there were 40 passing executions, covering 39 distinct tests.
+The fixture temporarily allowed the software keyboard with an attached hardware
+keyboard and restored the original setting and input method afterwards.
+
+Stage 6 coverage includes cancellation propagation for synthetic SMS/call-log/
+contact/calendar providers, no retry/fallback insert after an in-flight write is
+cancelled, full-name replacement against the Android contacts provider, and
+rejection of aggregated-contact update/delete. Contact cases create and clean up
+only their own generated local records. This does not establish real SMS/call,
+notification, calendar, camera/microphone or OEM permission/hardware acceptance.
+
+`assembleDebug`, `assembleDebugAndroidTest` and `lintDebug` with x86_64 and
+`-PrequireRime=true` passed (exit 0). No production code changed in this follow-up;
+the previously verified ARM64 Debug artifact at `20261101-113722` remains current.
+No new ARM64 packaging, full JVM rerun or Release assembly was needed for this
+test/documentation-only change. No real-provider call was made: the explicitly
+opt-in live class was excluded because temporary test credentials were not supplied.
+
+Evidence: `.tmp-evidence/ai-acceptance-build.log`,
+`.tmp-evidence/ai-acceptance-platform.log`,
+`.tmp-evidence/ai-acceptance-own-ime.log` and the exact class list in
+`.tmp-evidence/ai-acceptance-classes.txt`. Build command from the repository root:
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+```
+
+For platform reproduction install the matching main/test APKs with `adb install
+-r -t` on the isolated AVD, run the recorded class list with `am instrument -w -r
+-e class`, and require `OK (39 tests)`. For the second keyboard repeat select the
+already enabled `dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService`, run
+only `dev.zeroinput.ime.ai.AiAssistantImeInsetsTest`, then restore the original
+input method. Set `show_ime_with_hard_keyboard` to 1 only for this isolated fixture
+and restore its original value. The read-only AVD was shut down after verification.
+
+Next: connect an ARM64 physical device for OEM/layout/permission/hardware acceptance
+and provide explicit temporary provider test configuration for live transport.
+Only an emulator was connected this round. Those external acceptance items remain
+open; additional capability expansion still needs its separate scope decision.
+
+## AI interaction follow-up delivery (2026-11-01)
+
+The owner requested further Eta-inspired AI/device-agent interaction and
+capability improvements. Reviewed current uncommitted standalone-entry work,
+runtime/panel/settings sources, relevant architecture/threat boundaries and Eta
+baseline `e90922a4490389f524a10c6acebbcca336883935` runtime/tools designs.
+The concrete proposal and acceptance matrix are in the opening section of
+[the existing device-agent plan](ai-device-agent-plan.md).
+
+The owner confirmed all three stages on 2026-11-01. Implementation now includes
+fixed chat/task controls, bounded ordinary-chat queue/edit/interrupt, persistence
+settlement before queued continuation, local app search, capability overview,
+draft-only examples and structured task outcomes. Existing uncommitted changes
+remain. No new network path, permission, dependency or persisted format is added.
+
+Local implementation and acceptance are complete. The controlled old cancellation
+behavior reproduces the new regression failure (one test, one expected assertion
+failure); final source is restored. Failure/expiry/cancellation now have distinct
+labels, terminal replay is deduplicated, and completed-task reattachment carries
+only generic outcome metadata. Narrow screens at large font sizes stack navigation
+controls; chat and device actions stay reachable with reduced viewport height.
+
+Final checks: 1,814 JVM test executions, 1,810 passing and four credential-dependent
+live skips, zero failures/errors. The ARM64 package script ran with checks enabled
+and passed JVM tests, privacyCheck, Debug/Release merged manifests, Lint, requireRime
+assembly and APK signature/ABI/permission validation. Negative scanner self-tests
+also passed in the full x86_64 verification. Earlier Lint runs caught obsolete
+resources and KTX issues; these were fixed without relaxing checks.
+
+All 21 selected API 37 x86_64 instrumentation cases passed, including the new
+queue/interrupt presentation, local app search, no-grant capability overview,
+fixed device controls, 2x-font portrait/landscape chat layouts in both themes,
+entry/recreation and existing AI/storage/page/accessibility regressions. Eleven
+fixed-public-sample renders were exported and visually checked. These are public
+View fixtures, not live private screen captures. Real IME/OEM inset behavior still
+needs physical-device acceptance; the reduced-height fixture is not a claim that
+all OEM keyboards were exercised.
+
+Evidence: `.tmp-evidence/ai-interaction-cancel-before.log`,
+`.tmp-evidence/ai-interaction-verified-checks.log`,
+`.tmp-evidence/ai-interaction-final-layout-build.log`,
+`.tmp-evidence/ai-interaction-verified-platform.log`,
+`.tmp-evidence/ai-interaction-arm64-package.log` and `interaction-*.png` renders.
+The final outcome-dedup/navigation edits passed targeted x86_64 tests/build,
+the final 21-case platform run and the full ARM64 package checks.
+
+Artifact:
+`app/build/outputs/test-apk/20261101-113722/zero-fish-input-0.7.1-debug-arm64-v8a.apk`
+(112876302 bytes). SHA-256:
+`8c425b7b66ba959c086699a18c7f40aaa29aacc2c7f26e693b47d916838c5976`.
+Independently matched the APK to BUILD-PROVENANCE.json and SHA256SUMS.txt.
+The same directory includes license notices and handwriting corresponding sources.
+This is a Debug test package. No Release APK assembly, release signing, publication
+or Git commit was performed. Existing native-library stripping warnings remain.
+
+Verification commands (from repository root):
+
+```powershell
+./gradlew.bat test testPrivacyBoundary privacyCheck :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+./tools/package-test-apk.ps1 -Abi arm64-v8a
+$interactionClasses = @(
+    'dev.zeroinput.ime.ai.AiAssistantActivityTest',
+    'dev.zeroinput.ime.ai.AiAssistantLayoutTest',
+    'dev.zeroinput.ime.ai.AiInteractionPanelTest',
+    'dev.zeroinput.ime.ai.device.AiDeviceAgentActivityLifecycleTest',
+    'dev.zeroinput.ime.ai.AiWorkbenchFlowTest',
+    'dev.zeroinput.ime.ai.AiStorageFailurePanelTest',
+    'dev.zeroinput.ime.ai.page.PageReferenceBindingTest',
+    'dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityPlatformTest'
+) -join ','
+adb -s emulator-5582 shell am instrument -w -r -e assistantVisuals true -e class $interactionClasses dev.zeroinput.ime.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Install the matching x86_64 main/test APKs with `adb install -r -t` on an isolated
+AVD before instrumentation; require `OK (21 tests)`. The read-only verification
+AVD is shut down after the run. Next: manual ARM64/OEM use, a real configured
+provider, and Stage 6 hardware/category acceptance. Those remain unverified.
+Additional network/privileged tool extensions require their own boundary decision.
+
+## Standalone AI workbench and device-agent entry (2026-11-01)
+
+Goal: improve the existing AI workflow using Eta as a design reference and
+provide an independent entry. The owner confirmed one APK with a separate
+desktop AI entry, rather than another application ID. [ADR 0029](adr/0029-standalone-ai-entry.md)
+records that decision and the content-free exported launcher boundary.
+
+Implemented `zero fish AI`, a private full-screen chat with existing model,
+reasoning/action/translation selection, reviewed context and optional encrypted
+conversation controls. Settings and the keyboard AI More menu can open it.
+The host uses an explicit standalone request policy and a separate request
+coordinator; it has no editor, insertion or clipboard read port. Existing
+privacy/network gates remain; leaving clears transient state without replay.
+
+Device tasks now offer a bounded local launcher-app selector, readiness hints,
+and Stop for both pending launches and process-owned tasks. The ten-second
+single-use launch guard binds elapsed realtime, configuration, policy and data
+generation. Settings/configuration changes and return/destruction revoke pending
+starts. Attachment metadata work no longer captures the Activity on its worker.
+No provider/storage format, permission, Stage 6 consent or input-engine change
+is introduced. Local launcher visibility adds no application-list upload.
+
+The original handle-dependent Stop predicate was restored in a controlled build:
+the new platform regression failed with the expected disabled-Stop assertion.
+The repaired final source passes all 19 selected API 37 x86_64 platform cases,
+including the new entry/recreation, Stop and layout checks plus existing AI,
+storage-error, page-reference and device-accessibility regressions. Fixed public
+layout samples cover 360x720 portrait and 600x320 landscape at 2x font, both
+themes; top/composer renders were inspected. These are detached public Views,
+not captures of live private content. An initial optional image-export test
+failed on the test-package cache path; the repaired test uses a dedicated target
+test cache and writes images off the main thread.
+
+Evidence: `.tmp-evidence/ai-assistant-stop-before.log`,
+`.tmp-evidence/ai-assistant-entry-before.log`,
+`.tmp-evidence/ai-assistant-final-platform.log`, the `assistant-*.png` public
+renders and `.tmp-evidence/ai-assistant-verified-checks.log`. The initial full
+JVM/privacy/negative-scanner/Lint/x86_64 Debug main/test build passed. Final
+`./tools/package-test-apk.ps1 -Abi arm64-v8a` passed with all checks enabled
+(exit 0): 1,780 passing JVM test executions, four credential-dependent live
+skips, zero failures/errors; privacyCheck with Debug/Release merged manifests,
+negative scanner checks, Lint, requireRime assembly and APK signature/ABI/permission
+validation passed. Log: `.tmp-evidence/ai-assistant-arm64-package.log`.
+
+Artifact: `app/build/outputs/test-apk/20261101-091903/zero-fish-input-0.7.1-debug-arm64-v8a.apk`
+(112843214 bytes). SHA-256:
+`abf0cf33493422c2c6f786a92cbdc70182833636b5696b9868e85ddef0922cd5`.
+The artifact was independently matched to BUILD-PROVENANCE.json and SHA256SUMS.txt.
+The same directory contains license notices and handwriting corresponding sources.
+The existing native-library stripping warning remains; no size improvement is
+claimed. No Release APK assembly, release signing or publication was performed.
+
+Current state: implementation and the stated local checks are complete. Next:
+manual ARM64/OEM acceptance and real-provider validation; those remain unverified,
+as do the broader Stage 6 hardware/provider cases outside this 19-case selection.
+The dedicated read-only emulator was shut down after validation. AI navigation
+and AI settings bindings were separated by responsibility so their owning methods
+remain below 100 lines.
+
+The new default-launch regression also reproduced the initial equal-priority
+entry selecting the AI gateway instead of keyboard setup. The AI filter now
+uses priority -1, pinned by privacy checks; the final platform test and package
+query verify that settings at priority 0 remains the primary launch destination.
+
+Verification commands:
+
+```powershell
+./gradlew.bat test testPrivacyBoundary privacyCheck :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+./tools/package-test-apk.ps1 -Abi arm64-v8a
+$aiClasses = @(
+    'dev.zeroinput.ime.ai.AiAssistantActivityTest',
+    'dev.zeroinput.ime.ai.AiAssistantLayoutTest',
+    'dev.zeroinput.ime.ai.device.AiDeviceAgentActivityLifecycleTest',
+    'dev.zeroinput.ime.ai.AiWorkbenchFlowTest',
+    'dev.zeroinput.ime.ai.AiStorageFailurePanelTest',
+    'dev.zeroinput.ime.ai.page.PageReferenceBindingTest',
+    'dev.zeroinput.ime.ai.device.DeviceAgentAccessibilityPlatformTest'
+) -join ','
+adb -s emulator-5582 shell am instrument -w -r -e assistantVisuals true -e class $aiClasses dev.zeroinput.ime.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The platform invocation requires the matching x86_64 main/test APKs installed
+on the isolated AVD. Its verdict must be `OK (19 tests)`, not merely ADB exit 0.
+
 ## Dictionary update task repair (2026-11-01)
 
 The user selected preserving all sixteen tables after the upstream source split:

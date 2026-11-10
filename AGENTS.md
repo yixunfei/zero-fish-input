@@ -38,9 +38,14 @@ ZeroInput 是一个面向 Android 的开源输入法，应用 ID 为 `dev.zeroin
 
 ### 3.1 离线核心、可选 AI 联网与零追踪
 
+- E4 按已确认计划与 ADR 0033 增加独立适配器 `app/ai/AiRemoteHttpsTransport`，仅用于主动连接的公网 HTTPS MCP 和固定 Brave 搜索端点；凭据独立加密、实际连接 DNS 校验、无重定向/代理/自动重试，目录审核和逐次确认不可省略。此例外不扩展模型适配器或输入法数据访问范围。
+
+- 用户于 2026-11-02 确认 AI 扩展分阶段方案，虚拟屏仅先验证普通 Android API。E1 角色与显式记忆按 ADR 0030 实施：仅主动保存、按角色隔离和显式共享、预览勾选后随草稿发送，不自动提取或读取输入法个人数据；上下文库使用独立密钥，AI 清除涵盖该库。E2 按 ADR 0031 支持用户选定的单个有界 UTF-8 Skill 文本导入、审核保存和显式选择，不执行脚本或授予工具；独立加密库随 AI 数据清除。上下文压缩使用现有 provider，发送原文和应用摘要分别确认，保留原消息并校验代次。后续阶段按已确认计划落实对应 ADR、精确适配器和负向测试，不提前开放未实现的网络或权限路径，不授权 root、LSPosed、Shell 或特权虚拟屏后端。
+
 - 用户已明确批准 AI 工作台的可选联网例外，详见 `docs/adr/0015-ai-workbench-boundary.md`。Manifest 仅为此声明 `android.permission.INTERNET`；AI 总开关、联网开关和会话保存均默认关闭。
 - AI 联网适配器为 `app/ai/OpenAiCompatibleProvider`，只在用户主动提交时发送 AI 草稿与用户选择的会话历史；设置中的主动模型检测仅发送固定短测试文本；用户已批准的显式模型列表获取仅以当前填写的凭据请求同源 `/models`，不发送正文，不自动授予模型能力。强制 HTTPS、禁止重定向，限制请求、响应、历史与超时。不得增加未批准联网路径、WebView、遥测、广告、统计、远程配置或推送。
 - 用户于 2026-10-09 批准词库设置中的显式公开分类浏览和下载，详见 `docs/adr/0020-public-dictionaries.md`。独立适配器仅为 `app/dictionaries/DictionaryDownloadTransport`，不接触输入、个人数据或 AI 凭据；每次重定向校验 HTTPS 来源白名单，限制体积、超时及格式。完整万象核心与当前简体语法模型只从审核后的固定版本与哈希进入包体；每周更新 PR 不自动合并。下载后核心使用仍完全离线。
+- 已确认扩展方案的 E3 按 ADR 0032 实施：独立前台工具任务使用现有 `OpenAiCompatibleProvider`，仅发送独立草稿、所选工作上下文和逐次批准的工具结果。`AiFileToolExecutor` 只处理本任务显式选择的临时 SAF URI，读取/搜索和新文件另存均需确认；不授予目录、持久访问或任意路径权限，不重试不确定写入。工具任务不得放宽现有设备代理的前台窗口和阶段 6 审批边界。
 - 用户于 2026-10-09 进一步批准完整包／轻量包及本仓库 GitHub Releases 的万象 LTS、Mini INT8、手写公开资源按需下载，详见 `docs/adr/0021-optional-public-resources.md`。仅接受审核清单中固定名称、版本、哈希、大小和格式的数据；保留原联网适配器与主动确认边界，不下载执行代码或 native 库。每周 PR 审核后显式发布资源，不自动合并；轻量包仍内置完整万象词表并支持离线输入。
 - 用户于 2026-10-07 批准一次性页面引用例外，详见 `docs/adr/0019-explicit-page-references.md`。独立默认关闭，仅在合格 IME 会话主动点击后由 `app/ai/page/PageReferenceService` 获取源应用当前可见、非编辑、非敏感的无障碍文字；勾选和预览后仅显式发送所选内容。禁止后台正文采集、截图、OCR、手势、自动滚动、输入框/剪贴板读取，服务只读取事件元信息以撤销旧请求。窗口绑定、超时及会话/授权/设置/锁屏失效校验不可省略。
 - 用户已确认侧载/自有分发并批准阶段 0–5 的设备代理闭环及阶段 6 的直接数据读取/操作范围，详见 `docs/adr/0025-ai-device-agent-boundary.md` 与 `docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md`。`app/ai/device/DeviceAgentAccessibilityService` 是独立的操作型无障碍服务，默认关闭；必须经过独立声明、目标包绑定、能力范围和审批策略后才可启动任务。阶段 0–5 只允许固定的等待、导航、滚动、点击、长按、滑动、非敏感文本输入、输入框动作和指定目标应用打开动作；完整支持范围不等于 root、ADB、Shell、Shizuku 或系统安全绕过。阶段 6通知、用户选定文件/媒体、白名单系统设置、单次相机/麦克风、单个短信/电话、联系人和日历能力均默认关闭，按类别单独披露和授权；每个读取、采集或写入操作都需逐次确认，通知触发的后续操作也不例外。通知只读取用户指定包的最多 5 条活动通知；文件/媒体只访问本任务用户选择的 URI；通信、联系人和日历仅操作固定的单条目标。模型只能收到独立设备草稿、当前前台窗口的有界节点快照、显式审批的阶段 6结果和脱敏动作结果，不得读取外部编辑器、系统或私有剪贴板、个人词库或 emoji 历史。读取/采集内容仅在逐次批准后发送给当前 AI provider；代理历史默认不保存。截图开关默认关闭，独立任务每次需再次明确同意；获准时只捕获当前任务的一帧，不落盘，并随快照/任务失效清零。服务断开、锁屏、前台包/窗口变化、设置变化、取消或超时必须提升代次并撤销动作。
@@ -153,9 +158,13 @@ language-pack -> security
 
 ## 7. Android 组件与界面规范
 
+- E5 按已确认计划与 ADR 0034 支持独立默认关闭的 AI 通用状态通知和单次后台任务。`POST_NOTIFICATIONS` 增加此明确用途；新增 `FOREGROUND_SERVICE` 仅用于私有 `AiTaskForegroundService`，Android 14+ 为 shortService，最多 120 秒、不重启、不执行后台审批或 GUI 操作。`AiVoiceInteractionService` 与 `AiVoiceSessionService` 仅在 `BIND_VOICE_INTERACTION` 保护下导出；禁用上下文/截图采集，拒绝调用方数据、热词及隐式录音。其他原有权限和导出边界不变。
+
 - 所有新增 Activity、Service、Receiver、Provider 默认 `android:exported="false"`。
+- 用户于 2026-11-01 批准同 APK 的独立桌面 AI 入口，详见 `docs/adr/0029-standalone-ai-entry.md`。仅 `app/ai/AiAssistantLauncherActivity` 可新增导出，限 MAIN/LAUNCHER 无数据入口；不得转发 extras、URI、ClipData、授权或任务指令，不得在拉起时自动联网或启动任务。实际对话和设备面板仍不导出，沿用现有隐私及能力审批边界。
 - 已批准的系统入口为启动 Activity、受 `android.permission.BIND_INPUT_METHOD` 保护的 IME Service，以及仅接收 `ACTION_PROCESS_TEXT` / `ACTION_SEND` 纯文本的剪贴板导入 Activity。已批准的页面引用无障碍服务仅由 `android.permission.BIND_ACCESSIBILITY_SERVICE` 保护，能力限一次性文字读取；设备代理无障碍服务同样只接受系统绑定，且仅在用户主动启动的任务期间运行。其他新增导出组件必须先更新威胁模型并获得明确确认。
-- 不申请存储、位置等与离线输入无关的权限。阶段 6已明确批准的运行时权限仅可由对应类别/操作入口单独请求；通知监听、`WRITE_SETTINGS` 和无障碍服务分别使用独立系统设置授权。已批准的 `POST_NOTIFICATIONS` 仍仅用于用户主动开启的系统剪贴板变化提醒，且通知不得含正文、标签或来源。其他新增权限须说明必要性并同步更新 `privacyCheck` 白名单；白名单不得为了让构建通过而放宽。
+- 不申请存储、位置等与离线输入无关的权限。阶段 6已明确批准的运行时权限仅可由对应类别/操作入口单独请求；通知监听、`WRITE_SETTINGS` 和无障碍服务分别使用独立系统设置授权。已批准的 `POST_NOTIFICATIONS` 仅用于用户主动开启的系统剪贴板变化提醒及上述 E5 通用任务状态，通知不得含正文、标签或来源。其他新增权限须说明必要性并同步更新 `privacyCheck` 白名单；白名单不得为了让构建通过而放宽。
+- E6 按 ADR 0035 仅验证普通 API 的私有虚拟屏和固定公开自有样例预览；不镜像主屏、不采集第三方页面、不注入输入，不放宽设备代理的前台绑定。预览不保存、不联网，关闭页面、锁屏或 120 秒到期即释放。
 - 已批准的 `SYSTEM_ALERT_WINDOW` 仅用于独立、默认关闭的剪贴板通用状态悬浮提醒；首次开启和再次请求授权前必须先展示原因及限制，用户确认后才能打开系统授权页。悬浮窗不读取页面或选中文字，不抢输入焦点，不直接清理；锁屏、关闭、撤权、旧请求失效或进入本应用页面时移除。测试 APK 可包含仅用于公开固定文字跨应用验收的源 Activity，该组件不得进入 Debug/Release 主 APK。
 - 使用现有 Android Views、ViewBinding、Material 与资源体系。可见字符串放入资源，不硬编码；触控目标、无障碍描述、横竖屏、深浅主题和小屏布局均需可用。
 - 输入面板优先保证稳定尺寸与快速操作。动态内容不得导致键盘、候选条或工具按钮无意义跳动、重叠或溢出。

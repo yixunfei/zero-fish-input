@@ -1,5 +1,331 @@
 # AI 设备代理设计与实现计划
 
+## Assistant expansion (2026-11-02, accepted)
+
+Status: the owner confirmed the phased implementation and public-Android-API
+virtual-display route on 2026-11-02. E1-E7 passed local acceptance; E6 delivers
+the public own-content preview and explicit third-party limitations. Real-service
+and physical OEM validation remain separate. The owner requested
+background virtual screens, additional tools, MCP,
+Skills, role definitions and memory, context compaction, run notifications,
+web search, file tools, native assistant integration and improved pages.
+The choices below are accepted; privileged virtual-display investigation is
+excluded. New permissions/adapters must land with their corresponding ADR,
+implementation and negative checks. This confirmation resolves AGENTS.md 2.1
+for the described stages. Current delivered
+behavior and validation remain in `project-progress.md`.
+
+### Findings and platform constraints
+
+- At the start of this expansion, ordinary chat cancelled on leaving its Activity. Its queue and context
+  are memory-only; `AiContextSelection` permits selected history/references under
+  a 16,384-character/12-message budget. E1/E2 add the role, memory and compaction models described below.
+- `DeviceAgentCoordinator` already provides a bounded tool loop, approval and
+  cancellation, but its catalogs are fixed and its authority is bound to the
+  current foreground target/window. Reusing it by disabling foreground checks
+  would violate the accepted boundary. Ordinary tool chat needs an independent
+  task owner, with device operations still routed through the existing gate.
+- `AiConversationRepository` owns an encrypted, bounded conversation format.
+  New role/memory/Skill/connection stores can be separate versioned encrypted
+  files with dedicated aliases; existing conversations need no migration.
+- The current app targets API 36, minSdk 26. Native assistant integration needs
+  user selection and system-bound components. Foreground services need accurate
+  types and lifecycle handling; a notification alone does not keep a task alive.
+- Eta baseline `e90922a4490389f524a10c6acebbcca336883935` uses root or LSPosed for
+  its trusted virtual-display backend. Reviewed `VirtualDisplayController.kt`
+  and `VirtualDisplayCommandMain.kt`: the bridge uses a privileged process.
+  This is not an ordinary permission available to the current APK. Only concepts
+  are referenced; no Eta source/assets are copied.
+- Android restricts third-party launches on virtual displays. A local preview
+  of our own UI is not evidence that another app can run and be controlled there.
+  The virtual-screen stage must report launch, observation and action capability
+  separately and must never silently fall back to operating the user's main screen.
+
+### Delivery sequence and acceptance
+
+| Stage | User-visible result | Implementation and acceptance |
+| --- | --- | --- |
+| E1: workspace and context | Consistent Chat / Tasks / Tools / Context destinations; editable roles; explicit memory selection; source and budget preview | Immutable context projection in `ai-api`; private Views in `ime-ui`/`app`; separate encrypted stores in `user-data`; verify role isolation, revocation, deletion races and no request on navigation |
+| E2: Skills and compaction | Import/review/enable declarative Skills; preview selected instructions and requested tools; compact selected history with preview, apply and undo | Bounded text/manifest import; no code loader; summarize through the selected existing provider only after explicit action; stale revisions and failed summaries cannot replace context; no original-message deletion |
+| E3: tool runtime and files | Unified tool list, per-task selection, readable arguments/results, pending approvals and Stop; selected-file read/search and new-file output | Separate bounded tool-chat loop, adapter contracts and cancellation; reuse existing device gates; SAF URI grants only; preview/approve reads and output; test malformed tools, revoked URIs, uncertain writes and no automatic retry |
+| E4: MCP and web | Add/test/manage a remote MCP connection; review tools/resources/prompts; search the web and attach cited results | Dedicated HTTPS adapters and isolated credentials, explicit discovery/connect, reviewed tool allowlist, bounded JSON-RPC/SSE, source-labelled untrusted results; test injection, cross-origin auth, schema changes, network cancellation and size limits |
+| E5: notifications and native assistant | Generic Running / Needs approval / Finished notifications with Open/Stop; system assistant invocation opens a compact private surface | Independent notification opt-in; stale actions rejected; system assistant selection via platform settings/role availability; no automatic screen/audio collection; background continuation limited as below |
+| E6: virtual-screen feasibility | Explicit availability/limitations, bounded preview, stop/release and target/display selection if supported | First verify public APIs with fixed public fixtures; separately assess any privileged backend only if selected by the owner; prove main-display isolation, fresh task grants, display loss and lock cancellation before production integration |
+| E7: integrated acceptance | Consistent usable pages, localized errors and capability guidance, tested APK | JVM/negative tests, privacy scanner and merged manifests, Lint, requireRime Debug build, emulator layouts/IME/lifecycle, ARM64 packaging; separately report physical-device and real-service results |
+
+Each stage finishes its behavior, negative tests and documentation before moving
+on. No placeholder toggle is presented as an implemented capability. E6 may be
+blocked by platform privileges without blocking the verified E1-E5 features.
+
+### Proposed context, role, memory and Skill contract
+
+1. Roles have a name, description, editable instructions and an optional selected
+   tool set. Provide create/duplicate/edit/delete and a visible active-role chip.
+   A role requests tools; it never grants permissions or bypasses approvals.
+   Changing it revokes queued work and regenerates the context preview.
+2. Memory is explicit user-authored or user-approved text, scoped to a role or
+   deliberately shared. Cross-role sharing is off by default. Suggested memories
+   must be reviewed before saving; no silent mining of chats, app usage, editor,
+   clipboard, notifications or files. Each item supports inspect/edit/remove.
+   Sending selected items to the current provider is visible in the context view.
+3. Role and memory storage is opt-in through an explicit Save action, encrypted
+   in `noBackupFilesDir`. New stores use separate aliases and bounded strict
+   formats; no rewrite/migration of existing chat/configuration files. AI-data
+   clear/delete revokes reads, pending writes, summaries and queued tool tasks.
+   Start with at most 32 roles, 128 memory items of 2,048 characters, 32 Skills
+   with 16 KiB instruction files, and a 1 MiB decoded limit per new store.
+4. Skills initially consist of reviewed instructions, metadata and references
+   to already registered tools. Import a UTF-8 SKILL.md or a bounded data bundle;
+   reject executable content, traversal, symlinks, unknown files and oversized
+   input. No shell, DEX/JAR/native code, stdio subprocess, automatic install or
+   network fetch. Show unsupported Skill requirements rather than ignoring them.
+   Skill text cannot supply credentials or invent an enabled tool.
+5. Context has distinct typed sources: role, selected memory/Skills, selected
+   history, summary, files, web/MCP results and the current draft. Source text is
+   untrusted data; model output cannot elevate its priority or authority.
+   All additions count against an explicit budget. Keep the present validated
+   context ceiling initially; report characters/estimated tokens honestly.
+   Do not treat a character heuristic as the provider's exact token count.
+6. Compaction summarizes only selected, previously reviewed text via the selected
+   provider. It is a visible request with cancellation and the usual network gate.
+   Preserve recent turns, the current draft and unresolved tool-call/result pairs.
+   Bind proposals to the conversation, context revision, role, provider and data
+   generation. Apply only a still-current reviewed summary; undo is local and
+   memory-only initially. Summary failure/overflow leaves the original projection
+   usable. Do not compress away permission checks or persist ephemeral tool data.
+
+### Proposed tools, files and network contract
+
+- The runtime owns a single task and a fixed snapshot of enabled tool descriptors.
+  Each descriptor has an origin, stable ID, bounded schema, effect category and
+  executor. Start with 32 selected tools, 20 rounds, 40 calls, serial side effects
+  and five minutes while foregrounded. All adapters observe cancellation and
+  perform their final policy check immediately before dispatch. No retry of an
+  uncertain write. Stop never claims rollback of an already dispatched action.
+- Device tools retain their current approvals and foreground binding. Remote
+  tools cannot call around the device broker or inherit Stage 6 grants. The
+  coordinator validates actual arguments; read-only labels supplied by a server
+  or model are not trusted authorization facts.
+- Files use user-picked SAF documents for this task. Initially support bounded
+  UTF-8 text/Markdown/JSON/CSV reads and in-file search, plus Save As a new document.
+  Reading for the model shows the selected document and destination first.
+  Output shows destination/content before creation. A cloud document provider
+  may itself access its cloud service; choosing it is distinct from AI upload.
+  No all-files permission, recursive indexing, directory-wide persistent grant,
+  automatic overwrite/delete, arbitrary path execution or private-app storage.
+  Reuse approved attachment decoders for supported image/audio imports.
+- MCP initially supports the version-pinned 2025-11-25 Streamable HTTP subset:
+  initialize/initialized, paginated tools/list and approved tools/call; explicit
+  resources/list/read and prompts/list/get as reviewed context. Handle JSON and
+  SSE, session IDs, deadlines, cancellation and unsupported versions explicitly.
+  No server-initiated sampling, elicitation, filesystem roots, subscriptions or
+  background reconnect. Server changes invalidate tool selection and approvals.
+- Connections are user-entered public HTTPS endpoints, with a separate encrypted
+  token per endpoint. No model-provider token reuse, redirects, private/loopback/
+  link-local destination or credential forwarding. Resolve and enforce address
+  policy at connection time to address rebinding. OAuth-only servers are shown
+  as unsupported initially, rather than using an incomplete OAuth flow.
+  Discovery sends protocol metadata only; tool execution sends only displayed
+  arguments. Returned text enters model context only within the approved task.
+- Start web search with the Brave Web Search API and user-supplied API token;
+  no bundled paid account or automatic purchase. A search tool previews the
+  query, sends only that query and bounded filters, and returns up to five
+  title/URL/snippet results with visible citations. Search is not a claim that
+  full pages have been read. Results remain untrusted references. First release
+  opens source links in the external browser only after a tap; arbitrary page
+  downloading, WebView, cookies/login scraping and JS execution are excluded.
+  Other search backends can be adapted later without changing context authority.
+- Before implementation, accepted decisions must update exact adapters and
+  permissions in AGENTS.md, threat model, SECURITY and negative privacy checks.
+  Enumerating approved new adapters is not a blanket allowlist relaxation.
+
+### Proposed runtime notifications and assistant entry
+
+- AI run notifications get an independent opt-in and channel, reusing the Android
+  notification permission only with a newly disclosed AI purpose. Content is
+  generic status with no draft, answer, role/memory title, app/package or file name.
+  Open routes to the private task surface. Stop is an explicit immutable action
+  bound to the current in-memory generation. Old/replayed actions do nothing.
+- Default chat behavior still cancels when leaving. A separately selected
+  "continue this task in background" mode may finish an already-started non-GUI
+  tool/chat request using an app-owned non-sticky foreground service. Proposed
+  initial bound: 120 seconds, Android 14+ `shortService`, `FOREGROUND_SERVICE`,
+  matching cleanup on older APIs. Start only while visible; handle platform
+  timeout and denial, cancel on lock/revocation/process death, no reboot restart.
+  Do not run a queued next message after backgrounding. Require visible ongoing
+  notification availability for this product mode; otherwise explain and keep
+  foreground-only behavior. A pending approval pauses further dispatch until
+  the user returns; no approval or sensitive data entry from the notification.
+- This mode never detaches existing GUI actions from the foreground target.
+  Longer-lived/privileged virtual tasks need their own suitable service design;
+  do not misuse dataSync/remoteMessaging or repeatedly restart shortService.
+- Native assistant integration means optional selection as Android's digital
+  assistant, with a minimal system-bound `VoiceInteractionService` and session
+  service, protected by `BIND_VOICE_INTERACTION`. Use public role/settings flows
+  and show availability per OS/OEM. Invocation opens a compact private prompt;
+  it does not submit automatically or forward caller commands/extras/URI grants.
+  Disable assist-structure/screenshot acquisition, reject/discard unsolicited
+  content, no hotword listener or background microphone, no lock-screen tasks.
+  Existing explicitly approved page/audio paths remain separate user actions.
+  New exported system components need exact manifest/privacy-negative tests.
+
+### Virtual-screen decision to resolve
+
+Recommended default: keep the production APK on public Android APIs and perform
+an isolated public-fixture feasibility pass for display creation, launch eligibility,
+observation, display-targeted input and release. This can establish a limited
+own-app virtual surface and document incompatible third-party targets. It does
+not promise unattended third-party-app automation.
+
+Alternative: additionally investigate an explicitly privileged root/LSPosed or
+other system-authorized bridge as a separate experimental backend. Initial
+approval would authorize a feasibility design/prototype on a disposable emulator,
+not rooting a phone, installing hooks, shipping a privileged backend or granting
+the model arbitrary shell. Shizuku/shell availability is not assumed sufficient.
+After evidence, present exact supported operations, deployment prerequisites and
+threat/permission changes before production integration.
+
+Any eventual backend must bind target package, display ID, window, snapshot,
+task generation and fresh per-task consent; isolate approvals from display data;
+release surfaces/buffers on stop, lock, service loss or display removal; and
+explicitly refuse unsupported launches. Never capture secure windows, collect
+unrelated displays or move operations to the main display as an automatic fallback.
+
+### Interaction design and verification
+
+- Chat: compact model/role selector, one expandable context strip, scrollable
+  transcript with inline tool state, fixed composer and Send/Stop. Long prompts,
+  full tool schemas and configuration do not crowd the typing surface.
+- Tasks: current status, next required user action, bounded expandable timeline,
+  visible Stop and explicit new-run affordance. Display completed, cancelled,
+  expired, denied and uncertain-write outcomes distinctly.
+- Tools: built-in / MCP / web / files groups with Available, Disabled,
+  Needs configuration, Needs permission and Unsupported states. Configuration,
+  per-task selection and per-operation approval are distinct actions.
+- Context: Roles / Memory / Skills / Included sources; clear active scope,
+  source preview, budget, edit/delete and compaction controls. Imports show
+  a review screen, not an immediate activation. Preserve an unsent draft during
+  internal navigation only under the same active private workspace; leaving,
+  lock, data clear and process death invalidate it. No saved-instance plaintext.
+- Reuse Android Views/Material, bilingual resources and current theme. Validate
+  portrait/landscape, 360dp, 2x font, both themes, real IME insets, TalkBack labels,
+  touch targets, system role/permission return, cancellation and process death.
+  No Web design framework or new UI toolkit is needed.
+- Run targeted JVM/negative tests per stage, then the existing full checks and
+  ARM64 package command in the accepted interaction plan below. Add actual
+  platform tests for notifications, assistant entry, SAF and display isolation.
+  Use fixed public fixtures and an isolated emulator. Credential-dependent real
+  MCP/search/model and physical-device checks require supplied test endpoints/
+  credentials/devices and must be reported separately if unavailable.
+
+### Sources checked on 2026-11-02
+
+- [Eta virtual-display controller](https://github.com/Mangi-11/Eta/blob/e90922a4490389f524a10c6acebbcca336883935/app/src/main/kotlin/io/github/mangi/eta/agent/virtualdisplay/VirtualDisplayController.kt)
+- [Android display launch restrictions](https://source.android.com/docs/core/display/multi_display/activity-launch)
+- [Android foreground service types](https://developer.android.com/develop/background-work/services/fgs/service-types)
+- [Android native assistant service](https://developer.android.com/reference/android/service/voice/VoiceInteractionService)
+- [Android SAF documents](https://developer.android.com/training/data-storage/shared/documents-files)
+- [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+- [MCP tool specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+- [Brave Web Search API](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started)
+
+## Eta-inspired interaction follow-up (2026-11-01, accepted)
+
+Status: owner confirmed the three-stage scope on 2026-11-01; implementation and
+local acceptance are complete. Physical-device/provider acceptance remains as
+recorded in the progress entry. This section does not supersede accepted ADRs
+0025, 0026 or 0029. Current delivery evidence remains in `project-progress.md`.
+
+### Reference and observed gaps
+
+Reference baseline: Eta `e90922a4490389f524a10c6acebbcca336883935`.
+Reviewed its [runtime design](https://github.com/Mangi-11/Eta/blob/e90922a4490389f524a10c6acebbcca336883935/docs/AGENT_RUNTIME.md),
+`AgentRunController.kt`, `AgentToolsScreen.kt`, README and LICENSE. Borrow
+interaction concepts through original implementation. No source or assets are
+imported; the reference LICENSE identifies PolyForm Noncommercial 1.0.0.
+
+Local findings from source inspection (not new device acceptance):
+
+- `AiAssistantPanelView` puts transcript, response and composer in one ScrollView;
+  a long response increases the distance to input and send controls.
+- `AiDeviceAgentActivity` puts setup, start/stop, navigation and the timeline in
+  one scrolling column. Events become plain TextViews without structured status.
+- Its `resultLabel` maps both FAILED and EXPIRED to the stopped label. The
+  coordinator also contains internal English failure strings shown by the host.
+- `DeviceAgentSettingsActivity` already owns category switches and permissions;
+  a capability overview should project these controls, not duplicate authority.
+- The coordinator already has bounded event replay and process-owned tasks.
+  Opening ZeroInput can revoke the target-window binding. A panel redesign must
+  not promise continuous execution while the user leaves the target application.
+
+### Proposed scope and order
+
+1. **Panel and preparation.** Keep the existing APK and Android Views/Material.
+   Separate a scrollable conversation/task body from reachable input and primary
+   controls, adapting to landscape, IME and large text. Give chat/device/capability
+   navigation consistent names. Present target application label first with a
+   searchable bounded local selector and manual package entry as an advanced
+   option. Show readiness reasons and explicit routes to the relevant settings.
+   Fold attachment/screenshot options into task preparation; preserve fresh
+   screenshot consent and selected-URI lifetime. No automatic submit on navigation.
+2. **Task state and feedback.** Render state, pending approval, action and final
+   result separately, with expandable bounded details. Distinguish rejected,
+   expired, failed, cancelled and completed outcomes in both languages. Preserve
+   event order and prevent duplicate terminal rendering on replay. Show stop in
+   the task surface and keep the existing in-target overlay authoritative for
+   approvals and stop. A stopped/expired task can populate a new editable draft
+   only from still-valid local task input, followed by an explicit new start;
+   never replay an operation or restore approvals. Report uncertain dispatched
+   writes honestly without claiming rollback or retrying automatically.
+3. **Capabilities and bounded conversation interaction.** Provide a grouped
+   overview of existing GUI and Stage 6 tools with available/disabled/permission
+   required/unsupported states, sourced from the existing catalogs and policy.
+   Entry actions route to current disclosures and per-category authorization.
+   Add built-in task examples that fill editable drafts without submitting.
+   For ordinary chat only, allow up to four pending messages with a combined
+   `AiLimits.MAX_INPUT_CHARS` character budget, editable/removable before send.
+   Consume after the current response ends; explicit interrupt cancels the
+   current response and sends the selected replacement only after cancellation
+   ownership is settled. Leaving, locking, settings/model/context changes or
+   clearing data discard the queue; failure stops consumption. Device tasks
+   remain single-task with explicit stop/new start in this iteration.
+
+The implementation should keep UI projections in `ime-ui`, runtime contracts in
+`ai-api` only where needed, and lifecycle/permission adapters in `app`. Separate
+view construction from Activity launch/attachment ownership as required by the
+existing function-size limits. No new dependency, persistent format or permission
+is proposed. The owner approved the bounded ordinary-chat queue semantics.
+
+Remote MCP, imported executable Skills, browser/search transports, shell/root,
+background triggers, cross-app task orchestration and resumable device steering
+are separate design decisions. They are not implicitly authorized by this plan.
+In particular, resumable device steering requires a new snapshot/approval and
+foreground-ownership design; it cannot be implemented by retaining stale tokens.
+
+### Acceptance and delivery
+
+- Add deterministic regressions for status projection, replay, cancellation,
+  terminal/queue races, stale callbacks and configuration/data invalidation.
+- Cover local application search, capability status versus actual policy, no
+  grant on navigation, no task from a template click, and fresh task consent.
+- On an isolated emulator use fixed public fixtures to check portrait/landscape,
+  360dp width, 2x font, both themes, IME visibility, scroll position, accessibility
+  labels, reachable controls, rotation and return from system settings.
+- Run from the repository root:
+
+```powershell
+./gradlew.bat test testPrivacyBoundary privacyCheck :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+./tools/package-test-apk.ps1 -Abi arm64-v8a
+```
+
+Run the relevant AI/chat/device instrumentation classes plus new interaction
+cases on the matching installed x86_64 APKs; inspect actual test verdicts and
+public-fixture renders. Record exact tests, counts and artifacts in the existing
+progress entry. ARM64/OEM, real-provider and Stage 6 hardware checks remain
+separate acceptance items unless actually executed. Update architecture, threat
+model, SECURITY and README for the resulting behavior. Do not present the
+previous iteration's successful checks as evidence for this proposed work.
+
 日期：2026-10-21
 状态：阶段 0–6 核心实现已完成；页面引用与设备代理专项 instrumentation（7/7）、单元测试、privacyCheck、Lint、x86_64 Debug 构建及 `-PrequireRime=true` Release 构建通过。完整 Android instrumentation 392 项中 8 项失败、14 项按环境/真实服务条件跳过；5 项键盘尺寸/布局断言稳定失败，3 项整套运行时的 fixture/启动时序失败但单独重跑通过。Activity 实例重建及进程终止后从最近任务卡片恢复已在 Android 16 模拟器验证。物理设备兼容性、阶段 6 实机权限/硬件行为和真实模型服务仍待验收。
 范围：ZeroInput 内独立的 AI 设备操作模式

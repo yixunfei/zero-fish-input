@@ -51,11 +51,11 @@ class PinyinAlgebraTest {
             .withFuzzy(FuzzyPinyinPair.UAN_UANG, true)
             .withFuzzy(FuzzyPinyinPair.ON_ONG, true)
         val rules = PinyinAlgebra.rules(options)
-        assertTrue(rules.contains("derive/^r/l/"))
-        assertTrue(rules.contains("derive/^h/f/"))
-        assertTrue(rules.contains("derive/ian\u0024/iang/"))
-        assertTrue(rules.contains("derive/uan\u0024/uang/"))
-        assertTrue(rules.contains("derive/on\u0024/ong/"))
+        assertTrue(rules.contains("fuzz/^r/l/"))
+        assertTrue(rules.contains("fuzz/^h/f/"))
+        assertTrue(rules.contains("fuzz/ian\u0024/iang/"))
+        assertTrue(rules.contains("fuzz/uan\u0024/uang/"))
+        assertTrue(rules.contains("fuzz/on\u0024/ong/"))
     }
 
     @Test
@@ -66,12 +66,12 @@ class PinyinAlgebraTest {
             .withFuzzy(FuzzyPinyinPair.S_SH, true)
         val rules = PinyinAlgebra.rules(options)
 
-        assertTrue(rules.contains("derive/^zh/z/"))
-        assertTrue(rules.contains("derive/^z([^h])/zh\u00241/"))
-        assertTrue(rules.contains("derive/^ch/c/"))
-        assertTrue(rules.contains("derive/^c([^h])/ch\u00241/"))
-        assertTrue(rules.contains("derive/^sh/s/"))
-        assertTrue(rules.contains("derive/^s([^h])/sh\u00241/"))
+        assertTrue(rules.contains("fuzz/^zh/z/"))
+        assertTrue(rules.contains("fuzz/^z([^h])/zh\u00241/"))
+        assertTrue(rules.contains("fuzz/^ch/c/"))
+        assertTrue(rules.contains("fuzz/^c([^h])/ch\u00241/"))
+        assertTrue(rules.contains("fuzz/^sh/s/"))
+        assertTrue(rules.contains("fuzz/^s([^h])/sh\u00241/"))
     }
 
     @Test(expected = IllegalArgumentException::class)

@@ -10,6 +10,8 @@ import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -55,6 +57,11 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         screen = SecureClipboardManagerView(this)
+        ViewCompat.setOnApplyWindowInsetsListener(screen) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
         setContentView(screen)
         bindScreen()
         openVault()
@@ -93,6 +100,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         screen.onAddRequested = ::showAddDialog
         screen.onEnableRequested = ::enableAndOpen
         screen.onDeleteRequested = ::confirmDelete
+        screen.onReloadRequested = ::openVault
     }
 
     private fun openVault() {
@@ -115,6 +123,7 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         val generation = graph.secureClipboard.captureGeneration()
         runVaultOperation(
             operation = { graph.secureClipboard.metadata(grant, generation) },
+            listRead = true,
             onSuccess = {
                 metadata = it
                 screen.renderEntries(it)
@@ -295,20 +304,20 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun <T> runVaultOperation(operation: () -> T, onRejected: () -> Unit = {}, onSuccess: (T) -> Unit) {
+    private fun <T> runVaultOperation(operation: () -> T, onRejected: () -> Unit = {}, listRead: Boolean = false, onSuccess: (T) -> Unit) {
         try {
             worker.execute {
                 val result = runCatching(operation)
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     setBusy(false)
-                    result.onSuccess(onSuccess).onFailure { showError(getString(R.string.operation_failed)) }
+                    result.onSuccess(onSuccess).onFailure { showOperationFailure(listRead) }
                 }
             }
         } catch (_: RejectedExecutionException) {
             onRejected()
             setBusy(false)
-            showError(getString(R.string.operation_failed))
+            showOperationFailure(listRead)
         }
     }
 
@@ -317,7 +326,10 @@ class SecureClipboardManagerActivity : AppCompatActivity() {
         screen.setActionsEnabled(!value)
     }
 
-    private fun showError(message: String) {
+    private fun showOperationFailure(listRead: Boolean) {
+        metadata = emptyList()
+        val message = if (listRead) R.string.secure_clipboard_load_failed else R.string.secure_clipboard_operation_failed
+        screen.renderFailure(message)
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 

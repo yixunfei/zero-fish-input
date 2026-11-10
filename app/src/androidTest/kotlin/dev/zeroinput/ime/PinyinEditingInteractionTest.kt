@@ -87,6 +87,35 @@ class PinyinEditingInteractionTest {
         assertEquals(listOf(KeyboardAction.Text("'")), actions)
     }
 
+    @Test fun displayFollowsTheMatchedSyllablesAndTouchUsesTheOriginalOffsets() = withPanel { panel ->
+        onMain {
+            val selections = mutableListOf<Pair<CompositionSelection, String>>()
+            panel.onCompositionSelection = { range, raw -> selections += range to raw }
+            val state = snapshot("kanga").copy(
+                composition = "kang a",
+                candidates = listOf(
+                    Candidate("a", "看嘎", "kan ga", pinyinMatch = PinyinCandidateMatch("kan ga", 0, 5, true)),
+                    Candidate("b", "抗", "kang", pinyinMatch = PinyinCandidateMatch("kang", 0, 4, false)),
+                ),
+            )
+            panel.renderSession(InputSessionState(snapshot = state))
+            measure(panel)
+            val editor = editor(panel)
+            assertEquals("kan ga", editor.text.toString())
+            touch(editor, MotionEvent.ACTION_DOWN, 4)
+            touch(editor, MotionEvent.ACTION_UP, 4)
+            assertEquals(CompositionSelection(3) to "kanga", selections.single())
+            assertTrue(editor.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 2)
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, 5)
+            }))
+            assertEquals(CompositionSelection(2, 4) to "kanga", selections.last())
+
+            panel.renderSession(InputSessionState(snapshot = state.copy(highlightedIndex = 1)))
+            assertEquals("kang · a", editor.text.toString())
+        }
+    }
+
     @Test fun splitKeyRendersTheNewReadingAtTheTappedCaret() = withPanel { panel ->
         onMain {
             val graph = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph

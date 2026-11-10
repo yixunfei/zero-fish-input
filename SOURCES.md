@@ -20,6 +20,9 @@ provide a separate notices archive. Preserve them when redistributing binaries.
 
 ## Corresponding third-party sources
 
+- OkHttp: https://github.com/lysine-dev/okhttp/tree/parent-4.12.1 (upstream square/okhttp redirects here)
+- Okio: https://github.com/square/okio/tree/parent-3.6.0
+
 Run tools/bootstrap-rime.ps1 from a project source checkout to retrieve the exact
 sources and data used by this build. That script pins full commits and archive
 SHA-256 checksums. THIRD_PARTY.md lists the components and licenses.

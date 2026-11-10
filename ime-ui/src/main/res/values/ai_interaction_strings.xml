@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_queue_interrupt">中断发送</string>
+    <string name="ai_queue_send">加入待发</string>
+    <string name="ai_queue_full">待发最多 4 条，合计长度已满；请编辑或移除待发消息。</string>
+    <string name="ai_queue_item">待发 %1$d · %2$s</string>
+    <string name="ai_queue_edit">取回编辑</string>
+    <string name="ai_queue_remove">移除</string>
+    <string name="ai_queue_draft_occupied">请先发送或清空当前草稿，再取回待发消息。</string>
+    <string name="ai_capabilities">工具与能力</string>
+</resources>

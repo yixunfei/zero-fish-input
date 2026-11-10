@@ -1,5 +1,61 @@
 # Word association coverage and quality evaluation
 
+## Scene expansion (2026-11-05)
+
+The current Apache-2.0 project-authored corpus contains 2,002 pairs: 1,244
+Chinese and 758 English rows, with 497 and 346 prefix keys respectively (843
+total). It occupies 39,300 UTF-8 bytes. This iteration adds 274 rows, including
+traditional aliases and explicit continuation chains. The existing 4,096-row,
+128-character-row, 32-unit-context and eight-suggestion bounds are unchanged.
+There is no external corpus, new dependency, network access or personal-data
+collection. The original 156-case development suite and 23 supplemental cases
+retain their accepted results.
+
+[The new scene fixtures](../engine-dictionary/src/test/resources/association-quality-scenarios.tsv)
+were frozen and measured against the previous corpus before adding the new rows.
+They contain four positive cases for each of ten scenes per language: social,
+scheduling, work, delivery, travel, food, study, health, shopping and technical.
+Each language also has ten abstention cases. These public synthetic labels
+were visible during curation. This is a development/acceptance result, not
+independent natural-input accuracy, measured preference or typing savings.
+
+| Positive cases | Coverage before / after | Top-1 before / after | Top-3/8 before / after |
+| --- | --- | --- | --- |
+| Chinese (40) | 22 / 40 | 8 / 38 | 13 / 40 |
+| English (40) | 24 / 40 | 11 / 40 | 12 / 40 |
+| Combined (80) | 46 / 80 | 19 / 78 | 25 / 80 |
+
+Each number is a count out of the row's positive cases. Both before and after
+return zero suggestions on all 20 abstention cases. Eight selection chains
+cover Chinese, traditional text and English separators. An Android round trip
+also checks `please review → the → document` through the actual IME. The
+[recorded before report](../engine-dictionary/src/test/resources/association-quality-scenarios-baseline.tsv)
+and fixture hashes are pinned by `AssociationScenarioQualityTest`; old accepted
+ranks cannot regress, every new positive case needs a Top-3 result, and each
+language needs at least 38/40 Top-1 matches. The exhaustive corpus check covers
+all 843 keys. These checks measure a curated table, not general language ability.
+
+```powershell
+./gradlew.bat :engine-dictionary:test :engine-dictionary:evaluateWordAssociations `
+  :engine-dictionary:evaluateAssociationScenarios --console=plain --quiet
+```
+
+The new report is `engine-dictionary/build/reports/association-quality-scenarios.tsv`.
+It contains only IDs, categories, counts and ranks. Fixtures, baseline reports
+and evaluation code stay in the JVM test source set and are not APK resources.
+
+| Current artifact | SHA-256 |
+| --- | --- |
+| Scene fixtures | `756d14adac9942fce842d89070887ffa9e9efb91f043798387f637d6d8354bf6` |
+| Before report | `801c24764b51b8b717015f5eb8c5b1857314a5b057d4a1b39a5350c71def2f0e` |
+| 2,002-pair corpus | `778d14920b9a4f505c42cb29f8394778ea459ad1125562c04107349821da8d23` |
+
+Separately licensed, independently selected sequential public text and physical
+device latency/energy measurements remain future work. No user text or editor
+history may be collected to fill that gap.
+
+## Original expansion (2026-09-21)
+
 Date: 2026-09-21
 
 The approved follow-up expands public Chinese/English associations and adds a

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="id" name="management_status_message" />
+    <item type="id" name="management_status_retry" />
+    <string name="management_loading">正在加载…</string>
+    <string name="management_reload">重新加载列表</string>
+    <string name="management_load_failed">无法加载列表，请重试</string>
+    <string name="management_operation_failed">操作未完成。请重新加载列表，确认当前状态后再试。</string>
+    <string name="user_dictionary_empty">暂无个人词组，可点击右上角新增</string>
+    <string name="user_dictionary_no_matches">没有匹配的词组</string>
+    <string name="user_dictionary_page_empty">当前页没有词组，请返回上一页</string>
+    <string name="user_dictionary_page_range">第 %1$d–%2$d 条</string>
+    <string name="user_dictionary_delete_named">删除词组：%1$s</string>
+    <string name="secure_clipboard_load_failed">无法加载安全剪贴板。重试时需重新认证。</string>
+    <string name="secure_clipboard_operation_failed">操作未完成。请重新认证并加载列表，确认当前状态。</string>
+    <string name="dictionary_source_other">其他公开来源</string>
+</resources>

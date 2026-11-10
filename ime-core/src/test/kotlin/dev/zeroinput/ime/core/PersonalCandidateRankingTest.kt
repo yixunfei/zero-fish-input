@@ -1,11 +1,21 @@
 package dev.zeroinput.ime.core
 
 import dev.zeroinput.engine.api.Candidate
+import dev.zeroinput.engine.api.PinyinCandidateMatch
 import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalCandidateRankingTest {
     private val native = listOf(Candidate("a", "产生"), Candidate("b", "测试"))
+
+    @Test fun `frequency changes order within exact pinyin without lifting fuzzy matches above it`() {
+        val exact = PinyinCandidateMatch("xian", 0, 4, exact = true)
+        val candidates = listOf(Candidate("a", "先", pinyinMatch = exact), Candidate("b", "线", pinyinMatch = exact),
+            Candidate("c", "想", pinyinMatch = exact.copy(exact = false)))
+        val learned = mapOf("线" to 1, "想" to 100)
+        assertEquals(listOf("线", "先", "想"),
+            PersonalCandidateRanking.merge(candidates, emptyList(), "xian", 1, learned).map { it.text })
+    }
 
     @Test fun `existing word frequency promotes a native candidate across input codes without replacing its route`() {
         val ranked = PersonalCandidateRanking.merge(native, emptyList(), "cs", 3, mapOf("测试" to 3))

@@ -155,7 +155,9 @@ class ZeroInputService : InputMethodService() {
             graph.aiCoordinator, graph.aiConversations, graph.aiPersistenceExecutor,
             graph::aiConfigurationSnapshot, graph.aiDataGeneration,
             post = { mainHandler.post(it) }, allowed = ::aiAllowed,
-            editorPrivacy = { activeSession?.controller?.state?.privacy },
+            generationPolicy = { config -> dev.zeroinput.ime.ai.AiEditorPolicy.generationPolicy(
+                config.enabled, config.networkAllowed, activeSession?.controller?.state?.privacy,
+            ) },
             render = { inputView?.renderAi(it) },
             renderList = { inputView?.renderAiConversations(it) },
             renderConversation = { inputView?.renderAiConversation(it) },
@@ -399,6 +401,7 @@ class ZeroInputService : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        val preserveKeyboardPage = restarting && activeSession != null && activeSession?.packageName == attribute.packageName
         endInputSession(reset = false)
         val token = ++sessionSequence
         val connectionBinding = SessionConnectionBinding(currentInputConnection)
@@ -464,7 +467,7 @@ class ZeroInputService : InputMethodService() {
         val session = InputSession(token, newController, connectionBinding, attribute.packageName)
         activeSession = session
         controller = newController
-        inputView?.startEditor(dev.zeroinput.ime.core.EditorInputOptions.from(attribute))
+        inputView?.startEditor(dev.zeroinput.ime.core.EditorInputOptions.from(attribute), restarting = preserveKeyboardPage)
         newController.start(
             editorInfo = attribute,
             initialLanguage = initialLanguage,
@@ -907,12 +910,7 @@ class ZeroInputService : InputMethodService() {
                 aiNameEditor.reset(); aiPages.invalidate(); clearAiAttachments(); aiDraft.clear()
             }
         }
-        view.onAiSettingsRequested = { launchActivity(MainActivity::class.java) }
-        view.onAiDeviceAgentRequested = {
-            syncSessionPrivacy()
-            if (view.isAiDeviceAgentMode) exitDeviceAgentTaskMode()
-            else if (aiAllowed()) enterDeviceAgentTaskMode()
-        }
+        bindAiNavigation(view)
         view.onAiAddContentRequested = {
             syncSessionPrivacy()
             if (aiAllowed()) {
@@ -956,6 +954,22 @@ class ZeroInputService : InputMethodService() {
                 invalidateAiRequest()
             }
             updateScreenCapturePolicy()
+        }
+    }
+
+    private fun bindAiNavigation(view: ZeroInputView) {
+        view.onAiSettingsRequested = { launchActivity(MainActivity::class.java) }
+        view.onAiAssistantRequested = {
+            syncSessionPrivacy()
+            if (aiAllowed()) {
+                invalidateAiRequest()
+                launchActivity(dev.zeroinput.ime.ai.AiAssistantActivity::class.java)
+            }
+        }
+        view.onAiDeviceAgentRequested = {
+            syncSessionPrivacy()
+            if (view.isAiDeviceAgentMode) exitDeviceAgentTaskMode()
+            else if (aiAllowed()) enterDeviceAgentTaskMode()
         }
     }
 
@@ -1237,6 +1251,7 @@ class ZeroInputService : InputMethodService() {
             KeyboardAction.ShowSymbols,
             KeyboardAction.ShowNumbers,
             KeyboardAction.ShowMoreSymbols,
+            KeyboardAction.ShowPreviousSymbols,
             KeyboardAction.ShowSymbolGroups,
             -> Unit
         }

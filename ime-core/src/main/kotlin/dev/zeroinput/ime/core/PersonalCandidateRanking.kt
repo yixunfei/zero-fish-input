@@ -10,11 +10,15 @@ internal object PersonalCandidateRanking {
         val learned = personal.groupBy(Candidate::text).mapValues { (_, rows) ->
             rows.maxWith(compareBy<Candidate> { it.input == input }.thenBy { it.score })
         }
-        val nativeRanks = native.mapIndexed { index, candidate -> candidate.text to index }.toMap()
+        val nativeRanks = buildMap { native.forEachIndexed { index, candidate -> putIfAbsent(candidate.text, index) } }
+        val hasExactPinyin = native.any { it.pinyinMatch?.exact == true }
         // A text match deduplicates the row, not its selection ownership. Keep the
         // engine identity so selection retains the reading and native editing route.
         return (native + personal).distinctBy(Candidate::text)
-            .sortedByDescending { candidate ->
+            .sortedWith(compareByDescending<Candidate> { candidate ->
+                hasExactPinyin && (candidate.pinyinMatch?.exact == true ||
+                    candidate.text !in nativeRanks && candidate.input == input)
+            }.thenByDescending { candidate ->
                 val prior = nativeRanks[candidate.text]?.let { 1.0 / (it + 1) } ?: 0.0
                 val learnedCandidate = learned[candidate.text]
                 // A native match already validates the spelling. Reuse the word's existing
@@ -26,6 +30,6 @@ internal object PersonalCandidateRanking {
                     match * (1.1 + ln(count.coerceAtMost(1_000_000).toDouble() / threshold))
                 }
                 prior + bonus
-            }
+            })
     }
 }

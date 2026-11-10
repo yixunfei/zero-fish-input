@@ -96,7 +96,7 @@ class DictionaryEntryInteractionTest {
             graph.dictionaryEdits.reset(id)
             clickLabel(R.string.save)
             waitFor {
-                visibleText(context.getString(R.string.public_dictionary_failed)) || !hasEditor()
+                visibleText(context.getString(R.string.management_operation_failed)) || !hasEditor()
             }
             assertTrue("An old form must not recreate reset edits", localEntries().isEmpty())
         } finally {

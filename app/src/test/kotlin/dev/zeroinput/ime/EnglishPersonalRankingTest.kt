@@ -28,6 +28,7 @@ class EnglishPersonalRankingTest {
             connection,
             { EnglishInputEngine(lexicon = listOf("the", "there", "their")) },
             store,
+            personalPromotionThreshold = { 3 },
         )
         controller.start(
             EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT },
@@ -62,7 +63,7 @@ class EnglishPersonalRankingTest {
         val store = Store()
         val connection = Connection()
         val controller = InputSessionController(connection,
-            { EnglishInputEngine(lexicon = listOf("the", "there", "their")) }, store)
+            { EnglishInputEngine(lexicon = listOf("the", "there", "their")) }, store, personalPromotionThreshold = { 3 })
         controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT },
             InputLanguage.ENGLISH, PrivacyConfiguration())
 

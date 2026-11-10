@@ -98,7 +98,7 @@
     <string name="delete">Delete</string>
     <string name="language_chinese">Chinese</string>
     <string name="language_english">English</string>
-    <string name="user_dictionary_item_details">%1$s · %2$s · %3$d</string>
+    <string name="user_dictionary_item_details">%1$s · %2$s · Weight %3$d</string>
     <string name="user_dictionary_add">Add phrase</string>
     <string name="user_dictionary_delete">Delete phrase</string>
     <string name="user_dictionary_import">Import phrases</string>
@@ -114,7 +114,7 @@
     <string name="user_dictionary_next">Next page</string>
     <string name="user_dictionary_threshold">Personal frequency promotion threshold</string>
     <string name="user_dictionary_threshold_value">Personal frequency promotion threshold: %1$d</string>
-    <string name="user_dictionary_threshold_message">Default: 3. Range: 1–100. Personal frequency or a manual weight promotes existing typing candidates and public next-word suggestions only after reaching this threshold. Input matching and default order still apply; no candidate is pinned. This controls ranking, not which words are suggested. Current threshold: %1$d</string>
+    <string name="user_dictionary_threshold_message">Default: 1. Range: 1–100. Personal frequency or a manual weight promotes existing typing candidates and public next-word suggestions only after reaching this threshold. Input matching and default order still apply; no candidate is pinned. This controls ranking, not which words are suggested. Current threshold: %1$d</string>
     <string name="user_dictionary_threshold_invalid">Enter an integer from 1 to 100</string>
     <plurals name="user_dictionary_imported">
         <item quantity="one">Imported %1$d phrase</item>

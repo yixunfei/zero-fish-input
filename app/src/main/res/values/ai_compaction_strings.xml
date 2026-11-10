@@ -1,0 +1,10 @@
+<resources>
+    <string name="ai_compaction_title">压缩所选历史</string>
+    <string name="ai_compaction_notice">将下方所选较早历史及已有摘要发送给当前模型。最近两条消息保持原样，角色、记忆和其他引用不参与压缩。生成后可预览再应用，原始对话不会删除。</string>
+    <string name="ai_compaction_generate">发送并生成摘要</string>
+    <string name="ai_compaction_working">正在生成摘要…</string>
+    <string name="ai_compaction_preview">请核对事实与遗漏。应用后可在下一次发送或修改上下文前撤销。</string>
+    <string name="ai_compaction_apply">应用摘要</string>
+    <string name="ai_compaction_failed">摘要不可用、上下文已变化或预算不足。原上下文未被替换，请关闭后重试。</string>
+    <string name="ai_compaction_unavailable">请先选择较早的历史消息，或检查当前模型配置。</string>
+</resources>

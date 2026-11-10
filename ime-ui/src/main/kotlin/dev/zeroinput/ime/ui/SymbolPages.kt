@@ -5,6 +5,7 @@ internal object SymbolPages {
     data class Group(val label: Int, val symbols: List<String>)
     data class Page(val group: Int, val number: Int, val count: Int, val symbols: List<String>)
     val groups = listOf(
+        Group(R.string.symbol_group_common, "，。！？、；,.—-()（）[]{}<>%=$@#\"'".map(Char::toString)),
         Group(R.string.symbol_group_english, "1234567890@#¥_&-+()/*\"':;!?[]{}<>|\\~^%=€£$¢©®°…‰•§¶¤¬¦¡¿«»‹›†‡‖‗‛‟‥‧′″‴‵‶‷※⁂⁎⁑⁕".map(Char::toString)),
         Group(R.string.symbol_group_chinese, "，。！？；：、·—…（）【】《》〈〉「」『』〔〕［］｛｝“”‘’﹃﹄﹁﹂﹏﹋﹌～々〃〆〇〒〓〝〞﹐﹑﹒﹔﹕﹖﹗﹙﹚﹛﹜﹝﹞".map(Char::toString)),
         Group(R.string.symbol_group_math, "±×÷−∓≠≈≡≤≥∞√∛∜∑∏∐∫∬∭∮∯∰∂∆∇∈∉∋∌⊂⊃⊆⊇⊄⊅⊈⊉∪∩∅∧∨¬∀∃∄∴∵∝∟∠∡∢⊥∥∦∶∷∽≅≃≄≆≇≉≊≋≍≎≏≐≑≒≓≔≕≖≗≙≚≜≝≟≪≫≮≯≰≱≲≳⊕⊖⊗⊘⊙⊚⊛⊜⊝⊞⊟⊠⊡⊢⊣⊤⊨⊩⊪⊫⋀⋁⋂⋃⋄⋅⋆⋈⋮⋯⋰⋱".map(Char::toString)),
@@ -22,6 +23,5 @@ internal object SymbolPages {
         val chunks = group.symbols.chunked(27)
         chunks.mapIndexed { page, symbols -> Page(index, page + 1, chunks.size, symbols) }
     }
-    val pages = entries.map(Page::symbols)
     fun firstPage(group: Int) = entries.indexOfFirst { it.group == group }
 }

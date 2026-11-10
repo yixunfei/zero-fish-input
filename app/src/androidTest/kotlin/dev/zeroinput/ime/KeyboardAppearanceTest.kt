@@ -9,7 +9,9 @@ import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.Candidate
+import dev.zeroinput.engine.api.CompositionSelection
 import dev.zeroinput.engine.api.EngineSnapshot
+import dev.zeroinput.engine.api.PinyinCandidateMatch
 import dev.zeroinput.ime.core.InputSessionState
 import dev.zeroinput.ime.settings.KeyboardAppearanceActivity
 import dev.zeroinput.ime.settings.SettingsRepository
@@ -89,8 +91,15 @@ class KeyboardAppearanceTest {
                 instrumentation.waitForIdleSync()
                 SystemClock.sleep(100)
                 capture("${preset.name.lowercase()}-${if (night) "dark" else "light"}-idle.png", activity.keyboard)
-                onMain { activity.keyboard.renderSession(InputSessionState(snapshot = EngineSnapshot("nihaozhongguo", "ni hao zhong guo",
-                    listOf(Candidate("1", "你好"), Candidate("2", "你"), Candidate("3", "拟好"), Candidate("4", "您好"))))) }
+                onMain {
+                    activity.keyboard.renderSession(InputSessionState(snapshot = EngineSnapshot("kanga", "kan ga",
+                        listOf(Candidate("1", "看嘎", "kan ga", pinyinMatch = PinyinCandidateMatch("kan ga", 0, 5, true)),
+                            Candidate("2", "抗啊"), Candidate("3", "看"), Candidate("4", "砍")),
+                        selection = CompositionSelection(5))))
+                    val preedit = views(activity.keyboard).filterIsInstance<TextView>()
+                        .single { it.javaClass.simpleName == "CompositionEditorView" }
+                    assertEquals("kan ga", preedit.text.toString())
+                }
                 instrumentation.waitForIdleSync()
                 SystemClock.sleep(100)
                 capture("${preset.name.lowercase()}-${if (night) "dark" else "light"}-candidates.png", activity.keyboard)

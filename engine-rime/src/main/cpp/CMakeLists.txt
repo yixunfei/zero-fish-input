@@ -79,7 +79,7 @@ add_subdirectory("${RIME_ROOT}" "${CMAKE_BINARY_DIR}/librime" EXCLUDE_FROM_ALL)
 target_compile_options(rime-static PRIVATE -Wno-error=deprecated-declarations)
 
 if(NOT ZEROINPUT_RIME_DEPENDENCIES_ONLY)
-add_library(zeroinput_rime SHARED zero_rime_jni.cpp)
+add_library(zeroinput_rime SHARED zero_rime_jni.cpp pinyin_translator.cpp)
 set(OCTAGRAM_ROOT "${RIME_DEPS_ROOT}/librime-octagram")
 if(NOT EXISTS "${OCTAGRAM_ROOT}/src/octagram.cc")
   message(FATAL_ERROR "Pinned Octagram sources are required. Run tools/bootstrap-rime.ps1")
@@ -92,7 +92,7 @@ target_sources(rime-static PRIVATE
   "${OCTAGRAM_ROOT}/src/octagram.cc"
 )
 target_include_directories(rime-static PRIVATE "${OCTAGRAM_ROOT}/src")
-target_include_directories(zeroinput_rime PRIVATE
+target_include_directories(zeroinput_rime SYSTEM PRIVATE
   "${OCTAGRAM_ROOT}/src"
   "${RIME_ROOT}/deps/darts-clone/include"
   "${RIME_ROOT}/deps/utf8cpp/source"
@@ -100,6 +100,7 @@ target_include_directories(zeroinput_rime PRIVATE
   "${RIME_ROOT}/src"
   "${RIME_ROOT}/include"
   "${CMAKE_BINARY_DIR}/librime/src"
+  "$<TARGET_PROPERTY:Boost::signals2,INTERFACE_INCLUDE_DIRECTORIES>"
 )
 target_link_libraries(zeroinput_rime PRIVATE rime-static android log)
 target_compile_options(zeroinput_rime PRIVATE

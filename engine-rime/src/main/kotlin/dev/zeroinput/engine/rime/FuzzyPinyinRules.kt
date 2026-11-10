@@ -38,22 +38,22 @@ internal object FuzzyPinyinRules {
     fun rimeRules(rule: Rule): List<String> = when (rule.scope) {
         Scope.INITIAL -> if (rule.sharedInitialSuffix == null) {
             listOf(
-                "derive/^${rule.left}/${rule.right}/",
-                "derive/^${rule.right}/${rule.left}/",
+                "fuzz/^${rule.left}/${rule.right}/",
+                "fuzz/^${rule.right}/${rule.left}/",
             )
         } else {
             listOf(
-                "derive/^${rule.right}/${rule.left}/",
-                "derive/^${rule.left}([^${rule.sharedInitialSuffix}])/${rule.right}\u00241/",
+                "fuzz/^${rule.right}/${rule.left}/",
+                "fuzz/^${rule.left}([^${rule.sharedInitialSuffix}])/${rule.right}\u00241/",
             )
         }
         Scope.FINAL -> listOf(
-            "derive/${rule.left}\u0024/${rule.right}/",
-            "derive/${rule.right}\u0024/${rule.left}/",
+            "fuzz/${rule.left}\u0024/${rule.right}/",
+            "fuzz/${rule.right}\u0024/${rule.left}/",
         )
         Scope.EXACT -> listOf(
-            "derive/^${rule.left}\u0024/${rule.right}/",
-            "derive/^${rule.right}\u0024/${rule.left}/",
+            "fuzz/^${rule.left}\u0024/${rule.right}/",
+            "fuzz/^${rule.right}\u0024/${rule.left}/",
         )
     }
 }

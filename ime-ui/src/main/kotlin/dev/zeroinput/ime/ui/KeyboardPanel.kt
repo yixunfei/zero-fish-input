@@ -226,11 +226,15 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         pairedSymbolsEnabled = value
     }
 
-    fun startEditor(value: EditorInputOptions) {
+    fun startEditor(value: EditorInputOptions, restarting: Boolean = false) {
+        val preservePage = restarting && editor == value
         editor = value
         composing = false
         shift = Shift.OFF
-        page = if (value.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC
+        if (!preservePage) {
+            page = if (value.layout == EditorLayout.TEXT) KeyboardPage.LETTERS else KeyboardPage.NUMERIC
+            symbolPage = 0
+        }
         render()
     }
 
@@ -271,7 +275,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
 
     private fun showSymbolPage(index: Int) {
         onUserInteraction()
-        symbolPage = Math.floorMod(index, SymbolPages.pages.size)
+        symbolPage = Math.floorMod(index, SymbolPages.entries.size)
         page = if (symbolPage == 0) KeyboardPage.SYMBOLS else KeyboardPage.MORE_SYMBOLS
         render()
         onPageChanged()
@@ -290,7 +294,8 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         if (keyboardLayout == value) return
         keyboardLayout = value
         shift = Shift.OFF
-        if (editor.layout == EditorLayout.TEXT) page = KeyboardPage.LETTERS
+        // Engine readiness may change the letter layout during a numeric/symbol
+        // entry. Apply that layout without navigating away from the chosen page.
         render()
     }
 
@@ -476,8 +481,15 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             if (spec.label.length > 2) 13 else 19, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
         val selected = spec.action == KeyboardAction.Shift && shift != Shift.OFF
         view.isSelected = selected
-        ViewCompat.setStateDescription(view, if (spec.action == KeyboardAction.Shift)
-            context.getString(when (shift) { Shift.OFF -> R.string.key_lowercase; Shift.ON -> R.string.key_uppercase; Shift.LOCKED -> R.string.key_caps_lock }) else null)
+        ViewCompat.setStateDescription(view, when (spec.action) {
+            KeyboardAction.Shift -> context.getString(when (shift) {
+                Shift.OFF -> R.string.key_lowercase
+                Shift.ON -> R.string.key_uppercase
+                Shift.LOCKED -> R.string.key_caps_lock
+            })
+            KeyboardAction.ShowSymbolGroups -> spec.label
+            else -> null
+        })
         view.setColors(
             if (selected) primaryContainerColor else when (spec.style) {
                 KeyStyle.NORMAL -> if (appearance.material == KeyboardMaterial.CLASSIC) surfaceColor else
@@ -507,9 +519,10 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
             KeyboardAction.Shift -> { onUserInteraction(); shift = if (shift == Shift.OFF) Shift.ON else Shift.OFF; render() }
             KeyboardAction.ShowLetters -> showLetters()
             KeyboardAction.ShowNumbers -> showNumbers()
-            KeyboardAction.ShowSymbols -> showSymbolPage(if (page == KeyboardPage.SYMBOLS || page == KeyboardPage.MORE_SYMBOLS) symbolPage - 1 else 0)
+            KeyboardAction.ShowSymbols -> showSymbolPage(0)
             KeyboardAction.ShowSymbolGroups -> showSymbolGroups()
             KeyboardAction.ShowMoreSymbols -> showSymbolPage(symbolPage + 1)
+            KeyboardAction.ShowPreviousSymbols -> showSymbolPage(symbolPage - 1)
             is KeyboardAction.Text -> {
                 onAction(action)
                 if (shift == Shift.ON) { shift = Shift.OFF; render(preserveCaseGestures = true) }

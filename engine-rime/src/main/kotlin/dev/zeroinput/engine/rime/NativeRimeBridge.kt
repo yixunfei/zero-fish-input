@@ -32,7 +32,7 @@ internal object NativeRimeBridge {
 
     external fun nativeProcessKey(sessionId: Long, keyCode: Int, modifiers: Int): Boolean
 
-    external fun nativeReadUpdate(sessionId: Long, simplified: Boolean): NativeRimeUpdate
+    external fun nativeReadUpdate(sessionId: Long, simplified: Boolean, includeSpelling: Boolean): NativeRimeUpdate
 
     external fun nativeCandidatePage(
         sessionId: Long,

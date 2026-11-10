@@ -42,7 +42,6 @@
     <string name="ai_device_agent_task_failed">设备任务已停止：%1$s</string>
     <string name="ai_device_agent_activity_title">独立设备任务</string>
     <string name="ai_device_agent_activity_description">输入任务和目标应用包名。任务只在目标应用处于前台、设备解锁且辅助功能服务可用时运行。你可为本任务选择一个文件或媒体附件；附件只在内存中暂存并发送到当前 AI 服务，不保存为代理历史。</string>
-    <string name="ai_device_agent_target_package">目标应用包名</string>
     <string name="ai_device_agent_target_package_hint">例如 com.example.app</string>
     <string name="ai_device_agent_activity_task">设备任务</string>
     <string name="ai_device_agent_activity_screenshot_confirm">本任务允许发送截图</string>
@@ -54,10 +53,8 @@
     <string name="ai_device_agent_activity_file_selected">本任务已选择一个附件；开始任务后可能发送给当前 AI 服务。</string>
     <string name="ai_device_agent_activity_file_removed">移除所选附件</string>
     <string name="ai_device_agent_activity_file_disabled">请先在设备代理设置中单独同意并启用文件能力。</string>
-    <string name="ai_device_agent_activity_action">动作 %1$s：%2$s</string>
     <string name="ai_device_agent_activity_ready">可以开始任务</string>
     <string name="ai_device_agent_activity_complete">任务已完成</string>
-    <string name="ai_device_agent_activity_failed">任务已停止：%1$s</string>
     <string name="ai_device_agent_activity_target_invalid">包名格式无效</string>
     <string name="ai_device_agent_activity_task_required">请输入设备任务</string>
     <string name="ai_device_agent_activity_disclosure_required">请先完成设备代理声明和设置</string>

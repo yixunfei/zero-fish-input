@@ -139,6 +139,19 @@ class WordAssociationIntegrationTest {
             await { activity.editor.text.toString() == "could you please help" }
         }
 
+    @Test fun reviewRequestContinuesThroughTheNewPublicSceneRows() =
+        withEditor(InputLanguage.ENGLISH) { activity ->
+            type("please")
+            onMain { panel().onKeyboardAction(KeyboardAction.Space) }
+            type("review")
+            onMain { panel().onKeyboardAction(KeyboardAction.Space) }
+            await { "the" in words() }
+            choose("the")
+            await { "document" in words() }
+            choose("document")
+            await { activity.editor.text.toString() == "please review the document" }
+        }
+
     private fun withEditor(language: InputLanguage, script: ChineseScript = ChineseScript.SIMPLIFIED,
         clearLearning: Boolean = false, action: (InputFixtureActivity) -> Unit) {
         val original = shell("settings get secure default_input_method").trim()

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_run_channel">AI task status</string>
+    <string name="ai_run_channel_description">Running, approval and completion status only, without task content.</string>
+    <string name="ai_run_title">AI task</string>
+    <string name="ai_run_running">Running</string>
+    <string name="ai_run_approval">Approval needed. Open the task.</string>
+    <string name="ai_run_finished">Task completed. Open to view.</string>
+    <string name="ai_run_failed">Task did not finish. Open to view.</string>
+    <string name="ai_run_stopped">Task stopped</string>
+    <string name="ai_run_stop">Stop</string>
+    <string name="ai_run_notifications">Show status notifications for this task</string>
+    <string name="ai_run_background">Continue this task in background (up to two minutes)</string>
+    <string name="ai_run_disclosure">Notifications show generic status only. Open the task to view content or approve operations. Background mode requires notifications and supports file reads and remote tools; Save As and device UI actions stay in the foreground. Background execution lasts at most two minutes, pauses for approval and stops on lock. Results stay in memory and are cleared two minutes after completion.</string>
+    <string name="ai_run_enable">Enable task notifications</string>
+</resources>

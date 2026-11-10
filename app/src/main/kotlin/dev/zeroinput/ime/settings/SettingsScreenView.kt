@@ -42,7 +42,7 @@ data class SettingsScreenState(
     val aiThinkingVisible: Boolean = true,
     val interfaceLanguageTag: String = "",
     val learnFromCommittedText: Boolean = false,
-    val personalPromotionThreshold: Int = 3,
+    val personalPromotionThreshold: Int = 1,
 )
 
 data class LanguagePackScreenState(
@@ -86,6 +86,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onAiNetworkChanged: (Boolean) -> Unit = {}
     var onAiThinkingVisibleChanged: (Boolean) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
+    var onAiAssistantRequested: () -> Unit = {}
     var onAiDataClearRequested: () -> Unit = {}
     var onAiPageSettingsRequested: () -> Unit = {}
     var onAiDeviceAgentSettingsRequested: () -> Unit = {}
@@ -243,6 +244,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(valueText().apply { setText(R.string.ai_privacy_notice) })
         statusRow(context.getString(R.string.ai_configuration), aiStatus)
         command(context.getString(R.string.ai_settings)) { onAiSettingsRequested() }
+        command(context.getString(R.string.ai_assistant_open)) { onAiAssistantRequested() }
         command(context.getString(R.string.ai_page_access_title)) { onAiPageSettingsRequested() }
         command(context.getString(R.string.ai_device_agent_settings)) { onAiDeviceAgentSettingsRequested() }
         command(context.getString(R.string.ai_clear_data)) { onAiDataClearRequested() }

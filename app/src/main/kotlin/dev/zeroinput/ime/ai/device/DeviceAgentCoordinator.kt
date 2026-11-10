@@ -382,12 +382,16 @@ internal class DeviceAgentCoordinator(
             DeviceStage6ResultStatus.FAILED -> DeviceActionResultStatus.FAILED
         }
 
-        fun fail(reason: String) { if (valid()) finish(DeviceAgentEvent.Failed(text.stopped), failed = true) }
-        override fun cancel() = synchronized(lock) { if (valid()) finish(DeviceAgentEvent.State(DeviceAgentState.PAUSED, text.stopped), failed = true) }
+        fun fail(reason: String) {
+            if (valid()) finish(DeviceAgentEvent.Failed(
+                if (reason == "Device task expired" || reason == "Task time limit reached") text.expired else text.failed,
+            ))
+        }
+        override fun cancel() = synchronized(lock) { if (valid()) finish(DeviceAgentEvent.State(DeviceAgentState.PAUSED, text.cancelled)) }
         private fun valid(): Boolean = !ended && !closed && active === this
         private fun state(state: DeviceAgentState) = emit(DeviceAgentEvent.State(state, text.status(state)))
 
-        private fun finish(event: DeviceAgentEvent, failed: Boolean = false) {
+        private fun finish(event: DeviceAgentEvent) {
             if (!valid()) return
             ended = true
             requestSerial++
@@ -416,7 +420,6 @@ internal class DeviceAgentCoordinator(
             if (owner != null) broker.revokeTask(owner)
             // Keep only bounded outcome metadata after termination, never task text or approval parameters.
             eventHistory = emptyList()
-            if (failed) emit(DeviceAgentEvent.State(DeviceAgentState.FAILED, text.stopped))
             emit(event)
         }
 
@@ -427,6 +430,8 @@ internal class DeviceAgentCoordinator(
                 event !is DeviceAgentEvent.ActionFinished &&
                 event !is DeviceAgentEvent.Completed) {
                 eventHistory = (eventHistory + event).takeLast(DeviceAgentLimits.MAX_EVENT_HISTORY)
+            } else if (event is DeviceAgentEvent.Completed) {
+                eventHistory = listOf(DeviceAgentEvent.State(DeviceAgentState.COMPLETED, text.completed))
             }
             post { synchronized(lock) {
                 if (timelineOwner != id || closed) return@synchronized

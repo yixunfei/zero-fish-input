@@ -1,0 +1,12 @@
+<resources>
+    <string name="ai_tool_task">File and tool tasks</string>
+    <string name="ai_workspace_skills">Select Skills</string>
+    <string name="ai_workspace_skill">Skill: %1$s</string>
+    <string name="ai_workspace_compact">Compact selected history</string>
+    <string name="ai_workspace_undo">Undo compaction</string>
+    <string name="ai_workspace_summary_label">Conversation summary</string>
+    <string name="ai_workspace_context">Roles and memory</string>
+    <string name="ai_workspace_memory">Selected memory %1$d</string>
+    <string name="ai_workspace_default">No role</string>
+    <string name="ai_workspace_summary">%1$s · Memories: %2$d · Skills: %5$d · Context characters: %3$d/%4$d</string>
+</resources>

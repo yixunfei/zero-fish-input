@@ -17,9 +17,15 @@ class UserDictionaryAdapter(
     private val onEdit: (UserTerm) -> Unit = {},
     private val onDelete: (UserTerm) -> Unit,
 ) : ListAdapter<UserTerm, UserDictionaryAdapter.Holder>(Difference) {
+    private var revision = 0L
+    private val bound = mutableSetOf<Holder>()
 
     fun submit(values: List<UserTerm>) {
-        submitList(values.toList())
+        val expected = ++revision
+        bound.forEach { clear(it) }
+        submitList(values.toList()) {
+            if (revision == expected && itemCount > 0) notifyItemRangeChanged(0, itemCount)
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -27,23 +33,27 @@ class UserDictionaryAdapter(
         val row = LinearLayout(parent.context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((12 * density).toInt(), 0, (4 * density).toInt(), 0)
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (64 * density).toInt())
+            setPadding((16 * density).toInt(), (8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt())
+            minimumHeight = (64 * density).toInt()
+            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
         val textGroup = LinearLayout(parent.context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            minimumHeight = (48 * density).toInt()
+            isFocusable = true
+            filterTouchesWhenObscured = true
         }
         val value = TextView(parent.context).apply {
             textSize = 17f
-            maxLines = 1
+            maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
         }
         val details = TextView(parent.context).apply {
             textSize = 12f
             alpha = 0.64f
-            maxLines = 1
+            maxLines = 3
             ellipsize = TextUtils.TruncateAt.END
         }
         textGroup.addView(value)
@@ -62,12 +72,14 @@ class UserDictionaryAdapter(
         }
         row.addView(textGroup)
         row.addView(remove)
-        return Holder(row, value, details, remove)
+        return Holder(row, textGroup, value, details, remove)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val term = getItem(position)
-        holder.itemView.setOnClickListener { onEdit(term) }
+        bound += holder
+        val expected = revision
+        holder.texts.setOnClickListener { if (revision == expected) onEdit(term) }
         holder.value.text = term.value
         val language = holder.itemView.context.getString(
             when (term.language) {
@@ -81,19 +93,27 @@ class UserDictionaryAdapter(
             language,
             term.frequency,
         )
-        holder.remove.setOnClickListener { onDelete(term) }
+        holder.remove.setOnClickListener { if (revision == expected) onDelete(term) }
+        holder.remove.contentDescription = holder.itemView.context.getString(R.string.user_dictionary_delete_named, term.value)
     }
 
     override fun onViewRecycled(holder: Holder) {
+        bound -= holder
+        clear(holder)
+        super.onViewRecycled(holder)
+    }
+
+    private fun clear(holder: Holder) {
         holder.value.text = ""
         holder.details.text = ""
         holder.remove.setOnClickListener(null)
-        holder.itemView.setOnClickListener(null)
-        super.onViewRecycled(holder)
+        holder.texts.setOnClickListener(null)
+        holder.remove.contentDescription = null
     }
 
     class Holder(
         itemView: LinearLayout,
+        val texts: LinearLayout,
         val value: TextView,
         val details: TextView,
         val remove: AppCompatImageButton,

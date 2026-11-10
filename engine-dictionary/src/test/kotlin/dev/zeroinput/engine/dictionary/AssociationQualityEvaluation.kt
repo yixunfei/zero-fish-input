@@ -11,9 +11,11 @@ object AssociationQualityEvaluation {
     data class Result(val case: Case, val count: Int, val rank: Int, val acceptable: Int)
 
     @JvmStatic fun main(args: Array<String>) {
-        require(args.size == 1)
+        require(args.size in 1..2)
         val index = WordAssociationIndex.loadBundled()
-        val bytes = checkNotNull(javaClass.getResourceAsStream("/association-quality.tsv")).use { it.readBytes() }
+        val fixture = args.getOrElse(1) { "association-quality.tsv" }
+        require(fixture in listOf("association-quality.tsv", "association-quality-scenarios.tsv"))
+        val bytes = checkNotNull(javaClass.getResourceAsStream("/$fixture")).use { it.readBytes() }
         val results = evaluate(index, readCases(bytes.toString(Charsets.UTF_8)))
         val output = File(args[0]).apply { parentFile.mkdirs() }
         output.writeText(buildString {

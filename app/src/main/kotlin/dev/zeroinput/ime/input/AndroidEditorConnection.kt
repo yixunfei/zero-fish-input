@@ -86,8 +86,8 @@ class AndroidEditorConnection(
         }
         committedConnection = connection
         onCommitted(text)
-        val target = start?.plus(cursorOffset)?.coerceIn(start, start + text.length)
-        if (target != null) {
+        if (start != null && current() === connection && selection.hasCommitAt(start, text.length)) {
+            val target = start + cursorOffset.coerceIn(0, text.length)
             selection.expectSelection(target)
             if (platformCall { connection.setSelection(target, target) } != true) {
                 invalidateContext()

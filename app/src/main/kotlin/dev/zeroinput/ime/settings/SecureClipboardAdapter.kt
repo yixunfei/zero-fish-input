@@ -1,7 +1,6 @@
 package dev.zeroinput.ime.settings
 
 import android.text.TextUtils
-import android.text.format.DateUtils
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -12,6 +11,8 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import dev.zeroinput.ime.R
 import dev.zeroinput.userdata.SecureClipboardMetadata
+import java.text.DateFormat
+import java.util.Date
 
 internal class SecureClipboardAdapter(
     private val onDelete: (SecureClipboardMetadata) -> Unit,
@@ -21,23 +22,24 @@ internal class SecureClipboardAdapter(
         val row = LinearLayout(parent.context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((20 * density).toInt(), 0, (8 * density).toInt(), 0)
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (72 * density).toInt())
+            setPadding((20 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt())
+            minimumHeight = (72 * density).toInt()
+            layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
         val texts = LinearLayout(parent.context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         val label = TextView(parent.context).apply {
             textSize = 17f
-            maxLines = 1
+            maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
         }
         val details = TextView(parent.context).apply {
             textSize = 12f
             alpha = 0.68f
-            maxLines = 1
+            maxLines = 3
         }
         texts.addView(label)
         texts.addView(details)
@@ -56,15 +58,13 @@ internal class SecureClipboardAdapter(
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = getItem(position)
         holder.label.text = item.label
-        val relativeTime = DateUtils.getRelativeTimeSpanString(
-            item.updatedAtEpochMillis,
-            System.currentTimeMillis(),
-            DateUtils.MINUTE_IN_MILLIS,
-        )
+        val locale = holder.itemView.resources.configuration.locales[0]
+        val updatedAt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
+            .format(Date(item.updatedAtEpochMillis))
         holder.details.text = holder.itemView.context.getString(
             R.string.secure_item_details,
             item.valueLength,
-            relativeTime,
+            updatedAt,
         )
         holder.delete.setOnClickListener { onDelete(item) }
     }

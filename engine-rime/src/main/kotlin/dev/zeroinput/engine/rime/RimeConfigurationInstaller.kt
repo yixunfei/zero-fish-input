@@ -2,6 +2,7 @@ package dev.zeroinput.engine.rime
 
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -17,7 +18,7 @@ internal class RimeConfigurationInstaller(
     fun prepare(options: ChineseInputOptions): Pair<String, File> {
         val id = PinyinAlgebra.schemaId(options)
         val file = File(directories.user, "$id.schema.yaml")
-        val expectedVersion = "5.0"
+        val expectedVersion = "6.0"
         val current = if (file.isFile) runCatching { JSONObject(file.readText()).getJSONObject("schema").getString("version") }.getOrNull() else null
         if (current != expectedVersion) {
             // JSON is a YAML subset accepted by librime; use a structured parser for edits.
@@ -26,6 +27,10 @@ internal class RimeConfigurationInstaller(
             schema.getJSONObject("schema").put("version", expectedVersion)
             schema.getJSONObject("translator").put("prism", id)
             schema.getJSONObject("speller").put("algebra", JSONArray(PinyinAlgebra.rules(options, publicSyllables)))
+            schema.put("zeroinput", JSONObject()
+                .put("full_pinyin", options.keyboardLayout == ChineseKeyboardLayout.FULL &&
+                    options.effectiveDoublePinyinScheme == DoublePinyinScheme.OFF)
+                .put("prefer_exact_spelling", options.effectiveFuzzyPinyinMask != 0 || options.experimentalTypoCorrection))
             schema.getJSONObject("menu").put("page_size", options.candidatePageSize)
             if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) {
                 schema.getJSONObject("speller").put("alphabet", "abcdefghijklmnopqrstuvwxyz23456789")
@@ -33,7 +38,7 @@ internal class RimeConfigurationInstaller(
                 schema.getJSONObject("translator").put("spelling_hints", 64)
                 schema.getJSONObject("simplifier").put("inherit_comment", true)
             }
-            if (options.effectiveDoublePinyinScheme == dev.zeroinput.engine.api.DoublePinyinScheme.MICROSOFT) {
+            if (options.effectiveDoublePinyinScheme == DoublePinyinScheme.MICROSOFT) {
                 schema.getJSONObject("speller").put("alphabet", "abcdefghijklmnopqrstuvwxyz;")
             }
             val temporary = Files.createTempFile(directories.user.toPath(), "$id-", ".tmp").toFile()

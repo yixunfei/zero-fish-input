@@ -1,0 +1,40 @@
+<resources>
+    <item name="ai_tool_prompt" type="id" />
+    <item name="ai_tool_start" type="id" />
+    <string name="ai_tool_title">文件与工具任务</string>
+    <string name="ai_tool_setup_show">查看工具与上下文</string>
+    <string name="ai_tool_setup_hide">收起任务设置</string>
+    <string name="ai_tool_selection_summary">已选工具：%1$d · 文件：%2$d · 上下文：%3$d 字符</string>
+    <string name="ai_tool_prompt">描述本次任务…</string>
+    <string name="ai_tool_notice">选择工具并填写任务，每个操作都需确认。默认离开即停止，可单独开启限时后台运行。文件仅限本次选择的文本、Markdown、JSON 或 CSV，单文件最多 64 KiB；文件提供方可能自行联网。锁屏始终停止，不会自动保存任务。</string>
+    <string name="ai_tool_start">开始任务</string>
+    <string name="ai_tool_pick">选择文件</string>
+    <string name="ai_tool_clear_files">移除所选文件</string>
+    <string name="ai_tool_selected_document">所选文档</string>
+    <string name="ai_tool_read">读取选定文件</string>
+    <string name="ai_tool_search_file">在选定文件中搜索</string>
+    <string name="ai_tool_save">另存为新文件</string>
+    <string name="ai_tool_file_label">%1$s：%2$s</string>
+    <string name="ai_tool_destination">本次结果发送至模型：%1$s</string>
+    <string name="ai_tool_provider_model">%1$s / %2$s</string>
+    <string name="ai_tool_model_missing">尚未配置</string>
+    <string name="ai_tool_no_role">无角色</string>
+    <string name="ai_tool_context_count">%1$s · 记忆：%2$d · Skills：%3$d · 上下文：%4$d 字符</string>
+    <string name="ai_tool_approval_preview">操作：%1$s\n%3$s\n\n请核对来源、参数与正文。批准后执行，结果将用于本次模型任务。\n%2$s</string>
+    <string name="ai_tool_approve">批准并执行</string>
+    <string name="ai_tool_decline">拒绝本次操作</string>
+    <string name="ai_tool_thinking">正在请求下一步…</string>
+    <string name="ai_tool_waiting">等待你确认操作</string>
+    <string name="ai_tool_executing">正在执行已批准的操作…</string>
+    <string name="ai_tool_completed">任务已完成</string>
+    <string name="ai_tool_stopped">任务已停止</string>
+    <string name="ai_tool_failed">任务未完成。可能已失效、达到限制或操作不可用。</string>
+    <string name="ai_tool_uncertain">任务已停止，但刚才的写入结果不确定。请检查目标文件，避免重复写入。</string>
+    <string name="ai_tool_unavailable">请检查模型配置、任务内容和所选工具。Skill 需要的工具也必须在本次选择中。</string>
+    <string name="ai_tool_result">%1$s 的结果：\n%2$s</string>
+    <string name="ai_tool_confirm_write">确认写入新文档</string>
+    <string name="ai_tool_save_preview">目标：%1$s\n\n%2$s\n\n取消可能留下文件提供方已创建的空文档；中断写入不会自动重试。</string>
+    <string name="ai_tool_write">写入这个文档</string>
+    <string name="ai_tool_leave_notice">离开会停止当前任务，清除未发送草稿、上下文选择和本次文件授权。已保存的对话、角色、记忆和 Skills 保留。</string>
+    <string name="ai_tool_open">打开工具任务</string>
+</resources>

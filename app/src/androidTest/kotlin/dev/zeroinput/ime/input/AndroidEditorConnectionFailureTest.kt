@@ -49,6 +49,19 @@ class AndroidEditorConnectionFailureTest {
         assertFalse(adapter.reopenCommittedText("()"))
     }
 
+    @Test fun pairedCursorPlacementIsSkippedAfterTheBoundEditorChanges() {
+        val old = Fixture("")
+        val replacement = Fixture("")
+        var current = old
+        val adapter = AndroidEditorConnection(0, 0, onCommitted = { current = replacement }) { current }
+
+        assertTrue(adapter.commitPairedText("[]", 1))
+
+        assertEquals(1, old.commits)
+        assertEquals(0, old.selections)
+        assertEquals(0, replacement.selections)
+    }
+
     @Test fun uncertainDeleteDoesNotReplayADeleteKey() {
         for (failure in listOf("before", "delete")) {
             val connection = Fixture(failure)
@@ -88,6 +101,7 @@ class AndroidEditorConnectionFailureTest {
 
     private class Fixture(private val failure: String) : InputConnectionWrapper(null, false) {
         var commits = 0
+        var selections = 0
         var deletes = 0
         var keys = 0
         var batchEnds = 0
@@ -101,7 +115,10 @@ class AndroidEditorConnectionFailureTest {
             commits++
             return accept("commit")
         }
-        override fun setSelection(start: Int, end: Int) = accept("selection")
+        override fun setSelection(start: Int, end: Int): Boolean {
+            selections++
+            return accept("selection")
+        }
         override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence {
             accept("before")
             return "x"

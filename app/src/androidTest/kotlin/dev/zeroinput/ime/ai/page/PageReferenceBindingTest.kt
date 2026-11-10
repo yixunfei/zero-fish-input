@@ -86,7 +86,7 @@ class PageReferenceBindingTest {
         }
         val controller = AiWorkbenchController(AiCoordinator(provider), AiConversationRepository(store),
             { it.run() }, { null }, AiDataGeneration(), { it(); true }, { allowed }, {}, {}, {},
-            editorPrivacy = { null })
+            generationPolicy = { config -> dev.zeroinput.ime.ai.AiEditorPolicy.generationPolicy(config.enabled, config.networkAllowed, null) })
         val binding = AiPageReferenceBinding(broker, Handler(Looper.getMainLooper()), controller,
             { allowed }, { "public.fixture" }, { view }, { settingsOpened++ }, {})
 

@@ -79,9 +79,11 @@ class InputExperienceVisualTest {
         click(UiR.string.key_symbols)
         capture("symbols")
         assertEquals(originalHeight, panel.height)
-        repeat(2) { click(UiR.string.key_more_symbols) }
-        capture("symbols-chinese")
+        click(UiR.string.key_more_symbols)
+        capture("symbols-next-page")
         assertEquals(originalHeight, panel.height)
+        click(UiR.string.key_previous_symbols)
+        assertTrue(descendants(panel).any { it.contentDescription == "%" && visible(it, panel) })
         click(UiR.string.key_letters)
         click(UiR.string.keyboard_tools)
         capture("tools")

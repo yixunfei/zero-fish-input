@@ -5,8 +5,8 @@
     <string name="dictionary_search">Search</string>
     <string name="dictionary_add">Add entry</string>
     <string name="dictionary_changes_only">Local changes only</string>
-    <string name="dictionary_entry">%1$s · %2$s · Weight %3$d</string>
-    <string name="dictionary_deleted_entry">Deleted: %1$s · %2$s · Weight %3$d</string>
+    <string name="dictionary_entry">%1$s\n%2$s · Weight %3$d</string>
+    <string name="dictionary_deleted_entry">Deleted: %1$s\n%2$s · Weight %3$d</string>
     <string name="dictionary_previous">Previous page</string>
     <string name="dictionary_next">Next page</string>
     <string name="dictionary_no_entries">No matching entries</string>

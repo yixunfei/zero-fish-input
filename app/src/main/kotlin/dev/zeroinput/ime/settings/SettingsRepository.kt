@@ -234,7 +234,7 @@ class SettingsRepository(context: Context) {
         const val KEY_SOUND_EFFECTS = "keyboard.sound-effects"
         const val KEY_WORD_ASSOCIATIONS = "keyboard.word-associations"
         const val KEY_PERSONAL_PROMOTION_THRESHOLD = "learning.personal-promotion-threshold"
-        const val DEFAULT_PERSONAL_PROMOTION_THRESHOLD = 3
+        const val DEFAULT_PERSONAL_PROMOTION_THRESHOLD = 1
         const val MAX_PERSONAL_PROMOTION_THRESHOLD = 100
         const val KEY_PAIRED_SYMBOLS = "keyboard.paired-symbols"
         const val KEY_THEME = "keyboard.theme"

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_capabilities">Tools and capabilities</string>
+    <string name="ai_capability_row">%1$s · %2$s</string>
+    <string name="ai_capability_notice">Current configuration only. Actual use still requires a target, file selection where applicable, and approval. Configure each capability separately in settings.</string>
+    <string name="ai_capability_disabled">Disabled</string>
+    <string name="ai_capability_permission">Permission or service connection required</string>
+    <string name="ai_capability_unsupported">Unsupported on this device</string>
+    <string name="ai_capability_ready">Configured; approval required at use</string>
+    <string name="ai_task_expired">Task or action expired</string>
+    <string name="ai_task_failed">Execution failed</string>
+    <string name="ai_task_cancelled">Task cancelled</string>
+    <string name="ai_task_failure_hint">Check the target app, model and permissions before starting a new task. An already dispatched operation may have taken effect; check its result first.</string>
+    <string name="ai_task_details">%1$s; tap to expand or collapse details</string>
+    <string name="ai_target_search">Search app name or package</string>
+    <string name="ai_target_manual">Enter target package manually</string>
+    <string name="ai_task_examples">Task examples</string>
+    <string name="ai_task_options">Attachment and screenshot options</string>
+    <string name="ai_readiness_fix">Review configuration and permissions</string>
+    <string name="ai_task_start_new">Start new task</string>
+    <string name="ai_task_approval_hint">Approve or stop using the task overlay in the target app.</string>
+    <string name="ai_task_clear_draft">Clear the current draft before selecting an example.</string>
+    <string-array name="ai_task_examples">
+        <item>Find and open Help in the selected app, then finish.</item>
+        <item>Scroll down one page in the selected app, then describe the visible content.</item>
+    </string-array>
+</resources>

@@ -55,6 +55,39 @@ class SecureClipboardManagerPrivacyTest {
         }
     }
 
+    @Test fun rejectedMetadataReadOffersReloadOnlyThroughFreshAuthentication() = withActivity { activity ->
+        val requestId = AtomicReference<String>()
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.component?.className != SecureClipboardUnlockActivity::class.java.name) return null
+                requestId.set(intent.getStringExtra(SecureClipboardUnlockActivity.EXTRA_REQUEST_ID))
+                return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            lateinit var screen: SecureClipboardManagerView
+            onMain {
+                val worker = SecureClipboardManagerActivity::class.java.getDeclaredField("worker").apply { isAccessible = true }
+                (worker.get(activity) as java.util.concurrent.ExecutorService).shutdownNow()
+                screen = views(activity.window.decorView).filterIsInstance<SecureClipboardManagerView>().single()
+                screen.onEnableRequested()
+            }
+            await { requestId.get() != null }
+            val firstRequest = checkNotNull(requestId.getAndSet(null))
+            onMain { AuthenticationBroker.complete(firstRequest, AuthenticationGrant.afterSuccessfulSystemAuthentication()) }
+            awaitOnMain { views(screen).filterIsInstance<android.widget.TextView>().any {
+                it.text == activity.getString(R.string.secure_clipboard_load_failed)
+            } }
+            onMain { screen.onReloadRequested() }
+            await { requestId.get() != null }
+            val secondRequest = checkNotNull(requestId.getAndSet(null))
+            assertNotEquals(firstRequest, secondRequest)
+            onMain { AuthenticationBroker.complete(secondRequest, null) }
+            awaitOnMain { activity.isFinishing }
+        } finally { instrumentation.removeMonitor(monitor) }
+    }
+
     @Test fun deleteConfirmationProtectsItsLabelAndClosesWithThePage() = withActivity { activity ->
         lateinit var dialogRoot: View
         onMain {

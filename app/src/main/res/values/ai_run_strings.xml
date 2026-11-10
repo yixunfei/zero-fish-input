@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_run_channel">AI 任务状态</string>
+    <string name="ai_run_channel_description">仅显示运行、待确认和完成状态，不包含任务内容。</string>
+    <string name="ai_run_title">AI 任务</string>
+    <string name="ai_run_running">正在运行</string>
+    <string name="ai_run_approval">需要确认，请打开任务</string>
+    <string name="ai_run_finished">任务已完成，打开查看</string>
+    <string name="ai_run_failed">任务未完成，打开查看</string>
+    <string name="ai_run_stopped">任务已停止</string>
+    <string name="ai_run_stop">停止</string>
+    <string name="ai_run_notifications">本次任务显示状态通知</string>
+    <string name="ai_run_background">允许本次任务在后台继续（最多两分钟）</string>
+    <string name="ai_run_disclosure">通知只显示通用状态，打开后才能查看内容或批准操作。后台模式需允许通知；可继续文件读取和远程工具，另存为与设备界面操作仍需留在前台。后台任务最多运行两分钟，遇到待确认操作会暂停，锁屏立即停止。结果仅在内存中保留，完成后两分钟清除。</string>
+    <string name="ai_run_enable">开启本次通知</string>
+</resources>

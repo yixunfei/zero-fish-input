@@ -31,3 +31,13 @@ tasks.register<JavaExec>("evaluateCandidateQuality") {
     mainClass.set("dev.zeroinput.engine.dictionary.CandidateQualityEvaluation")
     args(layout.buildDirectory.file("reports/candidate-quality.tsv").get().asFile.absolutePath)
 }
+
+tasks.register<JavaExec>("evaluateAssociationScenarios") {
+    group = "verification"
+    description = "Evaluates offline associations on the frozen bilingual scenario fixtures."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.zeroinput.engine.dictionary.AssociationQualityEvaluation")
+    args(layout.buildDirectory.file("reports/association-quality-scenarios.tsv").get().asFile.absolutePath,
+        "association-quality-scenarios.tsv")
+}

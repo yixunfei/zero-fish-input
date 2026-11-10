@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -30,6 +31,13 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".ZeroInputApplication"
         android:allowBackup="false"
@@ -42,6 +50,55 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ZeroInput"
         android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".ai.AiAssistantLauncherActivity"
+            android:label="@string/ai_assistant_app_name"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="${applicationId}.ai"
+            android:theme="@style/Theme.ZeroInput.PrivateImport">
+            <intent-filter android:priority="-1">
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ai.AiAssistantActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="${applicationId}.ai"
+            android:theme="@style/Theme.ZeroInput.PrivateImport"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ai.AiToolTaskActivity"
+            android:launchMode="singleTop"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:allowTaskReparenting="false"
+            android:theme="@style/Theme.ZeroInput.PrivateImport"
+            android:windowSoftInputMode="adjustResize" />
+
+        <service android:name=".ai.AiTaskForegroundService"
+            android:exported="false" android:foregroundServiceType="shortService"
+            android:stopWithTask="true" />
+        <receiver android:name=".ai.AiTaskStopReceiver" android:exported="false" />
+        <service android:name=".ai.AiVoiceInteractionService"
+            android:label="@string/ai_assistant_app_name" android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter><action android:name="android.service.voice.VoiceInteractionService" /></intent-filter>
+            <meta-data android:name="android.voice_interaction" android:resource="@xml/ai_voice_interaction" />
+        </service>
+        <service android:name=".ai.AiVoiceSessionService" android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <service android:name=".ai.AiDisabledRecognitionService" android:exported="false"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter><action android:name="android.speech.RecognitionService" /></intent-filter>
+        </service>
 
         <activity
             android:name=".settings.MainActivity"
@@ -133,6 +190,15 @@
         <activity
             android:name=".ai.AiComposeActivity"
             android:label="@string/ai_import_title"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:allowTaskReparenting="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ZeroInput.PrivateImport"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ai.AiSkillsActivity"
             android:exported="false"
             android:excludeFromRecents="true"
             android:allowTaskReparenting="false"

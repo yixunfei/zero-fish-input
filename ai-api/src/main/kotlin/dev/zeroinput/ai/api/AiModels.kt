@@ -59,6 +59,7 @@ data class AiRequest(
     val model: String? = null,
     val references: List<AiReference> = emptyList(),
     val reasoningMode: AiReasoningMode = AiReasoningMode.DEFAULT,
+    val workspaceContext: AiWorkspaceContext = AiWorkspaceContext(),
 ) {
     init {
         require(input.isNotBlank()) { "AI input must not be blank" }
@@ -68,7 +69,7 @@ data class AiRequest(
             "Invalid AI model"
         }
         require(history.size <= AiLimits.MAX_HISTORY_MESSAGES) { "AI history is too large" }
-        AiReference.validate(history, references)
+        workspaceContext.validate(history, references)
         require(targetLanguage == null || targetLanguage.length in 2..32) { "Invalid target language" }
         require(attachments.size <= AiLimits.MAX_ATTACHMENTS) { "Too many AI attachments" }
         require(attachments.sumOf { it.bytes.size } <= AiLimits.MAX_ATTACHMENT_BYTES) { "AI attachments are too large" }

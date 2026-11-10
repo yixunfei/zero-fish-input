@@ -1,5 +1,61 @@
 # Security policy
 
+APK delivery also verifies reviewed full/lite resources, prebuilt startup data
+and native runtime hashes, and rejects retained native debug sections or excessive
+incremental ZIP space. Checks cannot be disabled with Python optimization.
+The default physical-file budget is 80,000,000 bytes; an explicit delivery-limit
+override does not change the separately reported project target. Packaging reset
+is confined to generated Debug ZIP directories, rejects links and preserves native
+caches, historical deliveries and application data. See
+[APK size optimization](docs/apk-size-optimization.md).
+
+E6 (ADR 0035) limits virtual displays to an explicit private own-content public
+fixture. No screen mirroring, user content, remote transmission, foreign app
+launch or input injection is exposed. Stop/display loss/timeout release the
+display; exit/lock also release the preview surface. Only the fixed public frame
+may remain visible in an open stopped preview. Device foreground checks stay mandatory.
+
+E5 (ADR 0034) permits default-off generic task notifications, nonce-bound actions
+and a private non-sticky 120-second short foreground service. It cannot approve
+operations or detach GUI device actions. Native assistant services are system-
+bound, ignore unsolicited content and disable contextual/screenshot collection.
+
+Explicit remote tools follow ADR 0033: public HTTPS MCP and fixed Brave search
+only, independent encrypted tokens, actual socket DNS checks and reviewed calls.
+No redirects, proxies, automatic retries, server commands, stdio or OAuth fallback.
+Results are untrusted context. New remote capability does not expose IME data.
+
+Foreground file/tool tasks follow ADR 0032. Their independent draft and reviewed
+catalog use the existing HTTPS provider. Every call is approved, schema-checked,
+bounded and generation-fenced. File IDs resolve only to task-selected temporary
+SAF URIs. Save As accepts a fresh system creation result with a second destination
+review, rejects known/reused targets and never retries uncertain writes. A
+bounded picker handoff suspends dispatch; lock/settings/data revocation cancels
+it. Device tasks keep their separate foreground/Stage 6 gate. No permission or
+additional network destination is introduced by E3.
+
+Declarative Skills and compaction follow ADR 0031. Skill import is one explicitly
+picked, bounded UTF-8 document with review before save; no script, archive or
+dependency execution. Tool requirements cannot grant authority. The independent
+encrypted Skill library participates in AI-data deletion. Summary generation and
+application require separate explicit actions; revision/generation checks reject
+stale proposals and originals remain intact. No new network path is added.
+
+Standalone roles and memory (ADR 0030) are explicitly authored/saved, encrypted
+under a separate context-library key, and selected per chat. Role scope is checked
+before inclusion. AI-data deletion covers this library and revokes queued edits.
+Role instructions are preferences, not permissions or protocol system messages.
+
+The owner-approved standalone AI entry (ADR 0029) adds only a content-free
+MAIN/LAUNCHER gateway in the existing APK. It opens a private, secure chat screen
+without forwarding incoming content, grants or commands and without starting a
+request. The chat has no editor/clipboard read or insertion capability; existing
+network, privacy and optional encrypted-history gates apply. Device tasks retain
+their existing approval and foreground boundaries. Local app selection exposes
+only eligible launchable targets; its list is not uploaded. Pending starts are
+single-use and expire after ten seconds of elapsed realtime, including sleep;
+configuration, policy and data changes revoke them before dispatch.
+
 Composing-candidate personalization uses only bounded exact-word lookups of
 already-produced native candidates in the prepared frequency mirror. It reuses
 existing encrypted usage across input codes without enumerating private words,
@@ -31,6 +87,10 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
 下载 APK 为 Debug 签名且可调试，仅适合测试；维护者正式签名与真机认证验收尚未完成。
 
 ## 支持边界
+
+- 管理页读取失败与空列表分别反馈，不显示原始异常。重新加载只读取列表，不重放保存、删除、
+  导入或下载；安全剪贴板失败后隐藏旧元数据，重试必须重新认证。离页撤销旧回调并清除个人词组
+  的可见内容及未保存草稿，过期的条目点击不能操作替代条目。
 
 - 个人联想默认仅从已被编辑器接受的候选点击学习。可选“从提交结果学习”默认关闭，开启后仍受全部隐私策略及写入代次限制，不读取编辑器已有正文。管理页使用安全窗口、禁用字段状态保存、自动填充和内容捕获；查询在后台执行且每页最多 50 项，拼音匹配只使用本地公开字音表，不建立额外明文词库。权重编辑和删除撤销旧排队学习；过期会话的异步刷新不能重显旧候选。
 
@@ -140,6 +200,7 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
 - 中文配置变化会使旧引擎预热结果及待处理认证操作失效；隐私收紧仍立即取消组合与个性化读取。
 - 简繁转换完全离线，词典固定版本并在构建时校验。生成的拼音索引不含用户数据，不启用 Rime 用户词典。
 - 长按删除与候选点击均受会话和手势生命周期约束，失效操作不会延迟作用于新的输入框。
+- 成对符号上屏后，仅在原输入连接和已跟踪的提交区间仍有效时将光标放到符号中间。
 - 面板返回和表情分类手势沿用交互失效边界；横滑先取消条目点击，取消手势不得插入内容。外部光标移动只结束已有组合并清除旧候选，不读取周边正文，不学习该次组合，也不重写新选区。
 - 自选键盘背景只接收用户通过系统选择器授权的图片，限制实际字节、源像素与解码尺寸；后台重编码去除
   元数据，以独立 AES-GCM/Keystore 密钥加密保存在 noBackupFilesDir。删除或恢复默认会使旧导入失效并
@@ -422,3 +483,12 @@ closed. Staged preparation and rollback protect existing reviewed inputs from
 handled failures. The bot rebuilds matching default Rime artifacts, verifies
 branch ownership and uses an exact lease; merge and publication remain explicit.
 See docs/adr/0028-dictionary-source-split.md.
+## AI interaction follow-up (2026-11-01)
+
+Standalone chat supports a bounded, memory-only pending-message queue. Leaving
+the chat, stopping, changing context/model/settings, locking or clearing AI data
+discards pending messages. Device operations remain single-task and never replay
+after cancellation. Tool availability is an informational view of existing gates;
+it grants no permission. Task examples fill drafts only, and screenshots require
+fresh consent for every task. A dispatched platform write may already have taken
+effect when stopped; check its result before starting another task.

@@ -179,7 +179,8 @@ class AiWorkbenchFlowTest {
                 )
             }, AiDataGeneration(),
             { handler.post(it) }, { allowed && panel.isAiOpen }, panel::renderAi,
-            panel::renderAiConversations, panel::renderAiConversation, editorPrivacy = { ready.privacy })
+            panel::renderAiConversations, panel::renderAiConversation,
+            generationPolicy = { config -> AiEditorPolicy.generationPolicy(config.enabled, config.networkAllowed, ready.privacy) })
 
         init {
             panel.renderSession(ready)

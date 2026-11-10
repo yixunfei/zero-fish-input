@@ -1,0 +1,10 @@
+<resources>
+    <string name="ai_virtual_title">虚拟屏能力验证</string>
+    <string name="ai_virtual_limits">本次仅预览 ZeroInput 自有的公开样例，不显示其他应用或主屏内容。当前不支持在后台虚拟屏中读取或操作第三方应用；设备代理仍需目标应用位于前台。预览最多保留 2 分钟，关闭页面或锁屏即释放。</string>
+    <string name="ai_virtual_fixture">ZeroInput\n独立虚拟屏 · 公开样例</string>
+    <string name="ai_virtual_start">开始预览</string>
+    <string name="ai_virtual_idle">尚未创建虚拟屏</string>
+    <string name="ai_virtual_running">独立虚拟屏已创建 · 640 × 360\n应用运行：仅自有样例\n第三方页面读取与操作：不可用</string>
+    <string name="ai_virtual_stopped">预览已停止，虚拟屏已释放</string>
+    <string name="ai_virtual_unavailable">此设备无法创建预览，请关闭后重试。</string>
+</resources>

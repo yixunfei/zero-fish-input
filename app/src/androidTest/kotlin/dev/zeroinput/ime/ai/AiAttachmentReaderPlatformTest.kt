@@ -20,6 +20,32 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29)
 class AiAttachmentReaderPlatformTest {
+    @Test fun skillDocumentReaderRejectsRevocationInvalidEncodingAndOversizedOrNonTextFiles() {
+        withDocument("text/markdown", "---\nname: Public\n---\nPublic instructions".toByteArray()) { resolver ->
+            val text = AiDocumentTextReader.read(resolver, URI, android.os.CancellationSignal(), 16_384) { true }
+            assertEquals("Public", AiSkillDocument.parse(text).name)
+            assertThrows(IllegalStateException::class.java) {
+                AiDocumentTextReader.read(resolver, URI, android.os.CancellationSignal(), 16_384) { false }
+            }
+            val cancelled = android.os.CancellationSignal().apply { cancel() }
+            assertThrows(android.os.OperationCanceledException::class.java) {
+                AiDocumentTextReader.read(resolver, URI, cancelled, 16_384) { true }
+            }
+            assertThrows(IllegalArgumentException::class.java) {
+                AiDocumentTextReader.read(resolver, Uri.parse("file:///private"), android.os.CancellationSignal(), 16_384) { true }
+            }
+        }
+        for ((mime, bytes) in listOf("text/plain" to ByteArray(16_385) { 65 },
+            "text/plain" to byteArrayOf(0xc0.toByte()), "text/plain" to byteArrayOf(0),
+            "application/zip" to "Public".toByteArray())) {
+            withDocument(mime, bytes) { resolver ->
+                assertThrows(Exception::class.java) {
+                    AiDocumentTextReader.read(resolver, URI, android.os.CancellationSignal(), 16_384) { true }
+                }
+            }
+        }
+    }
+
     @Test fun documentBytesAreBoundedEvenWhenProviderReportsAnIncorrectSize() {
         withDocument("text/plain", "public document".toByteArray()) { resolver ->
             val attachment = AiAttachmentReader.read(resolver, URI)

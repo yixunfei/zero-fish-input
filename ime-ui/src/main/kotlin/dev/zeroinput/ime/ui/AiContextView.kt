@@ -46,8 +46,22 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
                 }
             })
         })
+        value.workspace.persona?.let { persona ->
+            addView(label(context.getString(R.string.ai_workspace_context)))
+            addView(label(if (preview) listOf(persona.name, persona.description, persona.instructions)
+                .filter(String::isNotBlank).joinToString("\n") else persona.name))
+        }
+        value.workspace.memories.forEachIndexed { index, memory ->
+            addView(label(context.getString(R.string.ai_workspace_memory, index + 1)))
+            addView(label(if (preview) memory.text else referencePreview(memory.text)))
+        }
+        value.workspace.skills.forEach { skill ->
+            addView(label(context.getString(R.string.ai_workspace_skill, skill.name)))
+            addView(label(if (preview) skill.description + "\n" + skill.instructions else referencePreview(skill.description)))
+        }
         value.references.forEachIndexed { index, reference ->
-            addView(label(context.getString(R.string.ai_reference_number, index + 1)))
+            addView(label(if (reference.source == AiReference.Source.SUMMARY) context.getString(R.string.ai_workspace_summary_label)
+                else context.getString(R.string.ai_reference_number, index + 1)))
             addView(label(if (preview) reference.text else referencePreview(reference.text)))
             if (!preview) addView(button(R.string.ai_context_remove) { onRemove(value.revision, index) })
         }
@@ -65,7 +79,8 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
             })
         }
         addView(label(context.getString(R.string.ai_context_transient)).apply { textSize = 12f })
-        if (value.references.isEmpty() && (if (preview) value.selectedHistory.isEmpty() else value.messages.isEmpty())) {
+        if (value.workspace.characterCount == 0 && value.references.isEmpty() &&
+            (if (preview) value.selectedHistory.isEmpty() else value.messages.isEmpty())) {
             addView(label(context.getString(R.string.ai_context_empty)))
         }
     }

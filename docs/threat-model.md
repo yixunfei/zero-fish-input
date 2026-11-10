@@ -1,5 +1,25 @@
 # Threat model
 
+E6 (ADR 0035) addresses accidental main-screen mirroring, foreign-app fallback
+and stale display resources. Private OWN_CONTENT_ONLY flags, a fixed public
+Presentation, no launch/input port and bounded lifecycle cleanup isolate the
+preview. Display creation does not establish third-party observation/control.
+
+E5 (ADR 0034) covers stale notification intents, background task ownership,
+service timeouts and system assistant invocation. Task nonces, immutable actions,
+independent opt-in, generic notification text, a 120-second bound and revocation
+on lock/configuration/service loss protect transient state. Background approvals
+are forbidden. Assistant services discard all caller context and cannot capture
+the screen or microphone through invocation.
+
+E4 remote tools (ADR 0033) add malicious MCP servers, DNS rebinding, credential
+forwarding and search-result injection to the task boundary. The exact
+AiRemoteHttpsTransport adapter binds public-only DNS to actual sockets, rejects
+redirects/proxies/retries, separates endpoint tokens, bounds JSON/SSE, and never
+interprets server content as authority. Catalog changes revoke reviewed calls.
+Connection storage has its own key and is included in AI deletion. No input,
+clipboard, device grant, local root or arbitrary page-fetch capability is exposed.
+
 ## Protected assets
 
 - 用户输入习惯、词组、词频和 emoji 最近使用记录。
@@ -8,6 +28,41 @@
 - 本地导入的语言包和用户主动导出的数据。
 
 ## Enforced controls
+
+- APK delivery checks preserve the full/lite contract, all core tables and the
+  exact reviewed prebuilt startup manifest/archives. Bundled optional-model
+  hashes and reduced native runtime hashes are verified in the final ZIP.
+  Integrity and size checks remain active under optimized Python. A physical
+  byte budget, native ELF debug-section detection and bounded ZIP overhead
+  prevent symbol leakage or stale incremental archive space from silently
+  inflating deliveries. Packaging reset rejects links and touches only the
+  allowlisted generated Debug ZIP directories; native caches, delivered APKs
+  and application data are outside its scope. Budget overrides remain explicit
+  and cannot relabel the fixed 80,000,000-byte target as met.
+
+- ADR 0032 treats model tool calls as untrusted requests. Tool identity and
+  effects come from the reviewed app catalog, with closed schemas, bounded JSON,
+  single-use approvals, serial dispatch and task/data/configuration fences.
+  Duplicate IDs, unknown names, extra arguments and unsupported schemas reject
+  execution. Task deadlines and UI-delivery failure close the task. Source file
+  IDs bind only selected SAF URIs; no model path or URI is accepted. Save As uses
+  fresh creation and destination review, rejects known/reused URI targets and
+  treats dispatch errors as uncertain without retry. Metadata/read/write work is
+  off the main thread. Picker cancellation, timeout, screen-off and recreation
+  release pending state; no model request proceeds while awaiting the picker.
+  Document providers can still misrepresent files or perform their own network
+  access; the app does not claim transactional rollback of provider operations.
+
+- ADR 0031 adds explicitly saved Skills as protected AI assets. A malicious
+  document cannot load code, YAML extensions, archives or dependencies. Import
+  validates content URI, MIME, UTF-8 and byte limits and observes cancellation,
+  deadlines and data/activity generations. Review precedes save and per-chat
+  selection; library changes invalidate selection approval. Unsupported tool
+  requirements fail closed. Definitions use a separate encrypted file/key and
+  participate in AI deletion. Compaction previews both source and output;
+  forged, stale, revoked or oversized proposals cannot change context. It
+  retains original messages and excludes role/memory/file/page content from
+  the summarization request. Model summaries are fallible reference data.
 
 - Enabling incognito mode requires explicit acknowledgement that source-app Copy
   and Cut still use the system clipboard. Cancellation and recreation do not
@@ -97,6 +152,9 @@
   历史写入失效；会话或隐私策略变化同样会使已排队的词组、词频和 emoji 写入失效。用户主动
   清除会删除用户词组和 emoji 历史的专用 Keystore 密钥，实现密文与密钥一并擦除。
 - 输入会话首帧只使用轻量内存引擎；Rime 会话和语言包词典由共享有界后台队列创建、启动。
+  同配置编辑器重启可保留数字/符号页面选择，但仍销毁旧会话并重新绑定连接；不保留
+  组合、候选、Shift 状态、认证授权或异步任务代次。页面选择不作为编辑器身份依据。
+  成对符号使用已有的选区位置。提交后仅在原连接和提交区间仍有效时移动光标。
   会话初始语言从当前 ZeroInput subtype（`zh-CN`/`en-US`）解析，回调缺失或乱序时才使用本地
   语言设置，避免系统显示的 subtype 与实际引擎状态分离。
   键盘上的语言切换同步系统子类型；系统回调仍执行交互失效和个性化任务取消，旧认证结果不能
@@ -236,6 +294,12 @@
   cleared on reset/close. No coordinates, key history, model context, private
   training corpus or new permission is persisted. Canonical reading metadata
   prevents learning corrected output under the misspelled input.
+- Automatic full-pinyin segmentation uses the current session's public prism
+  and a bounded search. An alternate candidate keeps the original raw-input
+  offsets and respects manually inserted delimiters. Display-only spaces and
+  match hints are scoped to the composition view. Space uses the same visible
+  candidate route as a tap, with its own opt-in learning gate and the existing
+  editor-acceptance and privacy checks.
 
 - Chinese preferences are immutable snapshots included in warm-up identity.
   Changing options invalidates old preparation results and authenticated actions.
@@ -1062,6 +1126,17 @@ checked before private reads and opening public originals; retained overrides
 stay manageable even if their upstream original disappears after redownload.
 Malformed, truncated, duplicate, oversized or unauthenticated edit data fails closed.
 
+Management worker exceptions and executor rejection produce localized,
+content-free failure states rather than empty lists or raw exception strings.
+The reload action reads the list only: uncertain writes, deletes, imports and
+downloads require another explicit user action. Private clipboard failures hide
+all old metadata, and reload obtains a new one-use authentication grant; an old
+grant is never retained for retry. Page cancellation revokes queued work and
+posted callbacks. Personal phrase rows/drafts are scrubbed on stop, and retired
+phrase/expression bindings reject stale clicks. The public association scene
+fixtures and before reports contain synthetic public samples only and remain in
+test resources. No personal format, permission or network boundary is extended.
+
 Redownload retains encrypted edits and enabled state. Bundled restore uses verified
 APK data; remote replacement requires the locked archive hash before selecting one
 bounded data entry. Archive paths never become output paths. Download cancellation,
@@ -1151,7 +1226,61 @@ edited credentials, protocol changes and stale results. Live catalog acceptance
 now requires a successful parsed list containing the requested model separately
 from successful generation; a passing generation cannot conceal failed discovery.
 
+## Standalone AI launcher and chat (2026-11-01)
+
+ADR 0030 adds roles and memory as protected AI assets. Shared memory requires
+explicit per-item sharing and selection; role-scoped items cannot cross roles.
+Structured preferences cannot become protocol system messages or tool authority.
+All selected text shares the existing context limit. The atomic library uses a
+separate Keystore alias, strict bounded parsing and no plaintext cache. Revision
+checks reject stale edits; data clear revokes queued operations and deletes the
+file/key; failed deletion blocks access until retry. Review surfaces disable
+state saving, autofill and content capture and use secure windows. No automatic
+memory learning or new editor/clipboard/network access is introduced.
+
+The new public launcher is a content-free gateway (ADR 0029). Only MAIN with
+exactly LAUNCHER and no data/MIME type is accepted. Incoming extras, ClipData,
+commands and URI grants are not inspected or forwarded. The private chat and
+device task components cannot be externally started. Opening/reopening never
+starts a request, enables a setting or replays a device action. Privacy checks
+validate the exact gateway filter and the private chat's export/recents flags;
+negative scanner cases mutate these boundaries.
+
+Standalone chat is an explicit draft source, with no fabricated editor identity
+and no personalization grant. It retains the existing default-off network/history
+settings and fails closed on learning-off, incognito, lock, configuration change,
+backgrounding and data revocation. Its independent request coordinator prevents
+IME cancellation from substituting for its lifecycle. FLAG_SECURE, disabled
+autofill/content capture and empty saved state protect transient content. History
+uses the existing encrypted repository and reviewed bounded context.
+
+Launcher visibility is limited to MAIN/LAUNCHER activities; local choices are
+bounded and filtered by the existing target policy. No inventory is uploaded.
+The pending-start guard is single-use, checks elapsed realtime before dispatch
+and binds configuration/policy/data generation. A late timer or configuration
+callback cannot restart an expired/cancelled request with new credentials.
+Stop works without a retained Activity-owned handle. Foreground task revocation
+and the existing approval overlay still apply, including Stage 6 one-use consent.
+
 ## AI device agent boundary (2026-10-19)
+
+The accepted 2026-11-01 interaction follow-up adds a bounded memory-only queue
+to ordinary standalone chat. Pending text is user-authored, never persisted as
+drafts or copied from an editor/clipboard. Four pending messages share the existing
+input-character budget. Editing retrieves and removes an item, and refuses to
+overwrite an existing draft. Interrupt cancels the old generation before sending
+the replacement. Posted continuation is revoked on leave/lock, settings/model/
+context changes, data deletion, failure or explicit stop; configuration and data
+generation are revalidated before dispatch. Optional persistence must settle
+before the next request, so request cancellation cannot silently skip that save.
+No queue, steering or automatic retry is added to device actions.
+
+Capability discovery reads configuration/permission/feature metadata only, never
+notifications, files, contacts or other protected category data. Viewing the
+overview or choosing an example cannot enable a tool or start a task. Search is
+limited to the existing local launcher selection. Expandable task rows retain
+the existing bounded transient presentation lifetime, and never restore approvals
+or make claims that cancellation rolled back already dispatched operations.
 
 The device agent is an explicit side-load/private-distribution capability. It is
 disabled by default and requires an in-app disclosure, a selected target package,

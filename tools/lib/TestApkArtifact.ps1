@@ -1,5 +1,39 @@
 Set-StrictMode -Version Latest
 
+function Reset-TestApkPackaging {
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
+    # AGP incremental ZIP replacement can retain removed library/DEX bytes.
+    # Reset only reproducible Debug packaging state, never native caches or deliveries.
+    $root = [IO.Path]::GetFullPath($RepositoryRoot)
+    $build = [IO.Path]::GetFullPath((Join-Path $root 'app/build'))
+    $targets = @('intermediates/incremental/packageDebug', 'intermediates/apk/debug', 'outputs/apk/debug') |
+        ForEach-Object { [IO.Path]::GetFullPath((Join-Path $build $_)) }
+    foreach ($path in $targets) {
+        if (-not $path.StartsWith($build + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Unsafe APK packaging reset path.'
+        }
+        $ancestor = $path
+        while ($ancestor -and $ancestor.Length -ge $root.Length) {
+            if (Test-Path -LiteralPath $ancestor) {
+                if ((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                    throw 'APK packaging reset cannot traverse links.'
+                }
+            }
+            $ancestor = Split-Path $ancestor -Parent
+        }
+        if (Test-Path -LiteralPath $path) {
+            if (@(Get-ChildItem -LiteralPath $path -Recurse -Force -Attributes ReparsePoint).Count -gt 0) {
+                throw 'APK packaging reset cannot remove linked content.'
+            }
+        }
+    }
+    # Validate every path before removing any state.
+    foreach ($path in $targets) {
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
+    }
+}
+
 function Resolve-TestApkArtifact {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_assistant_title">AI assistant</string>
+    <string name="ai_assistant_notice">Start chats and device tasks yourself, using your configured model provider.</string>
+    <string name="ai_assistant_chat">Chat</string>
+    <string name="ai_assistant_fullscreen">Full-screen AI assistant</string>
+    <string name="ai_assistant_device">Device tasks</string>
+    <string name="ai_assistant_settings">AI settings</string>
+    <string name="ai_assistant_working">Replying…</string>
+    <string name="ai_assistant_finished">Reply complete</string>
+    <string name="ai_assistant_stopped">Stopped</string>
+</resources>

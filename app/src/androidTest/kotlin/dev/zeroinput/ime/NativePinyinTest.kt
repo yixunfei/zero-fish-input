@@ -2,6 +2,7 @@ package dev.zeroinput.ime
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.EditorContext
 import dev.zeroinput.engine.api.EngineKey
 import dev.zeroinput.engine.api.InputEngine
@@ -15,6 +16,52 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class NativePinyinTest {
+    @Test
+    fun mixedInitialAndNearSyllableOfferTheWholePhrase() = withEngine { engine ->
+        for ((raw, learning) in listOf("nmen" to "nmen", "nmeng" to "nimen")) {
+            type(engine, raw)
+            val snapshot = engine.snapshot
+            val index = snapshot.candidates.indexOfFirst { it.text == "你们" }
+            assertTrue("Expected the whole phrase for $raw among: ${snapshot.candidates.map { it.text }}", index >= 0)
+            if (raw == "nmeng") assertTrue(snapshot.candidates.first().text == "柠檬")
+            assertTrue(snapshot.rawInput == raw)
+            assertTrue(snapshot.candidates[index].pinyinMatch?.end == raw.length)
+            val update = engine.selectCandidate(index)
+            assertTrue(update.committedText == "你们" && !update.snapshot.isComposing)
+            assertTrue(update.learningInput == learning)
+        }
+        type(engine, "nmeng")
+        assertTrue(engine.handle(EngineKey.Enter).committedText == "nmeng")
+    }
+
+    @Test
+    fun mixedRecoveryRequiresAbbreviatedPinyin() = withEngine(ChineseInputOptions(abbreviatedPinyin = false)) { engine ->
+        type(engine, "nmeng")
+        assertFalse(engine.snapshot.candidates.any { it.text == "你们" })
+    }
+
+    @Test
+    fun alternateSplitFillsTheCandidateListWithoutEditingTheRawInput() = withEngine { engine ->
+        type(engine, "kanga")
+        val initial = engine.snapshot
+        assertTrue("Primary segmentation must remain first", initial.candidates.first().pinyinMatch?.spelling == "kang a")
+        val alternate = initial.candidates.indexOfFirst { it.pinyinMatch?.spelling == "kan ga" }
+        assertTrue("An alternate whole reading must be available on the first page", alternate > 0)
+        assertTrue("A projected reading must not insert a delimiter into the user's input", initial.rawInput == "kanga")
+        val selected = engine.selectCandidate(alternate)
+        assertTrue("Selecting the projected reading must commit exactly the visible word",
+            selected.committedText == initial.candidates[alternate].text && !selected.snapshot.isComposing)
+        assertTrue("Learning must use the unmodified code", selected.learningInput == "kanga")
+
+        type(engine, "kang'a")
+        assertTrue("Explicit syllable boundaries must remain in the raw input", engine.snapshot.rawInput == "kang'a")
+        assertFalse(engine.snapshot.candidates.any { it.pinyinMatch?.spelling == "kan ga" })
+        assertTrue(engine.handle(EngineKey.Backspace).snapshot.rawInput == "kang'")
+        engine.reset()
+        type(engine, "kanga")
+        assertTrue(engine.handle(EngineKey.Enter).committedText == "kanga")
+    }
+
     @Test
     fun completeCandidateSelectionCommitsAndClearsComposition() = withEngine { engine ->
         type(engine, "nihao")
@@ -88,12 +135,12 @@ class NativePinyinTest {
         input.forEach { engine.handle(EngineKey.Character(it.toString())) }
     }
 
-    private fun withEngine(action: (InputEngine) -> Unit) {
+    private fun withEngine(options: ChineseInputOptions = ChineseInputOptions(), action: (InputEngine) -> Unit) {
         val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication
         val graph = application.graph
         graph.engineExecutor.submit {
             check(graph.rime.runtime.isReady) { "Native Rime must be ready for integration tests" }
-            checkNotNull(graph.rime.createNativeOrNull()).use { engine ->
+            checkNotNull(graph.rime.createNativeOrNull(options)).use { engine ->
                 engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
                 action(engine)
             }

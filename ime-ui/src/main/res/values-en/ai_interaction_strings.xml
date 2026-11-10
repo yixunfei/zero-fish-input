@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_queue_interrupt">Interrupt</string>
+    <string name="ai_queue_send">Queue</string>
+    <string name="ai_queue_full">Queue limit reached: up to 4 messages within the total text budget.</string>
+    <string name="ai_queue_item">Queued %1$d · %2$s</string>
+    <string name="ai_queue_edit">Edit draft</string>
+    <string name="ai_queue_remove">Remove</string>
+    <string name="ai_queue_draft_occupied">Send or clear your draft before editing a queued message.</string>
+    <string name="ai_capabilities">Tools and capabilities</string>
+</resources>

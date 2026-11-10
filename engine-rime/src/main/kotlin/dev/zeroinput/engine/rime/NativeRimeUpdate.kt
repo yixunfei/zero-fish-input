@@ -11,4 +11,7 @@ internal class NativeRimeUpdate(
     val lastPage: Boolean,
     val highlightedIndex: Int,
     val caretPosition: Int,
+    val spellings: Array<String>,
+    /** Start/end byte offsets, valid as character offsets only for ASCII input. */
+    val spellingRanges: IntArray,
 )

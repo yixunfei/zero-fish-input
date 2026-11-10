@@ -6,6 +6,7 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 
 | Component | Pinned version | License | License text | Purpose |
 | --- | --- | --- | --- | --- |
+| OkHttp / Okio JVM | 4.12.1 / 3.6.0 | Apache-2.0 | `Apache-2.0.txt` | E4 opt-in HTTPS tools with socket-bound public DNS checks; no initialization networking or Android components |
 | librime | 1.13.1 (`1c233581`) | BSD-3-Clause | `librime-BSD-3-Clause.txt` | 中文输入引擎 |
 | darts-clone | librime bundled copy | BSD-3-Clause | `darts-clone-BSD-3-Clause.txt` | librime 数据结构 |
 | rime-luna-pinyin | `46acf031` | LGPL-3.0 | `rime-data-LGPL-3.0.txt`, `GPL-3.0.txt` | 全拼词典 |
@@ -29,6 +30,18 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 | Tegaki Chinese stroke model data | 0.3 simplified-light / traditional | LGPL-2.1 | `Tegaki-LGPL-2.1.txt` | Offline simplified/traditional handwriting tables |
 | rimeinn/rime-kaomoji expression data | `e66d8f26ee47b4a2a840983b7d71ed69b5ecf756` | LGPL-3.0 | `rime-kaomoji-LGPL-3.0.txt`, `GPL-3.0.txt` | 离线颜文字分类数据，原始与适配后的数据源码随 APK 分发 |
 | Android NDK runtime | 28.2.13676358 | 多许可证 | `android-ndk-NOTICE.txt` | `libc++_shared.so` 与 native 运行时 |
+
+OkHttp is needed for actual-socket DNS enforcement; a separate DNS preflight with
+the platform URL connection would permit rebinding. The maintained 4.x patch
+keeps the project's Kotlin baseline and includes the upstream 4.12.1 certificate
+distrust patch. Maven coordinates are fixed, no dynamic versions. Downloaded JAR
+sizes are 791,976 bytes (OkHttp) and 359,580 bytes (Okio JVM); release shrinking
+determines actual APK overhead. SHA-256 values reviewed on 2026-11-02:
+`86706f20171c58167b4acca46a66a4039d6b7927543b5ed944b7311c3cb52de0`
+and `67543f0736fc422ae927ed0e504b98bc5e269fda0d3500579337cb713da28412`.
+The adapter retains platform TLS, has no telemetry, and disables retries,
+redirects, proxies, cookies, caches and idle connection reuse. Offline input is
+independent of both libraries. Sources remain Apache-2.0 compatible.
 
 Rime 与颜文字的 LGPL 源数据随 APK 提供；Tegaki 笔画表的原始训练 XML、模型、构建文件和
 适配脚本另随对应源码归档提供。ZeroInput 的独立源码仍采用 Apache-2.0。分发二进制时必须同时

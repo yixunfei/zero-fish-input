@@ -1,0 +1,103 @@
+# Project-authored public synthetic scenarios; Apache-2.0.
+# Frozen before this expansion; visible during curation, not an independent accuracy set.
+# id language category context acceptable-next-words (pipe-separated; - means abstain)
+zh201	zh	social	谢谢你的	帮助|支持|关心
+zh202	zh	social	好久没有	联系|见面
+zh203	zh	social	祝你周末	愉快|开心
+zh204	zh	social	等你有空	再聊|联系
+zh205	zh	scheduling	会议改到	明天|下午
+zh206	zh	scheduling	时间确定	以后|了
+zh207	zh	scheduling	我们周五	见面|见
+zh208	zh	scheduling	到了以后	联系|告诉我
+zh209	zh	work	请确认一下	时间|信息
+zh210	zh	work	文档已经	更新|发送
+zh211	zh	work	收到请	回复|确认
+zh212	zh	work	有问题随时	联系|沟通
+zh213	zh	delivery	快递到了	取一下|联系我
+zh214	zh	delivery	收货地址	发给我|确认一下
+zh215	zh	delivery	预计明天	送达|到达
+zh216	zh	delivery	包裹已经	发出|送达
+zh217	zh	travel	到站以后	联系|告诉我
+zh218	zh	travel	请问地铁站	在哪里|怎么走
+zh219	zh	travel	路上注意	安全|休息
+zh220	zh	travel	酒店已经	预订|确认
+zh221	zh	food	今天中午吃	什么|面条
+zh222	zh	food	少放一点	盐|辣椒
+zh223	zh	food	不需要	餐具|了
+zh224	zh	food	一起去吃	饭|火锅
+zh225	zh	study	这道题怎么	做|解
+zh226	zh	study	考试顺利	通过|加油
+zh227	zh	study	复习一下	重点|内容
+zh228	zh	study	作业已经	完成|提交
+zh229	zh	health	记得按时	吃药|休息
+zh230	zh	health	早点休息	晚安|吧
+zh231	zh	health	身体不舒服	休息一下|去医院
+zh232	zh	health	检查结果	出来了|正常
+zh233	zh	shopping	这个还有	货吗|吗
+zh234	zh	shopping	可以帮我	看看|确认一下
+zh235	zh	shopping	退款已经	到账|申请
+zh236	zh	shopping	发票抬头	发给我|确认一下
+zh237	zh	technical	网络连接	失败|正常
+zh238	zh	technical	重新启动	试试|应用
+zh239	zh	technical	文件已经	保存|上传
+zh240	zh	technical	請確認一下	時間|資訊
+zh241	zh	abstention	忘我	-
+zh242	zh	abstention	自我	-
+zh243	zh	abstention	何去何从	-
+zh244	zh	abstention	咫尺天涯	-
+zh245	zh	abstention	叶绿素	-
+zh246	zh	abstention	杠杆原理	-
+zh247	zh	abstention	莫名其妙	-
+zh248	zh	abstention	反向传播	-
+zh249	zh	abstention	無我	-
+zh250	zh	abstention	量子纠缠	-
+en201	en	social	thanks for your	help|support
+en202	en	social	it was nice to	meet|see
+en203	en	social	hope you have a	great|good
+en204	en	social	looking forward to seeing	you
+en205	en	scheduling	can we meet	tomorrow|today
+en206	en	scheduling	please confirm the	time|details
+en207	en	scheduling	let me know when	you
+en208	en	scheduling	see you on	monday|friday
+en209	en	work	please review the	document|changes
+en210	en	work	i have attached the	file|document
+en211	en	work	i will get back to	you
+en212	en	work	keep me updated	on
+en213	en	delivery	the package has been	shipped|delivered
+en214	en	delivery	please send me your	address|details
+en215	en	delivery	your order is	ready|confirmed
+en216	en	delivery	when will it	arrive|ship
+en217	en	travel	how do i get to	the
+en218	en	travel	where is the nearest	station|hotel
+en219	en	travel	i would like to book a	room|table
+en220	en	travel	have a safe	trip|journey
+en221	en	food	what would you like to	eat|drink
+en222	en	food	could i have some	water|coffee
+en223	en	food	a table for	two|four
+en224	en	food	let us have	lunch|dinner
+en225	en	study	could you explain	this|it
+en226	en	study	i need to study	for|more
+en227	en	study	good luck with your	exam|studies
+en228	en	study	i have finished my	homework|assignment
+en229	en	health	get well	soon
+en230	en	health	i hope you feel	better
+en231	en	health	remember to take your	medicine|medication
+en232	en	health	please get some	rest|sleep
+en233	en	shopping	do you have this in	stock|blue
+en234	en	shopping	how much does it	cost
+en235	en	shopping	i would like a	refund|receipt
+en236	en	shopping	can i pay by	card|cash
+en237	en	technical	the connection has	failed|timed
+en238	en	technical	please try	again
+en239	en	technical	the file has been	saved|uploaded
+en240	en	technical	could you restart the	application|device
+en241	en	abstention	notgood	-
+en242	en	abstention	whenevergood	-
+en243	en	abstention	alongside	-
+en244	en	abstention	chlorophyll	-
+en245	en	abstention	quaternion	-
+en246	en	abstention	misunderstanding	-
+en247	en	abstention	microscope	-
+en248	en	abstention	bystander	-
+en249	en	abstention	counterclockwise	-
+en250	en	abstention	thermodynamics	-

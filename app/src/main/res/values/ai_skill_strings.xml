@@ -1,0 +1,18 @@
+<resources>
+    <string name="ai_skill_title">Skills</string>
+    <string name="ai_skill_notice">Skill 是可审阅的工作步骤文字，不执行脚本。保存不代表启用；勾选并应用后才随当前问题发送。所需工具必须另行配置和授权。</string>
+    <string name="ai_skill_name">Skill 名称</string>
+    <string name="ai_skill_instructions">工作步骤与要求</string>
+    <string name="ai_skill_required_tools">所需工具（每行一个，可选）</string>
+    <string name="ai_skill_create">新建 Skill</string>
+    <string name="ai_skill_import">导入 Markdown 文档</string>
+    <string name="ai_skill_edit">审阅与编辑 Skill</string>
+    <string name="ai_skill_manage">管理与导入</string>
+    <string name="ai_skill_empty">尚无 Skill。可新建，或导入不超过 16 KiB 的 UTF-8 Markdown 文档。</string>
+    <string name="ai_skill_unsupported">本次上下文未提供这些工具：%1$s。此 Skill 暂不可选择。</string>
+    <string name="ai_skill_delete">删除这个 Skill？</string>
+    <string name="ai_skill_import_failed">无法导入。仅接受有界 UTF-8 文字；元数据支持 name、description 和 allowed-tools 数组，不支持其他字段、多行元数据或脚本包。</string>
+    <string name="ai_skill_leave_title">前往 Skill 管理？</string>
+    <string name="ai_skill_leave_notice">离开对话会清除未发送的草稿和本次上下文选择。保存的对话、角色和记忆保留。</string>
+    <string name="ai_skill_leave_confirm">前往管理</string>
+</resources>

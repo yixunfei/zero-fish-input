@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -15,31 +14,32 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.forEach
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.ConcatAdapter
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.management.ManagementStatusView
+import dev.zeroinput.ime.management.ManagementTaskRunner
 import dev.zeroinput.userdata.ExpressionException
 import dev.zeroinput.userdata.ExpressionFailure
 import dev.zeroinput.userdata.PersonalExpression
-import java.util.concurrent.Future
-import java.util.concurrent.RejectedExecutionException
-import java.util.concurrent.atomic.AtomicLong
 
 open class ExpressionManagerActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
     protected open val repository: dev.zeroinput.userdata.PersonalExpressionRepository get() = graph.expressions
     private val worker = BoundedExecutors.singleThread("zeroinput-expressions", 2)
-    private val generation = AtomicLong()
-    private var task: Future<*>? = null
+    private val tasks by lazy { ManagementTaskRunner(worker, { runOnUiThread(it) },
+        { foreground && !isFinishing && !isDestroyed }, ::setBusy, ::showFailure) }
     private val adapter = ExpressionManagerAdapter(::edit, ::confirmDelete)
     private var form: ExpressionEditorDialog? = null
     private var confirmation: AlertDialog? = null
     private var observer: AutoCloseable? = null
     private var catalogPreparation: java.io.Closeable? = null
     private lateinit var toolbar: MaterialToolbar
-    private lateinit var status: TextView
+    private lateinit var status: ManagementStatusView
+    private var loadingList = false
     private var busy = false
     private var foreground = false
     private var requestedId: String? = null
@@ -73,10 +73,7 @@ open class ExpressionManagerActivity : AppCompatActivity() {
         observer = graph.observeExpressions {
             runOnUiThread {
                 if (foreground) {
-                    generation.incrementAndGet()
-                    task?.cancel(false)
-                    BoundedExecutors.purge(worker)
-                    setBusy(false)
+                    tasks.cancel()
                     adapter.submit(emptyList())
                     form?.dialog?.dismiss()
                     form = null
@@ -96,16 +93,14 @@ open class ExpressionManagerActivity : AppCompatActivity() {
 
     override fun onPause() {
         foreground = false
-        generation.incrementAndGet()
-        task?.cancel(false)
-        BoundedExecutors.purge(worker)
+        tasks.cancel()
         form?.dialog?.dismiss()
         form = null
         confirmation?.dismiss()
         confirmation = null
         adapter.submit(emptyList())
         requestedId = null
-        status.text = ""
+        status.clear()
         busy = false
         super.onPause()
     }
@@ -118,6 +113,7 @@ open class ExpressionManagerActivity : AppCompatActivity() {
     override fun onDestroy() {
         catalogPreparation?.close()
         observer?.close()
+        tasks.close()
         worker.shutdownNow()
         super.onDestroy()
     }
@@ -153,15 +149,18 @@ open class ExpressionManagerActivity : AppCompatActivity() {
             }
         }
         addView(toolbar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)))
-        status = TextView(this@ExpressionManagerActivity).apply {
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(16), dp(12), dp(16), dp(12))
+        status = ManagementStatusView(this@ExpressionManagerActivity)
+        val header = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun getItemCount() = 1
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                status.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                return object : RecyclerView.ViewHolder(status) {}
+            }
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) = Unit
         }
-        addView(status)
         addView(RecyclerView(this@ExpressionManagerActivity).apply {
             layoutManager = LinearLayoutManager(context)
-            adapter = this@ExpressionManagerActivity.adapter
+            adapter = ConcatAdapter(header, this@ExpressionManagerActivity.adapter)
             itemAnimator = null
             isSaveEnabled = false
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -169,10 +168,12 @@ open class ExpressionManagerActivity : AppCompatActivity() {
 
     private fun refresh() {
         if (!foreground || busy) return
-        runOperation({ current -> repository.snapshot(isCurrent = current).data.custom }) { entries ->
+        adapter.submit(emptyList())
+        status.loading()
+        runOperation({ current -> repository.snapshot(isCurrent = current).data.custom }, listRead = true) { entries ->
             adapter.submit(entries)
-            status.text = if (entries.isEmpty()) getString(R.string.expression_custom_empty)
-                else resources.getQuantityString(R.plurals.expression_custom_count, entries.size, entries.size)
+            status.show(if (entries.isEmpty()) getString(R.string.expression_custom_empty)
+                else resources.getQuantityString(R.plurals.expression_custom_count, entries.size, entries.size))
             val id = requestedId
             requestedId = null
             if (id != null) entries.firstOrNull { it.id == id }?.let(::edit)
@@ -238,34 +239,25 @@ open class ExpressionManagerActivity : AppCompatActivity() {
             .also { it.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
 
-    private fun <T> runOperation(operation: (() -> Boolean) -> T, success: (T) -> Unit) {
+    private fun <T> runOperation(operation: (() -> Boolean) -> T, listRead: Boolean = false, success: (T) -> Unit) {
         if (!foreground || busy) return
-        val expected = generation.incrementAndGet()
-        setBusy(true)
-        val current = { generation.get() == expected }
-        try {
-            task = worker.submit {
-                val result = runCatching { operation(current) }
-                runOnUiThread {
-                    if (!current() || !foreground || isDestroyed) return@runOnUiThread
-                    setBusy(false)
-                    result.onSuccess(success).onFailure { error ->
-                        val message = when ((error as? ExpressionException)?.failure) {
-                            ExpressionFailure.INVALID -> R.string.expression_invalid
-                            ExpressionFailure.DUPLICATE -> R.string.expression_duplicate
-                            ExpressionFailure.CAPACITY -> R.string.expression_capacity
-                            else -> R.string.expression_operation_failed
-                        }
-                        status.setText(message)
-                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-                    }
-                    drainPendingImport()
-                }
-            }
-        } catch (_: RejectedExecutionException) {
-            setBusy(false)
-            status.setText(R.string.expression_operation_failed)
+        loadingList = listRead
+        tasks.execute(operation) {
+            success(it)
+            drainPendingImport()
         }
+    }
+
+    private fun showFailure(error: Throwable) {
+        val message = when ((error as? ExpressionException)?.failure) {
+            ExpressionFailure.INVALID -> R.string.expression_invalid
+            ExpressionFailure.DUPLICATE -> R.string.expression_duplicate
+            ExpressionFailure.CAPACITY -> R.string.expression_capacity
+            else -> if (loadingList) R.string.management_load_failed else R.string.management_operation_failed
+        }
+        if (loadingList) adapter.submit(emptyList())
+        status.failure(message) { refresh() }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     private fun setBusy(value: Boolean) {

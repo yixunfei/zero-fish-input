@@ -16,9 +16,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.management.ManagementStatusView
+import dev.zeroinput.ime.management.ManagementTaskRunner
 import dev.zeroinput.languagepack.InstalledPublicDictionary
-import java.util.concurrent.Future
-import java.util.concurrent.RejectedExecutionException
 
 /** Foreground native catalog UI. Leaving the page cancels its outstanding network/parse request. */
 class DictionaryManagerActivity : AppCompatActivity() {
@@ -30,9 +30,19 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private val management by lazy { DictionaryManagementRows(this, graph, ::command,
         { work, complete -> runTask(work) { complete() } }, { changed(); showInstalled() }, ::confirmRedownload) }
     private lateinit var content: LinearLayout
-    private lateinit var status: TextView
+    private lateinit var status: ManagementStatusView
     private lateinit var progress: ProgressBar
-    private var pending: Future<*>? = null
+    private lateinit var scroll: ScrollView
+    private var busy = false
+    private var taskFailure = R.string.management_operation_failed
+    private val tasks by lazy { ManagementTaskRunner(worker, { runOnUiThread(it) },
+        { !isFinishing && !isDestroyed && !refreshAfterStop }, { value ->
+            busy = value
+            progress.visibility = if (value) View.VISIBLE else View.GONE
+        }, {
+            status.failure(taskFailure, ::showInstalled)
+            android.widget.Toast.makeText(this, taskFailure, android.widget.Toast.LENGTH_LONG).show()
+        }) }
     private var generation = 0L
     private var dirty = false
     private var currentSource: DictionarySource? = null
@@ -58,26 +68,32 @@ class DictionaryManagerActivity : AppCompatActivity() {
             navigationContentDescription = getString(R.string.navigate_up)
             setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
         })
-        status = TextView(this).apply { setPadding(24, 16, 24, 16) }
+        status = ManagementStatusView(this)
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = true
             visibility = View.GONE
         }
-        root.addView(status)
-        root.addView(progress)
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(status)
+            addView(progress)
+        }
         val controls = LinearLayout(this)
-        controls.addView(button(R.string.public_dictionary_home) { showInstalled() })
-        controls.addView(button(R.string.public_dictionary_cancel) { cancel(); status.setText(R.string.public_dictionary_cancelled) })
-        root.addView(controls)
+        controls.addView(button(R.string.public_dictionary_home) { cancel(); showInstalled() })
+        controls.addView(button(R.string.public_dictionary_cancel) { cancel(); status.show(getString(R.string.public_dictionary_cancelled)) })
+        body.addView(controls)
         content = LinearLayout(this).apply {
             isSaveEnabled = false
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             if (android.os.Build.VERSION.SDK_INT >= 30) importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
-            orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 24) }
-        root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
+            orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(16)) }
+        body.addView(content)
+        scroll = ScrollView(this).apply { addView(body) }
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                cancel()
                 if (history.isNotEmpty()) {
                     val (source, page) = history.removeLast()
                     browse(source, page, remember = false)
@@ -92,7 +108,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
         currentSource = null
         currentPage = null
         runTask({ InstalledView(graph.publicDictionaries.list(), graph.publicResources.list(),
-            graph.builtInDictionaries.list(), graph.dictionaryEdits.read().names) }) { snapshot ->
+            graph.builtInDictionaries.list(), graph.dictionaryEdits.read().names) }, failure = R.string.management_load_failed) { snapshot ->
             val installed = snapshot.downloaded
             val resources = snapshot.resources
             content.removeAllViews()
@@ -117,7 +133,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
             }
             label(getString(R.string.public_dictionary_installed))
             installed.filterNot { it.id.startsWith("builtin_") }.forEach { management.downloaded(it, snapshot.names) }
-            status.setText(if (dirty) R.string.public_dictionary_pending else R.string.public_dictionary_offline)
+            status.show(getString(if (dirty) R.string.public_dictionary_pending else R.string.public_dictionary_offline))
         }
     }
 
@@ -129,7 +145,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
                 runTask({
                     if (table != null) downloads.redownloadBuiltIn(table, progress)
                     else downloads.redownload(requireNotNull(item), progress)
-                }) { changed(); showInstalled() }
+                }, failure = R.string.public_dictionary_failed) { changed(); showInstalled() }
             }.show()
     }
 
@@ -143,7 +159,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
         if (remember && currentSource == source && currentPage != page) history.addLast(source to currentPage)
         currentSource = source
         currentPage = page
-        runTask({ catalog.list(source, page) }) { rows ->
+        runTask({ catalog.list(source, page) }, failure = R.string.public_dictionary_failed) { rows ->
             renderCatalog(source, rows, 0)
         }
     }
@@ -167,8 +183,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
         if (offset + CATALOG_PAGE_SIZE < rows.size) command(getString(R.string.public_dictionary_next_page)) {
             renderCatalog(source, rows, offset + CATALOG_PAGE_SIZE)
         }
-        (content.parent as ScrollView).scrollTo(0, 0)
-        status.setText(R.string.public_dictionary_choose)
+        scroll.scrollTo(0, 0)
+        status.show(getString(R.string.public_dictionary_choose))
     }
 
     private fun confirmInstall(source: DictionarySource, item: CatalogItem) {
@@ -179,7 +195,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
 
     private fun install(source: DictionarySource, item: CatalogItem) {
         val progress = downloadProgress()
-        runTask({ downloads.install(source, item, progress) }) { changed(); showInstalled() }
+        runTask({ downloads.install(source, item, progress) }, failure = R.string.public_dictionary_failed) { changed(); showInstalled() }
     }
 
     private fun downloadProgress(): (Long, Long) -> Unit {
@@ -191,7 +207,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
                 lastProgress = now
                 runOnUiThread {
                     if (token == generation && !isDestroyed) {
-                        status.text = getString(R.string.public_dictionary_progress, received / 1024)
+                        status.show(getString(R.string.public_dictionary_progress, received / 1024))
                         progress.isIndeterminate = total <= 0
                         if (total > 0) progress.progress = (received * 100 / total).toInt()
                     }
@@ -200,35 +216,22 @@ class DictionaryManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun <T> runTask(work: () -> T, complete: (T) -> Unit) {
+    private fun <T> runTask(work: () -> T, failure: Int = R.string.management_operation_failed, complete: (T) -> Unit) {
+        if (busy) return
         cancel()
-        val token = generation
-        progress.visibility = View.VISIBLE
+        taskFailure = failure
         progress.isIndeterminate = true
-        status.setText(R.string.public_dictionary_working)
-        try {
-            pending = worker.submit {
-                val result = runCatching(work)
-                runOnUiThread {
-                    if (token == generation && !isDestroyed) {
-                        pending = null
-                        progress.visibility = View.GONE
-                        result.fold(complete) { status.setText(R.string.public_dictionary_failed) }
-                    }
-                }
-            }
-        } catch (_: RejectedExecutionException) {
-            progress.visibility = View.GONE
-            status.setText(R.string.public_dictionary_failed)
-        }
+        content.removeAllViews()
+        status.show(getString(R.string.public_dictionary_working))
+        tasks.execute({ work() }, complete)
     }
 
     private fun cancel() {
-        generation++; pending?.cancel(true); pending = null; progress.visibility = View.GONE
-        BoundedExecutors.purge(worker)
+        generation++
+        tasks.cancel()
     }
     private fun changed() { dirty = true }
-    private fun label(text: String) { content.addView(TextView(this).apply { this.text = text; setPadding(0, 16, 0, 8) }) }
+    private fun label(text: String) { content.addView(TextView(this).apply { this.text = text; setPadding(0, dp(16), 0, dp(8)) }) }
     private fun command(text: String, action: () -> Unit) {
         content.addView(TextView(this).apply {
             this.text = text
@@ -239,12 +242,17 @@ class DictionaryManagerActivity : AppCompatActivity() {
             val value = android.util.TypedValue()
             theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
             setBackgroundResource(value.resourceId)
-            setOnClickListener { action() }
+            setOnClickListener { if (!busy) action() }
         })
     }
     private fun button(resource: Int, action: () -> Unit) = MaterialButton(this).apply {
-        setText(resource); setOnClickListener { action() }
+        setText(resource)
+        isAllCaps = false
+        minHeight = dp(48)
+        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        setOnClickListener { action() }
     }
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun sourceLabel(source: DictionarySource): String = getString(when (source) {
         DictionarySource.WANXIANG -> R.string.public_dictionary_wanxiang
         DictionarySource.ICE -> R.string.public_dictionary_ice
@@ -267,6 +275,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
             runOnUiThread {
                 if (revocationObserver != null && editEpoch != graph.dictionaryEdits.generation()) {
                     editEpoch = graph.dictionaryEdits.generation()
+                    cancel()
                     management.close(); content.removeAllViews(); showInstalled()
                 }
             }
@@ -277,7 +286,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
         revocationObserver?.close(); revocationObserver = null
         refreshAfterStop = true; cancel(); management.close(); content.removeAllViews(); super.onStop()
     }
-    override fun onDestroy() { worker.shutdownNow(); super.onDestroy() }
+    override fun onDestroy() { tasks.close(); worker.shutdownNow(); super.onDestroy() }
 
     private companion object { const val CATALOG_PAGE_SIZE = 64 }
 }

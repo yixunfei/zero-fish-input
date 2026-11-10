@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_remote_title">MCP and web search</string>
+    <string name="ai_remote_notice">Connections and tokens are encrypted separately. Public HTTPS MCP and Brave Search only. Adding or saving does not connect. Fetch and review tools for each task; every remote operation still needs approval. Local servers, OAuth and scripts are unsupported.</string>
+    <string name="ai_remote_add_mcp">Add MCP connection</string>
+    <string name="ai_remote_add_search">Add Brave Search</string>
+    <string name="ai_remote_connect">Connect and fetch catalog</string>
+    <string name="ai_remote_select_search">Review search tool</string>
+    <string name="ai_remote_name">Connection name</string>
+    <string name="ai_remote_endpoint">HTTPS address (port 443)</string>
+    <string name="ai_remote_token">Dedicated token (optional for MCP)</string>
+    <string name="ai_remote_invalid">Check the name, public HTTPS address and token.</string>
+    <string name="ai_remote_delete">Delete this connection and its token?</string>
+    <string name="ai_remote_network_off">Enable AI and networking in AI settings first.</string>
+    <string name="ai_remote_loading">Connecting and fetching tools, resources and prompts…</string>
+    <string name="ai_remote_failed">Connection unavailable, expired or returned unsupported data. Check the address, token and server version before retrying.</string>
+    <string name="ai_remote_review">%1$s\nAvailable: %2$d · Unsupported: %3$d\nSelect up to 32 items for this task. Brave tokens are validated only when a query is approved; snippets do not mean full pages were read.</string>
+    <string name="ai_remote_definition">%1$s\nArguments:\n%2$s</string>
+    <string name="ai_remote_apply">Add to this task</string>
+    <string name="ai_remote_open_source">Open source in browser: %1$s</string>
+</resources>

@@ -18,6 +18,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
     var onAddRequested: () -> Unit = {}
     var onEnableRequested: () -> Unit = {}
     var onDeleteRequested: (SecureClipboardMetadata) -> Unit = {}
+    var onReloadRequested: () -> Unit = {}
 
     private val adapter = SecureClipboardAdapter { onDeleteRequested(it) }
     private val toolbar = createToolbar()
@@ -38,12 +39,25 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
         setOnClickListener { onEnableRequested() }
         filterTouchesWhenObscured = true
     }
-    private val state = LinearLayout(context).apply {
+    private val reloadButton = MaterialButton(context).apply {
+        setText(R.string.management_reload)
+        isAllCaps = false
+        minHeight = dp(48)
+        filterTouchesWhenObscured = true
+        setOnClickListener { onReloadRequested() }
+        visibility = View.GONE
+    }
+    private val stateContent = LinearLayout(context).apply {
         orientation = VERTICAL
         gravity = Gravity.CENTER
+        setPadding(dp(16), dp(16), dp(16), dp(16))
         addView(stateText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
-        addView(enableButton, LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)).apply { topMargin = dp(16) })
-        layoutParams = FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        addView(enableButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { topMargin = dp(16) })
+        addView(reloadButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+    }
+    private val state = android.widget.ScrollView(context).apply {
+        isFillViewport = true
+        addView(stateContent)
     }
 
     init {
@@ -56,7 +70,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
         addView(toolbar, LayoutParams(LayoutParams.MATCH_PARENT, dp(56)))
         addView(FrameLayout(context).apply {
             addView(list)
-            addView(state)
+            addView(state, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         }, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         renderLoading()
     }
@@ -66,6 +80,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
         stateText.setText(R.string.authenticating)
         state.visibility = View.VISIBLE
         enableButton.visibility = View.GONE
+        reloadButton.visibility = View.GONE
         list.visibility = View.GONE
         toolbar.menu.findItem(MENU_ADD)?.isVisible = false
     }
@@ -75,6 +90,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
         stateText.setText(R.string.secure_clipboard_disabled)
         state.visibility = View.VISIBLE
         enableButton.visibility = View.VISIBLE
+        reloadButton.visibility = View.GONE
         list.visibility = View.GONE
         toolbar.menu.findItem(MENU_ADD)?.isVisible = false
     }
@@ -85,6 +101,7 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
         stateText.setText(R.string.secure_clipboard_empty)
         state.visibility = if (isEmpty) View.VISIBLE else View.GONE
         enableButton.visibility = View.GONE
+        reloadButton.visibility = View.GONE
         list.visibility = if (isEmpty) View.GONE else View.VISIBLE
         toolbar.menu.findItem(MENU_ADD)?.isVisible = true
     }
@@ -94,12 +111,22 @@ internal class SecureClipboardManagerView(context: Context) : LinearLayout(conte
         stateText.setText(R.string.secure_clipboard_locked)
         state.visibility = View.VISIBLE
         enableButton.visibility = View.GONE
+        reloadButton.visibility = View.GONE
         list.visibility = View.GONE
     }
 
     fun setActionsEnabled(enabled: Boolean) {
         toolbar.menu.findItem(MENU_ADD)?.isEnabled = enabled
         enableButton.isEnabled = enabled
+        reloadButton.isEnabled = enabled
+    }
+
+    fun renderFailure(resource: Int) {
+        clearMetadata()
+        stateText.setText(resource)
+        stateText.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        reloadButton.visibility = View.VISIBLE
+        toolbar.menu.findItem(MENU_ADD)?.isVisible = false
     }
 
     private fun clearItemsImmediately() {

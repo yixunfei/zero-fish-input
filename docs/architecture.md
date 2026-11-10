@@ -1,5 +1,20 @@
 # Architecture
 
+E6 keeps ordinary DisplayManager/Presentation ownership in AiVirtualScreen,
+with a lifecycle-owned capability dialog and local TextureView. Its fixed public
+fixture has no tool executor, private data input or device action connection.
+
+E5 moves tool-run ownership into an app-scoped bounded runtime with weak UI
+observers. Its optional private foreground service owns liveness, never tool
+authority. Native assistant session/platform adapters remain in app and use
+the existing model boundary; they expose no IME/editor or device-broker port.
+
+E4 follows ADR 0033: `AiRemoteHttpsTransport` owns all new socket I/O and public
+DNS enforcement. MCP/search protocol adapters depend on a bounded transport port;
+they cannot access model credentials or device/IME ports. Separate encrypted
+connection storage belongs to user-data. Reviewed ephemeral catalogs are consumed
+through the existing AiToolExecutor task contract with per-call approval.
+
 The public project and application display name is `zero fish input`.
 `dev.zeroinput.ime`, Kotlin namespaces, engine resource identifiers, encrypted file
 names and Keystore aliases retain their existing identity. Debug uses the separate
@@ -30,6 +45,30 @@ language-pack -> engine-dictionary
 业务层不引用 librime 类型。升级、替换或移除 librime 时，变化限制在 `engine-rime` 模块和语言数据部署器内。
 
 ## Runtime boundaries
+
+Keyboard page selection belongs to ime-ui. A same-application Android input
+restart may retain the numeric/symbol page only while the ordinary keyboard is
+open and EditorInputOptions are unchanged. This retains no editor content,
+composition, shift state, authorization or connection: ZeroInputService still
+retires the old session and creates a new token and connection binding. Engine
+letter-layout refreshes do not navigate away from numeric/symbol pages.
+
+ADR 0032 adds a separate foreground tool-task Activity. ai-api owns immutable
+tool definitions, requests/results and provider/executor ports. AiToolRun owns
+bounded serial model/approval/execution state; the existing HTTPS provider
+serializes native tool calls for the three existing protocols. AiToolJson applies
+a strict bounded schema subset. File executors only see the task's selected URI
+map; model arguments never address platform paths. AiTaskDocumentPicker owns a
+single-use, two-minute picker handoff and Save As destination confirmation.
+All private state is transient; device broker checks remain independent.
+
+ADR 0031 extends standalone context with declarative Skills and reviewed
+compaction. ai-api owns immutable recipes/proposals, user-data owns the separate
+encrypted Skill store, and app owns bounded SAF reading, review UI and revocable
+library sessions. The controller summarizes only selected earlier turns through
+the existing provider, then applies an explicitly reviewed projection. It retains
+original messages and a transient undo state. Skill prerequisites do not enable
+tools in ordinary chat. Existing persistence formats are unchanged.
 
 Public dictionary settings use a dedicated explicit download adapter and native
 catalog views. `engine-dictionary/importer` owns format conversion; `language-pack`
@@ -146,8 +185,8 @@ units only for the user's explicit Backspace action and retains no context histo
 4. `PersonalizationStore` 是学习数据端口；加密实现位于 `user-data`，`ime-core` 不依赖具体仓库。
    应用层适配器负责在获得允许后按需后台预热和串行学习写入，输入主线程只读取内存缓存。
    联想词频索引随用户词库快照在后台准备，主线程只对公开联想 TopK（最多 8 条）做精确内存查找和稳定排序；
-   快照未就绪时保持词表顺序，本轮不迟到重排，写入完成后只供下一次成功提交使用。候选构造在排序完成后进行，
-   词频预热和个人候选查询完成都不会通知界面；个人候选缓存只在后续按键更新候选时读取，后台完成不重发控制器状态。
+   快照未就绪时保持词表顺序。后台准备、写入和查询完成后发布无内容通知；服务校验当前连接和隐私资格后，
+   才刷新仍在组合的候选或仍可见的联想。
    会话或隐私策略变化以及清除个性化数据时都会提升队列代次，使此前排队但尚未执行的学习写入
    失效，并立即隐藏旧候选；用户主动清除还会删除用户词组和 emoji 历史各自的 Keystore 密钥。
 5. emoji 最近记录与安全剪贴板无标签索引由后台线程读取并缓存。安全剪贴板正文只在一次性认证
@@ -370,7 +409,7 @@ phrase pairs on the existing engine worker. A volatile immutable provider is
 published once; there are no asynchronous private-context tasks or delivery
 callbacks. Queries before readiness return no candidates.
 
-The public corpus currently has 1,728 pairs and 735 distinct language/prefix
+The public corpus currently has 2,002 pairs and 843 distinct language/prefix
 keys. A query still performs at most 32 suffix probes and returns at most eight
 words. If the asynchronous public index is not ready at the first successful
 commit, that commit produces no association row and is not replayed when loading
@@ -606,9 +645,23 @@ contain settings and public dictionary indexes, never personal input.
 
 The bundled schema uses JSON syntax, a YAML subset understood by librime, so
 Android's structured JSON parser can derive bounded configurations. Rime compiles
-fuzzy and abbreviation rules into its own prism; the app does not implement a
-second pinyin parser. OpenCC text dictionaries come from the pinned source archive
-and are hash-checked during the build. No runtime downloads are involved.
+fuzzy and abbreviation rules into its own prism. Fuzzy edges carry librime's
+spelling penalty. With fuzzy or experimental typo rules enabled, the full-pinyin
+translator puts complete exact readings first within a 16-candidate window.
+When a short undelimited input yields a synthesized sentence, a partial result
+or only a fuzzy match, it tries up to two alternate splits using the same
+public prism. One validated whole result can join the candidate stream with
+its spans projected onto the original input. A short consonant-only code such
+as `ng` can also expose an initial-based result after the literal syllable.
+For a two-syllable mixed code starting with `n` or `m`, a short dictionary
+lookup restores abbreviated edges pruned by the literal interjection path.
+It can offer a final `eng` to `en` recovery after the literal mixed match.
+The projected phrase keeps the typed offsets and exposes the dictionary reading.
+The Android runtime supplies the
+adapter through the existing script-translator slot, so the reviewed base
+schema and precompiled prism still serve the default configuration.
+OpenCC text dictionaries come from the pinned source archive and are
+hash-checked during the build.
 
 The input view shares one header between tools and candidates. A toolbar-only
 state uses one 48dp row; portrait composition uses a 96dp header for the 48dp
@@ -625,9 +678,10 @@ privacy transitions cancel scheduled gesture callbacks.
 
 Each Rime update is copied through one JNI context read after processing the key,
 instead of reading the same native context separately for each field. Candidate
-paging does not rewrite unchanged Android composing spans, and commitText already
-clears the previous span. The engine API and synchronous ownership of editor
-mutations remain unchanged.
+pinyin metadata carries only the matched slice and its original offsets.
+The composition editor inserts display spaces and maps touch and accessibility
+offsets back to the raw input. Candidate paging preserves the Android composing
+span, and commitText replaces it.
 
 ## Engine compatibility
 
@@ -911,6 +965,16 @@ upstream removal cannot hide an active override from management. Editor forms
 capture the displayed data generation when opened; saving cannot adopt a newer
 generation after reset. Completion callbacks close only their submitting dialog.
 
+Management pages share `app/management/ManagementTaskRunner` for bounded worker
+delivery and request-generation revocation, plus content-free localized list
+feedback. Read failures remain distinct from empty results. Reload actions only
+read local lists; they never replay a save, delete, import or network request.
+Private clipboard reload always returns through its existing fresh system
+authentication entry. Personal phrase rows and drafts are cleared when the page
+stops, and retired row bindings cannot finish an old click. Unchanged expression
+rows receive fresh bindings after scrubbing. Scrollable search/forms and content
+height rows support narrow windows and larger fonts without changing stored data.
+
 ## Review hardening (2026-10-18)
 
 Secure clipboard mutations stage the body-free index before writing the body.
@@ -940,7 +1004,54 @@ metadata ticket is persisted, and cold acquisitions retain full verification on
 the worker. UI header/options and unchanged list models skip redundant rendering;
  these changes do not establish measured frame-time or cold-start improvements.
 
+## Standalone AI entry (2026-11-01)
+
+The accepted 2026-11-02 context extension (ADR 0030) adds persona, scoped memory
+and reviewed projection models in `ai-api`. The private library review surface
+uses serial background I/O. `user-data` owns one atomic role/memory store with a
+separate key; conversation formats remain unchanged. Explicit selection enters
+structured user content only on submission and shares the history/reference
+budget. Lifecycle/data revocation discards selection and pending callbacks.
+The keyboard does not read this library or inherit standalone roles.
+
+[ADR 0029](adr/0029-standalone-ai-entry.md) adds a second launcher icon in the
+same APK. The exported, content-free `AiAssistantLauncherActivity` opens only
+the private `AiAssistantActivity` with a clean explicit Intent. The full-screen
+`ime-ui/AiAssistantPanelView` renders user input, streaming answers, model and
+reasoning selection, context review and saved-chat controls. The host supplies
+an explicit standalone policy to `AiWorkbenchController`; keyboard calls still
+derive their policy from the actual editor. The independent coordinator shares
+the existing transport and workers, without sharing IME request cancellation.
+Neither the new panel nor host has an external editor or clipboard read port.
+Configuration/settings revocation and data deletion invalidate pending results
+and storage; leaving the private chat cancels and clears transient content.
+
+Device mode opens the existing process-owned task loop. A local bounded launcher
+query provides eligible targets, without transmitting the application list.
+Pending starts bind configuration, capability policy and data generation to a
+single-use elapsed-time deadline; Stop also cancels these starts. A new Activity
+instance can stop the active coordinator without recovering an old Activity
+handle. Existing foreground binding and in-task approval/stop overlay remain
+authoritative; opening the panel is never an automatic task resume.
+
 ## AI device agent (2026-10-19)
+
+The 2026-11-01 interaction follow-up separates the standalone chat composer and
+device-task start/stop controls from scrolling content. `AiChatQueue` is an
+owner-thread, memory-only ordinary-chat queue with at most four pending messages
+and a combined `MAX_INPUT_CHARS` budget. Posted drains carry a revocable generation;
+configuration, context/model changes, cancellation, data deletion and leaving the
+host discard pending messages. Queue dispatch also rechecks focus, configuration
+and data generation. It has no device-tool port. Successful queued continuation
+waits for optional conversation persistence to settle; storage failure stops it.
+
+`DeviceCapabilityOverview` projects the fixed action catalogs, current policy,
+platform features and operation-specific permissions. It never grants authority
+or reads category data. Configuration remains in the existing settings surface.
+Task examples populate a draft only. App search filters the already bounded local
+launcher results. `DeviceTaskTimelineView` renders bounded state/action/approval
+rows without constructing or executing actions; target-overlay approval remains
+authoritative. Each new task consumes fresh screenshot consent.
 
 The device agent is a separate operation-capable path from the ordinary AI
 workbench and from the read-only page-reference service. Platform-free request,
@@ -1025,9 +1136,9 @@ that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.m
 
 Composing candidates also consult the prepared exact-word frequency mirror in batches of eight (at most 60 already-produced native candidates). This preserves accumulated usage across full pinyin and initials: selecting `ceshi -> 测试` promotes the native `测试` candidate under both `ceshi` and `cs`. The total and the matching input-code frequency are combined by maximum, never added twice. Native selection routes, readings and base order remain intact. No private vocabulary is enumerated or added by this lookup, and no storage format changes. The personal-frequency promotion threshold and its current value are directly available beside learning settings and above the personal phrase list. The setting changes ranking only; the independent association switch controls next-word availability.
 
-Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, exact versus completion match, and a logarithmic frequency bonus starting at a configurable threshold (default 3). No word is pinned. The same policy reranks the bounded public next-word list. Worker completions emit a content-free notification; the platform checks session identity and current privacy before refreshing the composition or a still-visible association round. Hidden rounds never reappear. The English engine produces only public prefix completions. It has no personal-source constructor or scoring path; the controller alone merges personal suggestions and applies the shared threshold, so a second engine-side ranking cannot bypass it.
+Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, input match and a logarithmic frequency bonus starting at the configured threshold, which defaults to 1. Complete exact full-pinyin matches keep precedence over approximate native matches. The first personal page participates in reranking, and later personal pages append to it. The same frequency bonus reranks the bounded public next-word list. Worker completions emit a content-free notification, and the platform checks session identity and privacy before refreshing the composition or a still-visible association round. The English engine produces public prefix completions, and the controller owns its personal ranking.
 
-Explicit candidate selection records usage by default. Learning from implicit commits is an independent, opt-in setting and remains subject to editor acceptance and privacy. Enter keeps its literal-input behavior and never invents a Chinese conversion. The manager exposes 50-row pages, searches code/text prefixes and pinyin (including polyphones and initials), and edits phrase, language and weight while retaining repository identity. Pinyin matching uses a worker-loaded verified public character table; it caches no private words. Private searches scan at most the repository's existing 20,000-term bound on a worker, and never hand the entire dictionary to the UI. The encrypted format is unchanged.
+Explicit candidate selection records usage by default. Space follows the highlighted built-in Chinese candidate when personal ranking changes the native default. Learning from implicit commits is an independent opt-in and requires editor acceptance and privacy eligibility. Fuzzy-only or corrected spellings learn the canonical reading. Enter commits literal input. The manager exposes 50-row pages, searches code/text prefixes and pinyin (including polyphones and initials), and edits phrase, language and weight while retaining repository identity. Pinyin matching uses a worker-loaded verified public character table. Private searches scan at most the repository's existing 20,000-term bound on a worker and return a single page to the UI.
 
 ## Input interaction repairs (2026-10-30)
 
@@ -1050,9 +1161,10 @@ lexicon. Their displayed frequency uses the maximum of the public weight and
 learned word frequency. Public dictionary weights and persisted formats do not
 change.
 
-## Symbol groups (2026-10-31)
+## Symbol groups
 
-The UI owns a curated offline catalog of 12 named symbol groups. Each group is
-chunked into pages of at most 27 symbols. A lifecycle-dismissed popup selects the
-group directly; page controls and horizontal swipes preserve continuous browsing.
-No personal data, new dependency or runtime network access is involved.
+The UI owns a curated offline catalog of 13 named groups, starting with a
+27-symbol common page. A lifecycle-dismissed popup selects the group directly.
+The previous and next buttons and horizontal swipes share continuous paging.
+The editor adapter places the caret inside a pair using its tracked insertion
+range and checks that the range and bound connection still match after commit.

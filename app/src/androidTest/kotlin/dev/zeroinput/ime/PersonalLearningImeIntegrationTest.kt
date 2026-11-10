@@ -79,8 +79,8 @@ class PersonalLearningImeIntegrationTest {
                 await { editor.editor.text.toString() == "测试".repeat(round + 1) }
             }
             type("cs")
-            assertEquals("测试", words().firstOrNull())
-            choose("测试")
+            await { words().firstOrNull() == "测试" }
+            onMain { panel().onKeyboardAction(KeyboardAction.Space) }
             await { editor.editor.text.toString() == "测试".repeat(4) }
             type("cs")
             assertEquals("测试", words().firstOrNull())

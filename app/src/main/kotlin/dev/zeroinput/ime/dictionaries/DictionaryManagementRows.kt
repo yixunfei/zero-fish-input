@@ -48,7 +48,7 @@ internal class DictionaryManagementRows(
                 (builtin.replacement?.bytes ?: builtin.bytes) / 1024)
         })
         if (remote != null) form.addView(android.widget.TextView(activity).apply {
-            text = activity.getString(R.string.public_dictionary_item, title, remote.source, remote.entries,
+            text = activity.getString(R.string.public_dictionary_item, title, dictionarySourceLabel(activity, remote.source), remote.entries,
                 remote.bytes / 1024, remote.version.take(12))
         })
         form.addView(MaterialSwitch(activity).apply {

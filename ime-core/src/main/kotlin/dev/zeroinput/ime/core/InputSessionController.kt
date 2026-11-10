@@ -40,7 +40,7 @@ class InputSessionController(
     private val wordAssociationsEnabled: () -> Boolean = { true },
     private val kaomojiCandidates: KaomojiCandidateSource = KaomojiCandidateSource.Empty,
     private val onAssociationWarmup: () -> Unit = {},
-    private val personalPromotionThreshold: () -> Int = { 3 },
+    private val personalPromotionThreshold: () -> Int = { 1 },
     private val learnFromCommittedText: () -> Boolean = { false },
 ) : AutoCloseable {
     private var engine: InputEngine? = null
@@ -181,7 +181,8 @@ class InputSessionController(
                     }
                     if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
                         (candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied ||
-                            state.modelRanked || routes.getOrNull(state.snapshot.highlightedIndex) is CandidateRoute.Personal)) {
+                            state.modelRanked || promotedChineseCandidate() ||
+                            routes.getOrNull(state.snapshot.highlightedIndex) is CandidateRoute.Personal)) {
                         selectCandidate(activeEngine, state.snapshot.highlightedIndex, learn = learnFromCommittedText())
                     } else handleKey(activeEngine, EngineKey.Space, allowLearning = learnFromCommittedText())
                 }
@@ -291,6 +292,12 @@ class InputSessionController(
             (engine as? CandidateTextNormalizer)?.normalizeCandidateText(value) ?: value
         } else associations.clear()
         if (state.snapshot.isComposing || associations.candidates.isNotEmpty()) publish(rawEngineSnapshot)
+    }
+
+    private fun promotedChineseCandidate(): Boolean {
+        if (language != InputLanguage.CHINESE || languagePackKey != null) return false
+        val route = routes.getOrNull(state.snapshot.highlightedIndex) as? CandidateRoute.Engine ?: return false
+        return route.reference.id != rawEngineSnapshot.candidates.getOrNull(rawEngineSnapshot.highlightedIndex)?.id
     }
 
     /** Requests private frequency preparation only when this editor may use associations. */

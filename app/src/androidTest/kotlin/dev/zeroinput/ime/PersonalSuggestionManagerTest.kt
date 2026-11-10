@@ -26,6 +26,14 @@ class PersonalSuggestionManagerTest {
             }
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             instrumentation.waitForIdleSync()
+            val rotationDeadline = android.os.SystemClock.uptimeMillis() + 5_000
+            var landscape = false
+            while (!landscape && android.os.SystemClock.uptimeMillis() < rotationDeadline) {
+                scenario.onActivity { landscape = it.resources.configuration.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+                if (!landscape) android.os.SystemClock.sleep(20)
+            }
+            assertTrue("Android must deliver the requested landscape configuration", landscape)
             lateinit var dialog: AlertDialog
             scenario.onActivity { activity ->
                 assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE,

@@ -1,0 +1,9 @@
+<resources>
+    <string name="ai_native_title">System digital assistant</string>
+    <string name="ai_native_notice">Type a question, then send. No screen reading or automatic recording.</string>
+    <string name="ai_native_send">Send</string>
+    <string name="ai_native_full">Full app</string>
+    <string name="ai_native_choose">Choose system assistant</string>
+    <string name="ai_native_setup_notice">Choose zero fish AI in system settings, then use the system assistant gesture or button for a private text conversation. Invocation never submits, captures the screen, listens for hotwords or records audio. Hiding or locking cancels and clears this session. Device support varies. Opening settings leaves this page and clears unsent drafts.</string>
+    <string name="ai_native_unavailable">This device does not support this assistant selection entry.</string>
+</resources>

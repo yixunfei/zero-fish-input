@@ -63,6 +63,25 @@ class AiConfigurationStorageTest {
         assertTrue(runCatching { f.storage.clear() }.isFailure)
         assertTrue(f.history.keyDeleted)
         assertTrue(f.conversations.list().isEmpty())
+        assertTrue(f.context.keyDeleted)
+        assertTrue(f.library.read().personas.isEmpty())
+        assertTrue(f.skillsStore.keyDeleted)
+        assertTrue(f.skills.read().skills.isEmpty())
+        assertTrue(f.connectionStore.keyDeleted)
+        assertTrue(f.connections.read().connections.isEmpty())
+    }
+
+    @Test fun historyOptOutKeepsExplicitContextSavesButAiClearDeletesThem() {
+        val f = Fixture()
+        f.storage.write(AiConfiguration(saveConversations = false))
+        assertEquals(1, f.library.read().personas.size)
+        assertEquals(1, f.skills.read().skills.size)
+        assertEquals(1, f.connections.read().connections.size)
+        f.storage.clear()
+        assertTrue(f.library.read().personas.isEmpty())
+        assertTrue(f.context.keyDeleted)
+        assertTrue(f.skillsStore.keyDeleted)
+        assertTrue(f.connectionStore.keyDeleted)
     }
 
     private class Fixture {
@@ -70,10 +89,22 @@ class AiConfigurationStorageTest {
         val history = MemoryStore()
         val configuration = AiConfigurationRepository(config)
         val conversations = AiConversationRepository(history)
-        val storage = AiConfigurationStorage(configuration, conversations)
+        val context = MemoryStore()
+        val library = dev.zeroinput.userdata.AiContextLibraryRepository(context)
+        val skillsStore = MemoryStore()
+        val skills = dev.zeroinput.userdata.AiSkillRepository(skillsStore)
+        val connectionStore = MemoryStore()
+        val connections = dev.zeroinput.userdata.AiConnectionRepository(connectionStore)
+        val storage = AiConfigurationStorage(configuration, conversations, library, skills, connections)
         init {
             configuration.write(AiConfiguration(saveConversations = true))
+            connections.write(0, dev.zeroinput.ai.api.AiConnectionLibrary(connections = listOf(
+                dev.zeroinput.ai.api.AiConnection("id", "Public", dev.zeroinput.ai.api.AiConnectionKind.MCP, "https://example.com/mcp", "fixture")))) { true }
             conversations.upsert(AiConversation(id = "saved", title = "public fixture"))
+            library.write(0, dev.zeroinput.ai.api.AiContextLibrary(personas = listOf(
+                dev.zeroinput.ai.api.AiPersona("id", "Public role", "", "Be concise")))) { true }
+            skills.write(0, dev.zeroinput.ai.api.AiSkillLibrary(skills = listOf(
+                dev.zeroinput.ai.api.AiSkill("id", "Public recipe", "", "Be concise")))) { true }
         }
     }
 

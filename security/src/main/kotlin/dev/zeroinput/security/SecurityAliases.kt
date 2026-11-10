@@ -12,4 +12,7 @@ object SecurityAliases {
     const val SECURE_CLIPBOARD_INDEX = "zeroinput.secure-clipboard-index.v1"
     const val AI_CONFIGURATION = "zeroinput.ai-configuration.v1"
     const val AI_CONVERSATIONS = "zeroinput.ai-conversations.v1"
+    const val AI_CONTEXT_LIBRARY = "zeroinput.ai-context-library.v1"
+    const val AI_SKILLS = "zeroinput.ai-skills.v1"
+    const val AI_CONNECTIONS = "zeroinput.ai-connections.v1"
 }

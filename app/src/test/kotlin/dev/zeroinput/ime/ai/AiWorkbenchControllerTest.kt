@@ -17,6 +17,160 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun laterCompactionRollsThePriorSummaryForwardAndContextEditsRevokeUndo() {
+        val f = Fixture(save = false, standalone = true)
+        repeat(3) { index ->
+            f.controller.submit(AiAction.ASK, "question $index", null)
+            f.provider.emit(AiStreamEvent.Completed("answer $index")); f.flush()
+        }
+        val replies = mutableListOf<Result<AiCompactionProposal>>()
+        assertTrue(f.controller.requestCompaction(f.controller.contextState.revision, replies::add))
+        f.provider.emit(AiStreamEvent.Completed("First public summary")); f.flush()
+        assertTrue(f.controller.applyCompaction(replies.removeFirst().getOrThrow()))
+        f.controller.submit(AiAction.ASK, "new public question", null)
+        f.provider.emit(AiStreamEvent.Completed("new public answer")); f.flush()
+        assertFalse(f.controller.undoCompaction())
+        assertTrue(f.controller.requestCompaction(f.controller.contextState.revision, replies::add))
+        assertEquals("First public summary", f.provider.requests.last().references.single().text)
+        assertEquals(listOf("question 2", "answer 2"), f.provider.requests.last().history.map { it.content })
+        f.provider.emit(AiStreamEvent.Completed("Combined public summary")); f.flush()
+        assertTrue(f.controller.applyCompaction(replies.single().getOrThrow()))
+        assertEquals("Combined public summary", f.controller.contextState.references.single().text)
+        assertEquals(8, f.controller.contextState.messages.size)
+        f.controller.clearContext(f.controller.contextState.revision)
+        assertFalse(f.controller.undoCompaction())
+    }
+
+    @Test fun compactionRequiresPreviewApplyAndUndoPreservesOriginalMessagesAndOtherSources() {
+        val f = Fixture(save = false, standalone = true)
+        repeat(3) { index ->
+            f.controller.submit(AiAction.ASK, "question $index", null)
+            f.provider.emit(AiStreamEvent.Completed("answer $index")); f.flush()
+        }
+        val role = AiPersona("id", "Public role", "", "Be concise")
+        f.controller.selectWorkspace(f.controller.contextState.revision, AiWorkspaceContext(role))
+        f.controller.addReferences(f.controller.contextState.revision, listOf(AiReference("Excluded public page")))
+        val before = f.controller.contextState
+        val replies = mutableListOf<Result<AiCompactionProposal>>()
+        assertTrue(f.controller.requestCompaction(before.revision, replies::add))
+        val request = f.provider.requests.last()
+        assertEquals(before.messages.take(4), request.history)
+        assertTrue(request.references.isEmpty()); assertNull(request.workspaceContext.persona)
+        f.provider.emit(AiStreamEvent.Completed("Public concise summary")); f.flush()
+        assertSame(before, f.controller.contextState)
+        assertTrue(f.controller.applyCompaction(replies.single().getOrThrow()))
+        assertEquals(setOf(4, 5), f.controller.contextState.selectedHistory)
+        assertEquals(before.messages, f.controller.contextState.messages)
+        assertEquals(role, f.controller.contextState.workspace.persona)
+        assertEquals(2, f.controller.contextState.references.size)
+        assertTrue(f.repository.list().isEmpty())
+        assertTrue(f.controller.undoCompaction())
+        assertEquals(before.selectedHistory, f.controller.contextState.selectedHistory)
+        assertEquals(before.references, f.controller.contextState.references)
+        assertFalse(f.controller.undoCompaction())
+    }
+
+    @Test fun revokedOrForgedCompactionProposalCannotReplaceContext() {
+        val f = Fixture(save = false, standalone = true)
+        repeat(2) { index ->
+            f.controller.submit(AiAction.ASK, "question $index", null)
+            f.provider.emit(AiStreamEvent.Completed("answer $index")); f.flush()
+        }
+        val before = f.controller.contextState
+        val replies = mutableListOf<Result<AiCompactionProposal>>()
+        assertFalse(f.controller.applyCompaction(AiCompactionProposal(before.revision, "forged")))
+        assertTrue(f.controller.requestCompaction(before.revision, replies::add))
+        f.provider.emit(AiStreamEvent.Completed("public summary")); f.flush()
+        f.generation.invalidate()
+        assertFalse(f.controller.applyCompaction(replies.single().getOrThrow()))
+        assertSame(before, f.controller.contextState)
+        replies.clear()
+        assertTrue(f.controller.requestCompaction(before.revision, replies::add))
+        f.provider.emit(AiStreamEvent.Completed("late summary"))
+        f.controller.newConversation(); f.flush()
+        assertTrue(replies.isEmpty())
+    }
+
+    @Test fun malformedSummaryLeavesSelectionUntouchedAndStalePreviewCannotStart() {
+        val f = Fixture(save = false, standalone = true)
+        repeat(2) { index ->
+            f.controller.submit(AiAction.ASK, "question $index", null)
+            f.provider.emit(AiStreamEvent.Completed("answer $index")); f.flush()
+        }
+        val before = f.controller.contextState
+        val replies = mutableListOf<Result<AiCompactionProposal>>()
+        assertTrue(f.controller.requestCompaction(before.revision, replies::add))
+        f.provider.emit(AiStreamEvent.Completed("x".repeat(4_097))); f.flush()
+        assertTrue(replies.single().isFailure); assertSame(before, f.controller.contextState)
+        f.controller.clearContext(before.revision)
+        assertFalse(f.controller.requestCompaction(before.revision, replies::add))
+    }
+
+    @Test fun workspaceSelectionIsBoundedSentExplicitlyAndClearedOnConversationChange() {
+        val f = Fixture(save = false, standalone = true)
+        val role = AiPersona("id", "Public role", "", "Use short paragraphs")
+        val revision = f.controller.contextState.revision
+        assertTrue(f.controller.selectWorkspace(revision, AiWorkspaceContext(role)))
+        assertTrue(f.provider.requests.isEmpty())
+        assertFalse(f.controller.selectWorkspace(revision, AiWorkspaceContext()))
+        f.controller.submit(AiAction.ASK, "public question", null)
+        assertEquals(role, f.provider.requests.single().workspaceContext.persona)
+        f.controller.newConversation()
+        assertNull(f.controller.contextState.workspace.persona)
+        f.provider.emit(AiStreamEvent.Completed("late answer")); f.flush()
+        assertFalse(f.events.any { it is AiStreamEvent.Completed })
+    }
+
+    @Test fun successfulTurnSettlesOnlyAfterOptionalPersistenceCompletes() {
+        val f = Fixture(save = true, standalone = true)
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.provider.emit(AiStreamEvent.Completed("public answer"))
+        f.ui.drain()
+        assertTrue(f.events.any { it is AiStreamEvent.Completed })
+        assertTrue(f.settled.isEmpty())
+        f.worker.drain(); f.ui.drain()
+        assertEquals(listOf(true), f.settled)
+        assertEquals(1, f.repository.list().size)
+    }
+
+    @Test fun failedPersistenceStopsContinuationAndRevokedPersistenceNeverSettles() {
+        val f = Fixture(save = true, standalone = true)
+        f.store.failWrite = true
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.provider.emit(AiStreamEvent.Completed("public answer"))
+        f.flush()
+        assertEquals(listOf(false), f.settled)
+        val revoked = Fixture(save = true, standalone = true)
+        revoked.controller.submit(AiAction.ASK, "public question", null)
+        revoked.provider.emit(AiStreamEvent.Completed("public answer"))
+        revoked.ui.drain()
+        revoked.controller.invalidate()
+        revoked.flush()
+        assertTrue(revoked.settled.isEmpty())
+    }
+
+    @Test fun standaloneChatUsesExplicitPolicyWithoutAnEditorAndKeepsHistoryTransientByDefault() {
+        val f = Fixture(save = false, standalone = true)
+        f.privacy = null
+        f.controller.submit(AiAction.ASK, "public question", null)
+        assertEquals(1, f.provider.requests.size)
+        f.provider.emit(AiStreamEvent.Completed("public answer"))
+        f.flush()
+        assertTrue(f.events.any { it is AiStreamEvent.Completed })
+        assertTrue(f.repository.list().isEmpty())
+    }
+
+    @Test fun standaloneBackgroundingRejectsQueuedCompletionAndPersistence() {
+        val f = Fixture(save = true, standalone = true)
+        f.controller.submit(AiAction.ASK, "public question", null)
+        f.provider.emit(AiStreamEvent.Completed("public answer"))
+        f.allowed = false
+        f.controller.invalidate()
+        f.flush()
+        assertFalse(f.events.any { it is AiStreamEvent.Completed })
+        assertTrue(f.repository.list().isEmpty())
+    }
+
     @Test fun reasoningIsRenderedSeparatelyAndCannotBeConsumedForInsertion() {
         val f = Fixture(save = false)
         f.controller.submit(AiAction.ASK, "public question", null)
@@ -602,7 +756,7 @@ class AiWorkbenchControllerTest {
         }
     }
 
-    private class Fixture(save: Boolean = true) {
+    private class Fixture(save: Boolean = true, standalone: Boolean = false) {
         val worker = Queue()
         val ui = Queue()
         val provider = Provider()
@@ -617,6 +771,7 @@ class AiWorkbenchControllerTest {
         var summaries = emptyList<AiConversationSummary>()
         val historyLoading = mutableListOf<Boolean>()
         val historyFailed = mutableListOf<Boolean>()
+        val settled = mutableListOf<Boolean>()
         var storageFailures = 0
         var profile = AiProviderProfile(
             id = "fixture",
@@ -637,9 +792,12 @@ class AiWorkbenchControllerTest {
                 )
             },
             generation, { ui.execute(it); true }, { allowed }, events::add, { summaries = it }, {},
-            editorPrivacy = { privacy },
+            generationPolicy = { config ->
+                if (standalone) AiStandalonePolicy.generationPolicy(config, allowed)
+                else AiEditorPolicy.generationPolicy(config.enabled, config.networkAllowed, privacy)
+            },
             renderHistoryStatus = { _, loading, failed -> historyLoading += loading; historyFailed += failed },
-            contextCurrent = { contextCurrent }, storageFailed = { storageFailures++ })
+            contextCurrent = { contextCurrent }, storageFailed = { storageFailures++ }, turnSettled = { settled += it })
         fun flush() { repeat(3) { ui.drain(); worker.drain() }; ui.drain() }
     }
     private class Queue : Executor {

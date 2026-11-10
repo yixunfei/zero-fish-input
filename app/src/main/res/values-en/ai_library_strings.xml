@@ -1,0 +1,30 @@
+<resources>
+    <string name="ai_library_title">Roles and memory</string>
+    <string name="ai_library_notice">Choose a role and memories for this chat. They go to the current model only when you send. Saving locally requires an explicit Save action.</string>
+    <string name="ai_library_loading">Loading…</string>
+    <string name="ai_library_failed">Could not confirm the read or save result. Reload to check.</string>
+    <string name="ai_library_retry">Retry</string>
+    <string name="ai_library_new_role">New role</string>
+    <string name="ai_library_new_memory">Add memory</string>
+    <string name="ai_library_default">No role</string>
+    <string name="ai_library_edit">Edit</string>
+    <string name="ai_library_duplicate">Duplicate role</string>
+    <string name="ai_library_delete">Delete</string>
+    <string name="ai_library_delete_role">Delete this role and its scoped memories?</string>
+    <string name="ai_library_delete_memory">Delete this memory?</string>
+    <string name="ai_library_name">Role name</string>
+    <string name="ai_library_description">Description (optional)</string>
+    <string name="ai_library_instructions">Role preferences and working style</string>
+    <string name="ai_library_memory_text">What should the assistant remember?</string>
+    <string name="ai_library_shared">Allow selection by all roles</string>
+    <string name="ai_library_scope">Scoped to the current role by default. Without a role, explicitly choose sharing.</string>
+    <string name="ai_library_shared_label">Shared memory\n%1$s</string>
+    <string name="ai_library_memory_heading">Available memories</string>
+    <string name="ai_library_save">Save locally</string>
+    <string name="ai_library_apply">Use in this chat</string>
+    <string name="ai_library_preview">Preview included text</string>
+    <string name="ai_library_budget">Context characters: %1$d / %2$d</string>
+    <string name="ai_library_invalid">Content is empty, too long, or exceeds the item limit. Please check.</string>
+    <string name="ai_library_expired">Context changed or exceeds the budget. Please select again.</string>
+    <string name="ai_library_none">No memories yet. New memories must still be selected for this chat.</string>
+</resources>

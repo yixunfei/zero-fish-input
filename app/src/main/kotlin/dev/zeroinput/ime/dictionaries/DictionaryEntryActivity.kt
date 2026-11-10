@@ -19,10 +19,10 @@ import dev.zeroinput.engine.dictionary.importer.PublicPinyin
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.management.ManagementStatusView
+import dev.zeroinput.ime.management.ManagementTaskRunner
 import dev.zeroinput.userdata.DictionaryEdit
 import dev.zeroinput.userdata.DictionaryWord
-import java.util.concurrent.Future
-import java.util.concurrent.RejectedExecutionException
 
 class DictionaryEntryActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
@@ -31,9 +31,17 @@ class DictionaryEntryActivity : AppCompatActivity() {
     private lateinit var dictionaryId: String
     private lateinit var query: EditText
     private lateinit var rows: LinearLayout
-    private lateinit var status: TextView
-    private var pending: Future<*>? = null
-    private var generation = 0L
+    private lateinit var status: ManagementStatusView
+    private var active = false
+    private var busy = false
+    private var mutating = false
+    private val tasks by lazy { ManagementTaskRunner(worker, { runOnUiThread(it) },
+        { active && !isFinishing && !isDestroyed }, { busy = it }, {
+            rows.removeAllViews()
+            val message = if (mutating) R.string.management_operation_failed else R.string.management_load_failed
+            status.failure(message, ::refresh)
+            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show()
+        }) }
     private var offset = 0
     private var changesOnly = false
     private var dialog: AlertDialog? = null
@@ -70,23 +78,41 @@ class DictionaryEntryActivity : AppCompatActivity() {
                 setOnMenuItemClickListener { edit(null); true }
             }
         })
-        query = dictionaryField(this@DictionaryEntryActivity, R.string.dictionary_search_hint, 256)
-        addView(LinearLayout(this@DictionaryEntryActivity).apply {
+        val body = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), dp(16))
+        }
+        query = dictionaryField(this@DictionaryEntryActivity, R.string.dictionary_search_hint, 256).apply {
+            setSingleLine(false)
+            maxLines = 3
+            setHorizontallyScrolling(false)
+            imeOptions = imeOptions or android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setOnEditorActionListener { _, action, _ ->
+                if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    offset = 0
+                    refresh()
+                    true
+                } else false
+            }
+        }
+        body.addView(LinearLayout(this@DictionaryEntryActivity).apply {
             isBaselineAligned = false
             addView(query, LinearLayout.LayoutParams(0, -2, 1f))
             addView(button(R.string.dictionary_search) { offset = 0; refresh() })
         })
-        addView(MaterialSwitch(this@DictionaryEntryActivity).apply {
+        body.addView(MaterialSwitch(this@DictionaryEntryActivity).apply {
             setText(R.string.dictionary_changes_only)
             setOnCheckedChangeListener { _, enabled -> changesOnly = enabled; offset = 0; refresh() }
         })
-        status = TextView(this@DictionaryEntryActivity)
-        addView(status)
+        status = ManagementStatusView(this@DictionaryEntryActivity)
+        body.addView(status)
         rows = LinearLayout(this@DictionaryEntryActivity).apply { orientation = LinearLayout.VERTICAL }
-        addView(ScrollView(this@DictionaryEntryActivity).apply { addView(rows) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        body.addView(rows)
+        addView(ScrollView(this@DictionaryEntryActivity).apply { addView(body) }, LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun refresh() {
+        if (busy && mutating) return
         val text = query.text.toString().trim()
         val start = offset
         val onlyChanges = changesOnly
@@ -94,22 +120,31 @@ class DictionaryEntryActivity : AppCompatActivity() {
             rows.removeAllViews()
             page.entries.forEach { entry ->
                 val word = entry.replacement ?: requireNotNull(entry.original)
-                rows.addView(MaterialButton(this).apply {
+                rows.addView(TextView(this).apply {
                     this.text = getString(if (entry.replacement == null) R.string.dictionary_deleted_entry else R.string.dictionary_entry,
                         word.text, word.reading, word.weight)
-                    isAllCaps = false
+                    textSize = 16f
+                    minimumHeight = dp(64)
+                    gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    isFocusable = true
+                    filterTouchesWhenObscured = true
+                    val background = android.util.TypedValue()
+                    theme.resolveAttribute(android.R.attr.selectableItemBackground, background, true)
+                    setBackgroundResource(background.resourceId)
                     setOnClickListener { edit(entry) }
                 })
             }
             if (start > 0) rows.addView(button(R.string.dictionary_previous) { offset = (start - DictionaryEntrySearch.PAGE_SIZE).coerceAtLeast(0); refresh() })
             if (page.hasMore) rows.addView(button(R.string.dictionary_next) { offset = start + DictionaryEntrySearch.PAGE_SIZE; refresh() })
             rows.addView(TextView(this).apply { setText(R.string.dictionary_edit_notice) })
-            status.text = if (page.entries.isEmpty()) getString(R.string.dictionary_no_entries)
-                else getString(R.string.dictionary_result_count, start + 1, start + page.entries.size)
+            status.show(if (page.entries.isEmpty()) getString(R.string.dictionary_no_entries)
+                else getString(R.string.dictionary_result_count, start + 1, start + page.entries.size))
         }
     }
 
     private fun edit(entry: DictionaryEdit?) {
+        if (busy) return
         // Bind to the displayed data, not the generation at Save: reset notifications
         // may still be queued on the UI thread when an old form is submitted.
         val expected = editEpoch
@@ -169,34 +204,30 @@ class DictionaryEntryActivity : AppCompatActivity() {
         runTask({
             if (expected != graph.dictionaryEdits.generation()) throw java.util.concurrent.CancellationException()
             operation()
-        }) {
+        }, mutation = true) {
             submittedDialog?.dismiss()
             if (dialog === submittedDialog) dialog = null
             refresh()
         }
     }
 
-    private fun <T> runTask(work: () -> T, complete: (T) -> Unit) {
+    private fun <T> runTask(work: () -> T, mutation: Boolean = false, complete: (T) -> Unit) {
+        if (busy && mutating) return
         cancel()
-        val token = generation
-        status.setText(R.string.public_dictionary_working)
-        try {
-            pending = worker.submit {
-                val result = runCatching(work)
-                runOnUiThread {
-                    if (token == generation && !isDestroyed) {
-                        pending = null
-                        result.fold(complete) { status.setText(R.string.public_dictionary_failed) }
-                    }
-                }
-            }
-        } catch (_: RejectedExecutionException) { status.setText(R.string.public_dictionary_failed) }
+        mutating = mutation
+        rows.removeAllViews()
+        status.loading()
+        tasks.execute({ work() }, complete)
     }
 
-    private fun button(label: Int, action: () -> Unit) = MaterialButton(this).apply { setText(label); setOnClickListener { action() } }
-    private fun cancel() { generation++; pending?.cancel(true); pending = null; BoundedExecutors.purge(worker) }
+    private fun button(label: Int, action: () -> Unit) = MaterialButton(this).apply {
+        setText(label); isAllCaps = false; minHeight = dp(48); setOnClickListener { action() }
+    }
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun cancel() { tasks.cancel() }
     override fun onStart() {
         super.onStart()
+        active = true
         editEpoch = graph.dictionaryEdits.generation()
         revocationObserver = graph.addPersonalizationListener {
             runOnUiThread {
@@ -210,11 +241,12 @@ class DictionaryEntryActivity : AppCompatActivity() {
         if (::query.isInitialized) refresh()
     }
     override fun onStop() {
+        active = false
         revocationObserver?.close(); revocationObserver = null
         cancel(); dialog?.dismiss(); dialog = null
         if (::rows.isInitialized) { rows.removeAllViews(); query.text.clear(); offset = 0 }
         super.onStop()
     }
-    override fun onDestroy() { worker.shutdownNow(); super.onDestroy() }
+    override fun onDestroy() { tasks.close(); worker.shutdownNow(); super.onDestroy() }
     companion object { const val EXTRA_ID = "dictionary_id" }
 }

@@ -5,6 +5,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DictionaryCandidatePagingTest {
+    @Test fun wholeInputSuggestionsCannotReplaceAFixedSegment() {
+        val native = EngineSnapshot("nihao", "你 hao", listOf(Candidate("keep", "好", input = "hao"),
+            Candidate("hide", "号", input = "hao")), canUndoSelection = true)
+        val store = Store(PersonalSuggestionPage(
+            items = listOf(PersonalSuggestion("whole", "拟好", 100, "nihao")),
+            hasMore = true,
+            suppressedDictionaryEntries = setOf("号\thao"),
+            dictionaryEditsApplied = true,
+        ))
+        val paging = PersonalCandidatePaging()
+        val fixed = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        assertEquals(listOf("keep"), fixed.candidates.map { it.id })
+        assertFalse(fixed.hasNextPage)
+        val reset = paging.publish(native.copy(canUndoSelection = false), store, InputLanguage.CHINESE, true) { it }
+        assertEquals("personal:whole", reset.candidates.first().id)
+    }
+
     private val native = EngineSnapshot("nihao", "ni hao", listOf(Candidate("original", "你好"), Candidate("other", "拟好")))
     @Test fun canonicalCandidateReadingsFilterTyposWithoutHidingAnotherPronunciation() {
         val paging = PersonalCandidatePaging()

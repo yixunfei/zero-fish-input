@@ -1,5 +1,8 @@
 #include <jni.h>
 #include <rime_api.h>
+#include <rime/candidate.h>
+#include <rime/context.h>
+#include <rime/service.h>
 #include <opencc/Config.hpp>
 #include <opencc/Converter.hpp>
 
@@ -10,6 +13,7 @@
 #include <vector>
 
 bool ZeroInputLoadGrammar(const std::string& shared_directory);
+void ZeroInputInstallPinyinTranslator();
 
 namespace {
 std::mutex engine_mutex;
@@ -203,6 +207,7 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeInitialize(
     return JNI_FALSE;
   }
   api->join_maintenance_thread();
+  ZeroInputInstallPinyinTranslator();
   initialized = true;
   return JNI_TRUE;
 }
@@ -293,21 +298,33 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeProcessKey(
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeReadUpdate(
-    JNIEnv* env, jobject, jlong session_id, jboolean simplified) {
+    JNIEnv* env, jobject, jlong session_id, jboolean simplified, jboolean include_spelling) {
   std::lock_guard<std::mutex> lock(engine_mutex);
   ContextLease context(session_id);
   CommitLease commit(session_id);
   std::vector<std::string> texts;
   std::vector<std::string> comments;
+  std::vector<std::string> spellings;
+  std::vector<jint> spelling_ranges;
   if (context.acquired) {
     const auto& menu = context.value.menu;
     const int count = std::min(menu.num_candidates, 10);
+    auto session = include_spelling ? rime::Service::instance().GetSession(session_id) : nullptr;
+    const auto* current = session ? session->context() : nullptr;
+    const auto* segment = current && !current->composition().empty() ? &current->composition().back() : nullptr;
     for (int index = 0; index < count; ++index) {
       const auto& candidate = menu.candidates[index];
       texts.emplace_back(ConvertDisplayText(
           env, candidate.text ? candidate.text : "", simplified));
       if (env->ExceptionCheck()) return nullptr;
       comments.emplace_back(candidate.comment ? candidate.comment : "");
+      if (include_spelling) {
+        const auto absolute_index = static_cast<size_t>(menu.page_no) * menu.page_size + index;
+        auto row = segment ? segment->GetCandidateAt(absolute_index) : nullptr;
+        spellings.emplace_back(row ? row->preedit() : "");
+        spelling_ranges.push_back(row ? static_cast<jint>(row->start()) : -1);
+        spelling_ranges.push_back(row ? static_cast<jint>(row->end()) : -1);
+      }
     }
   }
   jstring raw = ToJString(env, api ? api->get_input(session_id) : "");
@@ -318,21 +335,30 @@ Java_dev_zeroinput_engine_rime_NativeRimeBridge_nativeReadUpdate(
   jstring committed = ToJString(env, committed_text.c_str());
   jobjectArray candidates = ToStringArray(env, texts);
   jobjectArray candidate_comments = ToStringArray(env, comments);
+  jobjectArray candidate_spellings = ToStringArray(env, spellings);
+  const auto range_count = static_cast<jsize>(spelling_ranges.size());
+  jintArray candidate_ranges = env->NewIntArray(range_count);
+  if (!candidate_ranges || env->ExceptionCheck()) return nullptr;
+  if (range_count != 0) env->SetIntArrayRegion(candidate_ranges, 0, range_count, spelling_ranges.data());
   jclass type = env->FindClass("dev/zeroinput/engine/rime/NativeRimeUpdate");
   if (!type || env->ExceptionCheck()) return nullptr;
   jmethodID constructor = env->GetMethodID(type, "<init>",
-      "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;IZII)V");
+      "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;"
+      "[Ljava/lang/String;IZII[Ljava/lang/String;[I)V");
   if (!constructor) return nullptr;
   jobject result = env->NewObject(type, constructor, raw, composition, committed, candidates,
       candidate_comments, context.acquired ? context.value.menu.page_no : 0,
       static_cast<jboolean>(!context.acquired || context.value.menu.is_last_page),
       context.acquired ? context.value.menu.highlighted_candidate_index : 0,
-      api && session_id ? static_cast<jint>(api->get_caret_pos(session_id)) : 0);
+      api && session_id ? static_cast<jint>(api->get_caret_pos(session_id)) : 0,
+      candidate_spellings, candidate_ranges);
   env->DeleteLocalRef(raw);
   env->DeleteLocalRef(composition);
   env->DeleteLocalRef(committed);
   env->DeleteLocalRef(candidates);
   env->DeleteLocalRef(candidate_comments);
+  env->DeleteLocalRef(candidate_spellings);
+  env->DeleteLocalRef(candidate_ranges);
   env->DeleteLocalRef(type);
   return result;
 }

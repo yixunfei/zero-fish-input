@@ -74,6 +74,52 @@ class ChineseOptionsTest {
     }
 
     @Test
+    fun shortInitialsRemainAvailableBehindAConflictingExactSyllable() {
+        withEngine(ChineseInputOptions()) { engine ->
+            type(engine, "ng")
+            assertTrue(engine.snapshot.candidates.first().pinyinMatch?.exact == true)
+            assertTrue("The same input must also offer a multi-initial result",
+                engine.snapshot.candidates.any { it.pinyinMatch?.spelling == "n g" })
+        }
+        withEngine(ChineseInputOptions(abbreviatedPinyin = false)) { engine ->
+            type(engine, "ng")
+            assertFalse(engine.snapshot.candidates.any { it.pinyinMatch?.spelling == "n g" })
+        }
+    }
+
+    @Test
+    fun fullSpellingLeadsTheFirstPageWhenFuzzyMatchesConflict() {
+        withEngine(ChineseInputOptions().withAllFuzzy(true)) { engine ->
+            for (input in listOf("xian", "lan", "lin", "zang")) {
+                engine.reset()
+                type(engine, input)
+                val candidates = engine.snapshot.candidates
+                assertTrue("Full spelling must lead", candidates.first().pinyinMatch?.exact == true)
+                assertFalse("A fuzzy or partial result must not precede a complete exact match",
+                    candidates.dropWhile { it.pinyinMatch?.exact == true }.any { it.pinyinMatch?.exact == true })
+                val selected = engine.handle(EngineKey.Space)
+                assertEquals(candidates.first().text, selected.committedText)
+            }
+            type(engine, "xian")
+            assertTrue("Fuzzy matches remain reachable", offers(engine, "想"))
+        }
+    }
+
+    @Test
+    fun exactAlternateSplitCanLeadWhenTheOriginalFullMatchIsOnlyFuzzy() {
+        withEngine(ChineseInputOptions().withAllFuzzy(true)) { engine ->
+            type(engine, "kanga")
+            val snapshot = engine.snapshot
+            assertEquals("kanga", snapshot.rawInput)
+            assertTrue("The exact alternate reading must precede the fuzzy whole result",
+                snapshot.candidates.first().pinyinMatch?.exact == true &&
+                    snapshot.candidates.first().pinyinMatch?.spelling == "kan ga")
+            assertTrue("The former fuzzy match remains selectable",
+                snapshot.candidates.any { it.comment == "kan a" && it.pinyinMatch?.exact == false })
+        }
+    }
+
+    @Test
     fun everyFuzzyPairCanBeEnabledIndependently() {
         val fixtures = listOf(
             Triple(FuzzyPinyinPair.Z_ZH, "zongguo", "中国"),

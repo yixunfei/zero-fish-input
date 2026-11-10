@@ -1,0 +1,30 @@
+<resources>
+    <string name="ai_library_title">角色与记忆</string>
+    <string name="ai_library_notice">选择本次对话使用的角色和记忆。仅在点击发送后交给当前模型；保存到本机需主动点击保存。</string>
+    <string name="ai_library_loading">正在读取…</string>
+    <string name="ai_library_failed">未能确认读取或保存结果，请重新读取后检查。</string>
+    <string name="ai_library_retry">重试</string>
+    <string name="ai_library_new_role">新建角色</string>
+    <string name="ai_library_new_memory">添加记忆</string>
+    <string name="ai_library_default">不使用角色</string>
+    <string name="ai_library_edit">编辑</string>
+    <string name="ai_library_duplicate">复制角色</string>
+    <string name="ai_library_delete">删除</string>
+    <string name="ai_library_delete_role">删除该角色及其专属记忆？</string>
+    <string name="ai_library_delete_memory">删除这条记忆？</string>
+    <string name="ai_library_name">角色名称</string>
+    <string name="ai_library_description">角色说明（可选）</string>
+    <string name="ai_library_instructions">角色偏好与工作方式</string>
+    <string name="ai_library_memory_text">希望助理记住的内容</string>
+    <string name="ai_library_shared">允许各角色选择使用</string>
+    <string name="ai_library_scope">默认仅属于当前角色；未选角色时须明确选择共享。</string>
+    <string name="ai_library_shared_label">共享记忆\n%1$s</string>
+    <string name="ai_library_memory_heading">可选记忆</string>
+    <string name="ai_library_save">保存到本机</string>
+    <string name="ai_library_apply">用于本次对话</string>
+    <string name="ai_library_preview">发送内容预览</string>
+    <string name="ai_library_budget">上下文：%1$d / %2$d 字符</string>
+    <string name="ai_library_invalid">内容为空、过长或超出数量限制，请检查。</string>
+    <string name="ai_library_expired">上下文已变化或超出预算，请重新选择。</string>
+    <string name="ai_library_none">尚无记忆。添加后仍需勾选才能用于本次对话。</string>
+</resources>

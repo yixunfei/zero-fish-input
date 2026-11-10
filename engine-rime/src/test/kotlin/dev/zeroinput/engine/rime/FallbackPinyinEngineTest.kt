@@ -11,6 +11,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FallbackPinyinEngineTest {
+    @Test fun `mixed nasal recovery offers the corrected phrase after the literal mixed spelling`() {
+        val engine = FallbackPinyinEngine()
+        val snapshot = engine.restoreComposition("nmeng").snapshot
+        assertEquals("nmeng", snapshot.rawInput)
+        assertEquals(listOf("柠檬", "你们"), snapshot.candidates.take(2).map { it.text })
+        assertEquals("你们", engine.selectCandidate(1).committedText)
+        val disabled = FallbackPinyinEngine(ChineseInputOptions(abbreviatedPinyin = false))
+        assertTrue(disabled.restoreComposition("nmeng").snapshot.candidates.none { it.text == "你们" })
+    }
+
+    @Test fun `known phrases accept abbreviated and mixed input while native pinyin warms up`() {
+        val engine = FallbackPinyinEngine()
+        for (code in listOf("zg", "zhg", "zhongg", "zguo")) {
+            engine.restoreComposition(code)
+            assertEquals("中国", engine.handle(EngineKey.Space).committedText)
+        }
+        val disabled = FallbackPinyinEngine(ChineseInputOptions(abbreviatedPinyin = false))
+        assertTrue(disabled.restoreComposition("zg").snapshot.candidates.none { it.text == "中国" })
+        for (initial in listOf("p", "q")) {
+            assertTrue(engine.restoreComposition(initial).snapshot.candidates.isNotEmpty())
+        }
+    }
+
     @Test fun `nine key handoff preserves digits and converts using public readings`() {
         val engine = FallbackPinyinEngine(ChineseInputOptions(
             keyboardLayout = dev.zeroinput.engine.api.ChineseKeyboardLayout.NINE_KEY))
@@ -103,7 +126,7 @@ class FallbackPinyinEngineTest {
         do {
             for (candidate in engine.snapshot.candidates) assertTrue(seen.add(candidate.text))
         } while (engine.changePage(dev.zeroinput.engine.api.PageDirection.NEXT).consumed)
-        assertEquals(setOf("你", "呢", "尼", "你好"), seen)
+        assertEquals(setOf("你", "呢", "尼", "你好", "你们", "柠檬"), seen)
     }
 
     @Test fun `partial selection only consumes a complete reading before unmatched input`() {

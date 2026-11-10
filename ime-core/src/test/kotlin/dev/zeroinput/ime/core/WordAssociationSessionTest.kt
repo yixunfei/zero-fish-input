@@ -12,7 +12,7 @@ class WordAssociationSessionTest {
         var count = 2
         val session = WordAssociationSession(NextWordPredictor { _, _, _ ->
             listOf(NextWordSuggestion("alpha"), NextWordSuggestion("beta"))
-        }, frequencyProvider = { _, _ -> mapOf("beta" to count) })
+        }, promotionThreshold = { 3 }, frequencyProvider = { _, _ -> mapOf("beta" to count) })
         session.committed("hello", InputLanguage.ENGLISH)
         assertEquals("alpha", session.candidates.first().text)
         val oldId = session.candidates.first().id

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="ai_workspace_context" type="id" />
+    <item name="ai_assistant_prompt" type="id" />
+    <item name="ai_assistant_send" type="id" />
+    <item name="ai_assistant_stop" type="id" />
+    <item name="ai_assistant_result" type="id" />
+    <item name="ai_assistant_device" type="id" />
+    <item name="ai_assistant_body" type="id" />
+    <item name="ai_assistant_interrupt" type="id" />
+</resources>

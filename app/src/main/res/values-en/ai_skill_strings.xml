@@ -1,0 +1,18 @@
+<resources>
+    <string name="ai_skill_title">Skills</string>
+    <string name="ai_skill_notice">A Skill is reviewed workflow text, not executable code. Saving does not enable it. Only selected and applied Skills accompany your next request. Required tools need separate configuration and authorization.</string>
+    <string name="ai_skill_name">Skill name</string>
+    <string name="ai_skill_instructions">Workflow instructions</string>
+    <string name="ai_skill_required_tools">Required tools (one per line, optional)</string>
+    <string name="ai_skill_create">New Skill</string>
+    <string name="ai_skill_import">Import Markdown document</string>
+    <string name="ai_skill_edit">Review and edit Skill</string>
+    <string name="ai_skill_manage">Manage and import</string>
+    <string name="ai_skill_empty">No Skills yet. Create one or import a UTF-8 Markdown document up to 16 KiB.</string>
+    <string name="ai_skill_unsupported">These tools are unavailable in this context: %1$s. This Skill cannot be selected yet.</string>
+    <string name="ai_skill_delete">Delete this Skill?</string>
+    <string name="ai_skill_import_failed">Cannot import. Only bounded UTF-8 text is accepted. Metadata supports name, description and an allowed-tools array; other fields, multiline metadata and script bundles are unsupported.</string>
+    <string name="ai_skill_leave_title">Open Skill management?</string>
+    <string name="ai_skill_leave_notice">Leaving clears the unsent draft and current context selection. Saved chats, roles and memory remain.</string>
+    <string name="ai_skill_leave_confirm">Open management</string>
+</resources>

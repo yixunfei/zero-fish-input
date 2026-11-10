@@ -19,6 +19,9 @@ import dev.zeroinput.engine.api.EngineSnapshot
 internal class CompositionEditorView(context: Context) : AppCompatTextView(context) {
     var onSelection: (CompositionSelection, String) -> Unit = { _, _ -> }
     private var input = ""
+    private var editableText = ""
+    private var rawOffsets = intArrayOf(0)
+    private var displayOffsets = intArrayOf(0)
     private var selection: CompositionSelection? = null
     private var preview: CompositionSelection? = null
     private var touching = false
@@ -55,7 +58,7 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
                     info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY)
                     info.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY)
                     info.movementGranularities = AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_CHARACTER
-                    info.setTextSelection(it.lower, it.upper)
+                    info.setTextSelection(displayOffsets[it.lower], displayOffsets[it.upper])
                 }
             }
         })
@@ -63,15 +66,50 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
 
     fun render(snapshot: EngineSnapshot, label: String) {
         val next = snapshot.selection?.takeIf { snapshot.isComposing && it.isValidFor(snapshot.rawInput) }
-        if (input != snapshot.rawInput || selection != next) cancelGesture()
+        val candidate = snapshot.candidates.getOrNull(snapshot.highlightedIndex)
+        val match = candidate?.pinyinMatch?.takeIf {
+            it.start in snapshot.rawInput.indices && it.end in (it.start + 1)..snapshot.rawInput.length &&
+                it.spelling.replace(" ", "") == snapshot.rawInput.substring(it.start, it.end)
+        }
+        val editable = when {
+            next == null -> snapshot.rawInput
+            match != null -> {
+                val matched = listOf(snapshot.rawInput.take(match.start), match.spelling).filter(String::isNotEmpty).joinToString(" ")
+                if (match.end < snapshot.rawInput.length) "$matched · ${snapshot.rawInput.drop(match.end)}" else matched
+            }
+            label.replace(" ", "") == snapshot.rawInput -> label
+            else -> snapshot.rawInput
+        }
+        if (input != snapshot.rawInput || selection != next || editableText != editable) cancelGesture()
+        if (input != snapshot.rawInput || editableText != editable) setOffsets(snapshot.rawInput, editable)
         input = snapshot.rawInput
+        editableText = editable
         selection = next
-        val display = if (next != null) input else label
+        val reading = candidate?.comment.orEmpty()
+        val display = when {
+            next == null -> label
+            match != null && reading.isNotEmpty() && match.spelling.replace('\'', ' ').trimEnd() != reading ->
+                context.getString(R.string.pinyin_matched_reading, editable, reading)
+            else -> editable
+        }
         if (text.toString() != display) text = display
         isClickable = next != null
-        contentDescription = if (next != null) context.getString(R.string.pinyin_edit_description, display) else display
+        val announced = if (match != null && match.end < input.length)
+            context.getString(R.string.pinyin_remaining_input, display) else display
+        contentDescription = if (next != null) context.getString(R.string.pinyin_edit_description, announced) else announced
         if (next != null) post { revealCaret() } else scrollTo(0, 0)
         invalidate()
+    }
+
+    private fun setOffsets(raw: String, display: String) {
+        rawOffsets = IntArray(display.length + 1)
+        displayOffsets = IntArray(raw.length + 1)
+        var offset = 0
+        for (index in display.indices) {
+            if (raw.getOrNull(offset) == display[index]) offset++
+            rawOffsets[index + 1] = offset
+            displayOffsets[offset] = index + 1
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -122,12 +160,13 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
         invalidate()
     }
 
-    private fun offset(event: MotionEvent): Int = getOffsetForPosition(event.x, event.y).coerceIn(0, input.length)
+    private fun offset(event: MotionEvent): Int =
+        rawOffsets[getOffsetForPosition(event.x, event.y).coerceIn(0, editableText.length)]
 
     private fun revealCaret() {
         val range = preview ?: selection ?: return
         val textLayout = layout ?: return
-        val x = textLayout.getPrimaryHorizontal(range.end)
+        val x = textLayout.getPrimaryHorizontal(displayOffsets[range.end])
         val available = (width - paddingLeft - paddingRight).coerceAtLeast(1)
         val target = when {
             x < scrollX -> x.toInt()
@@ -140,11 +179,11 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
     override fun onDraw(canvas: Canvas) {
         val range = preview ?: selection
         val textLayout = layout
-        if (range != null && textLayout != null && range.isValidFor(text.toString())) {
+        if (range != null && textLayout != null && range.isValidFor(input)) {
             val top = totalPaddingTop.toFloat()
             val bottom = top + textLayout.height
-            val start = totalPaddingLeft + textLayout.getPrimaryHorizontal(range.lower)
-            val end = totalPaddingLeft + textLayout.getPrimaryHorizontal(range.upper)
+            val start = totalPaddingLeft + textLayout.getPrimaryHorizontal(displayOffsets[range.lower])
+            val end = totalPaddingLeft + textLayout.getPrimaryHorizontal(displayOffsets[range.upper])
             marker.color = currentTextColor
             marker.alpha = if (range.start == range.end) 255 else 48
             canvas.drawRect(start, top, if (range.start == range.end) start + dp(2) else end, bottom, marker)
@@ -156,8 +195,10 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
         val current = selection ?: return super.performAccessibilityAction(action, arguments)
         val target = when (action) {
             AccessibilityNodeInfoCompat.ACTION_SET_SELECTION -> CompositionSelection(
-                arguments?.getInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_SELECTION_START_INT, -1) ?: -1,
-                arguments?.getInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_SELECTION_END_INT, -1) ?: -1)
+                rawOffsets.getOrNull(arguments?.getInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_SELECTION_START_INT, -1)
+                    ?: -1) ?: return false,
+                rawOffsets.getOrNull(arguments?.getInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_SELECTION_END_INT, -1)
+                    ?: -1) ?: return false)
             AccessibilityNodeInfoCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY,
             AccessibilityNodeInfoCompat.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY -> {
                 val step = if (action == AccessibilityNodeInfoCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY) 1 else -1

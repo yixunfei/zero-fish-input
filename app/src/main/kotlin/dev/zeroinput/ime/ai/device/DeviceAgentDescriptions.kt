@@ -11,6 +11,9 @@ internal class DeviceAgentDescriptions(private val context: Context? = null) {
     private fun string(id: Int, fallback: String, vararg args: Any): String = context?.getString(id, *args) ?: fallback
     val running get() = string(R.string.ai_device_agent_running, "Device task running")
     val stopped get() = string(R.string.ai_device_agent_stopped, "Task stopped; check settings, target and permissions")
+    val expired get() = string(R.string.ai_task_expired, "Task expired")
+    val failed get() = string(R.string.ai_task_failed, "Task failed")
+    val cancelled get() = string(R.string.ai_task_cancelled, "Task cancelled")
     val completed get() = string(R.string.ai_device_agent_activity_complete, "Task completed")
     val unavailable get() = string(R.string.ai_device_agent_unavailable, "Another task is running or the assistant is unavailable")
     val taskTitle get() = string(R.string.ai_device_agent_task_approval, "Review task")
@@ -22,7 +25,9 @@ internal class DeviceAgentDescriptions(private val context: Context? = null) {
         DeviceAgentState.PLAN_REVIEW -> string(R.string.ai_device_agent_planning, "Planning next step")
         DeviceAgentState.ACTION_APPROVAL -> actionTitle
         DeviceAgentState.COMPLETED -> completed
-        DeviceAgentState.FAILED, DeviceAgentState.REVOKED, DeviceAgentState.PAUSED -> stopped
+        DeviceAgentState.FAILED -> failed
+        DeviceAgentState.REVOKED -> expired
+        DeviceAgentState.PAUSED -> cancelled
         else -> running
     }
 
@@ -93,7 +98,7 @@ internal class DeviceAgentDescriptions(private val context: Context? = null) {
         return string(id, tool.replace('_', ' '))
     }
 
-    private fun stage6Capability(capability: DeviceStage6Capability): String = when (capability) {
+    fun stage6Capability(capability: DeviceStage6Capability): String = when (capability) {
         DeviceStage6Capability.NOTIFICATIONS -> string(R.string.ai_device_agent_stage6_notifications, "Read notifications")
         DeviceStage6Capability.MEDIA -> string(R.string.ai_device_agent_stage6_media, "Read or delete media")
         DeviceStage6Capability.SYSTEM_SETTINGS -> string(R.string.ai_device_agent_stage6_system_settings, "System settings")
@@ -106,7 +111,7 @@ internal class DeviceAgentDescriptions(private val context: Context? = null) {
         DeviceStage6Capability.CALENDAR -> string(R.string.ai_device_agent_stage6_calendar, "Calendar")
     }
 
-    private fun stage6Operation(operation: DeviceStage6Operation): String = when (operation) {
+    fun stage6Operation(operation: DeviceStage6Operation): String = when (operation) {
         DeviceStage6Operation.READ -> string(R.string.ai_device_agent_stage6_read, "Read")
         DeviceStage6Operation.CREATE -> string(R.string.ai_device_agent_stage6_create, "Create")
         DeviceStage6Operation.UPDATE -> string(R.string.ai_device_agent_stage6_update, "Update")

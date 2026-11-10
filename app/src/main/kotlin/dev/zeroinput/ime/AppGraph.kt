@@ -68,6 +68,7 @@ class AppGraph(context: Context) : AutoCloseable {
         queueCapacity = 2,
     )
     internal val aiDocumentExecutor: ExecutorService = BoundedExecutors.singleThread("zeroinput-ai-document", 1)
+    internal val aiRemoteExecutor: ExecutorService = BoundedExecutors.singleThread("zeroinput-ai-remote", 2)
     private val pageReferenceExecutor = BoundedExecutors.singleThread("zeroinput-page-reference", 1)
     internal val aiPersistenceExecutor: ExecutorService = BoundedExecutors.singleThread(
         name = "zeroinput-ai-storage",
@@ -118,10 +119,23 @@ class AppGraph(context: Context) : AutoCloseable {
     val secureClipboard = SecureClipboardVault(applicationContext)
     val aiConfiguration = dev.zeroinput.userdata.AiConfigurationRepository(applicationContext)
     val aiConversations = dev.zeroinput.userdata.AiConversationRepository(applicationContext)
-    private val aiConfigurationStorage = dev.zeroinput.ime.ai.AiConfigurationStorage(aiConfiguration, aiConversations)
+    val aiContextLibrary = dev.zeroinput.userdata.AiContextLibraryRepository(applicationContext)
+    val aiSkills = dev.zeroinput.userdata.AiSkillRepository(applicationContext)
+    val aiConnections = dev.zeroinput.userdata.AiConnectionRepository(applicationContext)
+    internal val aiConnectionGeneration = AiDataGeneration()
+    private val aiConfigurationStorage = dev.zeroinput.ime.ai.AiConfigurationStorage(aiConfiguration, aiConversations, aiContextLibrary, aiSkills, aiConnections)
     private val aiConfigurationState = dev.zeroinput.ime.ai.AiConfigurationState()
     val aiCoordinator = AiCoordinator(OpenAiCompatibleProvider({ aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor))
+    internal val standaloneAiCoordinator = AiCoordinator(OpenAiCompatibleProvider(
+        { aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor,
+    ))
     val aiDataGeneration = AiDataGeneration()
+    internal val toolProvider: dev.zeroinput.ai.api.AiToolProvider = OpenAiCompatibleProvider(
+        { aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor,
+    )
+    private val taskRuntimeDelegate = lazy { dev.zeroinput.ime.ai.AiTaskRuntime(applicationContext, ::aiConfigurationSnapshot,
+        { settings.learningEnabled && !settings.incognitoMode }, aiDataGeneration, aiConnectionGeneration, toolProvider) }
+    internal val aiTaskRuntime by taskRuntimeDelegate
     internal val aiContentInbox = dev.zeroinput.ime.ai.AiContentInbox()
     internal val pageReferences = dev.zeroinput.ime.ai.page.PageReferenceBroker(
         pageReferenceExecutor, { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
@@ -163,6 +177,9 @@ class AppGraph(context: Context) : AutoCloseable {
         stage6Controller = deviceStage6Controller,
     )
     private val aiImportSettingsObserver = settings.addChangeListener {
+        if (taskRuntimeDelegate.isInitialized()) aiTaskRuntime.revoke()
+        standaloneAiCoordinator.invalidate()
+        aiDataGeneration.invalidate()
         aiContentInbox.clear()
         pageReferences.invalidate()
         deviceAgentCoordinator.stop()
@@ -244,11 +261,15 @@ class AppGraph(context: Context) : AutoCloseable {
     }
 
     private fun revokeAiConfiguration(): Long {
+        if (taskRuntimeDelegate.isInitialized()) aiTaskRuntime.revoke()
         aiContentInbox.clear()
         pageReferences.invalidate()
         val token = aiConfigurationState.revoke()
         aiDataGeneration.invalidate()
         aiCoordinator.invalidate()
+        standaloneAiCoordinator.invalidate()
+        deviceAgentCoordinator.stop()
+        deviceAgentBroker.invalidate()
         aiConfigurationListeners.forEach { it() }
         return token
     }
@@ -459,6 +480,7 @@ class AppGraph(context: Context) : AutoCloseable {
         engineMaintenanceExecutor.shutdownNow()
         aiConfigurationListeners.clear()
         aiCoordinator.close()
+        standaloneAiCoordinator.close()
         deviceAgentCoordinator.close()
         deviceStage6Controller.close()
         deviceAgentBroker.close()
@@ -466,6 +488,8 @@ class AppGraph(context: Context) : AutoCloseable {
         aiExecutor.shutdownNow()
         aiProbeExecutor.shutdownNow()
         aiDocumentExecutor.shutdownNow()
+        aiRemoteExecutor.shutdownNow()
+        if (taskRuntimeDelegate.isInitialized()) aiTaskRuntime.close()
         aiImportSettingsObserver.close()
         aiCancellationExecutor.shutdown()
         aiPersistenceExecutor.shutdownNow()

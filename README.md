@@ -6,19 +6,19 @@
 
 **以离线输入为核心、可选联网 AI 工作台的中文与英文输入法，面向 Android 8.0 及以上设备。**
 
-[下载 v0.7.1 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.1) ·
+[下载 v0.7.2 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.2) ·
 [提交问题](https://github.com/yixunfei/zero-fish-input/issues) ·
 [贡献指南](CONTRIBUTING.md) · [安全政策](SECURITY.md) · [Apache-2.0](LICENSE)
 
 zero fish input（原工程名 ZeroInput）以隐私、安全、离线和可扩展性为核心。当前版本为
-`v0.7.1` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
+`v0.7.2` **预发布测试版**，中文提供全拼、简拼及可配置模糊拼音，同时提供离线英文候选、emoji 分类/搜索/最近使用、加密用户词组
 以及需要系统身份认证的安全剪贴板。另提供默认关闭的本地 AI 短词候选排序实验和可选联网
   AI 工作台；本地排序使用 UER RoBERTa-Mini WWM INT8 模型，全程在设备端运行。
 
 An offline Android keyboard for Chinese Pinyin and English, with encrypted local
 personalization, a private authenticated snippet vault, and optional offline
 RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI workbench. Android 8.0+;
- Apache-2.0 project code. Version 0.7.1 is a debug-signed testing prerelease.
+ Apache-2.0 project code. Version 0.7.2 is a debug-signed testing prerelease.
 
 项目展示及应用显示名称使用 `zero fish input`。Logo 保留所提供原图，图中文字为
 `ZERO FISH INPUT`；Android 启动图标使用该图的主体裁切。内部包名和数据标识保留 `zeroinput`。
@@ -26,9 +26,64 @@ RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI
 当前源码已修正误写的 `finish`，测试打包脚本生成 `zero-fish-input-<版本>-<ABI>.apk`
 及同名前缀的许可压缩包。远程仓库为 [yixunfei/zero-fish-input](https://github.com/yixunfei/zero-fish-input)。
 
+## 独立 AI 助手（2026-11-01）
+
+2026-11-02 扩展：独立对话页增加“角色与记忆”，可新建、复制、编辑和删除角色，
+保存角色专属或明确共享的记忆。勾选并预览后点击“用于本次对话”，随后主动发送才
+会交给当前模型；新对话不会自动继承。角色、记忆、历史和引用共用上下文预算。
+保存到本机使用独立加密库，不依赖会话保存开关；“清除 AI 数据”会同时删除它。
+删除角色会同时删除其专属记忆，共享记忆保留。角色偏好不能授予工具或系统权限。
+
+“Skills”可创建或导入单个 UTF-8 文本/Markdown（最多 16 KiB），预览编辑后保存，
+再选择用于本次对话。可选元数据仅支持 `name`、`description`、`allowed-tools`；
+工具列表使用 JSON 字符串数组。不会执行脚本、安装依赖或加载压缩包，普通对话中
+需要工具的 Skill 会显示为不可用。云文件提供方可能自行联网；保存不会发送给模型。
+“压缩上下文”先展示将发送的早期已选消息，生成后再次预览并确认应用；保留最近
+两条消息和全部原始记录，后续更改前可撤销。Skills 同样使用独立加密库并随 AI 数据清除。
+
+“文件与工具任务”使用独立草稿和逐次操作确认。选择本次文件和工具后，可读取片段、
+在文件中进行文本搜索，或通过系统文件选择器另存为新文件。仅接受最多 8 个、每个
+不超过 64 KiB 的 UTF-8 文本/Markdown/JSON/CSV；模型不能指定路径或 URI。
+另存前展示内容，选好新文件后再次确认目标；取消可能留下空文档，写入结果不确定时
+停止且不自动重试。角色、记忆和符合所选工具要求的 Skills 可用于任务。任务结束清除
+文件范围；默认离开即停止，锁屏始终停止，系统文件选择器仅保留最多两分钟的暂停交接。
+设备操作仍在独立设备代理面板中执行。
+
+任务页的“MCP 与网页搜索”可管理独立加密的连接和令牌。MCP 仅支持公网 HTTPS
+443 端口、2025-11-25 版本的有限 Streamable HTTP；主动连接获取工具、文本资源和
+提示词目录，预览参数并勾选后加入本次任务。不支持的 Schema 会计入不可用项目，
+服务端目录变化会拒绝旧调用；不支持本地服务器、OAuth、stdio 或脚本执行。
+Brave 需要自行提供专用 API 令牌；批准查询后返回最多五条标题、URL 和摘要，
+来源按钮经点击在外部浏览器打开，不自动读取整页。连接保存不联网，也不共享模型
+凭据；“清除 AI 数据”包括连接库和密钥。
+
+任务页可为本次任务开启通用状态通知，再选择最长两分钟的后台运行。后台支持文件读取
+和远程工具；待确认操作暂停，需回到页面批准。另存为及设备界面操作不进入此模式。
+通知仅显示状态，可打开或停止对应任务；完成结果在内存中最多保留两分钟，不自动保存。
+系统助理入口可从助手页面主动设置，系统手势或助理按键打开独立文本对话；不读取屏幕、
+不自动录音，隐藏或锁屏即清除。设备是否提供助理选择入口取决于系统。
+
+“虚拟屏能力验证”仅创建自有公开样例的独立预览，关闭或两分钟到期即释放。
+当前不支持第三方应用的后台虚拟屏读取与控制，也不会切回主屏执行操作。
+
+同一 APK 现在提供第二个桌面入口 **zero fish AI**，无需先打开输入框或切换默认输入法。
+打开后可直接对话、规划、润色、改写或翻译，选择已配置模型和思考档位，勾选本轮上下文，
+或管理已启用保存的加密会话。输入法设置中也有“打开 AI 助手”，键盘 AI 的更多菜单提供“全屏 AI 助手”，打开时开始独立草稿。首次使用仍须在 AI 设置
+主动启用 AI 与联网并配置服务；打开面板不会发送请求。隐身模式、关闭学习或锁屏时不可用。
+离开对话页会停止请求并清空临时内容，旋转不会恢复草稿或重发；需要保留的对话须预先开启会话保存。
+
+“设备任务”进入独立 Agent 面板：可选择授权范围内的目标应用，也可手填包名，填写任务后主动开始。
+面板显示权限与配置就绪状态，以及任务事件。等待应用打开时仍可停止；等待超过十秒或配置改变
+须重新发起。执行时沿用目标应用中的审批/停止浮层；返回 ZeroInput 等前台应用切换会撤销任务。
+截图及各类直接数据能力继续独立默认关闭，按既有规则确认。
+
+本轮参考 [Eta 的入口与运行循环设计](https://github.com/Mangi-11/Eta/blob/main/docs/AGENT_RUNTIME.md)，
+实现边界见 [ADR 0029](docs/adr/0029-standalone-ai-entry.md)。
+
 ## 本轮输入修复（2026-10-30）
 
-- 符号键盘提供12 个可选分组、1336 个常用与特殊符号条目（按每页最多 27 个分页）；点击页码或左右滑动翻页，滑动不提交符号。
+- 符号键盘首屏提供 27 个常用符号，包括 `%`、`=`、`$`、`—`、中英文括号和英文引号。可用 `‹`、`›` 或左右滑动翻页，点击分组名可直达 13 个分组，点击 `123` 可切到数字键盘。
+- 点按左括号或引号会插入一对符号并将光标放在中间。在设置的「输入」中可关闭「成对符号自动补全」。
 - 中文全键盘按 Shift 后，逗号、句号显示并输入半角；单次 Shift 在输入后恢复，锁定 Shift 时保持。
 - 键盘工具栏前部增加“私密复制”，选中文字后可直接进入既有认证和保存流程；隐私模式可主动复制，密码框仍禁止。其他应用的系统选字菜单顺序与入口可见性由宿主决定。
 - 编辑器提供表情跨度时整体删除；文字标签优先交给宿主处理删除键。不推测任意括号文字的删除长度，未提供边界或不处理删除键的应用仍可能需要多次删除。
@@ -36,12 +91,11 @@ RoBERTa-Mini INT8 candidate ranking. Current source also adds an opt-in HTTPS AI
 
 ## 安装与启用
 
-个人词频默认从候选点击学习；达到提权阈值后开始提升已有候选的排序，仍结合默认顺序和输入匹配，不固定置顶。同一词在不同输入码下的使用记录共同影响已有候选：例如用 `ceshi` 点击“测试”，累计词频也会影响 `cs` 下的“测试”。设置的“管理个人词组”支持拼音、简拼、输入码或词语搜索，按页查看、新增、编辑及删除词语和权重。“个人词频提权阈值”直接显示在学习设置旁和管理页顶部，默认 3，可调整为 1–100；手动权重与点击累计的词频都参与比较，阈值不是概率置信度。需要从空格等提交结果学习时，可额外开启“从提交结果学习”；只处理本输入法成功提交的内容，不读取编辑器已有正文。回车保持原始输入提交行为。
+个人词频默认从候选点击学习。累计次数达到阈值后，词频与输入匹配和默认顺序一起决定候选排序。用 `ceshi` 点击“测试”，累计词频也会影响 `cs` 下的“测试”。“个人词频提权阈值”位于学习设置旁和词组管理页顶部，默认 1，可调整为 1–100，已保存的设置继续生效。词组管理页支持按拼音、简拼、输入码或词语搜索，以及查看、新增、编辑和删除词组。中文内置引擎的空格键提交当前高亮候选。需要学习空格等方式提交的内容时，可开启“从提交结果学习”。回车直接提交原始输入。
 
 验收可用 `ceshi` 连续三次点选“测试”，检查词频逐次增加，并分别输入 `ceshi`、`cs` 检查排序；将该词累计权重调低或提高阈值后检查默认候选恢复。关闭提交学习时，空格提交不增加权重；敏感输入框或隐私模式下既不读取也不更新个人词频。
 
-v0.7.1 包含个人联想权重学习与管理、多协议 AI Provider、词库本地编辑与撤销、拼音组合光标编辑、候选连续浏览和 full/lite 公开资源包，
-并补充了本轮审查后的隐私、并发、错误处理和中文草稿转换修复。完整变化见 [发布说明](docs/releases/v0.7.1.md)。
+v0.7.2 修复混合简拼候选，改进符号输入，并纳入近期的词库管理、AI 工作台和打包改动。详见 [发布说明](docs/releases/v0.7.2.md)。
 也可按下方构建说明运行 `./tools/package-test-apk.ps1` 自行生成测试包。
 当前代码审查与测试记录见 [2026-10-07 审查](docs/code-audit-2026-10-07.md)。
 最新一轮输入与交互边界修复见 [2026-10-30 审计](docs/code-audit-2026-10-30.md)：
@@ -49,12 +103,12 @@ v0.7.1 包含个人联想权重学习与管理、多协议 AI Provider、词库�
 AI 仓库及控制器的 JVM 测试使用 Robolectric 4.16.1 的 Android API 28 环境；
 首次运行需下载主机测试依赖，缓存后可离线运行，不进入测试 APK 或应用运行时。
 
-1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.1)
-   下载 `zero-fish-input-0.7.1-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
+1. 从 [Release 页面](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.2)
+   下载 `zero-fish-input-0.7.2-debug-universal.apk`。它包含 `arm64-v8a`、`armeabi-v7a` 和
    `x86_64` 三种架构，要求 Android 8.0（API 26）或更新版本。
    存储空间有限时可自行构建轻量包，其余公开资源可在设置中按需下载。
 2. 对照同页 `SHA256SUMS.txt` 校验下载；Windows 可运行
-   `Get-FileHash .\zero-fish-input-0.7.1-debug-universal.apk -Algorithm SHA256`。
+   `Get-FileHash .\zero-fish-input-0.7.2-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，在系统输入法设置中启用，然后选择为当前键盘。
    Android 会显示针对所有第三方输入法的系统提醒；项目的隐私边界见下文。
 4. 在普通输入框中输入 `nihao` 并选取“你好”，通过语言切换键切换英文。
@@ -63,7 +117,7 @@ AI 仓库及控制器的 JVM 测试使用 Robolectric 4.16.1 的 Android API 28 
    `nihao` 选取“你好”。准备失败会显示“中文加载失败”，可重试；仅在验证中文转换和选词
    可用后才切换到 Rime。普通输入框请求禁止预测建议时保留中文转换、关闭英文预测，且不读取或学习个人数据。
 
-本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.7.1-debug`，
+本次 APK 使用 **Debug 签名**，包名为 `dev.zeroinput.ime.debug`，版本为 `0.7.2-debug`，
 可调试，仅用于体验和反馈。尚未配置维护者正式发布签名，不建议用此测试包保存真实秘密。
 Release 源码构建生成的包名为 `dev.zeroinput.ime`，两个包的本地数据彼此独立。
 不同开发环境的 Debug 签名可能不同；遇到签名冲突不要直接卸载，以免丢失本地数据。
@@ -95,6 +149,8 @@ Android 会以 `INSTALL_PARSE_FAILED_NO_CERTIFICATES` 拒绝安装。当前仓�
 中文全拼/双拼正在输入时，Shift 自动显示为“分词”，点击后逐段选字；无组合或英文状态恢复大小写。
 候选栏拼音可点按或拖动移动光标，长按后拖动选择范围；字母在光标处插入或替换选区，退格删除
 选区或光标前字符。例如 `chaxun` 可定位为 `c|haxun`，竖线只表示光标，不插入分隔符。
+全拼输入时，编辑栏用空格显示当前高亮候选的音节边界。箭头后的拼音是简拼或模糊音所匹配的读音，
+居中圆点右侧是仍待转换的字母。光标和删除仍以实际输入的字母及手动分隔符为准。
 将光标移到拼音中间再点击“分词”，会在当前位置插入半角 `'`，如 `c|h` 变为 `c'h`，
 候选栏立即显示新的拼音与分隔符；光标在末尾时仍可逐段选字。中文组合期间符号页的 `'` 同样用于分词。
 编辑已有选字的组合时先还原拼音、撤销已选段，再重新选词。“撤销上一段选字”仍用于修改已选片段。
@@ -105,6 +161,8 @@ Android 会以 `INSTALL_PARSE_FAILED_NO_CERTIFICATES` 拒绝安装。当前仓�
 没有组合输入时顶栏收紧为 48dp 单行；开始输入后显示拼音编辑与候选行。顶栏最右侧的收起按钮
 会隐藏键盘并保留当前输入内容。
 数字使用独立键盘，可直接切换符号；点 `ABC` 或固定返回按钮回到原语言，数字和符号可连续输入。
+同一编辑器配置下，宿主重启输入连接或引擎更新九键/全键布局时保留数字页和符号分页；
+切换输入框或编辑器配置后重新使用默认页面。
 中英文切换会先按原样上屏未完成的拼音或英文。候选刷新时保留当前浏览位置，新输入回到首候选；
 较长词句在候选栏限宽，在展开列表中完整换行显示。
 展开列表双向接续加载，顶部候选条不再同时触发加载；Debug 和 Release 均不显示测试用输入诊断框。
@@ -181,6 +239,10 @@ Emoji 面板内使用随包图形，首次后台准备完成后可离线显示�
 仍遵循个性化权限。发出的内容是完整 Unicode 文本，接收应用如何显示由其字体决定。
 [RGI 数据与显示验证](docs/rgi-emoji-validation.md) 记录正式版本、来源、许可证和覆盖检查。
 
+个人词组、词典、自定义颜文字与安全剪贴板管理页均提供中英文状态提示，区分加载中、空列表和读取失败。
+失败后可点击“重新加载列表”；该操作不会重放保存、删除、导入或下载，安全剪贴板需要重新认证。
+词典词条以词语和拼音/权重分行显示，个人词组和剪贴板行高随字体调整；小屏和横屏可滚动查看控件。
+
 ## 离线词联想
 
 设置 → 输入中的 **“词联想”** 默认开启。普通文本输入框中选中“谢谢”后可点“你”，再点
@@ -188,8 +250,8 @@ Emoji 面板内使用随包图形，首次后台准备完成后可离线显示�
 联想显示在候选条中，仅点选才上屏；空格正常输入空格，回车正常换行或执行输入框操作。
 继续输入时恢复普通拼音或英文候选。没有匹配词对时不显示联想。
 
-当前内置 1,728 组自编公开词对，覆盖问候、日程、工作、出行、餐饮、学习和健康等常用场景，
-支持“联系 → 方式”和 `could → you → please → help` 等连续点选。覆盖仍有限，不是自由续写
+当前内置 2,002 组自编公开词对，覆盖问候、日程、工作、快递、出行、餐饮、学习、健康、购物和技术等常用场景，
+支持“联系 → 方式”、“收到请 → 确认 → 时间”和 `please review → the → document` 等连续点选。覆盖仍有限，不是自由续写
 或训练好的语言模型。它只使用本次输入法成功上屏的短上下文和公开词对生成候选，不读取
 输入框已有正文或私人历史；个人词频只重排这些公开候选，不注入个人词库中的新词。
 **“个人词频提权阈值”同时作用于输入候选和这里最多 8 条的公开联想，独立的“词联想”开关
@@ -283,7 +345,8 @@ PDF、Office 文档、自动截屏、录音及厂商专有接口不在当前支�
 Messages 的图片协议片段发送；截图不落盘，任务或快照失效时立即清零，平台不支持或超限时安全失败。
 输入法面板模式不隐式启用截图。代理历史默认不保存，任务状态只存在当前内存会话中。
 设备代理使用现有唯一 HTTPS provider，并支持已配置的 Chat Completions、Responses 和
-Anthropic Messages tool-call 协议；不会新增 WebView、远程 MCP、遥测或其他联网入口。
+Anthropic Messages tool-call 协议；不使用 WebView 或遥测。E4 的 MCP 与网页搜索位于
+独立工具任务页，使用单独的凭据与适配器，不继承设备代理的授权。
 
 当前交付包含 AI 面板内的独立任务模式，以及可从设置打开的独立设备代理 Activity。独立页面提供
 任务草稿、目标包名、任务级截图确认、动作审批、停止按钮和内存时间线；旋转只重新绑定现有任务。
@@ -488,11 +551,15 @@ Android 9 及以上使用系统清空接口；Android 8.x 写入空文本，不�
 本轮回归范围与设备验收记录见 [交互便利性验证](docs/interaction-usability-validation.md)。
 
 - 默认输出简体。键盘工具栏的“简/繁”和设置页均可切换文字，个人候选也使用当前文字形式。
-- 简拼默认开启，支持 `zg`、`zhg`、`zhongg`、`zguo` 等全拼与首字母混输。
+- 简拼默认开启，支持 `zg`、`zhg`、`zhongg`、`zguo` 等全拼与首字母混输。输入 `ng` 时，
+  单音节结果在前，也可选择 `n g` 的简拼结果。
+- 输入 `nmen` 可选“你们”。输入 `nmeng` 时，符合原拼写的“柠檬”在前，首屏也提供按 `en` 补查的“你们”。
+- 全拼候选优先匹配完整精确拼写，模糊拼音候选可以继续浏览。无手动分隔符且词典缺少整串匹配时，
+  引擎会尝试其他音节切分。例如 `kanga` 可以同时出现 `kang a` 与 `kan ga` 的整串结果。
 - 模糊拼音默认关闭，可分别启用 `z/zh`、`c/ch`、`s/sh`、`n/l`、`hu/fu`、`r/l`、`h/f`、
   `an/ang`、`en/eng`、`in/ing`、`ian/iang`、`uan/uang`、`on/ong`。中文标点和每页候选数量（5、8、10）可在设置页调整。
-- 初次使用或重建配置时，键盘显示准备状态；失败时可主动重试。准备期间提供基础输入，
-  本次拼音组合结束后才切换引擎或应用普通设置，避免丢弃正在输入的内容。
+- 初次使用或重建配置时，键盘显示准备状态；失败时可主动重试。准备期间的小词库支持常见短语的全拼和简拼，
+  如 `nihao`、`nh`、`zg`。普通设置变更在组合结束后应用。
 - 拼音与候选分行显示，候选右侧箭头展开多行面板，面板底部支持翻页；展开不改变键盘高度。
 - 长按退格清空当前拼音，且本次长按不会继续删除已上屏内容。没有拼音组合时连续删除，
   松手、滑出按键或切换输入框/面板即停止。emoji 搜索中长按退格清空搜索词。
@@ -522,7 +589,7 @@ Android 9 及以上使用系统清空接口；Android 8.x 写入空文本，不�
 - 输入时显示拼音与候选，候选左侧工具按钮可打开工具栏；返回键回到候选。候选展开沿用当前
   按键区高度，主题更换不会清除正在输入的拼音。
 - 点按 Shift 输入一个大写字母后恢复小写，长按锁定大写，再次点按解除。新输入框重置大小写和符号页。
-- 两页符号均可退格，第二页可直接返回字母页或数字符号页。数字、电话、日期输入框使用专用数字
+- 所有符号页均可退格，并可直接返回字母页或切换到数字页。数字、电话、日期输入框使用专用数字
   布局；小数点和正负号按输入框允许的类型显示，数字不会作为九键拼音码处理。
 - 回车显示搜索、发送、下一项或完成等输入框动作；有中英文组合时第一次回车只提交原始输入
   （例如拼音 `da` 上屏为 `da`），再次回车才换行或执行输入框动作。候选点选和空格仍可选词。
@@ -591,7 +658,7 @@ python -B tools/prepare-handwriting-stroke-model.py
 Lint：
 
 ```powershell
-./tools/package-test-apk.ps1
+./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000
 ```
 
 APK、第三方许可证、手写模型对应源码压缩包及 SHA-256 清单位于 `app/build/outputs/test-apk/<时间戳>/`。
@@ -603,7 +670,7 @@ APK、第三方许可证、手写模型对应源码压缩包及 SHA-256 清单�
 ./tools/test-java-toolchain.ps1
 python tools/rime-prebuilt/test_verify.py
 ./tools/test-input-experience.ps1 -Serial emulator-5554 `
-  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.7.1-debug-universal.apk' `
+  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.7.2-debug-universal.apk' `
   -TestClass 'dev.zeroinput.ime.AiProviderManagementTest,dev.zeroinput.ime.AiSettingsFailureTest,dev.zeroinput.ime.AiImeInteractionTest'
 ```
 
@@ -616,11 +683,35 @@ python tools/rime-prebuilt/test_verify.py
 `./tools/package-test-apk.ps1 -Install` 可在验证通过后直接覆盖安装 Debug 测试版。Debug 版使用
 独立包名 `dev.zeroinput.ime.debug`，不会覆盖正式版。
 
+### 安装包包体专项
+
+[包体优化专项](docs/apk-size-optimization.md)以 ARM64 完整包为优先目标，预算为
+80,000,000 字节（80 MB，约 76.29 MiB）。保留完整万象词表、Emoji、Mini 和首次输入加速。
+当前完整 ARM64 未签名 Release 实测约 83.25 MB（79.39 MiB），仍高于该严格预算，
+不能将 MiB 数值作为 80 MB 达标证据。
+
+打包脚本使用与引擎相同的固定 NDK 剥离原生调试符号；重建前仅清理可再生成的 Debug ZIP
+打包状态，保留 native 缓存和历史交付目录。复制交付包前检查完整资源、原生符号、ZIP
+残留空间及实际文件大小，默认超过 80 MB 即停止。报告见 `build/reports/apk-size/`；
+成功交付时附带 `APK-SIZE.json`，构建凭据也包含实际字节数和预算。
+
+只做测量或检查某个现有 APK：
+
+```powershell
+python tools/resources/apk_size.py 'app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk' `
+  --report build/reports/apk-size/arm64-release.json --report-only
+python -m unittest discover -s tools/resources -p 'test_*.py'
+```
+
+移除 `--report-only` 即执行严格门禁。如确需生成仍超目标的测试包，可显式传入
+`-MaxApkBytes <允许的字节数>`；这只改变该次交付上限，报告中的 `targetMet` 仍按
+80,000,000 字节判断，不代表达成项目目标。Release 继续保持未签名，不生成正式签名密钥。
+
 单独检查某个产物的签名和 ABI：
 
 ```powershell
 ./tools/check-apk-installable.ps1 `
-  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.7.1-debug-arm64-v8a.apk' `
+  -ApkPath 'app/build/outputs/test-apk/<时间戳>/zero-fish-input-0.7.2-debug-arm64-v8a.apk' `
   -ExpectedPackage dev.zeroinput.ime.debug -ExpectedAbi arm64-v8a
 ```
 
@@ -928,3 +1019,18 @@ Chat Completions、Responses、Anthropic Messages 分别使用 `/chat/completion
 - AI 回答支持显式插入全部回答，或进入“按段选择”后插入所选段落；完成回答不会自动插入。
 - 设备代理联系人重命名按完整显示名处理；含多个原始账户记录的聚合联系人会明确拒绝修改／删除。
 - 取消会通知支持取消的 provider 查询。已发出的系统写入、短信或电话无法保证撤回，不会自动重试；详情见 [阶段 6 边界](docs/adr/0026-ai-device-agent-stage6-minimal-capabilities.md)。
+## AI interaction improvements (2026-11-01)
+
+In the independent AI chat, the input area stays below the scrolling conversation.
+During a reply, Send queues up to four messages within the shared text budget;
+queued messages can be removed or retrieved for editing. Interrupt cancels the
+current reply and sends the new draft. Stop, leaving, or changing model/context/
+settings clears pending messages. A failed reply or conversation save stops the
+queue; nothing is silently retried.
+
+Device tasks offer searchable local app selection, editable examples, collapsible
+attachment/screenshot options, fixed start/stop controls and expandable progress
+details. Tools and capabilities shows the current configuration and permission
+requirements; configure them through the existing settings. Approve/stop a running
+task from its target-app overlay. Returning to the assistant can revoke the task.
+Starting again is a new task with fresh checks and screenshot consent.

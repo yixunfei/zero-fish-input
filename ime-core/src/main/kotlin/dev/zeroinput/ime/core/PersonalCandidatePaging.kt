@@ -7,6 +7,7 @@ import java.util.TreeMap
 internal class PersonalCandidatePaging {
     private var input = ""
     private var composition = ""
+    private var fixedSegment = false
     private var offset = 0
     private var requested = 0
     private var page = PersonalSuggestionPage()
@@ -24,6 +25,7 @@ internal class PersonalCandidatePaging {
         editsPending = false
         input = ""
         composition = ""
+        fixedSegment = false
         offset = 0
         requested = 0
         page = PersonalSuggestionPage()
@@ -64,17 +66,21 @@ internal class PersonalCandidatePaging {
     }
 
     fun publish(native: EngineSnapshot, store: PersonalizationStore, language: InputLanguage,
-        allowed: Boolean, promotionThreshold: Int = 3, normalize: (String) -> String?): EngineSnapshot {
+        allowed: Boolean, promotionThreshold: Int = 1, normalize: (String) -> String?): EngineSnapshot {
         if (!allowed || native.rawInput.isBlank()) { clear(); return native }
-        if (input != native.rawInput || composition != native.composition) {
+        if (input != native.rawInput || composition != native.composition || fixedSegment != native.canUndoSelection) {
             clear()
             input = native.rawInput
             composition = native.composition
+            fixedSegment = native.canUndoSelection
         }
-        val loaded = runCatching {
+        val query = runCatching {
             (store as? PagedPersonalizationStore)?.suggestionPage(input, language, requested, PAGE_SIZE)
                 ?: PersonalSuggestionPage(store.suggestionsFor(input, language, PAGE_SIZE))
         }.getOrDefault(PersonalSuggestionPage())
+        // Whole-input rows cannot replace a segment the user already selected.
+        // Keep the query's dictionary suppression metadata for the native rows.
+        val loaded = if (fixedSegment) query.copy(items = emptyList(), hasMore = false) else query
         if (revision != null && revision != loaded.revision) {
             val wasFirstPage = requested == 0
             offset = 0
@@ -112,20 +118,23 @@ internal class PersonalCandidatePaging {
                     "${it.text}\t" in loaded.suppressedDictionaryEntries
         }
         val includesNative = pages.isEmpty() || pages.firstKey() == 0
-        val personalRows = pages.values.flatMap(::rows)
-        val frequencies = if (includesNative) nativeFrequencies(store, visibleNative, language) else emptyMap()
-        val personal = if (includesNative) PersonalCandidateRanking.merge(visibleNative, personalRows, input, promotionThreshold, frequencies)
-            else personalRows
-        val items = personal.distinctBy(Candidate::text)
+        // Rerank the initial personal page with the native window. A later
+        // personal page appends rows without moving earlier choices.
+        val items = if (includesNative) {
+            val frequencies = nativeFrequencies(store, visibleNative, language)
+            val ranked = PersonalCandidateRanking.merge(visibleNative, rows(first), input, promotionThreshold, frequencies)
+            ranked + pages.tailMap(0, false).values.flatMap(::rows)
+        } else pages.values.flatMap(::rows)
+        val distinctItems = items.distinctBy(Candidate::text)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         // "Previous" is a personal affordance only while the merged first
         // page has been evicted by deeper browsing (changePage then owns it);
         // while the native first page is still cached the previous edge
         // belongs to the engine.
         val hasPrevious = pages.isNotEmpty() && pages.firstKey() > 0
-        return native.copy(candidates = items, highlightedIndex = if (items.firstOrNull()?.id?.startsWith("personal:") == true ||
-            offset > 0 || editsApplied || items.firstOrNull()?.text != visibleNative.firstOrNull()?.text) 0 else
-            items.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
+        return native.copy(candidates = distinctItems, highlightedIndex = if (distinctItems.firstOrNull()?.id?.startsWith("personal:") == true ||
+            offset > 0 || editsApplied || distinctItems.firstOrNull()?.text != visibleNative.firstOrNull()?.text) 0 else
+            distinctItems.indexOfFirst { it.id == highlightedId }.coerceAtLeast(0),
             hasPreviousPage = hasPrevious || includesNative && native.hasPreviousPage,
             hasNextPage = native.hasNextPage || (pages.lastEntry()?.value ?: first).hasMore)
     }

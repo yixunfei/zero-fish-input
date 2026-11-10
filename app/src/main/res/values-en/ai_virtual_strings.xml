@@ -1,0 +1,10 @@
+<resources>
+    <string name="ai_virtual_title">Virtual screen capability check</string>
+    <string name="ai_virtual_limits">Preview a public ZeroInput sample only. No other app or main-screen content appears here. Reading or controlling third-party apps on a background virtual screen is unavailable; device tasks still require the target app in the foreground. The preview expires after 2 minutes and is released on leaving or locking.</string>
+    <string name="ai_virtual_fixture">ZeroInput\nIndependent display · Public sample</string>
+    <string name="ai_virtual_start">Start preview</string>
+    <string name="ai_virtual_idle">No virtual screen created</string>
+    <string name="ai_virtual_running">Independent display created · 640 × 360\nApp execution: own sample only\nThird-party observation and control: unavailable</string>
+    <string name="ai_virtual_stopped">Preview stopped; virtual display released</string>
+    <string name="ai_virtual_unavailable">This device could not create the preview. Close and try again.</string>
+</resources>

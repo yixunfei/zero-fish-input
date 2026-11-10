@@ -28,6 +28,82 @@ import dev.zeroinput.ime.ui.R as UiR
 class KeyboardEditorIntegrationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun pairedSymbolsPutTheNextEditInsideAndTheSettingCanDisablePairing() {
+        val original = shell("settings get secure default_input_method").trim()
+        val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
+        val settings = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph.settings
+        val originalPairing = settings.pairedSymbolsEnabled
+        var activity: InputFixtureActivity? = null
+        try {
+            onMain { settings.pairedSymbolsEnabled = true }
+            shell("ime enable $method")
+            shell("ime set $method")
+            val fixture = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
+            activity = fixture
+            await { findKey(UiR.string.key_symbols) != null }
+            onMain { checkNotNull(findKey(UiR.string.key_symbols)).performClick() }
+            await { findKey(UiR.string.key_previous_symbols) != null }
+
+            onMain { key(panel(), "{").performClick() }
+            await { fixture.editor.text.toString() == "{}" && fixture.editor.selectionStart == 1 && fixture.editor.selectionEnd == 1 }
+            onMain { key(panel(), "（").performClick() }
+            await { fixture.editor.text.toString() == "{（）}" && fixture.editor.selectionStart == 2 }
+            onMain { key(panel(), "[").performClick() }
+            await { fixture.editor.text.toString() == "{（[]）}" && fixture.editor.selectionStart == 3 }
+            onMain { key(panel(), "%").performClick() }
+            await { fixture.editor.text.toString() == "{（[%]）}" }
+
+            onMain { settings.pairedSymbolsEnabled = false }
+            instrumentation.waitForIdleSync()
+            onMain { key(panel(), "(").performClick() }
+            await { fixture.editor.text.toString() == "{（[%(]）}" && fixture.editor.selectionStart == 5 }
+        } finally {
+            onMain {
+                activity?.finish()
+                settings.pairedSymbolsEnabled = originalPairing
+            }
+            if (original.isNotBlank() && original != "null") shell("ime set $original")
+        }
+    }
+
+    @Test fun textEditorRestartAfterEachDigitKeepsManualNumericPage() {
+        val original = shell("settings get secure default_input_method").trim()
+        val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"
+        var activity: InputFixtureActivity? = null
+        try {
+            shell("ime enable $method")
+            shell("ime set $method")
+            val fixture = instrumentation.startActivitySync(Intent(instrumentation.targetContext, InputFixtureActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
+            activity = fixture
+            await { findKey(UiR.string.key_numbers) != null }
+            onMain { checkNotNull(findKey(UiR.string.key_numbers)).performClick() }
+            for ((index, digit) in "1234567890".withIndex()) {
+                onMain { key(panel(), digit.toString()).performClick() }
+                await { fixture.editor.text.toString() == "1234567890".take(index + 1) }
+                onMain { fixture.getSystemService(InputMethodManager::class.java).restartInput(fixture.editor) }
+                // restartInput crosses the system process; main-thread idleness
+                // alone can precede delivery of the replacement connection.
+                SystemClock.sleep(300)
+                instrumentation.waitForIdleSync()
+                await { findKey(UiR.string.key_letters) != null }
+            }
+            onMain { checkNotNull(findKey(UiR.string.key_backspace)).performClick() }
+            await { fixture.editor.text.toString() == "123456789" }
+            onMain {
+                checkNotNull(findKey(UiR.string.key_space)).performClick()
+                key(panel(), "0").performClick()
+            }
+            await { fixture.editor.text.toString() == "123456789 0" }
+            onMain { checkNotNull(findKey(UiR.string.key_letters)).performClick() }
+            await { findKey(UiR.string.key_shift) != null }
+        } finally {
+            activity?.let { onMain { it.finish() } }
+            if (original.isNotBlank() && original != "null") shell("ime set $original")
+        }
+    }
+
     @Test fun pinyinCursorEditsCommitExactlyOnceToTheSameEditor() {
         val original = shell("settings get secure default_input_method").trim()
         val method = "dev.zeroinput.ime.debug/dev.zeroinput.ime.ZeroInputService"

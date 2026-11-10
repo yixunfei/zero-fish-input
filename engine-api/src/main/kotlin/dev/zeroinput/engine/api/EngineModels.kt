@@ -30,9 +30,18 @@ data class Candidate(
     val score: Int = 0,
     val input: String = "",
     val kind: CandidateKind = CandidateKind.STANDARD,
+    val pinyinMatch: PinyinCandidateMatch? = null,
 )
 
 enum class CandidateKind { STANDARD, RELATED_READING, NEXT_WORD }
+
+/** A candidate's matched slice of raw input, with display-only syllable spaces. */
+data class PinyinCandidateMatch(
+    val spelling: String,
+    val start: Int,
+    val end: Int,
+    val exact: Boolean,
+)
 
 data class EngineSnapshot(
     val rawInput: String = "",

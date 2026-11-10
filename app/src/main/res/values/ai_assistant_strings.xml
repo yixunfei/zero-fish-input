@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_assistant_app_name">zero fish AI</string>
+    <string name="ai_assistant_open">打开 AI 助手</string>
+    <string name="ai_assistant_ready">已就绪。发送时仅使用你填写的内容及选中的上下文。</string>
+    <string name="ai_assistant_privacy_blocked">当前隐私设置或锁屏状态不允许使用 AI。</string>
+    <string name="ai_assistant_configuration_loading">正在读取 AI 配置；暂不可发送。</string>
+    <string name="ai_assistant_configuration_failed">读取 AI 配置失败，请打开设置检查。</string>
+    <string name="ai_assistant_network_disabled">请在 AI 设置中启用 AI 及联网。</string>
+    <string name="ai_assistant_configuration_required">请先在 AI 设置中配置服务和模型。</string>
+    <string name="ai_device_choose_app">选择目标应用</string>
+    <string name="ai_device_choose_app_empty">没有可用的目标应用，请检查授权范围或填写包名。</string>
+    <string name="ai_device_choose_app_failed">暂时无法获取应用列表，请重试或填写包名。</string>
+    <string name="ai_device_stop_pending">已取消启动</string>
+    <string name="ai_device_launch_expired">启动已过期或配置已改变，请重新发起。</string>
+    <string name="ai_device_task_waiting">正在等待目标应用，仍可停止。</string>
+    <item name="ai_device_start" type="id" />
+    <item name="ai_device_stop" type="id" />
+    <item name="ai_device_target" type="id" />
+    <item name="ai_device_task" type="id" />
+</resources>

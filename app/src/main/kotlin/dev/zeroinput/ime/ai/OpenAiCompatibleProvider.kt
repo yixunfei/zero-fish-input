@@ -24,7 +24,30 @@ class OpenAiCompatibleProvider internal constructor(
     private val exchangeFactory: (URI) -> AiTransportExchange = { PlatformExchange(it) },
     private val nanoTime: () -> Long = System::nanoTime,
     private val scheduleTimeout: (Long, () -> Unit) -> AutoCloseable = AiRequestTimeouts::schedule,
-) : AiProvider, AiModelCatalog, DeviceAgentProvider {
+) : AiProvider, AiModelCatalog, DeviceAgentProvider, AiToolProvider {
+    override fun request(request: AiToolRequest, completed: (Result<AiToolResponse>) -> Unit): AiRequestHandle =
+        launch(null, {}, { completed(Result.failure(it)) },
+            { completed(Result.failure(InterruptedException())) }) { config, operation ->
+            val profile = checkNotNull(config.activeProvider())
+            val model = request.model ?: config.activeModel()
+            validateAgentConfiguration(config, model, false, emptyList())
+            val body = AiToolProtocol.encode(request, model, profile.protocol).toByteArray(StandardCharsets.UTF_8)
+            try {
+                require(body.size <= 262_144)
+                val response = exchange(config, AiEndpoint.parse(profile.endpoint, profile.protocol).generation, body, operation) { http ->
+                    require(http.contentType()?.substringBefore(';')?.trim()?.lowercase() == "application/json")
+                    http.input().use { input ->
+                        val decoder = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                            .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        InputStreamReader(input, decoder).buffered().use { reader ->
+                            AiToolProtocol.decode(AiToolJson.response(reader, operation::stopped), profile.protocol)
+                        }
+                    }
+                }
+                operation.complete { completed(Result.success(response)) }
+            } finally { body.fill(0) }
+        }
+
     override fun stream(request: AiRequest, listener: (AiStreamEvent) -> Unit): AiRequestHandle =
         launch(request, { listener(AiStreamEvent.Started) },
             { listener(AiStreamEvent.Failed(it)) }, { listener(AiStreamEvent.Cancelled) }) { config, operation ->

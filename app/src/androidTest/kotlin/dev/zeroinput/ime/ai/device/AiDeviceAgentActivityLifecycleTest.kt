@@ -4,6 +4,11 @@ import android.content.Intent
 import android.os.SystemClock
 import android.view.WindowManager
 import android.widget.EditText
+import com.google.android.material.button.MaterialButton
+import dev.zeroinput.ai.api.DeviceAgentPolicy
+import dev.zeroinput.ime.R
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -20,6 +25,31 @@ class AiDeviceAgentActivityLifecycleTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val graph get() = (context.applicationContext as ZeroInputApplication).graph
+
+    @Test fun newlyOpenedPanelCanStopATaskWithoutAnActivityOwnedHandle() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        // Hold the device worker before admission so no provider or platform operation can run.
+        graph.deviceAgentExecutor.execute { entered.countDown(); release.await(15, TimeUnit.SECONDS) }
+        assertTrue(entered.await(5, TimeUnit.SECONDS))
+        val handle = graph.deviceAgentCoordinator.start("Public queued task", "public.fixture", DeviceAgentPolicy()) {}
+        var activity: AiDeviceAgentActivity? = null
+        try {
+            assertTrue(graph.deviceAgentCoordinator.hasActiveTask)
+            activity = instrumentation.startActivitySync(Intent(context, AiDeviceAgentActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as AiDeviceAgentActivity
+            val stop = activity.findViewById<MaterialButton>(R.id.ai_device_stop)
+            instrumentation.runOnMainSync {
+                assertTrue("A fresh panel must expose Stop for the existing process-owned task", stop.isEnabled)
+                stop.performClick()
+            }
+            assertTrue(!graph.deviceAgentCoordinator.hasActiveTask)
+        } finally {
+            handle.cancel()
+            release.countDown()
+            activity?.let { owner -> instrumentation.runOnMainSync { owner.finish() } }
+        }
+    }
 
     @Test
     fun recreationKeepsTaskInactiveAndDoesNotRestorePrivateDraft() {

@@ -4,8 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SymbolPagesTest {
+    @Test fun commonPageContainsBothSidesOfEveryEverydayPairAndFrequentSymbols() {
+        assertEquals(R.string.symbol_group_common, SymbolPages.groups[SymbolPages.entries.first().group].label)
+        assertTrue(SymbolPages.entries.first().symbols.containsAll("%=$—()（）[]{}<>\"".map(Char::toString)))
+    }
+
     @Test fun everyCuratedSymbolIsReachableThroughItsGroupAndBoundedPage() {
-        assertEquals(12, SymbolPages.groups.size)
+        assertEquals(13, SymbolPages.groups.size)
         assertTrue(SymbolPages.groups.sumOf { it.symbols.size } >= 1300)
         SymbolPages.groups.forEachIndexed { index, group ->
             val pages = SymbolPages.entries.filter { it.group == index }

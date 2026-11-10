@@ -51,6 +51,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onModelSelected: (String) -> Unit = {}
     var onEditingChanged: (Boolean) -> Unit = {}
     var onSettings: () -> Unit = {}
+    var onOpenAssistant: () -> Unit = {}
     var onDeviceAgent: () -> Unit = {}
     var onAddContent: () -> Unit = {}
     var onImportContent: () -> Unit = {}
@@ -217,6 +218,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         }
     }
     private val settings = button(R.string.ai_settings) { onSettings() }
+    private val assistant = button(R.string.ai_assistant_fullscreen) { onOpenAssistant() }
     private val deviceAgent = button(R.string.ai_device_agent_open_task) { onDeviceAgent() }
     private val addContent = button(R.string.ai_add_content) { onAddContent() }
     private val importContent = button(R.string.ai_import_content) { onImportContent() }
@@ -537,7 +539,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     private fun showMore() {
         val menu = androidx.appcompat.widget.PopupMenu(context, more)
-        val commands = listOf(importContent, addContent, settings).filter { it !== importContent || importContent.isVisible }
+        val commands = listOf(assistant, importContent, addContent, settings).filter { it !== importContent || importContent.isVisible }
         commands.forEachIndexed { index, button -> menu.menu.add(0, index, index, button.text) }
         menu.setOnMenuItemClickListener { commands[it.itemId].performClick(); true }
         menu.show()

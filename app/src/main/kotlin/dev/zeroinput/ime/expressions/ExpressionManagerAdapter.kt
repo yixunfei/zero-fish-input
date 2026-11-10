@@ -29,7 +29,7 @@ internal class ExpressionManagerAdapter(
         val previous = entries
         val next = values.toList()
         entries = next
-        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
             override fun getOldListSize() = previous.size
             override fun getNewListSize() = next.size
 
@@ -38,7 +38,11 @@ internal class ExpressionManagerAdapter(
 
             override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
                 previous[oldItemPosition] == next[newItemPosition]
-        }).dispatchUpdatesTo(this)
+        })
+        diff.dispatchUpdatesTo(this)
+        // Every existing binding was scrubbed and its click identity revoked above.
+        // DiffUtil leaves unchanged rows untouched, so those also need a fresh binding.
+        if (next.isNotEmpty()) notifyItemRangeChanged(0, next.size)
     }
     override fun getItemCount() = entries.size
 

@@ -44,19 +44,27 @@ internal object KeyboardLayouts {
 
     fun symbols(context: android.content.Context, page: Int): List<List<KeySpec>> {
         val entry = SymbolPages.entries[page]
-        val values = SymbolPages.pages[page].map(::symbolKey)
+        val values = entry.symbols.map(::symbolKey)
+        val group = context.getString(SymbolPages.groups[entry.group].label)
+        val groupLabel = if (entry.count == 1) group
+            else context.getString(R.string.symbol_page, group, entry.number, entry.count)
         return listOf(
             values.take(10),
             values.drop(10).take(10),
-            listOf(KeySpec("‹", context.getString(R.string.key_symbols), KeyboardAction.ShowSymbols,
-                1.2f, KeyStyle.MODIFIER)) + values.drop(20) +
+            listOf(
+                KeySpec("‹", context.getString(R.string.key_previous_symbols), KeyboardAction.ShowPreviousSymbols,
+                    1f, KeyStyle.MODIFIER),
+                KeySpec("›", context.getString(R.string.key_more_symbols), KeyboardAction.ShowMoreSymbols,
+                    1f, KeyStyle.MODIFIER),
+            ) + values.drop(20) +
                 KeySpec("⌫", context.getString(R.string.key_backspace), KeyboardAction.Backspace, 1.2f, KeyStyle.MODIFIER),
-            symbolBottomRow(context).toMutableList().apply {
-                this[2] = KeySpec(context.getString(SymbolPages.groups[entry.group].label),
-                    context.getString(R.string.symbol_groups), KeyboardAction.ShowSymbolGroups, 2.6f, KeyStyle.MODIFIER)
-                this[1] = KeySpec(context.getString(R.string.symbol_page, entry.number, entry.count),
-                    context.getString(R.string.key_more_symbols), KeyboardAction.ShowMoreSymbols, 1.6f, KeyStyle.MODIFIER)
-            },
+            listOf(
+                KeySpec("ABC", context.getString(R.string.key_letters), KeyboardAction.ShowLetters, 1.35f, KeyStyle.MODIFIER),
+                KeySpec("123", context.getString(R.string.key_numbers), KeyboardAction.ShowNumbers, 1.1f, KeyStyle.MODIFIER),
+                KeySpec(groupLabel, context.getString(R.string.symbol_groups), KeyboardAction.ShowSymbolGroups, 3f, KeyStyle.MODIFIER),
+                KeySpec(context.getString(R.string.key_space), context.getString(R.string.key_space), KeyboardAction.Space, 2f),
+                KeySpec("↵", context.getString(R.string.key_enter), KeyboardAction.Enter, 1.35f, KeyStyle.PRIMARY),
+            ),
         )
     }
 
@@ -64,17 +72,6 @@ internal object KeyboardLayouts {
         val value = if (shifted) character.uppercase() else character.toString()
         KeySpec(value, value, KeyboardAction.Text(value))
     }
-
-    private fun symbolRow(characters: String): List<KeySpec> = characters.map { symbolKey(it.toString()) }
-
-    private fun symbolBottomRow(context: android.content.Context) = listOf(
-        KeySpec("ABC", context.getString(R.string.key_letters), KeyboardAction.ShowLetters, 1.35f, KeyStyle.MODIFIER),
-        KeySpec("123", context.getString(R.string.key_numbers), KeyboardAction.ShowNumbers, 1.1f, KeyStyle.MODIFIER),
-        KeySpec(",", context.getString(R.string.key_comma), KeyboardAction.LiteralText(","), 0.9f),
-        KeySpec(context.getString(R.string.key_space), context.getString(R.string.key_space), KeyboardAction.Space, 3.8f),
-        KeySpec(".", context.getString(R.string.key_period), KeyboardAction.LiteralText("."), 0.9f),
-        KeySpec("↵", context.getString(R.string.key_enter), KeyboardAction.Enter, 1.35f, KeyStyle.PRIMARY),
-    )
 
     private fun symbolKey(value: String) = KeySpec(value, value, symbolAction(value))
 

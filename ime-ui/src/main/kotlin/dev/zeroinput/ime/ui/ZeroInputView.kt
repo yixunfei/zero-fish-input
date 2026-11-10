@@ -99,6 +99,7 @@ class ZeroInputView @JvmOverloads constructor(
     var onAiDeviceAgentDraftChanged: (KeyboardAction) -> Unit = {}
     var onAiDeviceAgentTaskSubmitted: (String) -> Unit = {}
     var onAiSettingsRequested: () -> Unit = {}
+    var onAiAssistantRequested: () -> Unit = {}
     var onAiDeviceAgentRequested: () -> Unit = {}
     var onAiAddContentRequested: () -> Unit = {}
     var onAiImportContentRequested: () -> Unit = {}
@@ -359,13 +360,14 @@ class ZeroInputView @JvmOverloads constructor(
         if (value.isNotBlank()) candidateStrip.announceForAccessibility(value)
     }
 
-    fun startEditor(options: EditorInputOptions) {
+    fun startEditor(options: EditorInputOptions, restarting: Boolean = false) {
+        val preservePage = restarting && mode == PanelMode.KEYBOARD
         enginePreparation.resetEditor()
         editorOptions = options
         manualTools = false
         emoji.clearSession()
         handwriting.clear()
-        keyboard.startEditor(options)
+        keyboard.startEditor(options, restarting = preservePage)
         showMode(PanelMode.KEYBOARD, userInitiated = false)
     }
 
@@ -585,6 +587,7 @@ class ZeroInputView @JvmOverloads constructor(
         onAiVisibilityChanged = {}
         onAiDraftChanged = {}
         onAiSettingsRequested = {}
+        onAiAssistantRequested = {}
         onAiDeviceAgentRequested = {}
         onAiAddContentRequested = {}
         onAiImportContentRequested = {}
@@ -871,6 +874,7 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onRenameCancelled = { onAiRenameCancelled() }
         ai.onModelSelected = { onAiModelSelected(it) }
         ai.onSettings = { onAiSettingsRequested() }
+        ai.onOpenAssistant = { onAiAssistantRequested() }
         ai.onDeviceAgent = { onAiDeviceAgentRequested() }
         ai.onAddContent = { onAiAddContentRequested() }
         ai.onImportContent = { onAiImportContentRequested() }

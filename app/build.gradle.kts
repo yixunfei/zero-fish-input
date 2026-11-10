@@ -66,13 +66,15 @@ android {
     sourceSets.getByName("androidTest").assets.srcDir(handwritingAndroidTestAssets)
     namespace = "dev.zeroinput.ime"
     compileSdk = 36
+    // Use the same reviewed toolchain as engine-rime, including APK symbol stripping.
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "dev.zeroinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.7.1"
+        versionCode = 9
+        versionName = "0.7.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -151,6 +153,7 @@ tasks.matching {
 }
 
 dependencies {
+    implementation(libs.okhttp)
     implementation(libs.jsoup)
     implementation(project(":engine-api"))
     implementation(project(":engine-english"))

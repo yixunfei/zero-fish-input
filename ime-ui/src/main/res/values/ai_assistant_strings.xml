@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_assistant_title">AI 助手</string>
+    <string name="ai_assistant_notice">对话和设备任务均由你主动发起，使用已配置的模型服务。</string>
+    <string name="ai_assistant_chat">对话</string>
+    <string name="ai_assistant_fullscreen">全屏 AI 助手</string>
+    <string name="ai_assistant_device">设备任务</string>
+    <string name="ai_assistant_settings">AI 设置</string>
+    <string name="ai_assistant_working">正在回复…</string>
+    <string name="ai_assistant_finished">回复完成</string>
+    <string name="ai_assistant_stopped">已停止</string>
+</resources>

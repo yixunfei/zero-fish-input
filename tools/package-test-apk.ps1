@@ -5,6 +5,8 @@ param(
     [switch]$Install,
     [string]$Serial,
     [switch]$SkipChecks,
+    [ValidateRange(1, [long]::MaxValue)]
+    [long]$MaxApkBytes = 80000000,
     [string]$OutputDirectory
 )
 
@@ -119,12 +121,14 @@ function Assert-TestApk {
     $allowedPermissions = @(
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
-        # Only the user-enabled, content-free system clipboard reminder uses notifications.
+        # Opt-in content-free clipboard reminders and ADR 0034 generic AI task status only.
         "android.permission.POST_NOTIFICATIONS",
         # The separately enabled clipboard overlay requires explicit user consent.
         "android.permission.SYSTEM_ALERT_WINDOW",
         # User-approved optional AI transport; input and clipboard features remain offline.
         "android.permission.INTERNET",
+        # ADR 0034: private, opt-in non-GUI shortService task, bounded to 120 seconds.
+        "android.permission.FOREGROUND_SERVICE",
         # Stage 6 permissions are separately enabled, target-scoped and task-approved.
         "android.permission.WRITE_SETTINGS",
         "android.permission.READ_SMS",
@@ -209,6 +213,7 @@ try {
     }
 
     Write-Output "Building the $Abi debug test APK..."
+    Reset-TestApkPackaging -RepositoryRoot $repositoryRoot
     $buildArguments = @(
         ":app:assembleDebug", "--no-parallel", "-PrequireRime=true"
     )
@@ -229,12 +234,17 @@ $artifact = Resolve-TestApkArtifact -RepositoryRoot $repositoryRoot -Abi $Abi
 $sourceApk = $artifact.Path
 
 $metadata = Assert-TestApk $sourceApk $androidTools $expectedAbis
+$sizeReport = Join-Path $repositoryRoot "build/reports/apk-size/$Abi.json"
+Invoke-CheckedCommand "python" @((Join-Path $PSScriptRoot 'resources/verify-apk.py'), "full", $sourceApk)
+Invoke-CheckedCommand "python" @((Join-Path $PSScriptRoot 'resources/apk_size.py'), $sourceApk,
+    "--max-bytes", $MaxApkBytes.ToString(), "--report", $sizeReport)
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $artifactDirectory = Join-Path $artifactRoot $timestamp
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
 $artifactName = "zero-fish-input-$($metadata.VersionName)-$Abi.apk"
 $artifactApk = Join-Path $artifactDirectory $artifactName
 Copy-Item -LiteralPath $sourceApk -Destination $artifactApk
+Copy-Item -LiteralPath $sizeReport -Destination (Join-Path $artifactDirectory 'APK-SIZE.json')
 $sourceHash = (Get-FileHash -LiteralPath $sourceApk -Algorithm SHA256).Hash
 if ((Get-FileHash -LiteralPath $artifactApk -Algorithm SHA256).Hash -ne $sourceHash) {
     throw 'Packaged APK differs from the current Gradle output.'
@@ -246,6 +256,10 @@ if ((Get-FileHash -LiteralPath $artifactApk -Algorithm SHA256).Hash -ne $sourceH
     applicationId = $metadata.PackageName
     versionName = $metadata.VersionName
     abi = $Abi
+    apkBytes = (Get-Item -LiteralPath $artifactApk).Length
+    budgetBytes = $MaxApkBytes
+    targetBytes = 80000000
+    targetMet = (Get-Item -LiteralPath $artifactApk).Length -le 80000000
     sha256 = $sourceHash.ToLowerInvariant()
     packagedAtUtc = [DateTime]::UtcNow.ToString('o')
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDirectory 'BUILD-PROVENANCE.json') -Encoding utf8

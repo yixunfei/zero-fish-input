@@ -28,6 +28,8 @@ sealed interface KeyboardAction {
 
     data object ShowMoreSymbols : KeyboardAction
 
+    data object ShowPreviousSymbols : KeyboardAction
+
     data object ShowEmoji : KeyboardAction
 
     data object ShowSecureClipboard : KeyboardAction

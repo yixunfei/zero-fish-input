@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_remote_title">MCP 与网页搜索</string>
+    <string name="ai_remote_notice">连接和令牌单独加密保存。仅支持公网 HTTPS MCP 和 Brave 搜索；添加或保存不会联网。每次任务需重新获取并审核工具，远程操作仍需逐次确认。不支持本地服务器、OAuth 登录或脚本。</string>
+    <string name="ai_remote_add_mcp">添加 MCP 连接</string>
+    <string name="ai_remote_add_search">添加 Brave 搜索</string>
+    <string name="ai_remote_connect">连接并获取目录</string>
+    <string name="ai_remote_select_search">审核搜索工具</string>
+    <string name="ai_remote_name">连接名称</string>
+    <string name="ai_remote_endpoint">HTTPS 地址（443 端口）</string>
+    <string name="ai_remote_token">专用令牌（MCP 可留空）</string>
+    <string name="ai_remote_invalid">请检查名称、公网 HTTPS 地址与令牌。</string>
+    <string name="ai_remote_delete">删除这个连接及其令牌？</string>
+    <string name="ai_remote_network_off">请先在 AI 设置中开启 AI 与联网。</string>
+    <string name="ai_remote_loading">正在连接并获取工具、资源与提示词…</string>
+    <string name="ai_remote_failed">连接不可用、已过期或返回了不支持的数据。请检查地址、令牌和服务版本后重试。</string>
+    <string name="ai_remote_review">%1$s：%2$d 项可用，%3$d 项暂不支持。勾选本次任务需要的项目（最多 32 项）。Brave 令牌仅在批准查询时验证；结果为搜索摘要，不代表已读取原网页。</string>
+    <string name="ai_remote_definition">%1$s\n参数：\n%2$s</string>
+    <string name="ai_remote_apply">添加到本次任务</string>
+    <string name="ai_remote_open_source">在浏览器打开来源：%1$s</string>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_capabilities">工具与能力</string>
+    <string name="ai_capability_row">%1$s · %2$s</string>
+    <string name="ai_capability_notice">以下为当前配置状态。实际使用仍需目标应用、文件选择及逐次确认；未开启的能力可在设置中单独配置。</string>
+    <string name="ai_capability_disabled">未开启</string>
+    <string name="ai_capability_permission">需要授权或连接服务</string>
+    <string name="ai_capability_unsupported">设备不支持</string>
+    <string name="ai_capability_ready">已配置，使用时确认</string>
+    <string name="ai_task_expired">任务或动作已过期</string>
+    <string name="ai_task_failed">执行失败</string>
+    <string name="ai_task_cancelled">任务已取消</string>
+    <string name="ai_task_failure_hint">请检查目标应用、模型和授权后重新发起。已经发出的操作可能已生效，请先核对结果。</string>
+    <string name="ai_task_details">%1$s；点按展开或收起详情</string>
+    <string name="ai_target_search">搜索应用名称或包名</string>
+    <string name="ai_target_manual">手动填写目标包名</string>
+    <string name="ai_task_examples">任务示例</string>
+    <string name="ai_task_options">附件与截图选项</string>
+    <string name="ai_readiness_fix">检查配置与授权</string>
+    <string name="ai_task_start_new">发起新任务</string>
+    <string name="ai_task_approval_hint">请在目标应用的任务浮层中确认或停止。</string>
+    <string name="ai_task_clear_draft">请先清空当前任务，再选择示例。</string>
+    <string-array name="ai_task_examples">
+        <item>在所选应用中查找帮助入口，打开后结束。</item>
+        <item>在所选应用中向下滚动一页，然后描述可见内容。</item>
+    </string-array>
+</resources>

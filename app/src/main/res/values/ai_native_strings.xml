@@ -1,0 +1,10 @@
+<resources>
+    <item name="ai_native_prompt" type="id" />
+    <string name="ai_native_title">系统数字助理</string>
+    <string name="ai_native_notice">输入本次问题后发送。不会读取屏幕或自动录音。</string>
+    <string name="ai_native_send">发送</string>
+    <string name="ai_native_full">完整助手</string>
+    <string name="ai_native_choose">选择系统助理</string>
+    <string name="ai_native_setup_notice">可在系统中选择 zero fish AI，之后用系统助理手势或按键打开私密文本对话。不会自动提交、采集屏幕、监听热词或录音；隐藏或锁屏会取消并清除本次内容。系统与设备支持可能不同。打开系统设置将离开当前页面，未发送草稿会清除。</string>
+    <string name="ai_native_unavailable">此设备暂不支持这个助理选择入口。</string>
+</resources>

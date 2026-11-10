@@ -2,7 +2,7 @@ package dev.zeroinput.ai.api
 
 /** Source text is data, never an instruction or an executable message role. */
 class AiReference(val text: String, val source: Source = Source.PAGE) {
-    enum class Source { PAGE, IMPORT }
+    enum class Source { PAGE, IMPORT, SUMMARY }
 
     init {
         require(text.isNotBlank() && text.length <= MAX_REFERENCE_CHARS) { "Invalid AI reference" }
@@ -35,8 +35,9 @@ class AiContextState(
     val messages: List<AiMessage> = emptyList(),
     val selectedHistory: Set<Int> = emptySet(),
     val references: List<AiReference> = emptyList(),
+    val workspace: AiWorkspaceContext = AiWorkspaceContext(),
 ) {
     val characterCount: Int get() = messages.filterIndexed { index, _ -> index in selectedHistory }
-        .sumOf { it.content.length } + references.sumOf { it.text.length }
+        .sumOf { it.content.length } + references.sumOf { it.text.length } + workspace.characterCount
     override fun toString() = "AiContextState(redacted)"
 }

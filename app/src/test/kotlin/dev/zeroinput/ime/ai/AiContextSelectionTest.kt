@@ -5,6 +5,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AiContextSelectionTest {
+    @Test fun workspaceSharesRecentHistoryBudgetAndClearRemovesAllSelectedSources() {
+        val selection = AiContextSelection()
+        selection.reset(listOf(AiMessage(AiRole.USER, "x".repeat(16_380)), AiMessage(AiRole.ASSISTANT, "new")))
+        assertTrue(selection.workspace(selection.state.revision, AiWorkspaceContext(AiPersona("id", "Role", "", "Concise"))))
+        assertTrue(selection.recent(selection.state.revision))
+        assertEquals(listOf("new"), selection.history().map { it.content })
+        val revision = selection.state.revision
+        assertFalse(selection.include(revision, 0, true))
+        assertTrue(selection.clear(revision))
+        assertEquals(0, selection.state.characterCount)
+        assertNull(selection.state.workspace.persona)
+    }
+
     @Test fun recentSkipsSystemMessagesWithoutSpendingMessageOrCharacterBudget() {
         val selection = AiContextSelection()
         selection.reset(listOf(AiMessage(AiRole.USER, "earlier")) +

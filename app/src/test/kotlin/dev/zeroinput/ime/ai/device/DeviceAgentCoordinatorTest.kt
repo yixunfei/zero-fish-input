@@ -16,6 +16,21 @@ class DeviceAgentCoordinatorTest {
     )
 
     @Test
+    fun completedTaskReplaysOnlyGenericOutcomeWithoutAnswerOrRestart() {
+        val fixture = Fixture()
+        fixture.coordinator.start("Public task", target.packageName, fixture.policy) {}
+        fixture.drain()
+        fixture.provider.complete(0, DeviceAgentModelResponse("Public final answer", emptyList(), completed = true))
+        fixture.drain()
+        val replay = mutableListOf<DeviceAgentEvent>()
+        fixture.coordinator.observe(replay::add)
+        assertEquals(listOf(DeviceAgentEvent.State(DeviceAgentState.COMPLETED, "Task completed")), replay)
+        assertEquals(1, fixture.provider.requests.size)
+        assertFalse(fixture.coordinator.hasActiveTask)
+        fixture.close()
+    }
+
+    @Test
     fun recreationObserverReattachesWithoutStartingAnotherProviderRequest() {
         val fixture = Fixture()
         val firstObserver = mutableListOf<DeviceAgentEvent>()
@@ -101,6 +116,7 @@ class DeviceAgentCoordinatorTest {
         assertFalse(fixture.coordinator.hasActiveTask)
         assertEquals(0, fixture.port.actions)
         assertTrue(events.any { it is DeviceAgentEvent.State && it.state == DeviceAgentState.PAUSED })
+        assertFalse(events.any { it is DeviceAgentEvent.Failed || it is DeviceAgentEvent.State && it.state == DeviceAgentState.FAILED })
         fixture.close()
     }
 

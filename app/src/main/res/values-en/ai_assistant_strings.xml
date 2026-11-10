@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_assistant_app_name">zero fish AI</string>
+    <string name="ai_assistant_open">Open AI assistant</string>
+    <string name="ai_assistant_ready">Ready. Sending uses only your text and selected context.</string>
+    <string name="ai_assistant_privacy_blocked">Current privacy settings or screen lock prevent AI use.</string>
+    <string name="ai_assistant_configuration_loading">Loading AI settings; sending is unavailable.</string>
+    <string name="ai_assistant_configuration_failed">Unable to load AI settings. Open settings to check.</string>
+    <string name="ai_assistant_network_disabled">Enable AI and network access in AI settings.</string>
+    <string name="ai_assistant_configuration_required">Configure a provider and model in AI settings first.</string>
+    <string name="ai_device_choose_app">Choose target app</string>
+    <string name="ai_device_choose_app_empty">No target apps available. Check the allowed scope or enter a package name.</string>
+    <string name="ai_device_choose_app_failed">Unable to load apps. Retry or enter a package name.</string>
+    <string name="ai_device_stop_pending">Launch cancelled</string>
+    <string name="ai_device_launch_expired">Launch expired or settings changed. Start again.</string>
+    <string name="ai_device_task_waiting">Waiting for the target app. You can still stop.</string>
+</resources>

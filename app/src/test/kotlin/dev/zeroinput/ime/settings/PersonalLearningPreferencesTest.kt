@@ -12,12 +12,12 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE, application = Application::class)
 class PersonalLearningPreferencesTest {
-    @Test fun `implicit learning defaults off and threshold defaults to three and persists independently`() {
+    @Test fun `implicit learning defaults off and threshold defaults to one and persists independently`() {
         val context = RuntimeEnvironment.getApplication()
         context.getSharedPreferences("zeroinput-settings", Context.MODE_PRIVATE).edit().clear().commit()
         val settings = SettingsRepository(context)
         assertFalse(settings.learnFromCommittedText)
-        assertEquals(3, settings.personalPromotionThreshold)
+        assertEquals(1, settings.personalPromotionThreshold)
         settings.learnFromCommittedText = true
         settings.personalPromotionThreshold = 5
         assertEquals(5, context.getSharedPreferences("zeroinput-settings", Context.MODE_PRIVATE)

@@ -10,10 +10,12 @@ internal class FallbackPinyinEngine(
     private val cursorEditing = options.keyboardLayout == ChineseKeyboardLayout.FULL
     private val pageSize = options.candidatePageSize
     private val doublePinyinScheme = options.effectiveDoublePinyinScheme
+    private val fullPinyin = !nineKey && doublePinyinScheme == DoublePinyinScheme.OFF
+    private val abbreviatedPinyin = fullPinyin && options.abbreviatedPinyin
     private val readingIndex = buildReadings(options)
     private val completionIndex = buildCompletions(readingIndex)
     private val syllableIndex = readingIndex.mapValues { (_, entries) ->
-        entries.filter { (reading, _) -> reading !in compoundReadings }
+        entries.filter { (reading, _) -> reading !in compoundSyllables }
     }.filterValues { it.isNotEmpty() }
     private val input = StringBuilder()
     private val segments = ArrayDeque<Segment>()
@@ -34,7 +36,11 @@ internal class FallbackPinyinEngine(
             EngineCapability.CANDIDATE_PAGE_SIZE,
             EngineCapability.FUZZY_PINYIN,
             EngineCapability.DOUBLE_PINYIN,
-        ) + if (nineKey) setOf(EngineCapability.NINE_KEY_PINYIN) else emptySet(),
+        ) + when {
+            nineKey -> setOf(EngineCapability.NINE_KEY_PINYIN)
+            fullPinyin -> setOf(EngineCapability.ABBREVIATED_PINYIN)
+            else -> emptySet()
+        },
     )
 
     override fun start(context: EditorContext): EngineSnapshot = reset()
@@ -173,13 +179,16 @@ internal class FallbackPinyinEngine(
 
     private fun refresh(): EngineUpdate {
         page = 0
-        val remaining = input.substring(consumedLength())
+        val consumed = consumedLength()
+        val remaining = input.substring(consumed)
         val leading = remaining.takeWhile { it == '\'' }.length
         val raw = remaining.drop(leading)
         val found = ArrayList<Choice>()
         if (!syllableOnly) {
             val compact = raw.replace("'", "")
-            for ((reading, words) in completionIndex[compact].orEmpty()) {
+            val complete = readingIndex[compact].orEmpty()
+            val recovered = if (leading == 0 && consumed == 0) mixedRecovery(raw) else emptyList()
+            for ((reading, words) in complete + recovered + completionIndex[compact].orEmpty()) {
                 words.forEach { found += Choice(it, reading, remaining.length) }
             }
         }
@@ -197,6 +206,16 @@ internal class FallbackPinyinEngine(
         }
         choices = found.distinctBy { it.text to it.consumed }
         return render()
+    }
+
+    private fun mixedRecovery(raw: String): List<Pair<String, List<String>>> {
+        if (!abbreviatedPinyin || raw.length !in 5..7 ||
+            raw.first() !in "nm" || !raw.endsWith("eng") || '\'' in raw) return emptyList()
+        val shortened = raw.dropLast(1)
+        return readingIndex[shortened].orEmpty().filter { (reading, _) ->
+            val parts = compoundSyllables[reading] ?: return@filter false
+            parts[0].length > 1 && parts[0][0] == raw[0] && parts[1] == shortened.drop(1)
+        }
     }
 
     private fun render(): EngineUpdate {
@@ -226,7 +245,7 @@ internal class FallbackPinyinEngine(
             "an" to listOf("安", "按", "案"), "ba" to listOf("吧", "八", "把"),
             "bei" to listOf("被", "北", "杯"), "bu" to listOf("不", "部", "步"),
             "chi" to listOf("吃", "持", "迟"), "de" to listOf("的", "得", "德"),
-            "dui" to listOf("对", "队"), "fang" to listOf("方", "放", "房"),
+            "dui" to listOf("对", "队"), "en" to listOf("嗯"), "fang" to listOf("方", "放", "房"),
             "ge" to listOf("个", "各", "歌"), "gong" to listOf("公", "工", "共"),
             "hao" to listOf("好", "号", "浩"), "he" to listOf("和", "喝", "合"),
             "hen" to listOf("很", "恨"), "hui" to listOf("会", "回", "灰"),
@@ -236,31 +255,30 @@ internal class FallbackPinyinEngine(
             "le" to listOf("了", "乐"), "ma" to listOf("吗", "妈", "马"),
             "mei" to listOf("没", "每", "美"), "men" to listOf("们", "门"),
             "ming" to listOf("明", "名"), "ni" to listOf("你", "呢", "尼"),
-            "ren" to listOf("人", "认", "任"), "shi" to listOf("是", "时", "事"),
+            "ou" to listOf("欧", "偶"), "ping" to listOf("平", "评"),
+            "qing" to listOf("请", "情", "清"), "ren" to listOf("人", "认", "任"),
+            "shi" to listOf("是", "时", "事"),
             "shuo" to listOf("说", "硕"), "ta" to listOf("他", "她", "它"),
             "wo" to listOf("我", "握"), "xiang" to listOf("想", "向", "像"),
             "xie" to listOf("些", "写", "谢"), "yi" to listOf("一", "以", "已"),
             "you" to listOf("有", "又", "由"), "zai" to listOf("在", "再"),
             "zhe" to listOf("这", "着", "者"), "zhong" to listOf("中", "种", "重"),
-            "nihao" to listOf("你好"), "xiexie" to listOf("谢谢"),
+            "nihao" to listOf("你好"), "nimen" to listOf("你们"), "ningmeng" to listOf("柠檬"), "xiexie" to listOf("谢谢"),
             "women" to listOf("我们"), "zhongguo" to listOf("中国"),
             "keyi" to listOf("可以"), "meiyou" to listOf("没有"),
             "zaijian" to listOf("再见"), "shijie" to listOf("世界"),
         )
 
-        private val compoundReadings = setOf(
-            "nihao", "xiexie", "women", "zhongguo", "keyi", "meiyou", "zaijian", "shijie",
-        )
-
         private val compoundSyllables = mapOf(
             "nihao" to listOf("ni", "hao"), "xiexie" to listOf("xie", "xie"),
+            "nimen" to listOf("ni", "men"), "ningmeng" to listOf("ning", "meng"),
             "women" to listOf("wo", "men"), "zhongguo" to listOf("zhong", "guo"),
             "keyi" to listOf("ke", "yi"), "meiyou" to listOf("mei", "you"),
             "zaijian" to listOf("zai", "jian"), "shijie" to listOf("shi", "jie"),
         )
 
         private fun buildReadings(options: ChineseInputOptions): Map<String, List<Pair<String, List<String>>>> {
-            val syllables = phrases.keys - compoundReadings
+            val syllables = phrases.keys - compoundSyllables.keys
             return buildMap {
                 for ((reading, values) in phrases) {
                     val entry = reading to values
@@ -270,15 +288,28 @@ internal class FallbackPinyinEngine(
                                 DoublePinyin.encode(it, options.effectiveDoublePinyinScheme).orEmpty()
                             } ?: DoublePinyin.encode(variant, options.effectiveDoublePinyinScheme) ?: continue
                         val current = get(code).orEmpty()
-                        if (entry !in current) put(code, current + entry)
+                        if (entry !in current) put(code, if (variant == reading) listOf(entry) + current else current + entry)
                         if (options.keyboardLayout == ChineseKeyboardLayout.NINE_KEY) {
                             val numeric = variant.map(NineKeyReadings::digitFor).joinToString("")
                             val numericEntries = get(numeric).orEmpty()
                             if (entry !in numericEntries) put(numeric, numericEntries + entry)
                         }
                     }
+                    if (options.abbreviatedPinyin && options.keyboardLayout == ChineseKeyboardLayout.FULL &&
+                        options.effectiveDoublePinyinScheme == DoublePinyinScheme.OFF) {
+                        val parts = compoundSyllables[reading] ?: continue
+                        for (code in shortCodes(parts)) {
+                            val current = get(code).orEmpty()
+                            if (entry !in current) put(code, current + entry)
+                        }
+                    }
                 }
             }
+        }
+
+        private fun shortCodes(parts: List<String>): List<String> = parts.fold(listOf("")) { codes, part ->
+            val forms = listOfNotNull(part, part.take(1), part.take(2).takeIf { it in setOf("zh", "ch", "sh") }).distinct()
+            codes.flatMap { prefix -> forms.map { prefix + it } }
         }
 
         private fun buildCompletions(

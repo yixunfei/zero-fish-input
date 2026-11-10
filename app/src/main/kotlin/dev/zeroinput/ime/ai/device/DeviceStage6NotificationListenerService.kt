@@ -25,6 +25,8 @@ class DeviceStage6NotificationListenerService : NotificationListenerService() {
     companion object {
         private val active = AtomicReference<DeviceStage6NotificationListenerService?>()
 
+        internal val connected: Boolean get() = active.get() != null
+
         internal fun findForPackage(packageName: String): List<NotificationValue> {
             val service = active.get() ?: return emptyList()
             return runCatching {

@@ -87,8 +87,9 @@ class AiStorageFailurePanelTest {
         val controller = AiWorkbenchController(AiCoordinator(provider), AiConversationRepository(store), worker,
             { configuration }, AiDataGeneration(), { ui.execute(it); true }, { true }, panel::render,
             panel::renderConversations, panel::renderConversation,
-            editorPrivacy = { dev.zeroinput.ime.core.privacy.SessionPrivacy(false, true, true,
-                dev.zeroinput.ime.core.privacy.PrivacyReason.NONE) },
+            generationPolicy = { config -> AiEditorPolicy.generationPolicy(config.enabled, config.networkAllowed,
+                dev.zeroinput.ime.core.privacy.SessionPrivacy(false, true, true,
+                    dev.zeroinput.ime.core.privacy.PrivacyReason.NONE)) },
             renderHistoryStatus = panel::renderHistoryStatus, storageFailed = { storageFailures++ })
 
         init {

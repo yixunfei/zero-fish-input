@@ -124,10 +124,14 @@ class DictionaryManagementUiTest {
                 "clickable=${control.isClickable} height=${control.height} target=${48 * scale}",
                 control.isEnabled && control.isClickable && control.height >= (48 * scale).toInt())
             val layout = checkNotNull(control.layout)
-            assertTrue(diagnostic, layout.height <= control.height - control.compoundPaddingTop - control.compoundPaddingBottom)
+            assertTrue("$diagnostic ${control.javaClass.simpleName}: text=${layout.height} " +
+                "height=${control.height} padding=${control.compoundPaddingTop}/${control.compoundPaddingBottom}",
+                layout.height <= control.height - control.compoundPaddingTop - control.compoundPaddingBottom)
             for (line in 0 until layout.lineCount) {
                 assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
-                assertTrue(diagnostic, layout.getLineWidth(line) <= control.width - control.compoundPaddingLeft - control.compoundPaddingRight + 1)
+                assertTrue("$diagnostic ${control.javaClass.simpleName} line=$line width=${layout.getLineWidth(line)} " +
+                    "available=${control.width - control.compoundPaddingLeft - control.compoundPaddingRight}",
+                    layout.getLineWidth(line) <= control.width - control.compoundPaddingLeft - control.compoundPaddingRight + 1)
             }
         }
     }

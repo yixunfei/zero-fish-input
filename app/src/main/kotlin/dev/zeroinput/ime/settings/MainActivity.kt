@@ -119,6 +119,11 @@ class MainActivity : AppCompatActivity() {
                 aiConfig = result.getOrDefault(AiConfiguration())
                 aiConfigReady = result.isSuccess
                 render()
+                if (result.isSuccess && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) &&
+                    intent.getBooleanExtra(EXTRA_AI_SETTINGS, false)) {
+                    intent.removeExtra(EXTRA_AI_SETTINGS)
+                    showAiSettings()
+                }
             }
         } }
     }
@@ -131,6 +136,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_FUZZY_SETTINGS = "dev.zeroinput.ime.FUZZY_SETTINGS"
+        const val EXTRA_AI_SETTINGS = "dev.zeroinput.ime.AI_SETTINGS"
     }
 
     override fun onDestroy() {
@@ -174,24 +180,7 @@ class MainActivity : AppCompatActivity() {
         screen.onSoundEffectsChanged = { graph.settings.soundEffectsEnabled = it; render() }
         screen.onWordAssociationsChanged = { graph.settings.wordAssociationsEnabled = it; render() }
         screen.onPairedSymbolsChanged = { graph.settings.pairedSymbolsEnabled = it; render() }
-        screen.onAiEnabledChanged = { enabled ->
-            updateAiConfig {
-                copy(
-                    enabled = enabled,
-                    networkAllowed = if (enabled) networkAllowed else false,
-                )
-            }
-        }
-        screen.onAiNetworkChanged = { updateAiConfig { copy(networkAllowed = it) } }
-        screen.onAiThinkingVisibleChanged = { graph.settings.aiThinkingVisible = it; render() }
-        screen.onAiSettingsRequested = ::showAiSettings
-        screen.onAiDataClearRequested = ::confirmClearAiData
-        screen.onAiPageSettingsRequested = {
-            startActivity(Intent(this, dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java))
-        }
-        screen.onAiDeviceAgentSettingsRequested = {
-            startActivity(Intent(this, dev.zeroinput.ime.ai.device.DeviceAgentSettingsActivity::class.java))
-        }
+        bindAiSettings()
         screen.onInterfaceLanguageChanged = { tag ->
             AppCompatDelegate.setApplicationLocales(
                 if (tag == "system") LocaleListCompat.getEmptyLocaleList()
@@ -258,6 +247,30 @@ class MainActivity : AppCompatActivity() {
                     render()
                 }
             }
+        }
+    }
+
+    private fun bindAiSettings() {
+        screen.onAiEnabledChanged = { enabled ->
+            updateAiConfig {
+                copy(
+                    enabled = enabled,
+                    networkAllowed = if (enabled) networkAllowed else false,
+                )
+            }
+        }
+        screen.onAiNetworkChanged = { updateAiConfig { copy(networkAllowed = it) } }
+        screen.onAiThinkingVisibleChanged = { graph.settings.aiThinkingVisible = it; render() }
+        screen.onAiSettingsRequested = ::showAiSettings
+        screen.onAiAssistantRequested = {
+            startActivity(Intent(this, dev.zeroinput.ime.ai.AiAssistantActivity::class.java))
+        }
+        screen.onAiDataClearRequested = ::confirmClearAiData
+        screen.onAiPageSettingsRequested = {
+            startActivity(Intent(this, dev.zeroinput.ime.ai.page.PageReferenceSettingsActivity::class.java))
+        }
+        screen.onAiDeviceAgentSettingsRequested = {
+            startActivity(Intent(this, dev.zeroinput.ime.ai.device.DeviceAgentSettingsActivity::class.java))
         }
     }
 

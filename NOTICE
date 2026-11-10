@@ -1,6 +1,10 @@
 zero fish input (formerly ZeroInput)
 Copyright 2026 ZeroInput contributors
 
+Optional explicit remote tools include OkHttp 4.12.1 and Okio 3.6.0,
+Copyright Square, Inc., licensed under Apache-2.0.
+See LICENSES/Apache-2.0.txt and THIRD_PARTY.md.
+
 Host-only Android unit tests use Robolectric 4.16.1 under MIT,
 Copyright (c) 2010 Xtreme Labs, Pivotal Labs and Google Inc.
 See LICENSES/robolectric-MIT.txt. Robolectric is not shipped in the application.

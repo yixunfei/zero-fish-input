@@ -76,6 +76,9 @@ internal class EditorSelectionState(start: Int, end: Int) {
         pending.isEmpty() && observed == Selection(it.end, it.end) && it.end - it.start == length
     }
 
+    fun hasCommitAt(start: Int, length: Int): Boolean =
+        committed?.let { it.start == start && it.end - it.start == length } == true
+
     /** Returns the best known insertion anchor for an immediate cursor move. */
     fun insertionStart(): Int? {
         if (predicted.start < 0 || predicted.end < 0) return null

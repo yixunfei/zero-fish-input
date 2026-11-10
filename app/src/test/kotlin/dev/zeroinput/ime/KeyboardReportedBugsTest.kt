@@ -27,8 +27,10 @@ class KeyboardReportedBugsTest {
         key(panel, UiR.string.symbol_groups).performClick()
         val popup = org.robolectric.shadows.ShadowPopupMenu.getLatestPopupMenu()
         assertNotNull(popup)
-        assertEquals(12, popup.menu.size())
-        popup.menu.performIdentifierAction(2, 0)
+        assertEquals(13, popup.menu.size())
+        val mathematics = (0 until popup.menu.size()).map(popup.menu::getItem)
+            .single { it.title == activity.getString(UiR.string.symbol_group_math) }
+        popup.menu.performIdentifierAction(mathematics.itemId, 0)
         assertTrue(descendants(panel).filterIsInstance<TextView>().any { it.text.toString() == "∫" })
     }
 
@@ -65,6 +67,10 @@ class KeyboardReportedBugsTest {
         val first = labels()
         key(panel, UiR.string.key_more_symbols).performClick()
         val second = labels()
+        key(panel, UiR.string.key_previous_symbols).performClick()
+        assertEquals(first, labels())
+        key(panel, UiR.string.key_more_symbols).performClick()
+        assertEquals(second, labels())
         swipe(panel, -1)
         assertNotEquals(first, labels())
         assertNotEquals(second, labels())
@@ -78,6 +84,8 @@ class KeyboardReportedBugsTest {
         }
         assertTrue(pages.size >= 30)
         assertTrue(pages.flatten().containsAll(listOf("【", "∫", "→", "℃", "ǜ")))
+        key(panel, UiR.string.key_numbers).performClick()
+        assertTrue(labels().containsAll(listOf("1", "2", "3")))
     }
 
     @Test fun privateCopyIsVisibleWithoutOpeningMoreTools() = withActivity { activity ->

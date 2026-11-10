@@ -1,0 +1,10 @@
+<resources>
+    <string name="ai_compaction_title">Compact selected history</string>
+    <string name="ai_compaction_notice">Send the earlier selected history and existing summary below to the current model. The latest two messages stay unchanged. Roles, memory and other references are excluded. Review before applying; original messages are not deleted.</string>
+    <string name="ai_compaction_generate">Send and summarize</string>
+    <string name="ai_compaction_working">Generating summary…</string>
+    <string name="ai_compaction_preview">Check facts and omissions. You can undo before the next send or context change.</string>
+    <string name="ai_compaction_apply">Apply summary</string>
+    <string name="ai_compaction_failed">Summary unavailable, context changed, or budget exceeded. Original context was not replaced. Close and retry.</string>
+    <string name="ai_compaction_unavailable">Select earlier messages first, or check the current model configuration.</string>
+</resources>
