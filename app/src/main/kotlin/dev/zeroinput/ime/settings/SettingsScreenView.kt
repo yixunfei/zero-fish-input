@@ -43,6 +43,8 @@ data class SettingsScreenState(
     val interfaceLanguageTag: String = "",
     val learnFromCommittedText: Boolean = false,
     val personalPromotionThreshold: Int = 1,
+    val privateDraftEnabled: Boolean = false,
+    val savePrivateDraftOnSubmit: Boolean = true,
 )
 
 data class LanguagePackScreenState(
@@ -63,6 +65,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     var onPersonalPromotionThresholdRequested: () -> Unit = {}
     var onIncognitoChanged: (Boolean) -> Unit = {}
     var onSecureClipboardChanged: (Boolean) -> Unit = {}
+    var onPrivateDraftChanged: (Boolean) -> Unit = {}
+    var onPrivateDraftCopyChanged: (Boolean) -> Unit = {}
     var onHapticsChanged: (Boolean) -> Unit = {}
     var onSoundEffectsChanged: (Boolean) -> Unit = {}
     var onWordAssociationsChanged: (Boolean) -> Unit = {}
@@ -126,6 +130,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     private val modelSwitch = settingSwitch(context.getString(R.string.experimental_model_ranking)) { onModelRankingChanged(it) }
     private val incognitoSwitch = settingSwitch(context.getString(R.string.setting_incognito)) { onIncognitoChanged(it) }
     private val secureClipboardSwitch = settingSwitch(context.getString(R.string.secure_clipboard)) { onSecureClipboardChanged(it) }
+    private val privateDraftSwitch = settingSwitch(context.getString(R.string.private_draft_default)) { onPrivateDraftChanged(it) }
+    private val privateDraftCopySwitch = settingSwitch(context.getString(R.string.private_draft_keep_copy)) { onPrivateDraftCopyChanged(it) }
     private val hapticsSwitch = settingSwitch(context.getString(R.string.setting_haptics)) { onHapticsChanged(it) }
     private val soundEffectsSwitch = settingSwitch(context.getString(R.string.setting_sound_effects)) { onSoundEffectsChanged(it) }
     private val associationSwitch = settingSwitch(context.getString(R.string.setting_word_associations)) { onWordAssociationsChanged(it) }
@@ -186,6 +192,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             updateSwitch(modelSwitch, state.experimentalModelRanking)
             updateSwitch(incognitoSwitch, state.incognitoMode)
             updateSwitch(secureClipboardSwitch, state.secureClipboardEnabled)
+            updateSwitch(privateDraftSwitch, state.privateDraftEnabled)
+            updateSwitch(privateDraftCopySwitch, state.savePrivateDraftOnSubmit)
             updateSwitch(hapticsSwitch, state.hapticsEnabled)
             updateSwitch(soundEffectsSwitch, state.soundEffectsEnabled)
             updateSwitch(associationSwitch, state.wordAssociationsEnabled)
@@ -234,6 +242,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(committedLearningSwitch)
         promotionThreshold = command(context.getString(R.string.user_dictionary_threshold)) { onPersonalPromotionThresholdRequested() }
         content.addView(incognitoSwitch)
+        content.addView(privateDraftSwitch)
+        content.addView(privateDraftCopySwitch)
         content.addView(secureClipboardSwitch)
         command(context.getString(R.string.clipboard_guard_title)) { onClipboardGuardRequested() }
 

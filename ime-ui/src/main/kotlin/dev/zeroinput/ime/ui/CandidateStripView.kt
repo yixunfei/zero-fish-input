@@ -63,6 +63,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
     private var candidateInline = false
     private var aiEntryVisible = false
     private var reconversionAvailable = false
+    private var privateDraftMode = false
     private var pendingAnchor: Pair<String, Int>? = null
     private val statusRow = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -130,7 +131,7 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
             restoringScroll = true
             try { scroll.resetToStart() } finally { restoringScroll = false }
         }
-        if (changedInput && snapshot.candidates.isNotEmpty()) {
+        if (!privateDraftMode && changedInput && snapshot.candidates.isNotEmpty()) {
             val announcement = snapshot.candidates.first().text
             if (announcement != lastAnnouncedCandidate) {
                 lastAnnouncedCandidate = announcement
@@ -206,6 +207,11 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         updateActionVisibility()
     }
 
+    internal fun setPrivateDraftMode(value: Boolean) {
+        privateDraftMode = value
+        updateActionVisibility()
+    }
+
     fun renderStatus(value: InputEngineStatus) {
         if (value == lastStatus) return
         lastStatus = value
@@ -237,10 +243,10 @@ class CandidateStripView @JvmOverloads constructor(context: Context, attrs: Attr
         val canRetry = lastStatus == InputEngineStatus.FAILED
         val compact = actionDensity != CandidateActionDensity.FULL
         val hasCandidates = snapshot?.candidates?.isNotEmpty() == true
-        tools.visibility = VISIBLE
+        tools.visibility = if (privateDraftMode) GONE else VISIBLE
         reconvert.visibility = if (!hasCandidates && !compact && reconversionAvailable) VISIBLE else GONE
         ai.visibility = if (!hasCandidates && aiEntryVisible) VISIBLE else GONE
-        retry.visibility = if (canRetry) VISIBLE else GONE
+        retry.visibility = if (canRetry && !privateDraftMode) VISIBLE else GONE
         expand.visibility = if (canExpand) VISIBLE else GONE
     }
 

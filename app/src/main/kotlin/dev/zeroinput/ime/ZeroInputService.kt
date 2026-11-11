@@ -113,6 +113,29 @@ class ZeroInputService : InputMethodService() {
     private var interactionSequence = 0L
     @Volatile
     private var activeSession: InputSession? = null
+    private val shapeLookup by lazy {
+        dev.zeroinput.ime.input.ShapeLookup(assets, mainHandler, ::commitShape)
+    }
+    private val privateDraft by lazy {
+        dev.zeroinput.ime.input.PrivateDraftInput({ graph }, mainHandler, ::canUsePrivateDraft,
+            ::privateDraftCommitTarget, onSaved = { inputView?.let(::renderLocalPanels) }) {
+            Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+        }
+    }
+    private var privateDraftDefault = false
+    private var privateDraftToggle: dev.zeroinput.ime.auth.AuthenticationBroker.RequestHandle? = null
+    private var screenOffRegistered = false
+    private val screenOff = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                val privateOpen = inputView?.isPrivateDraftOpen == true
+                inputView?.closeAuxiliaryInput()
+                privateDraftToggle?.close()
+                cancelPasteConsent()
+                if (privateOpen) requestHideSelf(0)
+            }
+        }
+    }
     private var languagePackObserver: AutoCloseable? = null
     private var settingsObserver: AutoCloseable? = null
     private var personalizationObserver: AutoCloseable? = null
@@ -240,6 +263,10 @@ class ZeroInputService : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         refreshConfiguredSettings()
+        privateDraftDefault = graph.settings.privateDraftEnabled
+        androidx.core.content.ContextCompat.registerReceiver(this, screenOff,
+            android.content.IntentFilter(Intent.ACTION_SCREEN_OFF), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        screenOffRegistered = true
         pasteConsentObserver = graph.securePaste.observe { bindPasteConsent(authenticationFinished = true) }
         expressionObserver = graph.observeExpressions {
             mainHandler.post {
@@ -329,7 +356,10 @@ class ZeroInputService : InputMethodService() {
         // Revoke queued work before posting UI reconciliation; settings can also
         // change while an authentication activity owns the foreground.
         val previousPrivacy = configuredPrivacy
+        privateDraft.invalidate()
         refreshConfiguredSettings()
+        val privateDefaultChanged = privateDraftDefault != graph.settings.privateDraftEnabled
+        privateDraftDefault = graph.settings.privateDraftEnabled
         if (previousPrivacy != configuredPrivacy) {
             invalidatePendingPersonalization()
         } else {
@@ -339,6 +369,9 @@ class ZeroInputService : InputMethodService() {
         graph.aiCoordinator.invalidate()
         graph.aiDataGeneration.invalidate()
         mainHandler.post {
+            val reopenDraft = inputView?.isPrivateDraftOpen == true || privateDefaultChanged
+            inputView?.closeAuxiliaryInput()
+            inputView?.renderPrivateDraftSetting(graph.settings.privateDraftEnabled)
             invalidateAiRequest()
             inputView?.clearExpressionSession()
             registerInteraction()
@@ -362,6 +395,7 @@ class ZeroInputService : InputMethodService() {
                 reconcileLanguagePackSession(session)
             }
             inputView?.let(::renderLocalPanels)
+            if (reopenDraft) openDefaultPrivateDraft()
         }
     }
 
@@ -372,6 +406,7 @@ class ZeroInputService : InputMethodService() {
         controller?.invalidateWordAssociations()
         modelRanking.invalidate()
         appearanceBinding.close()
+        inputView?.closeAuxiliaryInput()
         inputView?.release()
         val appearance = graph.settings.keyboardAppearance
         val view = ZeroInputView(dev.zeroinput.ime.settings.KeyboardThemeContext.create(this, appearance.theme))
@@ -388,6 +423,7 @@ class ZeroInputService : InputMethodService() {
         controller?.state?.let(view::renderSession)
         renderEngineStatus()
         view.renderAi(AiStreamEvent.Completed(""))
+        openDefaultPrivateDraft()
         return keyboardWindow.wrap(view)
     }
 
@@ -495,6 +531,7 @@ class ZeroInputService : InputMethodService() {
         reconcileChineseOptions()
         inputView?.let(::renderLocalPanels)
         bindPasteConsent()
+        openDefaultPrivateDraft()
     }
 
     private fun updateNavigationBarAppearance() {
@@ -526,6 +563,7 @@ class ZeroInputService : InputMethodService() {
         controller?.invalidateReconversion()
         inputView?.cancelPendingGestures()
         inputViewActive = false
+        inputView?.closeAuxiliaryInput()
         aiDraft.close()
         deviceAgentDraft.close()
         inputView?.setAiDeviceAgentMode(false)
@@ -550,6 +588,13 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        inputView?.closeAuxiliaryInput()
+        shapeLookup.close()
+        privateDraft.close()
+        privateDraftToggle?.close()
+        privateDraftToggle = null
+        if (screenOffRegistered) unregisterReceiver(screenOff)
+        screenOffRegistered = false
         cancelDeviceAgentTask()
         if (aiPageBinding.isInitialized()) aiPages.close()
         appearanceBinding.close()
@@ -606,6 +651,8 @@ class ZeroInputService : InputMethodService() {
     override fun onEvaluateFullscreenMode(): Boolean = false
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        // System credential windows can route a key through the old IME binding.
+        if (privateDraftToggle != null || graph.securePaste.isAuthenticating) return super.onKeyDown(keyCode, event)
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && inputView?.canNavigateBack == true) {
             if (event.repeatCount == 0) event.startTracking()
             return true
@@ -629,10 +676,15 @@ class ZeroInputService : InputMethodService() {
                 return true
             }
         }
+        if (inputView?.let { it.isPrivateDraftOpen || it.isShapeLookupOpen } == true &&
+            (event.isPrintingKey || keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
+                keyCode == android.view.KeyEvent.KEYCODE_DEL || keyCode == android.view.KeyEvent.KEYCODE_FORWARD_DEL ||
+                keyCode == android.view.KeyEvent.KEYCODE_TAB)) return true
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (privateDraftToggle != null || graph.securePaste.isAuthenticating) return super.onKeyUp(keyCode, event)
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && event.isTracking && !event.isCanceled &&
             inputView?.navigateBack() == true) return true
         return super.onKeyUp(keyCode, event)
@@ -652,6 +704,7 @@ class ZeroInputService : InputMethodService() {
             handwritingCoordinator?.invalidate()
             inputView?.clearHandwriting()
             if (inputView?.isAiOpen == true) invalidateAiRequest()
+            if (inputView?.isPrivateDraftOpen == true) registerInteraction()
             cancelSecureClipboardRequest()
             graph.securePaste.editorChanged(pasteEditorIdentity())
             controller?.clearModelRanking()
@@ -687,6 +740,8 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype?) {
+        val reopenDraft = inputView?.isPrivateDraftOpen == true
+        inputView?.closeAuxiliaryInput()
         inputView?.clearExpressionSession()
         invalidateAiRequest()
         super.onCurrentInputMethodSubtypeChanged(newSubtype)
@@ -697,6 +752,7 @@ class ZeroInputService : InputMethodService() {
         invalidatePendingPersonalization()
         languageForSubtype(newSubtype)?.let(::switchTo)
         activeSession?.let { scheduleEngineWarmup(it, force = true) }
+        if (reopenDraft) openDefaultPrivateDraft()
     }
 
     @Suppress("DEPRECATION")
@@ -781,6 +837,8 @@ class ZeroInputService : InputMethodService() {
         view.onKeyboardAction = ::handleKeyboardAction
         view.onHideKeyboardRequested = { if (view === inputView && inputViewActive) requestHideSelf(0) }
         view.onClearCompositionRequested = clearComposition@{
+            if (view.isPrivateDraftOpen) return@clearComposition privateDraft.clearComposition()
+            if (view.isShapeLookupOpen) return@clearComposition false
             if (view.isSearchEditing) return@clearComposition searchDraft.clearComposition()
             if (view.isAiOpen) return@clearComposition aiDraft.clearComposition()
             registerInteraction()
@@ -835,6 +893,27 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun bindLocalPanelActions(view: ZeroInputView) {
+        view.renderPrivateDraftSetting(graph.settings.privateDraftEnabled)
+        view.onPrivateDraftRequested = { enabled -> requestPrivateDraft(view, enabled) }
+        view.onPrivateDraftVisibilityChanged = { visible ->
+            if (!visible) privateDraft.hide()
+            else if (canUsePrivateDraft(view)) {
+                controller?.reset()
+                privateDraft.open(view, controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions)
+            } else view.closeAuxiliaryInput()
+        }
+        view.onPrivateDraftPreview = privateDraft::toggleVisibility
+        view.onPrivateDraftFinished = privateDraft::finish
+        view.onShapeVisibilityChanged = { visible ->
+            if (!visible) shapeLookup.hide()
+            else if (canUseShapeLookup(view)) {
+                controller?.reset()
+                shapeLookup.open(view)
+            } else view.returnToKeyboard()
+        }
+        view.onShapeAction = shapeLookup::type
+        view.onShapeChoice = shapeLookup::choose
+        view.onShapeReset = shapeLookup::resetSelection
         view.onEmojiSelected = ::commitEmoji
         view.onExpressionFavoriteRequested = ::setExpressionFavorite
         view.onExpressionManagementRequested = { id ->
@@ -999,12 +1078,8 @@ class ZeroInputService : InputMethodService() {
 
     private fun updateScreenCapturePolicy() {
         window?.window?.let { imeWindow ->
-            // The ordinary AI and handwriting panels contain only user-visible
-            // drafts/results and must remain demonstrable. Secret surfaces
-            // protect their own Activity/Dialog windows; the IME window is
-            // protected globally only while the user explicitly enables
-            // incognito mode.
-            if (graph.settings.incognitoMode) {
+            // Keep protection across panel transitions while private input is enabled.
+            if (graph.settings.incognitoMode || graph.settings.privateDraftEnabled) {
                 imeWindow.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
             } else imeWindow.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
@@ -1038,6 +1113,78 @@ class ZeroInputService : InputMethodService() {
         val committed = connection.commitText(value, 1)
         if (committed) view.clearHandwriting()
         return committed
+    }
+
+    private fun canUseShapeLookup(view: ZeroInputView): Boolean =
+        view === inputView && view.isShapeLookupOpen && inputViewActive &&
+            activeSession?.controller?.state?.privacy?.isSensitive == false
+
+    private fun commitShape(view: ZeroInputView, value: String): Boolean {
+        syncSessionPrivacy()
+        if (!canUseShapeLookup(view)) return false
+        val session = activeSession ?: return false
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return false
+        registerInteraction()
+        return isSessionActive(session, connection) &&
+            runCatching { connection.commitText(value, 1) }.getOrDefault(false)
+    }
+
+    private fun eligibleForPrivateDraft(view: ZeroInputView): Boolean {
+        val session = activeSession ?: return false
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return false
+        val info = currentInputEditorInfo ?: return false
+        return view === inputView && inputViewActive && isSessionActive(session, connection) &&
+            dev.zeroinput.ime.input.isPrivateDraftEditor(info, session.controller.state.privacy, configuredPrivacy.incognitoMode) &&
+            window?.window != null
+    }
+
+    private fun isDeviceUnlocked(): Boolean =
+        dev.zeroinput.ime.input.isPrivateDraftDeviceAvailable(this)
+
+    private fun canUsePrivateDraft(view: ZeroInputView): Boolean =
+        view.isPrivateDraftOpen && graph.settings.privateDraftEnabled && eligibleForPrivateDraft(view)
+
+    private fun openDefaultPrivateDraft() {
+        val view = inputView ?: return
+        if (graph.settings.privateDraftEnabled && !graph.securePaste.inProgress &&
+            !view.isPrivateDraftOpen && !view.isSecureClipboardOpen &&
+            eligibleForPrivateDraft(view) && isDeviceUnlocked()) {
+            updateScreenCapturePolicy()
+            view.openPrivateDraft()
+        }
+    }
+
+    private fun requestPrivateDraft(view: ZeroInputView, enabled: Boolean) {
+        syncSessionPrivacy()
+        if (view !== inputView || privateDraftToggle != null) return
+        if (!eligibleForPrivateDraft(view) || !isDeviceUnlocked()) {
+            Toast.makeText(this, R.string.private_draft_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        registerInteraction()
+        if (enabled && graph.settings.privateDraftEnabled) {
+            openDefaultPrivateDraft()
+            return
+        }
+        if (enabled == graph.settings.privateDraftEnabled) return
+        val title = if (enabled) R.string.private_draft_enable else R.string.private_draft_disable
+        privateDraftToggle = dev.zeroinput.ime.auth.AuthenticationBroker.requestCancellable(this, title) { grant ->
+            if (privateDraftToggle == null) return@requestCancellable
+            privateDraftToggle = null
+            if (grant != null && isDeviceUnlocked()) graph.settings.setPrivateDraftEnabled(enabled, grant)
+            else Toast.makeText(this, R.string.authentication_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun privateDraftCommitTarget(view: ZeroInputView): ((String) -> Boolean)? {
+        val session = activeSession ?: return null
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return null
+        if (!canUsePrivateDraft(view) || !isDeviceUnlocked()) return null
+        val interaction = interactionSequence
+        return { value ->
+            canUsePrivateDraft(view) && isDeviceUnlocked() && interaction == interactionSequence && isSessionActive(session, connection) &&
+                runCatching { connection.commitText(value, 1) }.getOrDefault(false)
+        }
     }
 
     private fun aiAllowed(): Boolean {
@@ -1218,6 +1365,14 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun handleKeyboardAction(action: KeyboardAction) {
+        if (inputView?.isPrivateDraftOpen == true) {
+            privateDraft.type(action)
+            return
+        }
+        if (inputView?.isShapeLookupOpen == true) {
+            shapeLookup.type(action)
+            return
+        }
         if (inputView?.isHandwritingOpen == true) inputView?.clearHandwriting()
         registerInteraction(preserveWordAssociations = true)
         syncSessionPrivacy()
@@ -1259,6 +1414,11 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun handleControllerCommand(command: InputCommand) {
+        if (inputView?.isPrivateDraftOpen == true) {
+            privateDraft.command(command)
+            return
+        }
+        if (inputView?.isShapeLookupOpen == true) return
         if (inputView?.isSearchEditing == true) {
             registerInteraction()
             syncSessionPrivacy()
@@ -1741,6 +1901,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun endInputSession(reset: Boolean) {
+        inputView?.closeAuxiliaryInput()
         cancelDeviceAgentTask()
         searchDraft.close()
         handwritingCoordinator?.invalidate()

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shape_open">Find similar Han characters</string>
+    <string name="shape_reset">Choose another component</string>
+    <string name="shape_failed">Character shape data is unavailable</string>
+    <string name="shape_loading">Preparing character shapes</string>
+    <string name="shape_empty">No matching characters</string>
+    <string name="shape_choose_radical">Choose a radical or type pinyin</string>
+    <string name="shape_short">形</string>
+</resources>

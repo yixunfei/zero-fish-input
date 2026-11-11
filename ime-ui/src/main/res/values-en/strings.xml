@@ -212,7 +212,6 @@
     <string name="secure_clipboard_load_failed">Unable to load snippets. Retry or open Manage and authenticate to recover.</string>
     <string name="symbol_page">%1$s %2$d/%3$d</string>
     <string name="symbol_group_common">Common</string>
-    <string name="secure_clipboard_copy_short">Copy privately</string>
     <string name="symbol_groups">Choose symbol group</string>
     <string name="symbol_group_chinese">Chinese</string>
     <string name="symbol_group_english">English</string>

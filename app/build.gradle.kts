@@ -73,8 +73,8 @@ android {
         applicationId = "dev.zeroinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.7.2"
+        versionCode = 10
+        versionName = "0.7.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -144,7 +144,18 @@ android {
     }
 }
 
-tasks.named("preBuild").configure { dependsOn(prepareLicenseAssets) }
+val verifyHanShapeIndex = tasks.register("verifyHanShapeIndex") {
+    val index = layout.projectDirectory.file("src/main/assets/shape/han-shapes.tsv").asFile
+    inputs.file(index)
+    doLast {
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(index.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(sha256 == "e51647e0d948d3b2ed93f4a0d22ac106a82e9e82aacd63a795d6ab7414012dc1") {
+            "Bundled Han shape index checksum mismatch"
+        }
+    }
+}
+tasks.named("preBuild").configure { dependsOn(prepareLicenseAssets, verifyHanShapeIndex) }
 tasks.matching {
     (it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets")) ||
         (it.name.contains("AndroidTest") && it.name.contains("Lint", ignoreCase = true))

@@ -17,7 +17,10 @@ class InputFixtureActivity : Activity() {
         super.onCreate(null)
         editor = EditText(this).apply {
             inputType = intent.getIntExtra("input_type", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
-            imeOptions = intent.getIntExtra("ime_options", 0) or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            imeOptions = intent.getIntExtra("ime_options", 0)
+            if (!intent.getBooleanExtra("ordinary_fixture", false)) {
+                imeOptions = imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+            }
             isSaveEnabled = false
             setOnEditorActionListener { _, action, _ ->
                 editorActions += action

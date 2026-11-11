@@ -32,6 +32,8 @@ internal class SecurePasteCoordinator(
         override fun onChange(selfChange: Boolean) { cancel() }
     }
     private var observingIme = false
+    val inProgress: Boolean get() = pending != null
+    val isAuthenticating: Boolean get() = pending?.authorized == false
 
     fun deferBinding(identity: PasteEditorIdentity?, authenticationFinished: Boolean): Boolean = pending?.let {
         !it.authorized || (authenticationFinished && identity != it.source)

@@ -175,6 +175,8 @@ class MainActivity : AppCompatActivity() {
         }
         screen.onIncognitoChanged = ::setIncognitoEnabled
         screen.onSecureClipboardChanged = ::setSecureClipboardEnabled
+        screen.onPrivateDraftChanged = ::setPrivateDraftEnabled
+        screen.onPrivateDraftCopyChanged = { graph.settings.savePrivateDraftOnSubmit = it }
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
         screen.onSoundEffectsChanged = { graph.settings.soundEffectsEnabled = it; render() }
@@ -290,6 +292,20 @@ class MainActivity : AppCompatActivity() {
             clipboardAuthRequest = null
             if (isFinishing || isDestroyed) return@authCallback
             graph.settings.secureClipboardEnabled = grant != null
+            render()
+        }
+    }
+
+    private fun setPrivateDraftEnabled(enabled: Boolean) {
+        render()
+        val generation = ++clipboardAuthGeneration
+        clipboardAuthRequest?.close()
+        val title = if (enabled) R.string.private_draft_enable else R.string.private_draft_disable
+        clipboardAuthRequest = AuthenticationBroker.requestCancellable(this, title) authCallback@{ grant ->
+            if (generation != clipboardAuthGeneration) return@authCallback
+            clipboardAuthRequest = null
+            if (isFinishing || isDestroyed) return@authCallback
+            if (grant != null) graph.settings.setPrivateDraftEnabled(enabled, grant)
             render()
         }
     }
@@ -463,6 +479,8 @@ class MainActivity : AppCompatActivity() {
                 personalPromotionThreshold = graph.settings.personalPromotionThreshold,
                 incognitoMode = graph.settings.incognitoMode,
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
+                privateDraftEnabled = graph.settings.privateDraftEnabled,
+                savePrivateDraftOnSubmit = graph.settings.savePrivateDraftOnSubmit,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,
                 soundEffectsEnabled = graph.settings.soundEffectsEnabled,
                 wordAssociationsEnabled = graph.settings.wordAssociationsEnabled,

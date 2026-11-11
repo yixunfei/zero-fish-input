@@ -13,34 +13,34 @@ import java.util.UUID
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicLong
 
-class SecureClipboardVault(
+class SecureClipboardVault private constructor(
     private val store: EncryptedStore,
     private val indexStore: EncryptedStore,
+    private val draftEntries: PrivateDraftEntries?,
+    private val privateDraftWritesAllowed: () -> Boolean,
 ) {
-    constructor(context: Context) : this(
+    constructor(store: EncryptedStore, indexStore: EncryptedStore) : this(store, indexStore, null, { false })
+
+    constructor(context: Context, privateDraftWritesAllowed: () -> Boolean = { false }) : this(
         EncryptedFileStore(context, "secure-clipboard.bin", SecurityAliases.SECURE_CLIPBOARD),
         EncryptedFileStore(context, "secure-clipboard-index.bin", SecurityAliases.SECURE_CLIPBOARD_INDEX),
+        PrivateDraftEntries(context.applicationContext),
+        privateDraftWritesAllowed,
     )
 
     private val lock = Any()
     private val generation = AtomicLong()
-    /** Index entries contain no labels or正文 and are safe to cache in-process. */
+    /** The cached index contains only opaque entry IDs and timestamps. */
     private var indexCache: List<StoredSummary>? = null
     private var deletionPending = false
     private var indexNeedsRepair = false
     private var transactionFailed = false
 
-    fun count(): Int = synchronized(lock) { loadIndexSafely().size }
+    fun count(): Int = synchronized(lock) { loadIndexSafely().size + draftSummaries().size }
 
     fun summaries(): List<SecureClipboardSummary> = synchronized(lock) {
-        loadIndexSafely().sortedByDescending(StoredSummary::updatedAtEpochMillis)
-            .mapIndexed { index, summary ->
-                SecureClipboardSummary(
-                    id = summary.id,
-                    displayName = "",
-                    updatedAtEpochMillis = summary.updatedAtEpochMillis,
-                )
-            }
+        (loadIndexSafely().map { SecureClipboardSummary(it.id, "", it.updatedAtEpochMillis) } +
+            draftSummaries()).sortedByDescending(SecureClipboardSummary::updatedAtEpochMillis)
     }
 
     /** Revalidate after acquiring the vault lock; cancellation may occur while waiting. */
@@ -52,9 +52,10 @@ class SecureClipboardVault(
     ): String? = synchronized(lock) {
         checkOperationActive(expectedGeneration, isActive)
         require(grant.consume()) { "Authentication expired or was already used" }
-        val entries = load()
+        val value = if (draftSummaries().any { it.id == id }) draftEntries?.read(id)
+            else load().firstOrNull { it.id == id }?.value
         checkOperationActive(expectedGeneration, isActive)
-        entries.firstOrNull { it.id == id }?.value
+        value
     }
 
     fun metadata(grant: AuthenticationGrant, expectedGeneration: Long = captureGeneration()): List<SecureClipboardMetadata> {
@@ -66,7 +67,13 @@ class SecureClipboardVault(
             checkOperationActive(expected) { true }
             repairIndexIfNeeded(entries, expected)
             checkOperationActive(expected) { true }
-            entries.map { it.toMetadata() }
+            val drafts = draftSummaries().map { draft ->
+                checkOperationActive(expected) { true }
+                SecureClipboardMetadata(draft.id, "", checkNotNull(draftEntries).length(draft.id),
+                    draft.updatedAtEpochMillis)
+            }
+            checkOperationActive(expected) { true }
+            (entries.map { it.toMetadata() } + drafts).sortedByDescending(SecureClipboardMetadata::updatedAtEpochMillis)
         }
     }
 
@@ -105,7 +112,7 @@ class SecureClipboardVault(
         val cleanValue = validateValue(String(value))
         val previous = load()
         val entries = previous.toMutableList()
-        require(entries.size < MAX_ENTRIES) { "Secure clipboard is full" }
+        require(entries.size + draftSummaries().size < MAX_ENTRIES) { "Secure clipboard is full" }
         val entry = SecureClipboardEntry(
             id = UUID.randomUUID().toString(),
             label = validateLabel(label),
@@ -118,11 +125,39 @@ class SecureClipboardVault(
         entry.toMetadata()
     }
 
+    /** Explicit private draft completion, authorized by the authenticated feature setting. */
+    fun addPrivateDraft(value: CharArray, expectedGeneration: Long, isActive: () -> Boolean) = synchronized(lock) {
+        val allowed = { privateDraftWritesAllowed() && isActive() }
+        checkOperationActive(expectedGeneration, allowed)
+        require(value.size <= MAX_VALUE_LENGTH && value.any { !it.isWhitespace() } && '\u0000' !in value)
+        if (legacyIndexMissing()) {
+            indexNeedsRepair = true
+            indexCache = null
+            throw IOException("Secure clipboard index needs repair")
+        }
+        val drafts = draftSummaries()
+        require(loadIndexSafely().size + drafts.size < MAX_ENTRIES) { "Secure clipboard is full" }
+        checkNotNull(draftEntries).add(UUID.randomUUID().toString(), value, allowKeyCreation = drafts.isEmpty()) {
+            checkOperationActive(expectedGeneration, allowed)
+        }
+    }
+
+    private fun legacyIndexMissing(): Boolean =
+        store is EncryptedFileStore && indexStore is EncryptedFileStore &&
+            store.hasCommittedData() && !indexStore.hasCommittedData()
+
+    private fun draftSummaries(): List<SecureClipboardSummary> = draftEntries?.summaries().orEmpty()
+
     fun remove(id: String, grant: AuthenticationGrant, expectedGeneration: Long = captureGeneration()): Boolean {
         val expected = expectedGeneration
         return synchronized(lock) {
             checkOperationActive(expected) { true }
             require(grant.consume()) { "Authentication expired or was already used" }
+            if (draftSummaries().any { it.id == id }) {
+                if (!generation.compareAndSet(expected, expected + 1)) throw CancellationException("Clipboard operation cancelled")
+                checkNotNull(draftEntries).remove(id)
+                return@synchronized true
+            }
             val previous = load()
             val entries = previous.toMutableList()
             checkOperationActive(expected) { true }
@@ -155,6 +190,11 @@ class SecureClipboardVault(
             }
             try {
                 indexStore.delete(deleteKey = true)
+            } catch (error: Throwable) {
+                failure = failure?.also { it.addSuppressed(error) } ?: error
+            }
+            try {
+                draftEntries?.purge()
             } catch (error: Throwable) {
                 failure = failure?.also { it.addSuppressed(error) } ?: error
             }
@@ -328,7 +368,7 @@ class SecureClipboardVault(
     private fun repairIndexIfNeeded(entries: List<SecureClipboardEntry>, expectedGeneration: Long) {
         val expected = entries.map { StoredSummary(it.id, it.updatedAtEpochMillis) }.sortedBy { it.id }
         val actual = try {
-            if (indexNeedsRepair) null else loadIndexSafely().sortedBy { it.id }
+            if (indexNeedsRepair || legacyIndexMissing()) null else loadIndexSafely().sortedBy { it.id }
         } catch (_: IOException) {
             null
         }
@@ -337,7 +377,10 @@ class SecureClipboardVault(
     }
 
     private fun loadIndex(): List<StoredSummary> {
-        val bytes = indexStore.read() ?: return emptyList()
+        val bytes = indexStore.read() ?: run {
+            if (legacyIndexMissing()) throw IOException("Secure clipboard index needs repair")
+            return emptyList()
+        }
         return try {
             withJsonReader(bytes) { reader ->
                 var version: Long? = null

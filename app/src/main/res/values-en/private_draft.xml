@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="private_draft_default">Use private temporary input by default</string>
+    <string name="private_draft_keep_copy">Keep an encrypted copy when submitting private input</string>
+    <string name="private_draft_enable">Authenticate to enable private input and the secure clipboard</string>
+    <string name="private_draft_disable">Authenticate to turn off private temporary input</string>
+    <string name="private_draft_save_failed">Could not save the private draft. Check whether the secure clipboard is enabled or full.</string>
+    <string name="private_draft_commit_failed">Could not submit to the current text field</string>
+    <string name="private_draft_saved_only">Saved to the secure clipboard. The current text field did not receive the text.</string>
+    <string name="private_draft_unavailable">Unlock your device and open an ordinary text field to use private temporary input.</string>
+    <string name="private_draft_length_limit">The draft has reached its length limit. Extra text could not be added.</string>
+</resources>

@@ -4,4 +4,5 @@
     tools:ignore="ObsoleteSdkInt">
     <background android:drawable="@drawable/launcher_artwork" />
     <foreground android:drawable="@android:color/transparent" />
+    <monochrome android:drawable="@drawable/launcher_monochrome" />
 </adaptive-icon>

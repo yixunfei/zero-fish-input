@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shape_open">同型字查找</string>
+    <string name="shape_reset">返回选择部件</string>
+    <string name="shape_failed">字形数据不可用</string>
+    <string name="shape_loading">正在准备字形数据</string>
+    <string name="shape_empty">没有匹配的字</string>
+    <string name="shape_choose_radical">选部首或输入拼音</string>
+    <string name="shape_short">形</string>
+</resources>

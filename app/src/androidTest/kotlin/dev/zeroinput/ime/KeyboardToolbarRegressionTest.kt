@@ -1,6 +1,8 @@
 package dev.zeroinput.ime
 
 import android.content.Intent
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
@@ -14,6 +16,7 @@ import dev.zeroinput.ime.core.privacy.PrivacyReason
 import dev.zeroinput.ime.core.privacy.SessionPrivacy
 import dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity
 import dev.zeroinput.ime.testing.DeviceTouch
+import dev.zeroinput.ime.ui.ShapeChoice
 import dev.zeroinput.ime.ui.ZeroInputView
 import org.junit.Assert.*
 import org.junit.Test
@@ -82,7 +85,7 @@ class KeyboardToolbarRegressionTest {
             panel.renderSession(ready.copy(snapshot = EngineSnapshot("ni", "ni", listOf(Candidate("fixture", "你")))))
         }
         DeviceTouch.tapVisible { checkNotNull(find(panel, UiR.string.keyboard_tools)) }
-        DeviceTouch.tapVisible { checkNotNull(find(panel, UiR.string.ai_open)) }
+        tap(panel, UiR.string.ai_open)
         onMain { assertTrue(panel.isAiOpen) }
     }
 
@@ -108,7 +111,7 @@ class KeyboardToolbarRegressionTest {
             assertFalse(panel.isAiOpen)
         }
         tap(panel, UiR.string.keyboard_tools)
-        DeviceTouch.tapVisible { checkNotNull(find(panel, UiR.string.ai_entry_unavailable)) }
+        tap(panel, UiR.string.ai_entry_unavailable)
         onMain { assertNull(find(panel, UiR.string.ai_open)); assertFalse(panel.isAiOpen) }
     }
 
@@ -134,6 +137,33 @@ class KeyboardToolbarRegressionTest {
         onMain { assertTrue(panel.isAiOpen); assertTrue(panel.isAiEditing) }
     }
 
+    @Test fun privacyActionsAreReachableOnThePrimaryToolbar() = withPanel { panel ->
+        DeviceTouch.tapVisible { checkNotNull(find(panel, UiR.string.private_draft_open)) }
+        DeviceTouch.tapVisible { checkNotNull(find(panel, UiR.string.secure_clipboard_open)) }
+        onMain { assertTrue(panel.isSecureClipboardOpen) }
+    }
+
+    @Test fun toolsKeepInputActionsBeforeLanguageAndKeyboardSettings() = withPanel { panel ->
+        onMain { checkNotNull(find(panel, UiR.string.keyboard_tools)).performClick() }
+        instrumentation.waitForIdleSync()
+        onMain {
+            val controls = listOf(
+                UiR.string.handwriting_open,
+                UiR.string.shape_open,
+                UiR.string.language_switch,
+                UiR.string.keyboard_placement,
+                UiR.string.keyboard_settings,
+                UiR.string.secure_clipboard_open,
+                UiR.string.ai_open,
+                UiR.string.expression_smileys,
+            ).map { checkNotNull(find(panel, it)) }
+            val row = controls.first().parent as ViewGroup
+            assertTrue(controls.zipWithNext().all { (left, right) ->
+                row.indexOfChild(left) < row.indexOfChild(right)
+            })
+        }
+    }
+
     @Test fun toolsOpenWhileAiCandidatesExistAndReachOtherPanels() = withPanel { panel ->
         tap(panel, UiR.string.ai_open)
         onMain {
@@ -153,6 +183,36 @@ class KeyboardToolbarRegressionTest {
         }
         tap(panel, UiR.string.keyboard_return)
         onMain { assertNotNull(find(panel, UiR.string.keyboard_tools)) }
+    }
+
+    @Test fun refreshedShapeResultsRejectTouchesFromThePreviousList() = withPanel { panel ->
+        val chosen = mutableListOf<String>()
+        tap(panel, UiR.string.keyboard_tools)
+        tap(panel, UiR.string.shape_open)
+        onMain {
+            panel.onShapeChoice = { _, value -> chosen.add(value) }
+            panel.renderShapeLookup("", null, listOf(ShapeChoice("青")), false, false)
+        }
+        instrumentation.waitForIdleSync()
+        val cell = onMain { visible(panel).single { it.contentDescription == "青" } }
+        val down = SystemClock.uptimeMillis()
+        onMain {
+            touchShapeCell(cell, MotionEvent.ACTION_DOWN, down)
+            panel.renderShapeLookup("qing", null, listOf(ShapeChoice("青", "qīng")), false, false)
+        }
+        instrumentation.waitForIdleSync()
+        onMain {
+            touchShapeCell(cell, MotionEvent.ACTION_UP, down)
+            assertTrue(chosen.isEmpty())
+            val current = visible(panel).single { it.contentDescription == "青 qīng" }
+            current.performClick()
+            assertEquals(listOf("青"), chosen)
+        }
+    }
+
+    private fun touchShapeCell(view: View, action: Int, down: Long) {
+        val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, 2f, 2f, 0)
+        try { view.onTouchEvent(event) } finally { event.recycle() }
     }
 
     private fun withPanel(test: (ZeroInputView) -> Unit) {

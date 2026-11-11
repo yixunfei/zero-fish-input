@@ -1404,6 +1404,37 @@ the existing bounded selection reader, session/connection/settings generations,
 non-sensitive editor gate and authenticated save confirmation. Incognito remains
 compatible with explicit private import but never enables personal learning.
 
+Private temporary input accepts only keys directed to the eligible keyboard
+draft, with an empty personalization port and a screenshot-protected IME window.
+An ordinary text editor that requests only no predictive suggestions can use
+the isolated draft. Incognito and the no-personalized-learning flag still
+prevent opening the draft.
+The secure IME shows the current composition and candidates while editing.
+The default draft display exposes the last three committed characters and masks
+earlier text. Explicit reveal lasts for the current draft and resets on close.
+Private candidates skip automatic accessibility announcements.
+Locking, switching editors, leaving the panel or changing settings retires the
+buffer and cancels pending writes. The draft never reads the external editor,
+clipboard or AI data. Only the authenticated default setting and explicit finish
+enable an append. The vault encrypts a new item without loading any existing
+body and checks consent, request and deletion generation at commit. Private
+paste still requires its own authentication and current-editor confirmation.
+Pending draft writes and direct editor submission require an interactive,
+unlocked device at commit. The authenticated toggle result is discarded if the
+device has locked or stopped being interactive.
+The encrypted draft is staged before publication on every supported API level.
+Appending fails closed while the legacy clipboard index needs authenticated
+repair or while existing draft files lack their original key.
+Submit only follows the editor connection checks and bypasses the vault.
+While a system prompt is authenticating, hardware keys are delegated to Android
+so the retiring IME binding cannot route credentials as editor input.
+See [ADR 0036](adr/0036-private-temporary-input.md).
+
+Shape lookup processes public index data offline. The typed query only exists
+for the active panel and is never used for learning. Stale results are dropped
+on close or query change. Only a currently displayed choice may be committed
+after revalidating the current editor.
+
 Deletion style metadata comes only from the existing 64-unit cursor-local read.
 Formatting spans and plain bracketed text cannot authorize larger deletion. A
 possible textual label only delegates one Delete gesture to its host; false

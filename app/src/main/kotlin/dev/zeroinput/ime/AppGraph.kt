@@ -116,7 +116,10 @@ class AppGraph(context: Context) : AutoCloseable {
         expressionListeners += listener
         return AutoCloseable { expressionListeners -= listener }
     }
-    val secureClipboard = SecureClipboardVault(applicationContext)
+    val secureClipboard = SecureClipboardVault(applicationContext) {
+        settings.privateDraftEnabled && settings.secureClipboardEnabled &&
+            dev.zeroinput.ime.input.isPrivateDraftDeviceAvailable(applicationContext)
+    }
     val aiConfiguration = dev.zeroinput.userdata.AiConfigurationRepository(applicationContext)
     val aiConversations = dev.zeroinput.userdata.AiConversationRepository(applicationContext)
     val aiContextLibrary = dev.zeroinput.userdata.AiContextLibraryRepository(applicationContext)

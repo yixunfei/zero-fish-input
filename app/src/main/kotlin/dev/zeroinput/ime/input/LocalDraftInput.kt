@@ -23,8 +23,13 @@ internal class LocalDraftInput(
     private val render: (committed: String, preedit: String, state: InputSessionState) -> Unit,
     private val maxChars: Int,
     private val multiline: Boolean = true,
+    private val maskCommitted: Boolean = false,
+    private val onLengthLimit: () -> Unit = {},
 ) : AutoCloseable {
-    private val text = StringBuilder()
+    private val text = StringBuilder(if (maskCommitted) maxChars else 16)
+    private var lengthLimitReached = false
+    var showFullPrivateDraft = false
+        private set
     private var controller: InputSessionController? = null
     private var warmup: EngineWarmupCoordinator? = null
     private var delivery: EngineWarmupResultDelivery? = null
@@ -104,7 +109,28 @@ internal class LocalDraftInput(
     }
 
     fun submittedText(): String {
-        val input = controller ?: return ""
+        finishComposition()
+        return text.toString()
+    }
+
+    fun submittedChars(): CharArray? {
+        finishComposition()
+        if (lengthLimitReached) return null
+        return CharArray(text.length).also { text.getChars(0, text.length, it, 0) }
+    }
+
+    fun togglePrivateDraftVisibility() {
+        showFullPrivateDraft = !showFullPrivateDraft
+        refreshDisplay()
+    }
+
+    fun refreshDisplay() {
+        controller?.state?.let(::emit)
+    }
+
+    private fun finishComposition() {
+        lengthLimitReached = false
+        val input = controller ?: return
         // Some engines select one syllable at a time. Bound conversion by the
         // draft budget and stop if an engine fails to advance its preedit.
         var remaining = maxChars
@@ -112,13 +138,14 @@ internal class LocalDraftInput(
             val before = input.state.snapshot
             if (before.candidates.isEmpty()) input.handle(InputCommand.Enter)
             else input.handle(InputCommand.SelectCandidate(before.highlightedIndex.coerceIn(before.candidates.indices)))
+            if (lengthLimitReached) break
             if (input.state.snapshot == before) {
                 input.handle(InputCommand.Enter)
                 break
             }
         }
+        emit(input.state)
         resumePreparation()
-        return text.toString()
     }
 
     fun committedText(): String = text.toString()
@@ -167,7 +194,9 @@ internal class LocalDraftInput(
 
     /** Committed text only; the unfinished code is a separate pre-edit. */
     private fun emit(state: InputSessionState) {
-        render(text.toString(), preeditOf(state), state)
+        val preedit = preeditOf(state)
+        val committed = if (maskCommitted && !showFullPrivateDraft) maskedPrivateDraft(text) else text.toString()
+        render(committed, preedit, state)
     }
 
     private fun preeditOf(state: InputSessionState): String =
@@ -215,6 +244,7 @@ internal class LocalDraftInput(
     }
 
     override fun close() {
+        showFullPrivateDraft = false
         generation++
         retryWhenIdle = false
         idleRetries = 0
@@ -235,7 +265,11 @@ internal class LocalDraftInput(
         override fun setComposingText(text: String) = Unit
         override fun finishComposingText() = Unit
         override fun commitText(text: String): Boolean {
-            if (this@LocalDraftInput.text.length + text.length > maxChars) return false
+            if (text.length > maxChars - this@LocalDraftInput.text.length) {
+                lengthLimitReached = true
+                onLengthLimit()
+                return false
+            }
             this@LocalDraftInput.text.append(text)
             return true
         }
@@ -266,4 +300,12 @@ internal class LocalDraftInput(
         override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
         override fun recordUse(id: String, learningAllowed: Boolean) = Unit
     }
+}
+
+internal fun maskedPrivateDraft(text: CharSequence): String {
+    var tail = text.length
+    repeat(3) {
+        if (tail > 0) tail = Character.offsetByCodePoints(text, tail, -1)
+    }
+    return "•".repeat(tail.coerceAtMost(32)) + text.subSequence(tail, text.length)
 }

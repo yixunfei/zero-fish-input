@@ -111,6 +111,22 @@ class SettingsRepository(context: Context) {
         get() = preferences.getBoolean(KEY_SECURE_CLIPBOARD, false)
         set(value) = edit(KEY_SECURE_CLIPBOARD, value)
 
+    val privateDraftEnabled: Boolean
+        get() = preferences.getBoolean(KEY_PRIVATE_DRAFT, false)
+
+    var savePrivateDraftOnSubmit: Boolean
+        get() = preferences.getBoolean(KEY_PRIVATE_DRAFT_COPY, true)
+        set(value) = edit(KEY_PRIVATE_DRAFT_COPY, value)
+
+    internal fun setPrivateDraftEnabled(enabled: Boolean, grant: dev.zeroinput.security.AuthenticationGrant): Boolean {
+        if (!grant.consume() || privateDraftEnabled == enabled) return false
+        preferences.edit().apply {
+            putBoolean(KEY_PRIVATE_DRAFT, enabled)
+            if (enabled) putBoolean(KEY_SECURE_CLIPBOARD, true)
+        }.apply()
+        return true
+    }
+
     var hapticFeedbackEnabled: Boolean
         get() = preferences.getBoolean(KEY_HAPTICS, true)
         set(value) = edit(KEY_HAPTICS, value)
@@ -230,6 +246,8 @@ class SettingsRepository(context: Context) {
         const val KEY_LEARN_FROM_COMMITTED_TEXT = "learning.from-committed-text"
         const val KEY_INCOGNITO = "privacy.incognito"
         const val KEY_SECURE_CLIPBOARD = "secure-clipboard.enabled"
+        const val KEY_PRIVATE_DRAFT = "privacy.private-draft"
+        const val KEY_PRIVATE_DRAFT_COPY = "privacy.private-draft-save-on-submit"
         const val KEY_HAPTICS = "keyboard.haptics"
         const val KEY_SOUND_EFFECTS = "keyboard.sound-effects"
         const val KEY_WORD_ASSOCIATIONS = "keyboard.word-associations"

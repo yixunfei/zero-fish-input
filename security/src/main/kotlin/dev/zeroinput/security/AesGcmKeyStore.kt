@@ -10,8 +10,8 @@ import javax.crypto.SecretKey
 class AesGcmKeyStore(
     private val alias: String,
 ) {
-    fun encrypt(plaintext: ByteArray, associatedData: ByteArray): ByteArray =
-        AesGcmEnvelope.encrypt(plaintext, associatedData, getOrCreateKey())
+    fun encrypt(plaintext: ByteArray, associatedData: ByteArray, allowKeyCreation: Boolean = true): ByteArray =
+        AesGcmEnvelope.encrypt(plaintext, associatedData, if (allowKeyCreation) getOrCreateKey() else existingKey())
 
     fun decrypt(envelope: ByteArray, associatedData: ByteArray): ByteArray =
         AesGcmEnvelope.decrypt(envelope, associatedData, ::existingKey)

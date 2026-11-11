@@ -6,6 +6,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.ImageButton
 import dev.zeroinput.ime.ui.KeyboardAction
 import dev.zeroinput.ime.ui.KeyboardPanel
 import dev.zeroinput.ime.ui.ZeroInputView
@@ -93,6 +94,10 @@ class KeyboardReportedBugsTest {
         activity.setContentView(panel)
         panel.renderCopySelectionAvailable(true)
         val copy = descendants(panel).first { it.contentDescription == activity.getString(UiR.string.secure_clipboard_copy_selection) && it.isShown }
+        assertTrue(copy is ImageButton)
+        val touchTarget = (48 * panel.resources.displayMetrics.density).toInt()
+        assertEquals(touchTarget, copy.layoutParams.width)
+        assertEquals(touchTarget, copy.layoutParams.height)
         var requests = 0
         panel.onCopySelectionRequested = { requests++ }
         copy.performClick()

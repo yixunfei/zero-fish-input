@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="private_draft_default">默认开启私密临时输入</string>
+    <string name="private_draft_keep_copy">提交私密输入时保留加密副本</string>
+    <string name="private_draft_enable">验证并启用私密输入与安全剪贴板</string>
+    <string name="private_draft_disable">验证并关闭私密临时输入</string>
+    <string name="private_draft_save_failed">未能保存私密草稿，请检查安全剪贴板是否已启用或已满</string>
+    <string name="private_draft_commit_failed">未能提交到当前输入框</string>
+    <string name="private_draft_saved_only">已保存到安全剪贴板，当前输入框未接收文字</string>
+    <string name="private_draft_unavailable">请在已解锁设备的普通文本框中开启私密临时输入</string>
+    <string name="private_draft_length_limit">草稿已达长度上限，超出的文字未加入</string>
+</resources>

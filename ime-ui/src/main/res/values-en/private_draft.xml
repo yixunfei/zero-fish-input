@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="private_draft_open">Enable private temporary input</string>
+    <string name="private_draft_edit">Use private temporary input</string>
+    <string name="private_draft_disable">Turn off private temporary input by default</string>
+    <string name="private_draft_hint">Private temporary input</string>
+    <string name="private_draft_preview">Show this draft</string>
+    <string name="private_draft_mask">Mask draft</string>
+    <string name="private_draft_submit_only">Submit only</string>
+    <string name="private_draft_save_close">Save and close</string>
+    <string name="private_draft_save_submit">Save and submit</string>
+    <string name="private_draft_saving">Saving private draft</string>
+</resources>

@@ -1151,6 +1151,21 @@ retains the engine route. The first toolbar control reuses explicit private
 selection import, including its existing session, sensitivity and authentication
 checks. Android/host text-menu ordering is outside the IME's control.
 
+The private temporary input panel reuses `LocalDraftInput` with an empty
+personalization port, a masked draft display with visible recent text and
+composition candidates, and a separate completion owner. Submit only uses the
+current editor binding directly.
+Settings consumes a fresh one-use system grant on either toggle. Explicit
+completion can append a draft through `SecureClipboardVault` without reading
+legacy bodies. The app verifies the original editor connection again before
+insertion. See [ADR 0036](adr/0036-private-temporary-input.md).
+
+The shape lookup panel routes pinyin keys into an isolated query. It loads the
+verified bundled Han shape index on a single worker, ranks direct and shared
+components, and presents results in a recycled scrolling list using the expanded
+candidate styling. The selected result alone can be
+committed into the currently bound editor. No Rime contract changes are needed.
+
 Backspace requests at most 64 UTF-16 units with style metadata. Complete visible
 replacement spans with a known left boundary can be deleted as one unit. Bounded
 label-like suffixes without a usable span are dispatched as a Delete key to the

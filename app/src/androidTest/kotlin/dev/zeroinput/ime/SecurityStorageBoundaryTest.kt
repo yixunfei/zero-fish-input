@@ -16,6 +16,32 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SecurityStorageBoundaryTest {
+    @Test fun cancelledFirstWriteNeverExposesACommittedFile() = withStore { store, file, _ ->
+        val plaintext = "public fixture".toByteArray()
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            store.writeIfActive(plaintext) {
+                assertFalse(file.exists())
+                throw java.util.concurrent.CancellationException()
+            }
+        }
+        assertNull(store.read())
+        assertFalse(File(file.path + ".new").exists())
+        assertTrue(plaintext.all { it == 0.toByte() })
+    }
+
+    @Test fun appendingWithAnExistingVaultCannotReplaceAMissingKey() = withStore { store, file, alias ->
+        store.write("public fixture".toByteArray())
+        val envelope = file.readBytes()
+        AesGcmKeyStore(alias).deleteKey()
+        val pending = "second public fixture".toByteArray()
+        assertThrows(GeneralSecurityException::class.java) {
+            store.writeIfActive(pending, allowKeyCreation = false) { fail("Missing key cannot reach commit") }
+        }
+        assertFalse(keys().containsAlias(alias))
+        assertArrayEquals(envelope, file.readBytes())
+        assertTrue(pending.all { it == 0.toByte() })
+    }
+
     @Test fun vaultPurgeDeletesBothEncryptedFilesAndKeysWithoutParsingTheirContents() = withStore { body, bodyFile, bodyAlias ->
         withStore { index, indexFile, indexAlias ->
             body.write("unparseable public body fixture".toByteArray())

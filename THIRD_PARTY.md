@@ -175,6 +175,22 @@ copied or executed. Existing main pins remain authoritative until a data PR is
 reviewed and merged; this source policy does not itself update bundled data.
 
 
+## Offline Han shape lookup
+
+The bundled shape index combines Gavin Grover's
+[CJK Decomposition Data](https://github.com/amake/cjk-decomp/blob/c29b391fd6267e7a3541387e03a3dd60b1cd34d1/README.md)
+under its Apache-2.0 option with Mandarin readings and frequency from
+[Unihan 17.0.0](https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip) under
+Unicode License V3. The licenses are included in `LICENSES/`.
+
+`tools/prepare-shape-index.py` accepts the pinned
+[`cjk-decomp.txt`](https://raw.githubusercontent.com/amake/cjk-decomp/c29b391fd6267e7a3541387e03a3dd60b1cd34d1/cjk-decomp.txt)
+and `Unihan.zip` and checks both SHA-256 values before deriving the table.
+It includes 41,874 characters present in both datasets. The 1,408,142-byte
+TSV is build-verified and compressed in the APK. The decomposition source is
+archived, so coverage is limited to its recorded character forms and the
+reading intersection.
+
 ## Resource delivery variants
 
 LTS and handwriting data are bundled only in full APKs and optionally downloaded

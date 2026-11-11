@@ -74,10 +74,13 @@ class SecureClipboardUnlockActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     private fun createPromptInfo(): BiometricPrompt.PromptInfo {
+        val title = when (val requested = intent.getIntExtra(EXTRA_PROMPT_TITLE, 0)) {
+            R.string.clipboard_guard_authentication_title, R.string.private_draft_enable,
+            R.string.private_draft_disable -> requested
+            else -> R.string.unlock_secure_clipboard
+        }
         val builder = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(getString(if (intent.getIntExtra(EXTRA_PROMPT_TITLE, 0) == R.string.clipboard_guard_authentication_title) {
-                R.string.clipboard_guard_authentication_title
-            } else R.string.unlock_secure_clipboard))
+            .setTitle(getString(title))
             .setSubtitle(getString(R.string.app_name))
             .setConfirmationRequired(true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

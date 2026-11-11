@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="private_draft_open">开启私密临时输入</string>
+    <string name="private_draft_edit">使用私密临时输入</string>
+    <string name="private_draft_disable">关闭默认私密临时输入</string>
+    <string name="private_draft_hint">私密临时输入</string>
+    <string name="private_draft_preview">本次明文</string>
+    <string name="private_draft_mask">恢复遮罩</string>
+    <string name="private_draft_submit_only">仅提交</string>
+    <string name="private_draft_save_close">保存并关闭</string>
+    <string name="private_draft_save_submit">保存并提交</string>
+    <string name="private_draft_saving">正在保存私密草稿</string>
+</resources>

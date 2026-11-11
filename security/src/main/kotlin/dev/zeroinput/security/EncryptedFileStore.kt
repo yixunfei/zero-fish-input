@@ -1,7 +1,7 @@
 package dev.zeroinput.security
 
 import android.content.Context
-import android.util.AtomicFile
+import androidx.core.util.AtomicFile
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -17,6 +17,10 @@ class EncryptedFileStore(
     private val cipher = AesGcmKeyStore(keyAlias)
     private val associatedData = "zeroinput:$fileName:v1".toByteArray(StandardCharsets.UTF_8)
     private val lock = Any()
+
+    fun hasCommittedData(): Boolean = synchronized(lock) {
+        file.exists() || File(file.path + ".bak").exists()
+    }
 
     override fun read(): ByteArray? = synchronized(lock) {
         try {
@@ -34,14 +38,17 @@ class EncryptedFileStore(
         }
     }
 
-    override fun write(plaintext: ByteArray) = synchronized(lock) {
+    override fun write(plaintext: ByteArray) = writeIfActive(plaintext) {}
+
+    fun writeIfActive(plaintext: ByteArray, allowKeyCreation: Boolean = true, beforeCommit: () -> Unit) = synchronized(lock) {
         var encrypted: ByteArray? = null
         var output: java.io.FileOutputStream? = null
         try {
             file.parentFile?.mkdirs()
-            encrypted = cipher.encrypt(plaintext, associatedData)
+            encrypted = cipher.encrypt(plaintext, associatedData, allowKeyCreation)
             output = atomicFile.startWrite()
             output.write(encrypted)
+            beforeCommit()
             atomicFile.finishWrite(output)
             output = null
             // AtomicFile logs rename failures without throwing; callers must not publish an unsaved update.

@@ -89,6 +89,10 @@ SnakeYAML 2.4 is Apache-2.0 (LICENSES/Apache-2.0.txt); jsoup 1.18.3 is MIT
 
 XZ for Java 1.10: Copyright The XZ for Java authors and contributors; 0BSD.
 See LICENSES/xz-java-0BSD.txt.
+The offline Han shape index uses CJK Decomposition Data by Gavin Grover under
+Apache-2.0 and Unihan 17.0.0 data by Unicode, Inc. under Unicode License V3.
+The derived index filters entries and combines components with Mandarin readings
+and frequency. See THIRD_PARTY.md, LICENSES/Apache-2.0.txt and LICENSES/Unicode-V3.txt.
 ONNX Runtime 1.26.0 is rebuilt with a reduced CPU operator configuration.
 Build recipe, source revision and dependency hashes: tools/onnxruntime/.
 
