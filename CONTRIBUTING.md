@@ -35,7 +35,9 @@ device tests. With a JDK 21 host, also pass `-Jdk17Path <JDK17_HOME>` or set
 changes the selected keyboard, restoring it on exit. Use a development device
 with synthetic data. The script verifies the app and test APK checksums before
 and after execution. Each successful run prints its own report path under
-`build/device-apk-verification/`, with both hashes, the device and the test count.
+`build/device-apk-verification/`, with both hashes, the device and separate
+pass and skip counts. At least one test must pass. Pass `-Verbose` for raw
+instrumentation output.
 
 For all ABIs and distribution checks, run
 `./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000` and

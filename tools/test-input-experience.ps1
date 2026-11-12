@@ -86,12 +86,15 @@ try {
             Invoke-Adb @("shell", "ime", "set", $alternate.Trim())
             $changedMethod = $true
         }
-        $instrumentArguments = @("shell", "am", "instrument", "-w")
+        $instrumentArguments = @("shell", "am", "instrument", "-w", "-r")
         if ($TestClass) { $instrumentArguments += @("-e", "class", $TestClass) }
         $instrumentArguments += "$testPackage/androidx.test.runner.AndroidJUnitRunner"
         $result = Invoke-Adb $instrumentArguments
-        $result | Write-Output
-        $passedTests = Get-PassedInstrumentationTestCount ($result -join "`n")
+        $instrumentationOutput = $result -join "`n"
+        try { $counts = Read-InstrumentationResult $instrumentationOutput }
+        catch { $result | Write-Output; throw }
+        Write-Verbose $instrumentationOutput
+        Write-Output "Verified $($counts.Passed) passed and $($counts.Skipped) skipped device tests."
         Assert-InstalledApk -PackageName $appPackage -ExpectedHash $expectedHash
         Assert-InstalledApk -PackageName $testPackage -ExpectedHash $expectedTestHash
     } finally {
@@ -109,7 +112,8 @@ try {
         testApkSha256 = $expectedTestHash
         serial = $Serial
         tests = $TestClass
-        passedTests = $passedTests
+        passedTests = $counts.Passed
+        skippedTests = $counts.Skipped
         passed = $true
         verifiedAtUtc = $verifiedAt.ToString('o')
     } | ConvertTo-Json | Set-Content -LiteralPath "$reportPath.tmp" -Encoding utf8
