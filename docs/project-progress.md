@@ -51,7 +51,25 @@ New permissions, persistence formats and product capabilities require a separate
 - Engineering tool audit: 13 resource/APK integrity tests and 18 public-dictionary
   preparation/update tests passed (`python -m unittest discover -s tools/resources
   -p 'test_*.py' -v` and the same command with `-s tools/dictionaries`).
-- Next: finish input boundary review and consolidate the audit's remaining gaps.
+- Fixed flag deletion crossing an existing grapheme boundary: a trailing unpaired
+  regional indicator no longer consumes half of the previous flag. The device
+  regression reproduced a 4-unit deletion where only 2 units were expected.
+  All 16 emoji/local-draft device cases passed after the fix, including odd/even
+  runs, adjacent text, masked drafts and repeated deletion.
+  All 11 Android editor and editor-failure cases also passed, including actual
+  text/cursor preservation after deleting the unpaired indicator.
+  Aggregate `testDebugUnitTest`, `:engine-dictionary:test`, `privacyCheck`,
+  `:app:lintDebug`, Debug and AndroidTest builds passed with x86_64,
+  `-PrequireRime=true` and `--no-parallel`.
+  The pure JVM `:engine-api:test`, `:engine-english:test` and `:ai-api:test`
+  tasks also passed (up-to-date).
+- Approved next item (2026-11-12): local drafts currently append/delete only at the end;
+  their paired-symbol adapter does not position a caret between the symbols.
+  the user approved explicit caret placement/display and middle editing in
+  private/AI/search drafts, including paired-symbol insertion, preserving masking,
+  isolation and lifecycle clearing.
+- Next: complete aggregate checks, commit flag deletion, then implement the
+  approved draft-editing extension as a separate validated item.
   `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
   should follow lifecycle ownership and include session regressions.
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,

@@ -36,6 +36,13 @@ class AndroidEditorConnectionTest {
                     AndroidEditorConnection(cursor, cursor) { connection }.deleteBeforeCursor()
                     assertEquals("az", editor.text.toString())
                 }
+                val editor = editor("a🇨🇳🇨z")
+                val cursor = "a🇨🇳🇨".length
+                editor.setSelection(cursor)
+                val connection = checkNotNull(editor.onCreateInputConnection(EditorInfo()))
+                AndroidEditorConnection(cursor, cursor) { connection }.deleteBeforeCursor()
+                assertEquals("a🇨🇳z", editor.text.toString())
+                assertEquals("a🇨🇳".length, editor.selectionStart)
             }
         } finally { preparation.close() }
     }

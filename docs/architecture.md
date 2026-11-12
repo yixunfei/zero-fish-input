@@ -164,6 +164,8 @@ public-image cache supplies older Android versions independently of system fonts
 Variant selection emits the exact sequence. Cursor deletion combines bounded system
 grapheme segmentation with the bundled RGI suffix trie; it reads at most 64 UTF-16
 units only for the user's explicit Backspace action and retains no context history.
+Regional-indicator runs retain the system grapheme boundary: a flag suffix must
+not regroup an unpaired final indicator with half of the preceding flag.
 
 1. `ZeroInputService` 是唯一输入法服务并持有当前输入会话。每个会话都有单调递增的令牌，
    安全剪贴板在认证后返回编辑器，由用户再次确认时绑定当前令牌、实际 `InputConnection` 和
