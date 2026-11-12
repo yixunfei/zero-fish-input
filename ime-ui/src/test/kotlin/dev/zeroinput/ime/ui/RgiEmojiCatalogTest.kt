@@ -129,11 +129,21 @@ class RgiEmojiCatalogTest {
         assertEquals(listOf(custom), captured.resolve())
     }
 
-    private fun officialRows(): Map<String, String> = buildMap {
+    @Test fun suffixLookupDeletesOfficialMinimallyQualifiedAndUnqualifiedSequences() {
+        val variants = officialRows(setOf("minimally-qualified", "unqualified"))
+        assertTrue(variants.isNotEmpty())
+        variants.keys.forEach { value ->
+            assertEquals(value.length, EmojiCatalog.longestEmojiSuffixLength("public-prefix" + value))
+        }
+        assertEquals(0, EmojiCatalog.longestEmojiSuffixLength("123"))
+        assertEquals(0, EmojiCatalog.longestEmojiSuffixLength("#"))
+    }
+
+    private fun officialRows(statuses: Set<String> = setOf("fully-qualified", "component")): Map<String, String> = buildMap {
         File("src/test/resources/emoji/18.0/emoji-test.txt").forEachLine { line ->
             if (line.isNotBlank() && !line.startsWith('#')) {
                 val parts = line.substringBefore('#').split(';').map(String::trim)
-                if (parts.size == 2 && parts[1] in setOf("fully-qualified", "component")) {
+                if (parts.size == 2 && parts[1] in statuses) {
                     val value = buildString { parts[0].split(' ').forEach { appendCodePoint(it.toInt(16)) } }
                     put(value, parts[1])
                 }

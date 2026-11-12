@@ -1,6 +1,30 @@
 # Project status
 
-Updated 2026-11-11.
+Updated 2026-11-12.
+
+## Project audit and improvements
+
+The user approved reviewing existing input, dictionaries, private drafts and settings,
+fixing reproducible defects first, then improving missing states and engineering
+checks. Each completed item gets its own commit and local backup branch.
+New permissions, persistence formats and product capabilities require a separate decision.
+
+- Fixed whole-emoji deletion for minimally-qualified and unqualified sequences,
+  including individually omitted presentation selectors in ZWJ sequences. The
+  pinned official corpus reproduced the failure before the fix and passes after it;
+  ordinary digits and hash characters remain ordinary text.
+- Full `testDebugUnitTest`, `:engine-dictionary:test`, `privacyCheck`,
+  `:app:lintDebug` and `:app:assembleDebug` passed with
+  `-Pandroid.injected.build.abi=x86_64 -PrequireRime=true --no-parallel`.
+  The isolated x86_64 emulator passed
+  `RgiEmojiTest#deletionKeepsOptionalPresentationSequencesWhole` using
+  `tools/test-input-experience.ps1`; the installed APK hash was verified.
+- Review findings still to address: device validation accepts zero-test summaries;
+  continue reviewing private draft lifecycle and dictionary failure states.
+  `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
+  should follow lifecycle ownership and include session regressions.
+- Existing acceptance gaps remain: physical ARM input, the 80 MB package target,
+  and live-provider tests with explicit temporary credentials (see below).
 
 ## Current release
 
