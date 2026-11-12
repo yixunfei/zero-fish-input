@@ -96,6 +96,40 @@ New permissions, persistence formats and product capabilities require a separate
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,
   and live-provider tests with explicit temporary credentials (see below).
 
+## Project audit follow-up (2026-11-12)
+
+| Area | Correction | Commit |
+| --- | --- | --- |
+| Editor input | Backspace delegates one key to the current editor when cursor text is unavailable. Rebinding revokes fallback edits. | `4afd815` |
+| First use | Open settings reflects changes from the Android keyboard picker. The installation guide follows the two system steps. | `cbfea9e` |
+| Public dictionaries | Canceling a task reloads the installed list locally. Resource version checks restore the list after the prompt. | `92381f9` |
+| Device evidence | Both APKs are verified before and after the run. Each successful invocation has its own report. | `2e65558` |
+| Test results | Device reports count AndroidJUnitRunner passes and skips separately. An entirely skipped run cannot produce a pass report. | `e077e38` |
+
+The five changes have individual local backup branches `08` through `12`
+on the audit branch. Verification used the working tree with the existing
+settings and draft refinements.
+
+The x86_64 Debug and AndroidTest APKs built with `-PrequireRime=true`.
+The JVM suites had 1,043 passes and two opt-in live-provider skips, including
+reused Gradle results. `privacyCheck`, Lint and the Debug/Release merged manifest
+checks passed. The API 37 x86_64 emulator passed 48 device checks and skipped
+three opt-in live dictionary imports. Both installed APK hashes were verified.
+The actual system picker was exercised at 320 dp, 1.5 font scale and dark mode.
+A live public resource version check returned to the installed list after its
+prompt was dismissed. The device runner also recorded a two-pass/one-skip run
+and rejected an all-skipped run. PowerShell result fixtures passed with two
+valid and 18 invalid cases. The Python resource and dictionary tooling passed
+13 and 18 tests respectively.
+
+The ARM64 full Debug APK passed content, ABI and signature checks and measured
+92,404,458 bytes, exceeding the 80 MB target by 12,404,458 bytes. The largest
+asset groups are the reviewed prebuilt Rime data, dictionary tables, emoji and
+Mini model. See the [size optimization record](apk-size-optimization.md).
+Physical ARM, earlier Android releases and unsigned Release packaging were not
+exercised in this pass. Evidence is under `.tmp-evidence/goal-*` and
+`build/device-apk-verification/`.
+
 ## Current release
 
 [v0.7.3](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.3) is the current Debug-signed testing prerelease. It includes private temporary input, offline Han shape lookup, keyboard toolbar improvements and public dictionary import fixes. See [release notes](releases/v0.7.3.md) and [release validation](releases/v0.7.3-validation.md).
