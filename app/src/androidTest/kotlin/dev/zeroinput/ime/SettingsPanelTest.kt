@@ -238,19 +238,49 @@ class SettingsPanelTest {
         savePublicFixtures(panel, locale, night, scale)
         all.filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach {
             val available = it.width - it.compoundPaddingLeft - it.compoundPaddingRight
-            val layout = checkNotNull(it.layout)
             // This panel uses only built-in resource labels and synthetic state.
             val diagnostic = "Setting labels must fit a 320dp screen: locale=${locale.toLanguageTag()}, " +
                 "night=$night, scale=$scale, view=${it.javaClass.simpleName}, label=${it.text}, " +
                 "width=${it.width}, available=$available"
-            assertTrue(diagnostic, layout.lineCount > 0)
-            for (line in 0 until layout.lineCount) {
-                assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
-                assertTrue(diagnostic, layout.getLineWidth(line) <= available + 1)
-            }
-            assertEquals(diagnostic, it.text.length, layout.getLineEnd(layout.lineCount - 1))
-            assertTrue(diagnostic, layout.height <= it.height - it.compoundPaddingTop - it.compoundPaddingBottom)
+            assertLabelFits(it, diagnostic)
         }
+    }
+
+    private fun assertLabelFits(view: TextView, diagnostic: String) {
+        val available = view.width - view.compoundPaddingLeft - view.compoundPaddingRight
+        val layout = checkNotNull(view.layout)
+        assertTrue(diagnostic, layout.lineCount > 0)
+        for (line in 0 until layout.lineCount) {
+            assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
+            // getLineWidth includes the invisible trailing space at a soft wrap.
+            // getLineMax measures visible extent while retaining leading margins.
+            assertTrue(diagnostic, layout.getLineMax(line) <= available + 1)
+        }
+        assertEquals(diagnostic, view.text.length, layout.getLineEnd(layout.lineCount - 1))
+        assertTrue(diagnostic, layout.height <= view.height - view.compoundPaddingTop - view.compoundPaddingBottom)
+    }
+
+    @Test fun labelMeasurementStillRejectsVisibleOverflowEllipsisAndClippedHeight() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var result: Result<Unit>? = null
+        instrumentation.runOnMainSync {
+            result = runCatching {
+                val context = ContextThemeWrapper(instrumentation.targetContext, R.style.Theme_ZeroInput)
+                fun label(width: Int, height: Int, ellipsis: Boolean = false): TextView = TextView(context).apply {
+                    text = "Public fixture label with deliberately overflowing text"
+                    textSize = 24f
+                    setSingleLine(true)
+                    if (ellipsis) ellipsize = android.text.TextUtils.TruncateAt.END
+                    measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                    layout(0, 0, measuredWidth, measuredHeight)
+                }
+                for (view in listOf(label(50, 100), label(50, 100, true), label(2000, 1))) {
+                    org.junit.Assert.assertThrows(AssertionError::class.java) { assertLabelFits(view, "Public negative fixture") }
+                }
+            }
+        }
+        checkNotNull(result).getOrThrow()
     }
 
     private fun savePublicFixtures(panel: SettingsScreenView, locale: Locale, night: Boolean, scale: Float) {

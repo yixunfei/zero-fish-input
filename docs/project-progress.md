@@ -36,7 +36,22 @@ New permissions, persistence formats and product capabilities require a separate
   replacement preservation, publication notifications, disabled-state retention,
   offline restore, encrypted-edit tampering and missing keys. No storage-format
   or download-authority change was needed for these paths.
-- Next: continue reviewing settings lifecycle and user-visible failure recovery.
+- Settings review: 5 AI settings failure/lifecycle cases, 5 background storage
+  cases and 3 appearance binding cases passed on the isolated emulator.
+  The small-screen settings matrix initially reported overflow because its test
+  included invisible trailing spaces (217.29 pixels versus 210.88 visible pixels
+  in 212 available pixels). The assertion now uses Android Layout's visible
+  extent; checks for ellipsis, missing text and clipped height remain intact.
+  All 8 settings panel tests passed, including new negative fixtures for actual
+  horizontal overflow, ellipsis and insufficient height. The matrix covers
+  English/Chinese, light/dark and 1.0/1.5 font scale at 320 dp. Production layout
+  did not need changing.
+  `:app:lintDebug` and Debug/AndroidTest builds also passed with x86_64 and
+  `-PrequireRime=true`.
+- Engineering tool audit: 13 resource/APK integrity tests and 18 public-dictionary
+  preparation/update tests passed (`python -m unittest discover -s tools/resources
+  -p 'test_*.py' -v` and the same command with `-s tools/dictionaries`).
+- Next: finish input boundary review and consolidate the audit's remaining gaps.
   `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
   should follow lifecycle ownership and include session regressions.
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,
