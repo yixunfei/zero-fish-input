@@ -63,11 +63,21 @@ New permissions, persistence formats and product capabilities require a separate
   `-PrequireRime=true` and `--no-parallel`.
   The pure JVM `:engine-api:test`, `:engine-english:test` and `:ai-api:test`
   tasks also passed (up-to-date).
-- Approved next item (2026-11-12): local drafts currently append/delete only at the end;
-  their paired-symbol adapter does not position a caret between the symbols.
-  the user approved explicit caret placement/display and middle editing in
-  private/AI/search drafts, including paired-symbol insertion, preserving masking,
-  isolation and lifecycle clearing.
+- Completed the draft-editing extension approved on 2026-11-12:
+  private input, keyboard AI and expression search support tap positioning, a
+  visible caret, middle insertion/deletion and typing inside paired symbols.
+  Composition finishes before moving; masked prefixes require explicit reveal.
+  Changed renders, closed sessions, long presses and drags reject old gestures.
+  No permissions or storage formats changed. See
+  [ADR 0037](adr/0037-isolated-draft-caret.md).
+  All 40 device tests passed on the isolated API 37 x86_64 emulator, including
+  state, actual touch routing, masking, capacity, composition, long-query scrolling,
+  stale gestures, AI interactions and panel layouts. The installed APK hash was
+  verified before and after the run. Public-fixture renders were visually checked
+  at 320 dp light and 640 dp dark with 1.3 font scale.
+  Full Android module unit tests plus `:engine-api:test`, `:engine-english:test`,
+  `:ai-api:test` and `:engine-dictionary:test`, privacyCheck, Debug/AndroidTest builds
+  and `:app:lintDebug` passed with x86_64, `-PrequireRime=true` and `--no-parallel`.
 - Fixed AI command truncation in the 640 dp landscape split at font scale 1.3.
   The detail-panel width now grows with the font scale (bounded at 1.5), retaining
   full touch targets and visible command text. The existing panel matrix reproduced
@@ -75,9 +85,13 @@ New permissions, persistence formats and product capabilities require a separate
   light/dark, portrait/landscape and 1.0/1.3 font scales.
   Aggregate unit tests, privacyCheck, Debug/AndroidTest builds and Lint also
   passed with x86_64 and `-PrequireRime=true`; Lint reported no issues.
-- Next: finish aggregate checks and the approved draft-editing extension, with
-  the layout defect and draft feature committed and backed up separately.
-  `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
+- The approved audit scope is complete: existing input, dictionary failure,
+  private draft and settings flows were reviewed; reproducible defects and the
+  approved editing gap were addressed. Seven independent commits have local
+  backup branches `codex/backup-20261112-01-emoji-deletion` through the named
+  `06-ai-landscape` and `07-draft-caret` checkpoints. No remote push or release
+  publication was performed.
+  `ZeroInputService.kt` has 2169 lines, within the complex-file limit; any split
   should follow lifecycle ownership and include session regressions.
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,
   and live-provider tests with explicit temporary credentials (see below).

@@ -262,6 +262,12 @@ owns an independent bounded conversion session, shared as an implementation with
 AI drafts but instantiated separately. Its only commit target is a memory buffer;
 committed-text backspace uses the shared bounded grapheme boundary and clears
 removed buffer units before shortening the draft.
+The same controller owns a committed-text caret for private, AI and search
+drafts. `DraftTextView` emits revision-bound tap intents without an editor
+connection. Composing text is projected at the caret in AI/search; a tap finishes
+conversion before positioning. Pair insertion and middle deletion retain the
+suffix. Masked private prefixes remain unpositionable until explicit reveal.
+See [ADR 0037](adr/0037-isolated-draft-caret.md).
 It uses full pinyin/English and an empty personalization port. Search is limited
 to 64 UTF-16 units. Keys, candidates, paging, language switching and composition
 clear all route to that draft while editing. Panel/session/view/settings/subtype

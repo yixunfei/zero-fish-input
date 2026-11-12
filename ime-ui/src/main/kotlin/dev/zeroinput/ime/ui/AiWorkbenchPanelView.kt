@@ -27,6 +27,11 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     var onSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
     var onCancel: () -> Unit = {}
     var onDeviceAgentDraftChanged: (KeyboardAction) -> Unit = {}
+    var onDraftCaretRequested: (KeyboardAction.MoveDraftCaret) -> Unit = {}
+    private var draftCaret: DraftCaretUi? = null
+    private var draftComposing = false
+    private var draftRenderRevision = 0L
+    fun renderDraftCaret(value: DraftCaretUi) { draftCaret = value }
     var onDeviceAgentTaskSubmitted: (String) -> Unit = {}
     var onInsert: (String, Boolean, List<Int>?) -> Unit = { _, _, _ -> }
     var onThinkingVisibilityChanged: (Boolean) -> Unit = {}
@@ -87,7 +92,11 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         setEditing(true)
     }
 
-    private val draft = textView().apply {
+    private val draft = DraftTextView(context).apply {
+        textSize = 15f
+        setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
+        setPadding(dp(8), dp(4), dp(8), dp(4))
+        onCaretRequested = { if (!streaming && !renaming) onDraftCaretRequested(it) }
         id = R.id.ai_draft_text
         maxLines = Int.MAX_VALUE
         minHeight = dp(72)
@@ -278,16 +287,22 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     fun renderDraft(value: String, language: InputLanguage = inputLanguage, preedit: String = "") {
         draft.error = null
         committedDraftLength = value.length
+        draftComposing = preedit.isNotEmpty()
+        val insertion = draftCaret?.offset?.coerceIn(0, value.length) ?: value.length
         // Unconverted code stays visually distinct: without the underline a
         // half-typed pinyin reading looks like committed draft text.
         if (preedit.isEmpty()) {
             draft.text = value
         } else {
-            val composing = SpannableStringBuilder(value).append(preedit)
-            composing.setSpan(UnderlineSpan(), value.length, composing.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            val composing = SpannableStringBuilder(value).insert(insertion, preedit)
+            composing.setSpan(UnderlineSpan(), insertion, insertion + preedit.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             draft.setText(composing, TextView.BufferType.SPANNABLE)
         }
-        draftViewport.post { draftViewport.scrollTo(0, draft.height) }
+        draft.renderCaret(draftCaret, preedit.length)
+        val revision = ++draftRenderRevision
+        draftViewport.post {
+            if (draftRenderRevision == revision) draft.bringPointIntoView(insertion + preedit.length)
+        }
         inputLanguage = language
         renderInputStatus()
         refreshCommands()
@@ -556,6 +571,10 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
         modelMenu.render(emptyList(), null)
         renderImportedContent(false, emptyList())
         draft.text = ""
+        draftCaret = null
+        draftRenderRevision++
+        draftComposing = false
+        draft.renderCaret(null)
         hasCandidates = false
         candidates.clear()
         transcript.text = ""
@@ -658,14 +677,14 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
             private fun populate(menu: Menu) {
                 menu.clear()
                 menu.add(Menu.NONE, SELECTION_ACTION_ID, Menu.NONE, R.string.ai_use_selection).apply {
-                    isEnabled = !streaming && !renaming
+                    isEnabled = !streaming && !renaming && !draftComposing
                     setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 }
             }
             override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean { populate(menu); return true }
             override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean { populate(menu); return true }
             override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                if (item.itemId != SELECTION_ACTION_ID || streaming || renaming) return false
+                if (item.itemId != SELECTION_ACTION_ID || streaming || renaming || draftComposing) return false
                 val start = minOf(draft.selectionStart, draft.selectionEnd)
                 val end = maxOf(draft.selectionStart, draft.selectionEnd)
                 if (start < 0 || end <= start || end > committedDraftLength) return false

@@ -495,3 +495,11 @@ after cancellation. Tool availability is an informational view of existing gates
 it grants no permission. Task examples fill drafts only, and screenshots require
 fresh consent for every task. A dispatched platform write may already have taken
 effect when stopped; check its result before starting another task.
+
+## Isolated draft editing (2026-11-12)
+
+Caret placement and middle editing affect only the active private, keyboard AI
+or expression-search buffer. They do not read or move an external editor cursor.
+Masked private prefixes require the existing explicit reveal before positioning;
+busy views and obsolete gestures cannot move the caret. Session revocation and
+buffer clearing remain unchanged. See [ADR 0037](docs/adr/0037-isolated-draft-caret.md).

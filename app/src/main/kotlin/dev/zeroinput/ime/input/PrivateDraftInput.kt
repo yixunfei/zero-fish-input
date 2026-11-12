@@ -66,6 +66,7 @@ internal class PrivateDraftInput(
         maxChars = SecureClipboardVault.MAX_VALUE_LENGTH,
         maskCommitted = true,
         onLengthLimit = { notify(R.string.private_draft_length_limit) },
+        renderCaret = { view?.renderPrivateDraftCaret(it) },
     )
 
     private fun render(text: String, preedit: String, state: dev.zeroinput.ime.core.InputSessionState) {

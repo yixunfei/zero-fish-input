@@ -683,7 +683,11 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderSearchDraft(text: String, state: InputSessionState) {
         if (!isSearchEditing) return
         searchSnapshot = state.snapshot
-        emoji.renderQuery(text)
+        val composition = state.snapshot.composition
+        val committed = text.dropLast(composition.length)
+        val offset = searchCaret?.offset?.coerceIn(0, committed.length) ?: committed.length
+        emoji.renderQuery(committed.substring(0, offset) + composition + committed.substring(offset))
+        searchCaret?.let { emoji.renderCaret(it, composition.length) }
         candidateStrip.render(state.snapshot)
         keyboard.setComposing(state.snapshot.isComposing)
         renderDraftLanguage(state.language)
@@ -715,6 +719,11 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun openPrivateDraft() = showMode(PanelMode.PRIVATE_DRAFT, userInitiated = false)
+
+    private var searchCaret: DraftCaretUi? = null
+    fun renderSearchDraftCaret(value: DraftCaretUi) { searchCaret = value }
+    fun renderPrivateDraftCaret(value: DraftCaretUi) { privateDraft.renderCaret(value) }
+    fun renderAiDraftCaret(value: DraftCaretUi) { ai.renderDraftCaret(value) }
 
     fun renderPrivateDraft(text: String, hasInput: Boolean, state: InputSessionState, busy: Boolean, showFull: Boolean) {
         if (!isPrivateDraftOpen) return
@@ -915,6 +924,7 @@ class ZeroInputView @JvmOverloads constructor(
         emoji.onFavoriteRequested = { entry, selected -> onExpressionFavoriteRequested(entry, selected) }
         emoji.onManageRequested = { onExpressionManagementRequested(it) }
         emoji.onSearchModeChanged = { searchActive ->
+            searchCaret = null
             searchSnapshot = EngineSnapshot.Empty
             searchCandidatesExpanded = false
             onSearchVisibilityChanged(searchActive && mode == PanelMode.EMOJI)
@@ -922,6 +932,7 @@ class ZeroInputView @JvmOverloads constructor(
             refreshHeader()
         }
         emoji.onQueryClearRequested = { onSearchClearRequested() }
+        emoji.onCaretRequested = { if (isSearchEditing) dispatchKeyboardAction(it) }
         emoji.onUserInteraction = { onUserInteraction() }
         handwriting.onStrokesChanged = { onHandwritingStrokesChanged(it) }
         handwriting.onCandidateSelected = { onHandwritingCandidateSelected(it) }
@@ -933,6 +944,7 @@ class ZeroInputView @JvmOverloads constructor(
         shapeLookup.onChoice = { index, value -> if (isShapeLookupOpen) onShapeChoice(index, value) }
         shapeLookup.onReset = { if (isShapeLookupOpen) onShapeReset() }
         privateDraft.onPreview = { if (isPrivateDraftOpen) onPrivateDraftPreview() }
+        privateDraft.onCaretRequested = { if (isPrivateDraftOpen) dispatchKeyboardAction(it) }
         privateDraft.onFinish = { if (isPrivateDraftOpen) onPrivateDraftFinished(it) }
         secureClipboard.onCopySelectionRequested = { onCopySelectionRequested() }
         secureClipboard.onPasteConfirmed = { onPasteConfirmed() }
@@ -948,6 +960,7 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onSubmit = { action, input, target -> onAiSubmit(action, input, target) }
         ai.onCancel = { onAiCancel() }
         ai.onDeviceAgentDraftChanged = { onAiDeviceAgentDraftChanged(it) }
+        ai.onDraftCaretRequested = { if (isAiOpen) dispatchKeyboardAction(it) }
         ai.onDeviceAgentTaskSubmitted = { onAiDeviceAgentTaskSubmitted(it) }
         ai.onInsert = { value, includeThinking, sections -> onAiInsert(value, includeThinking, sections) }
         ai.onUseDraftSelection = { source, start, end ->

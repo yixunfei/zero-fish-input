@@ -156,12 +156,14 @@ class ZeroInputService : InputMethodService() {
         graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
         render = { text, preedit, state -> inputView?.renderAiDraft(text, state, preedit, sessionChineseOptions) },
         maxChars = dev.zeroinput.ai.api.AiLimits.MAX_INPUT_CHARS,
+        renderCaret = { inputView?.renderAiDraftCaret(it) },
     )
     /** Device tasks use a fresh draft and never inherit editor composition or AI context. */
     private val deviceAgentDraft = dev.zeroinput.ime.input.LocalDraftInput(
         graph = { graph }, post = { mainHandler.post(it) }, removePosted = mainHandler::removeCallbacks,
         render = { text, preedit, state -> inputView?.renderAiDeviceAgentDraft(text, state, preedit, sessionChineseOptions) },
         maxChars = dev.zeroinput.ai.api.DeviceAgentLimits.MAX_TASK_CHARS,
+        renderCaret = { inputView?.renderAiDraftCaret(it) },
     )
     private var deviceAgentRequestHandle: dev.zeroinput.ai.api.AiRequestHandle? = null
     private val searchDraft = dev.zeroinput.ime.input.LocalDraftInput(
@@ -170,6 +172,7 @@ class ZeroInputService : InputMethodService() {
         // unfinished pre-edit, so the query keeps the engine's formatted string.
         render = { text, _, state -> inputView?.renderSearchDraft(text + state.snapshot.composition, state) },
         maxChars = 64, multiline = false,
+        renderCaret = { inputView?.renderSearchDraftCaret(it) },
     )
     private var aiObserver: AutoCloseable? = null
     private val aiAttachments = mutableListOf<dev.zeroinput.ai.api.AiAttachment>()
@@ -1383,6 +1386,7 @@ class ZeroInputService : InputMethodService() {
             inputView?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }
         when (action) {
+            is KeyboardAction.MoveDraftCaret -> Unit
             is KeyboardAction.Text -> controller?.handle(InputCommand.Text(action.value))
             is KeyboardAction.LiteralText -> controller?.handle(InputCommand.LiteralText(action.value))
             is KeyboardAction.PairedText -> controller?.handle(InputCommand.PairedText(action.opening, action.closing))

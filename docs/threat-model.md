@@ -1412,6 +1412,15 @@ prevent opening the draft.
 The secure IME shows the current composition and candidates while editing.
 The default draft display exposes the last three committed characters and masks
 earlier text. Explicit reveal lasts for the current draft and resets on close.
+Caret editing uses only the isolated buffer. Masked prefix taps are rejected;
+revealing text explicitly enables positioning there. Masking again hides a caret
+inside the prefix. Views carry display offsets and revisions, and retire gestures
+on every render, including equal revisions from different draft owners. Closed
+or restarted drafts reject old requests. Busy private views cannot emit caret
+requests. Backspace clears vacated buffer units after preserving the suffix.
+Device regressions cover mask/reveal, busy and stale touches, replacement drafts,
+grapheme boundaries and capacity failure. See
+[ADR 0037](adr/0037-isolated-draft-caret.md).
 Private candidates skip automatic accessibility announcements.
 Locking, switching editors, leaving the panel or changing settings retires the
 buffer and cancels pending writes. The draft never reads the external editor,

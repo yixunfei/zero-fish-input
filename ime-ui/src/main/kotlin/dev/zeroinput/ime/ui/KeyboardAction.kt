@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.ui
 
 sealed interface KeyboardAction {
+    data class MoveDraftCaret(val offset: Int, val revision: Long) : KeyboardAction
     data class Text(val value: String) : KeyboardAction
 
     data class LiteralText(val value: String) : KeyboardAction
