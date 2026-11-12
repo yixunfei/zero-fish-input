@@ -18,6 +18,31 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalDraftInputTest {
+    @Test fun backspaceRemovesWholeCommittedGraphemesInBothDraftModes() = onMain {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        for (masked in listOf(false, true)) {
+            var rendered = ""
+            val draft = LocalDraftInput({ graph }, { false }, {}, { text, _, _ -> rendered = text },
+                maxChars = 4096, maskCommitted = masked)
+            try {
+                draft.start(InputLanguage.ENGLISH)
+                for (suffix in listOf("e\u0301", "👍🏽", "👩‍👩‍👧‍👦", "🇨🇳", "1\uFE0F\u20E3", "\r\n", "𠀀", "a")) {
+                    assertTrue(draft.replaceCommittedText("前文" + suffix))
+                    draft.handle(KeyboardAction.Backspace)
+                    assertEquals("前文", draft.committedText())
+                    assertEquals("前文", rendered)
+                }
+                assertTrue(draft.replaceCommittedText("x".repeat(2048) + "👍🏽"))
+                draft.handle(KeyboardAction.Backspace)
+                assertEquals("x".repeat(2048), draft.committedText())
+                draft.clear()
+                draft.handle(KeyboardAction.Backspace)
+                assertEquals("", draft.committedText())
+            } finally { draft.close() }
+            assertEquals("", draft.committedText())
+        }
+    }
+
     @Test fun layoutSpecificHandoffKeepsConvertiblePreeditWithoutPersonalization() = onMain {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         for ((options, code) in listOf(

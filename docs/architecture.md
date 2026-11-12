@@ -258,7 +258,9 @@ engine/schema effective-mask contract remain unchanged.
 Expression search labels are explicit internal edit targets. `app/input/LocalDraftInput`
 owns an independent bounded conversion session, shared as an implementation with
 AI drafts but instantiated separately. Its only commit target is a memory buffer;
-it uses full pinyin/English and an empty personalization port. Search is limited
+committed-text backspace uses the shared bounded grapheme boundary and clears
+removed buffer units before shortening the draft.
+It uses full pinyin/English and an empty personalization port. Search is limited
 to 64 UTF-16 units. Keys, candidates, paging, language switching and composition
 clear all route to that draft while editing. Panel/session/view/settings/subtype
 and privacy changes close the search session and invalidate warm-up delivery.

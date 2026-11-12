@@ -276,7 +276,8 @@ internal class LocalDraftInput(
         override fun commitPairedText(text: String, cursorOffset: Int): Boolean = commitText(text)
         override fun deleteBeforeCursor() {
             if (text.isNotEmpty()) {
-                val end = text.offsetByCodePoints(text.length, -1)
+                val start = (text.length - UnicodeDeletionBoundary.LOOKBEHIND_LIMIT).coerceAtLeast(0)
+                val end = text.length - UnicodeDeletionBoundary.precedingLength(text.subSequence(start, text.length))
                 for (index in end until text.length) text.setCharAt(index, '\u0000')
                 text.setLength(end)
             }

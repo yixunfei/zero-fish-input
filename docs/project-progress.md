@@ -23,7 +23,20 @@ New permissions, persistence formats and product capabilities require a separate
   requires exactly one positive test-count summary and rejects runner failures,
   aborts and crashes. `./tools/test-instrumentation-result.ps1` passed 2 valid
   and 10 invalid fixtures; the real emulator run also passed through this gate.
-- Next: continue reviewing private draft lifecycle and dictionary failure states.
+- Fixed local-draft backspace splitting committed graphemes. Private input, AI
+  drafts and expression search now share the bounded deletion boundary; removed
+  buffer units are still cleared. A new device regression failed before the fix
+  on a combining accent. All 10 `LocalDraftInputTest` device cases passed after
+  the fix, covering masked/unmasked drafts, long input, conversion, late engine
+  callbacks and personalization isolation.
+  Debug and AndroidTest builds, `:app:testDebugUnitTest`, `privacyCheck` and
+  `:app:lintDebug` passed with x86_64 and `-PrequireRime=true`.
+- Dictionary failure review: the isolated `PublicDictionaryStoreTest` and
+  `DictionaryManagementPlatformTest` passed 3 device tests for empty/cancelled
+  replacement preservation, publication notifications, disabled-state retention,
+  offline restore, encrypted-edit tampering and missing keys. No storage-format
+  or download-authority change was needed for these paths.
+- Next: continue reviewing settings lifecycle and user-visible failure recovery.
   `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
   should follow lifecycle ownership and include session regressions.
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,
