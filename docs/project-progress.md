@@ -68,8 +68,15 @@ New permissions, persistence formats and product capabilities require a separate
   the user approved explicit caret placement/display and middle editing in
   private/AI/search drafts, including paired-symbol insertion, preserving masking,
   isolation and lifecycle clearing.
-- Next: complete aggregate checks, commit flag deletion, then implement the
-  approved draft-editing extension as a separate validated item.
+- Fixed AI command truncation in the 640 dp landscape split at font scale 1.3.
+  The detail-panel width now grows with the font scale (bounded at 1.5), retaining
+  full touch targets and visible command text. The existing panel matrix reproduced
+  the failure before the fix; all 10 AI panel tests passed afterward, including
+  light/dark, portrait/landscape and 1.0/1.3 font scales.
+  Aggregate unit tests, privacyCheck, Debug/AndroidTest builds and Lint also
+  passed with x86_64 and `-PrequireRime=true`; Lint reported no issues.
+- Next: finish aggregate checks and the approved draft-editing extension, with
+  the layout defect and draft feature committed and backed up separately.
   `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
   should follow lifecycle ownership and include session regressions.
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,

@@ -1270,7 +1270,7 @@ class ZeroInputView @JvmOverloads constructor(
         val editing = searchActive || aiEditing || shapeTyping || isPrivateDraftOpen
         val splitSearch = editing && viewportPlan.splitDetailPanel
         // AI keeps three primary commands visible; reserve their width in a short landscape window.
-        val detailWeight = if (aiEditing) 5f else 1f
+        val detailWeight = if (aiEditing) 5f * resources.configuration.fontScale.coerceIn(1f, 1.5f) else 1f
         val keyboardWeight = if (aiEditing) 7f else 2f
         val compactPanel = dp(if (viewportPlan.candidateInline) EMOJI_SEARCH_HEIGHT_DP else PANEL_HEIGHT_DP)
         val defaultHeight = when {
