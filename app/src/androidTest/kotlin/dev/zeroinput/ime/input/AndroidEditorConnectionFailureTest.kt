@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.input
 
 import android.view.KeyEvent
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.*
@@ -75,6 +76,64 @@ class AndroidEditorConnectionFailureTest {
         assertEquals(0, selected.keys)
     }
 
+    @Test fun unavailableCursorTextDelegatesOneBackspaceToTheEditor() {
+        val connection = object : Fixture("") {
+            override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence? = null
+        }
+
+        AndroidEditorConnection(1, 1) { connection }.deleteBeforeCursor()
+
+        assertEquals(listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP).map { it to KeyEvent.KEYCODE_DEL },
+            connection.keyEvents)
+        assertEquals(0, connection.deletes)
+    }
+
+    @Test fun aCursorReadThatRebindsTheEditorCannotDispatchBackspace() {
+        val replacement = Fixture("")
+        for (text in listOf(null, "x")) {
+            var current: InputConnection? = null
+            val old = object : Fixture("") {
+                override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence? {
+                    current = replacement
+                    return text
+                }
+            }
+            current = old
+
+            AndroidEditorConnection(1, 1) { current }.deleteBeforeCursor()
+
+            assertEquals(0, old.keys)
+            assertEquals(0, old.deletes)
+            assertEquals(0, replacement.keys)
+            assertEquals(0, replacement.deletes)
+        }
+    }
+
+    @Test fun aRejectedEditThatRebindsTheEditorCannotDispatchBackspace() {
+        val replacement = Fixture("")
+        for (selectionStart in listOf(0, 1)) {
+            var current: InputConnection? = null
+            val old = object : Fixture("") {
+                override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                    current = replacement
+                    return false
+                }
+
+                override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                    current = replacement
+                    return false
+                }
+            }
+            current = old
+
+            AndroidEditorConnection(selectionStart, 1) { current }.deleteBeforeCursor()
+
+            assertSame(replacement, current)
+            assertEquals(0, old.keys)
+            assertEquals(0, replacement.keys)
+        }
+    }
+
     @Test fun reconversionAlwaysAttemptsBatchCleanupAndRejectsThrowingCalls() {
         for (failure in listOf("begin", "before", "region", "end")) {
             val connection = Fixture(failure)
@@ -99,11 +158,12 @@ class AndroidEditorConnectionFailureTest {
         assertEquals(1, connection.batchEnds)
     }
 
-    private class Fixture(private val failure: String) : InputConnectionWrapper(null, false) {
+    private open class Fixture(private val failure: String) : InputConnectionWrapper(null, false) {
         var commits = 0
         var selections = 0
         var deletes = 0
-        var keys = 0
+        val keyEvents = mutableListOf<Pair<Int, Int>>()
+        val keys get() = keyEvents.size
         var batchEnds = 0
         private fun accept(operation: String): Boolean {
             if (failure == operation) throw IllegalStateException("Fixture editor failure")
@@ -119,7 +179,7 @@ class AndroidEditorConnectionFailureTest {
             selections++
             return accept("selection")
         }
-        override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence {
+        override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence? {
             accept("before")
             return "x"
         }
@@ -127,7 +187,11 @@ class AndroidEditorConnectionFailureTest {
             deletes++
             return accept("delete")
         }
-        override fun sendKeyEvent(event: KeyEvent?): Boolean { keys++; return accept("key") }
+        override fun sendKeyEvent(event: KeyEvent?): Boolean {
+            requireNotNull(event)
+            keyEvents.add(event.action to event.keyCode)
+            return accept("key")
+        }
         override fun performEditorAction(editorAction: Int) = accept("action")
         override fun beginBatchEdit() = accept("begin")
         override fun setComposingRegion(start: Int, end: Int) = accept("region")

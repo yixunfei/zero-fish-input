@@ -141,13 +141,23 @@ class AndroidEditorConnection(
         // unrelated text before it. Replace the acknowledged selection directly.
         if (hasSelection) {
             // A throwing editor may already have applied the edit. Never replay it.
-            if (platformCall { connection.commitText("", 1) } == false) sendKey(connection, KeyEvent.KEYCODE_DEL)
+            if (platformCall { connection.commitText("", 1) } == false && current() === connection) {
+                sendKey(connection, KeyEvent.KEYCODE_DEL)
+            }
             return
         }
-        val before = platformCall {
+        val before = try {
             connection.getTextBeforeCursor(UnicodeDeletionBoundary.LOOKBEHIND_LIMIT, InputConnection.GET_TEXT_WITH_STYLES)
-        } ?: return
+        } catch (_: RuntimeException) {
+            invalidateContext()
+            return
+        }
         if (current() !== connection) return
+        if (before == null) {
+            // Let the editor decide what to delete when it cannot provide a boundary.
+            sendKey(connection, KeyEvent.KEYCODE_DEL)
+            return
+        }
         val deleteLength = UnicodeDeletionBoundary.precedingLength(before)
         if (deleteLength == 1 && UnicodeDeletionBoundary.prefersEditorDelete(before)) {
             // A true result (or exception after an uncertain edit) must not be
@@ -157,7 +167,9 @@ class AndroidEditorConnection(
             platformCall { connection.deleteSurroundingText(1, 0) }
             return
         }
-        if (platformCall { connection.deleteSurroundingText(deleteLength, 0) } == false) sendKey(connection, KeyEvent.KEYCODE_DEL)
+        if (platformCall { connection.deleteSurroundingText(deleteLength, 0) } == false && current() === connection) {
+            sendKey(connection, KeyEvent.KEYCODE_DEL)
+        }
     }
 
     override fun performEditorAction(actionId: Int): Boolean {

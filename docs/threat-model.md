@@ -1448,8 +1448,10 @@ Deletion style metadata comes only from the existing 64-unit cursor-local read.
 Formatting spans and plain bracketed text cannot authorize larger deletion. A
 possible textual label only delegates one Delete gesture to its host; false
 positives therefore use host editing semantics. Explicit rejection alone permits
-a one-character fallback. A connection change after the read, or an uncertain
-key exception, must not cause a second edit. Replacement spans touching the left
+a one-character fallback. If the cursor read returns null, one Delete gesture
+is delegated to the still-bound editor. A connection change after the read or
+a rejected edit revokes the fallback. An uncertain editing exception revokes
+any further edit for that gesture. Replacement spans touching the left
 read boundary are not expanded because they may have been truncated. No cursor
 text or span is cached, learned, logged, persisted or transmitted. Host editors
 may omit spans or ignore key events, so universal custom-label deletion cannot

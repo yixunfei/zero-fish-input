@@ -1180,7 +1180,9 @@ Backspace requests at most 64 UTF-16 units with style metadata. Complete visible
 replacement spans with a known left boundary can be deleted as one unit. Bounded
 label-like suffixes without a usable span are dispatched as a Delete key to the
 host, never deleted by guessed label length. Explicit key rejection falls back
-to one character; exceptions and accepted keys are never replayed.
+to one character. When the host returns no cursor text, the adapter delegates
+one Delete key to the still-bound host. Exceptions and accepted keys are never
+replayed. A rejected edit can fall back only while its editor remains bound.
 
 Dictionary replacement selections now resolve their opaque ID against current
 active edits on the existing personalization worker and learn into the encrypted
