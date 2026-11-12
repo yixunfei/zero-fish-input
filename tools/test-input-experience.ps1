@@ -20,6 +20,19 @@ function Invoke-Adb {
     return $output
 }
 
+function Assert-InstalledApk {
+    param([string]$PackageName, [string]$ExpectedHash)
+
+    $paths = @(Invoke-Adb @('shell', 'pm', 'path', $PackageName))
+    if ($paths.Count -ne 1 -or $paths[0] -notmatch '^package:(/data/app/[^\s]+/base\.apk)$') {
+        throw "Expected one installed base APK for $PackageName."
+    }
+    $hashOutput = @(Invoke-Adb @('shell', 'sha256sum', $Matches[1]))
+    if ($hashOutput.Count -ne 1 -or $hashOutput[0] -notmatch '^([a-fA-F0-9]{64})\s' -or $Matches[1] -ne $ExpectedHash) {
+        throw "Installed $PackageName differs from the APK selected for testing."
+    }
+}
+
 $devices = @(& $adb devices | Select-String '^(\S+)\s+device$' | ForEach-Object { $_.Matches[0].Groups[1].Value })
 if ($LASTEXITCODE -ne 0) { throw "Unable to list ADB devices." }
 if (-not $Serial) {
@@ -40,24 +53,27 @@ try {
     if ($compilerJdk) { $gradleArguments += "-Porg.gradle.java.installations.paths=$($compilerJdk.Replace('\', '/'))" }
     & ./gradlew.bat @tasks @gradleArguments
     if ($LASTEXITCODE -ne 0) { throw "Device test APK build failed." }
+    $appPackage = 'dev.zeroinput.ime.debug'
+    $testPackage = "$appPackage.test"
     $testDirectory = Join-Path $repositoryRoot "app/build/intermediates/apk/androidTest/debug"
-    $testMetadata = Get-Content (Join-Path $testDirectory "output-metadata.json") -Raw | ConvertFrom-Json
-    if (@($testMetadata.elements).Count -ne 1) { throw "Unexpected test APK outputs." }
+    $testMetadata = Get-Content -LiteralPath (Join-Path $testDirectory 'output-metadata.json') -Raw | ConvertFrom-Json
+    if ($testMetadata.applicationId -ne $testPackage -or $testMetadata.variantName -ne 'debugAndroidTest' -or
+        @($testMetadata.elements).Count -ne 1) { throw "Unexpected test APK identity or outputs." }
+    $testOutput = [string]$testMetadata.elements[0].outputFile
+    if ([IO.Path]::GetFileName($testOutput) -ne $testOutput -or [IO.Path]::GetExtension($testOutput) -ne '.apk') {
+        throw 'Invalid test APK output name.'
+    }
+    $testApk = Join-Path $testDirectory $testOutput
     $selectedApk = if ($ApkPath) { (Resolve-Path -LiteralPath $ApkPath).Path }
         else { (Resolve-TestApkArtifact -RepositoryRoot $repositoryRoot -Abi $abi).Path }
     $expectedHash = (Get-FileHash -LiteralPath $selectedApk -Algorithm SHA256).Hash.ToLowerInvariant()
+    $expectedTestHash = (Get-FileHash -LiteralPath $testApk -Algorithm SHA256).Hash.ToLowerInvariant()
     Invoke-Adb @("install", "-r", "-t", $selectedApk)
-    Invoke-Adb @("install", "-r", "-t", (Join-Path $testDirectory $testMetadata.elements[0].outputFile))
-    $installedPaths = @(Invoke-Adb @('shell', 'pm', 'path', 'dev.zeroinput.ime.debug'))
-    if ($installedPaths.Count -ne 1 -or $installedPaths[0] -notmatch '^package:(/data/app/[^\s]+/base\.apk)$') {
-        throw 'Expected one installed base APK for verification.'
-    }
-    $installedPath = $Matches[1]
-    $hashOutput = (Invoke-Adb @('shell', 'sha256sum', $installedPath)) -join ''
-    if ($hashOutput -notmatch '^([a-fA-F0-9]{64})\s' -or $Matches[1].ToLowerInvariant() -ne $expectedHash) {
-        throw 'Installed app differs from the APK selected for testing.'
-    }
+    Invoke-Adb @("install", "-r", "-t", $testApk)
+    Assert-InstalledApk -PackageName $appPackage -ExpectedHash $expectedHash
+    Assert-InstalledApk -PackageName $testPackage -ExpectedHash $expectedTestHash
     Write-Output "Installed APK SHA-256 verified: $expectedHash"
+    Write-Output "Installed test APK SHA-256 verified: $expectedTestHash"
 
     $originalMethod = @(Invoke-Adb @("shell", "settings", "get", "secure", "default_input_method"))[0].Trim()
     $changedMethod = $false
@@ -72,21 +88,33 @@ try {
         }
         $instrumentArguments = @("shell", "am", "instrument", "-w")
         if ($TestClass) { $instrumentArguments += @("-e", "class", $TestClass) }
-        $instrumentArguments += "dev.zeroinput.ime.debug.test/androidx.test.runner.AndroidJUnitRunner"
+        $instrumentArguments += "$testPackage/androidx.test.runner.AndroidJUnitRunner"
         $result = Invoke-Adb $instrumentArguments
         $result | Write-Output
-        Assert-InstrumentationSuccess ($result -join "`n")
-        $finalHash = (Invoke-Adb @('shell', 'sha256sum', $installedPath)) -join ''
-        if ($finalHash -notmatch '^([a-fA-F0-9]{64})\s' -or $Matches[1].ToLowerInvariant() -ne $expectedHash) {
-            throw 'Installed APK changed during device tests.'
-        }
-        @{
-            apk = $selectedApk; sha256 = $expectedHash; serial = $Serial; tests = $TestClass
-            passed = $true; verifiedAtUtc = [DateTime]::UtcNow.ToString('o')
-        } | ConvertTo-Json | Set-Content (Join-Path $repositoryRoot 'build/device-apk-verification.json') -Encoding utf8
+        $passedTests = Get-PassedInstrumentationTestCount ($result -join "`n")
+        Assert-InstalledApk -PackageName $appPackage -ExpectedHash $expectedHash
+        Assert-InstalledApk -PackageName $testPackage -ExpectedHash $expectedTestHash
     } finally {
         if ($changedMethod) { Invoke-Adb @("shell", "ime", "set", $originalMethod) }
     }
+
+    $reportDirectory = Join-Path $repositoryRoot 'build/device-apk-verification'
+    New-Item -Path $reportDirectory -ItemType Directory -Force | Out-Null
+    $verifiedAt = [DateTime]::UtcNow
+    $reportPath = Join-Path $reportDirectory "$($verifiedAt.ToString('yyyyMMdd-HHmmss'))-$([Guid]::NewGuid().ToString('N')).json"
+    @{
+        apk = $selectedApk
+        sha256 = $expectedHash
+        testApk = $testApk
+        testApkSha256 = $expectedTestHash
+        serial = $Serial
+        tests = $TestClass
+        passedTests = $passedTests
+        passed = $true
+        verifiedAtUtc = $verifiedAt.ToString('o')
+    } | ConvertTo-Json | Set-Content -LiteralPath "$reportPath.tmp" -Encoding utf8
+    Move-Item -LiteralPath "$reportPath.tmp" -Destination $reportPath
+    Write-Output "Device test report: $reportPath"
 } finally {
     Pop-Location
 }

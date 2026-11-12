@@ -33,7 +33,9 @@ Use `./tools/test-input-experience.ps1 -Serial <device-serial>` for connected
 device tests. With a JDK 21 host, also pass `-Jdk17Path <JDK17_HOME>` or set
 `JDK17_HOME` for the compiler toolchain. It installs test APKs and temporarily
 changes the selected keyboard, restoring it on exit. Use a development device
-with synthetic data.
+with synthetic data. The script verifies the app and test APK checksums before
+and after execution. Each successful run prints its own report path under
+`build/device-apk-verification/`, with both hashes, the device and the test count.
 
 For all ABIs and distribution checks, run
 `./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000` and
