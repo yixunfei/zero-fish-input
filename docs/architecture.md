@@ -981,6 +981,9 @@ Management pages share `app/management/ManagementTaskRunner` for bounded worker
 delivery and request-generation revocation, plus content-free localized list
 feedback. Read failures remain distinct from empty results. Reload actions only
 read local lists; they never replay a save, delete, import or network request.
+Canceling a dictionary task invalidates its pending results and reloads the
+installed list locally. A completed resource check clears the busy indicator
+and shows the previous list behind its confirmation dialog.
 Private clipboard reload always returns through its existing fresh system
 authentication entry. Personal phrase rows and drafts are cleared when the page
 stops, and retired row bindings cannot finish an old click. Unchanged expression
