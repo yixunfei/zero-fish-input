@@ -19,8 +19,11 @@ New permissions, persistence formats and product capabilities require a separate
   The isolated x86_64 emulator passed
   `RgiEmojiTest#deletionKeepsOptionalPresentationSequencesWhole` using
   `tools/test-input-experience.ps1`; the installed APK hash was verified.
-- Review findings still to address: device validation accepts zero-test summaries;
-  continue reviewing private draft lifecycle and dictionary failure states.
+- Fixed device validation accepting zero-test summaries. The result gate now
+  requires exactly one positive test-count summary and rejects runner failures,
+  aborts and crashes. `./tools/test-instrumentation-result.ps1` passed 2 valid
+  and 10 invalid fixtures; the real emulator run also passed through this gate.
+- Next: continue reviewing private draft lifecycle and dictionary failure states.
   `ZeroInputService.kt` has 2165 lines, within the complex-file limit; any split
   should follow lifecycle ownership and include session regressions.
 - Existing acceptance gaps remain: physical ARM input, the 80 MB package target,

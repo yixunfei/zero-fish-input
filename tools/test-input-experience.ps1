@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 . (Join-Path $PSScriptRoot 'lib/TestApkArtifact.ps1')
 . (Join-Path $PSScriptRoot 'lib/JavaToolchain.ps1')
+. (Join-Path $PSScriptRoot 'lib/InstrumentationResult.ps1')
 $sdkSetting = Get-Content (Join-Path $repositoryRoot "local.properties") |
     Where-Object { $_ -match '^sdk\.dir=' } | Select-Object -First 1
 if (-not $sdkSetting) { throw "Configure sdk.dir in local.properties before running device tests." }
@@ -74,9 +75,7 @@ try {
         $instrumentArguments += "dev.zeroinput.ime.debug.test/androidx.test.runner.AndroidJUnitRunner"
         $result = Invoke-Adb $instrumentArguments
         $result | Write-Output
-        if (($result -join "`n") -notmatch 'OK \(\d+ tests?\)' -or ($result -join "`n") -match 'FAILURES!!!') {
-            throw "Device regression tests failed."
-        }
+        Assert-InstrumentationSuccess ($result -join "`n")
         $finalHash = (Invoke-Adb @('shell', 'sha256sum', $installedPath)) -join ''
         if ($finalHash -notmatch '^([a-fA-F0-9]{64})\s' -or $Matches[1].ToLowerInvariant() -ne $expectedHash) {
             throw 'Installed APK changed during device tests.'
