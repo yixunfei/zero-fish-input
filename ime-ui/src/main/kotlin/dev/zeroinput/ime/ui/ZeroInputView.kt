@@ -267,9 +267,9 @@ class ZeroInputView @JvmOverloads constructor(
     private val copySelectionButton = panelIconButton(context, R.drawable.ic_copy_selection,
         R.string.secure_clipboard_copy_selection) {
         onCopySelectionRequested()
-    }.apply { visibility = GONE }
+    }.apply { visibility = GONE; filterTouchesWhenObscured = true }
     private var copySelectionAvailable = false
-    private val primaryTools: List<View> = listOf(copySelectionButton, toolsButton, privateDraftButton, secureClipboardButton,
+    private val primaryTools: List<View> = listOf(shapeButton, toolsButton, privateDraftButton, secureClipboardButton,
         aiButton, numbersButton, emojiButton)
     private val toolbarRow = createToolbar()
     private val additionalTools = (primaryTools.size until toolbarRow.childCount).map(toolbarRow::getChildAt)
@@ -601,6 +601,8 @@ class ZeroInputView @JvmOverloads constructor(
         privateDraft.render("", hasInput = false, busy = false, showFull = false)
         privateSnapshot = EngineSnapshot.Empty
         onCopySelectionRequested = {}
+        onCopyConfirmationAction = {}
+        onCopyConfirmationCancelled = {}
         onPasteConfirmed = {}
         onPasteCancelled = {}
         onSettingsRequested = {}
@@ -824,7 +826,22 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderCopySelectionAvailable(available: Boolean) {
         copySelectionAvailable = available
         secureClipboard.renderCopyAvailable(available)
-        copySelectionButton.isVisible = available && !isPrivateDraftOpen && !isShapeLookupOpen
+        updateCopySelectionButton()
+    }
+
+    var onCopyConfirmationAction: () -> Unit = {}
+    var onCopyConfirmationCancelled: () -> Unit = {}
+
+    fun renderCopyConfirmation(state: ClipboardCopyUi?) {
+        secureClipboard.renderCopyConfirmation(state)
+        if (state != null && mode != PanelMode.SECURE_CLIPBOARD) {
+            showMode(PanelMode.SECURE_CLIPBOARD, userInitiated = false)
+        }
+    }
+
+    private fun updateCopySelectionButton() {
+        copySelectionButton.isVisible = copySelectionAvailable && manualTools &&
+            (mode == PanelMode.KEYBOARD || mode == PanelMode.SECURE_CLIPBOARD)
     }
 
     fun renderPasteConfirmation(visible: Boolean) {
@@ -864,10 +881,10 @@ class ZeroInputView @JvmOverloads constructor(
         layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(48))
         primaryTools.forEach { addView(it, LayoutParams(dp(48), dp(48))) }
         fun addTool(view: View) { secondaryTools += view; addView(view, LayoutParams(dp(48), dp(48))) }
+        addView(copySelectionButton, LayoutParams(dp(48), dp(48)))
         addTool(panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.handwriting_open) {
             toggleMode(PanelMode.HANDWRITING)
         })
-        addView(shapeButton)
         addView(reconvertButton, LayoutParams(dp(48), dp(48)))
         addView(undoCandidateButton, LayoutParams(dp(48), dp(48)))
         addTool(languageButton)
@@ -947,6 +964,8 @@ class ZeroInputView @JvmOverloads constructor(
         privateDraft.onCaretRequested = { if (isPrivateDraftOpen) dispatchKeyboardAction(it) }
         privateDraft.onFinish = { if (isPrivateDraftOpen) onPrivateDraftFinished(it) }
         secureClipboard.onCopySelectionRequested = { onCopySelectionRequested() }
+        secureClipboard.onCopyConfirmationAction = { onCopyConfirmationAction() }
+        secureClipboard.onCopyConfirmationCancelled = { onCopyConfirmationCancelled() }
         secureClipboard.onPasteConfirmed = { onPasteConfirmed() }
         secureClipboard.onPasteCancelled = { onPasteCancelled() }
         secureClipboard.onManageRequested = {
@@ -1234,10 +1253,10 @@ class ZeroInputView @JvmOverloads constructor(
         val start = if (returnButton.isVisible) dp(48) else 0
         if (toolbarParams.marginStart != start) { toolbarParams.marginStart = start; toolbar.layoutParams = toolbarParams }
         toolsButton.isVisible = !manualTools && !isShapeLookupOpen && !isPrivateDraftOpen
-        copySelectionButton.isVisible = copySelectionAvailable && !isShapeLookupOpen && !isPrivateDraftOpen
+        updateCopySelectionButton()
         aiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen
         emojiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen
-        shapeButton.isVisible = manualTools && mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
+        shapeButton.isVisible = !manualTools && mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
         privateDraftButton.isVisible = isPrivateDraftOpen ||
             mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
         secureClipboardButton.isVisible = !sensitive && (mode == PanelMode.KEYBOARD || manualTools)

@@ -2,6 +2,54 @@
 
 Updated 2026-11-13.
 
+## Keyboard copy, shape lookup and appearance (2026-11-13)
+
+Shape lookup replaces copy selection in the primary toolbar. Copy selection is
+the first action in More tools and is also available from the private clipboard
+panel. The keyboard reviews the selection length, invokes system authentication,
+then asks for a fresh Save tap in the returned editor. The previous private
+import Activity and token handoff have been removed from the keyboard route.
+
+The Mint and Rose candidate accents match their respective palettes in light and
+dark mode. Background settings support custom RGB colors with a swatch and hex
+value. The picker saves only on confirmation and uses the existing preference.
+
+Android's standard EditText fixture exposes Copy to ZeroInput after full
+selection when it supports PROCESS_TEXT. Android and source apps control external
+selection menu placement and can omit external actions altogether. The user's
+vendor-specific reply/SMS menu still requires physical device confirmation.
+
+Validation command:
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest `
+  privacyCheck :app:lintDebug :app:processDebugMainManifest :app:processReleaseMainManifest `
+  "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+```
+
+The Debug verification passed with 967 JVM tests and two opt-in skips, and Lint
+reported no issues. An isolated API 37 x86_64 emulator passed 26 tests with
+verified app and test APK identities. Coverage included device PIN authentication,
+save and paste confirmations, editor selection changes, cancel, native editable
+and read-only selection menus, sharing, toolbar ordering, shape lookup, light
+and dark palettes and custom color persistence. Evidence is in
+`.tmp-evidence/keyboard-copy-final-checks.log` and
+`.tmp-evidence/keyboard-copy-device-acceptance.log`.
+
+Four landscape cases passed, including preview geometry and saving/cancelling
+a custom color. The geometry test uses the preview viewport instead of assuming
+the system rotation determines the key height. Final evidence:
+`.tmp-evidence/keyboard-copy-landscape-acceptance.log`.
+
+`./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000` passed
+full unit, privacy and Lint checks plus APK signature, ABI, permissions and
+contents validation. The Debug package is 92,425,098 bytes, within the test
+budget and above the 80 MB target. Artifact:
+`app/build/outputs/test-apk/20261113-123155/zero-fish-input-0.7.3-debug-arm64-v8a.apk`.
+SHA-256: `4b1509ac4340e2463eab252c042c7dd334f55e6a4797a54b2181c6fe8743ea6e`.
+Physical ARM64 execution, OEM selection menus, biometrics and Release APK
+packaging were not verified in this pass.
+
 ## Personal-frequency review and repair (2026-11-13)
 
 The user approved the review/fix plan, supplied `xz -> 限制`, and later narrowed

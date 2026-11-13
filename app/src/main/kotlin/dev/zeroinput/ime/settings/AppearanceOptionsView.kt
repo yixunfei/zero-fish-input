@@ -146,7 +146,27 @@ internal class AppearanceOptionsView(
         val colors = listOf(null, 0xffbed5ef.toInt(), 0xff343c49.toInt(), 0xffe8d8bc.toInt(), 0xffebcfdb.toInt())
         group(R.string.appearance_color, listOf(R.string.appearance_color_auto, R.string.appearance_color_blue,
             R.string.appearance_color_gray, R.string.appearance_color_sand, R.string.appearance_color_rose),
-            colors.indexOf(initial.backgroundColor).coerceAtLeast(0)) { update(value.copy(backgroundColor = colors[it])) }
+            colors.indexOf(initial.backgroundColor)) {
+            update(value.copy(backgroundColor = colors[it]))
+            renderSection()
+        }
+        val customColor = dev.zeroinput.ime.R.string.appearance_custom_background_color
+        addView(MaterialButton(context).apply {
+            isAllCaps = false
+            minHeight = dp(48)
+            text = if (initial.backgroundColor in colors) context.getString(customColor) else
+                context.getString(dev.zeroinput.ime.R.string.appearance_custom_background_color_value,
+                    initial.backgroundColor?.and(0xFFFFFF) ?: 0)
+            setOnClickListener {
+                val themed = KeyboardThemeContext.create(context, value.theme)
+                val color = value.backgroundColor ?: com.google.android.material.color.MaterialColors.getColor(
+                    themed, com.google.android.material.R.attr.colorSurface, android.graphics.Color.WHITE)
+                showKeyboardBackgroundColorPicker(context, color) {
+                    update(value.copy(backgroundColor = it))
+                    renderSection()
+                }
+            }
+        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         button(R.string.appearance_choose_image, chooseImage)
         button(R.string.appearance_remove_image, removeImage)
         description(R.string.appearance_image_hint)

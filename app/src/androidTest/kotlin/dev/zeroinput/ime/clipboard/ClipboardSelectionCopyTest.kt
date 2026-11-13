@@ -1,14 +1,13 @@
 package dev.zeroinput.ime.clipboard
 
-import android.content.ComponentName
 import android.content.Intent
 import android.view.accessibility.AccessibilityNodeInfo
-import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.clipboardguard.AndroidSystemClipboard
 import dev.zeroinput.ime.clipboardguard.ClipboardDeviceTestSupport as Device
 import dev.zeroinput.ime.testing.InputFixtureActivity
 import dev.zeroinput.security.AuthenticationGrant
+import dev.zeroinput.ime.ui.R as UiR
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -24,34 +23,31 @@ class ClipboardSelectionCopyTest {
         val clipboard = AndroidSystemClipboard(Device.context)
         val activity = Device.instrumentation.startActivitySync(Intent(Device.context, InputFixtureActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
-        val reviewMonitor = Device.instrumentation.addMonitor(ClipboardSelectionImportActivity::class.java.name, null, false)
         var createdId: String? = null
         try {
             Device.showFixtureKeyboard(activity)
             val baseline = clipboard.timestamp()
             Device.onMain { activity.editor.setText("public selection fixture"); activity.editor.selectAll() }
             Device.instrumentation.waitForIdleSync()
-            openPanel()
-            Device.click(Device.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_copy_selection))
-            val action = Device.context.getString(if (enabled) R.string.clipboard_import_authenticate else R.string.enable_secure_clipboard)
-            Device.await { Device.findText(action)?.window?.isFocused == true }
-            assertNull(Device.findText("public selection fixture")?.takeIf { it.window?.isFocused == true })
+            openPanel(UiR.string.keyboard_tools)
+            openPanel(UiR.string.secure_clipboard_copy_selection)
+            val action = Device.context.getString(if (enabled) UiR.string.secure_clipboard_copy_authenticate
+                else UiR.string.secure_clipboard_copy_enable)
+            Device.await { Device.findText(action) != null }
+            Device.onMain {
+                assertTrue("Review must leave the source window focused", activity.hasWindowFocus())
+                assertEquals("public selection fixture", activity.editor.text.toString())
+            }
             assertEquals(0, graph.secureClipboard.count())
             Device.click(action)
             authenticateFixture()
-            val review = checkNotNull(reviewMonitor.lastActivity)
-            Device.await("Authorized selection should keep its review page") {
-                var ready = false
-                Device.onMain {
-                    assertFalse("Authentication must not dismiss the captured draft", review.isFinishing)
-                    ready = review.hasWindowFocus() && descendants(review.window.decorView)
-                        .filterIsInstance<android.widget.TextView>().any { it.text == Device.context.getString(R.string.save) }
-                }
-                ready
-            }
+            val save = Device.context.getString(UiR.string.secure_clipboard_copy_save)
+            Device.await("Authentication must return to an explicit save in the keyboard") { Device.findText(save) != null }
+            Device.onMain { assertTrue(activity.hasWindowFocus()) }
             assertEquals("Authentication alone cannot save", 0, graph.secureClipboard.count())
-            Device.click(Device.context.getString(R.string.save))
+            Device.click(save)
             Device.await { graph.secureClipboard.count() == 1 }
+            Device.await { graph.settings.secureClipboardEnabled }
             val entry = graph.secureClipboard.summaries().single()
             createdId = entry.id
             assertEquals("public selection fixture", graph.secureClipboard.read(entry.id, grant()))
@@ -59,8 +55,9 @@ class ClipboardSelectionCopyTest {
             Device.showFixtureKeyboard(activity)
             Device.onMain { activity.editor.setText("") }
             Device.instrumentation.waitForIdleSync()
-            if (Device.findText(entry.displayName) == null) openPanel()
-            Device.click(entry.displayName)
+            val itemLabel = Device.context.getString(dev.zeroinput.ime.R.string.secure_clipboard_ordinal, 1)
+            if (Device.findText(Device.context.getString(UiR.string.secure_clipboard_copy_selection)) == null) openPanel()
+            Device.click(itemLabel)
             authenticateFixture()
             val confirm = Device.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_confirm_paste)
             Device.await("Returning from authentication must show a fresh paste confirmation") { Device.findText(confirm) != null }
@@ -73,44 +70,41 @@ class ClipboardSelectionCopyTest {
             }
             assertEquals(baseline, clipboard.timestamp())
         } finally {
-            Device.instrumentation.removeMonitor(reviewMonitor)
             createdId?.let { graph.secureClipboard.remove(it, grant()) }
             Device.onMain { graph.settings.secureClipboardEnabled = enabled; activity.finish() }
         }
     }
 
     @Test
-    fun transferIsOneUseAndReplacingOrClosingItWipesTheOldDraft() = Device.onMain {
-        val transfer = ClipboardSelectionTransfer()
+    fun movingSelectionOrCancellingDismissesTheReviewWithoutSaving() {
+        val graph = (Device.context.applicationContext as ZeroInputApplication).graph
+        val before = graph.secureClipboard.count()
+        val activity = Device.instrumentation.startActivitySync(Intent(Device.context, InputFixtureActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as InputFixtureActivity
         try {
-            val first = ClipboardImportRequest("fixture".toCharArray())
-            val old = transfer.offer(ClipboardImportDraft(first, 7))
-            val second = ClipboardImportRequest("fixture".toCharArray())
-            val token = transfer.offer(ClipboardImportDraft(second, 8))
-            assertEquals(ClipboardImportRequest.Phase.CLOSED, first.phase)
-            assertNull(transfer.take(old))
-            val taken = checkNotNull(transfer.take(token))
-            assertEquals(8L, taken.generation)
-            assertSame(second, taken.request)
-            assertNull(transfer.take(token))
-            taken.request.close()
-            val third = ClipboardImportRequest("fixture".toCharArray())
-            transfer.offer(ClipboardImportDraft(third, 9))
-            transfer.close()
-            assertEquals(ClipboardImportRequest.Phase.CLOSED, third.phase)
-        } finally { transfer.close() }
+            Device.showFixtureKeyboard(activity)
+            Device.onMain { activity.editor.setText("public selection fixture"); activity.editor.selectAll() }
+            Device.instrumentation.waitForIdleSync()
+            openPanel()
+            val copy = Device.context.getString(UiR.string.secure_clipboard_copy_selection)
+            val cancel = Device.context.getString(UiR.string.secure_clipboard_copy_cancel)
+            Device.click(copy)
+            Device.await { Device.findText(cancel) != null }
+            Device.onMain { activity.editor.setSelection(0) }
+            Device.await("Changing the editor selection must revoke copy review") { Device.findText(cancel) == null }
+            Device.onMain { activity.editor.selectAll() }
+            Device.instrumentation.waitForIdleSync()
+            Device.click(copy)
+            Device.click(cancel)
+            Device.await { Device.findText(cancel) == null }
+            assertEquals(before, graph.secureClipboard.count())
+        } finally {
+            Device.onMain { activity.finish() }
+        }
     }
 
-    @Test
-    fun selectionImportCannotBeLaunchedByOtherApplications() {
-        @Suppress("DEPRECATION")
-        val info = Device.context.packageManager.getActivityInfo(
-            ComponentName(Device.context, ClipboardSelectionImportActivity::class.java), 0)
-        assertFalse(info.exported)
-    }
-
-    private fun openPanel() {
-        val description = Device.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)
+    private fun openPanel(label: Int = UiR.string.secure_clipboard_open) {
+        val description = Device.context.getString(label)
         Device.await { Device.roots().any { root -> findDescription(root, description) != null } }
         val button = checkNotNull(Device.roots().firstNotNullOfOrNull { findDescription(it, description) })
         assertTrue(button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
@@ -121,13 +115,13 @@ class ClipboardSelectionCopyTest {
         return (0 until node.childCount).firstNotNullOfOrNull { node.getChild(it)?.let { child -> findDescription(child, description) } }
     }
 
-    private fun descendants(view: android.view.View): List<android.view.View> = listOf(view) +
-        if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
-
     private fun authenticateFixture() {
         Device.await("System device-credential input should be visible") {
             Device.roots().any { it.packageName?.toString() in setOf("com.android.systemui", "com.android.settings") &&
-                it.window?.isFocused == true && hasPasswordField(it) }
+                it.window?.isFocused == true && hasPasswordField(it) } ||
+                Device.shell("dumpsys window").lineSequence().any {
+                    it.contains("mCurrentFocus=") && it.contains("BiometricPrompt}")
+                }
         }
         Device.instrumentation.uiAutomation.waitForIdle(100, 3_000)
         Device.shell("input text 2468")

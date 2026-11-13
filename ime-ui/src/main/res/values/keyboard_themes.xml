@@ -25,8 +25,13 @@
     </style>
     <style name="ThemeOverlay.ZeroInput.Keyboard.Mint" parent="">
         <item name="colorPrimary">@color/keyboard_mint_primary</item>
+        <item name="colorPrimaryVariant">@color/keyboard_mint_primary</item>
+        <item name="colorOnPrimary">@color/keyboard_mint_on_primary</item>
         <item name="colorPrimaryContainer">@color/keyboard_mint_accent</item>
+        <item name="colorOnPrimaryContainer">@color/keyboard_mint_text</item>
         <item name="colorSecondaryContainer">@color/keyboard_mint_secondary</item>
+        <item name="colorSecondary">@color/keyboard_mint_primary</item>
+        <item name="colorOnSecondary">@color/keyboard_mint_on_primary</item>
         <item name="colorSurface">@color/keyboard_mint_surface</item>
         <item name="colorOnSurface">@color/keyboard_mint_text</item>
         <item name="colorSurfaceVariant">@color/keyboard_mint_modifier</item>
@@ -38,8 +43,13 @@
     </style>
     <style name="ThemeOverlay.ZeroInput.Keyboard.Rose" parent="">
         <item name="colorPrimary">@color/keyboard_rose_primary</item>
+        <item name="colorPrimaryVariant">@color/keyboard_rose_primary</item>
+        <item name="colorOnPrimary">@color/keyboard_rose_on_primary</item>
         <item name="colorPrimaryContainer">@color/keyboard_rose_accent</item>
+        <item name="colorOnPrimaryContainer">@color/keyboard_rose_text</item>
         <item name="colorSecondaryContainer">@color/keyboard_rose_secondary</item>
+        <item name="colorSecondary">@color/keyboard_rose_primary</item>
+        <item name="colorOnSecondary">@color/keyboard_rose_on_primary</item>
         <item name="colorSurface">@color/keyboard_rose_surface</item>
         <item name="colorOnSurface">@color/keyboard_rose_text</item>
         <item name="colorSurfaceVariant">@color/keyboard_rose_modifier</item>
@@ -56,15 +66,17 @@
     <color name="keyboard_gray_modifier">#DEE1E4</color>
     <color name="keyboard_gray_outline">#A5ABB1</color>
     <color name="keyboard_mint_primary">#006B5D</color>
+    <color name="keyboard_mint_on_primary">#FFFFFF</color>
     <color name="keyboard_mint_accent">#A6E9D8</color>
-    <color name="keyboard_mint_secondary">#F6D9CC</color>
+    <color name="keyboard_mint_secondary">#B9E5D8</color>
     <color name="keyboard_mint_surface">#F0F9F7</color>
     <color name="keyboard_mint_text">#173A34</color>
     <color name="keyboard_mint_modifier">#D5EAE4</color>
     <color name="keyboard_mint_outline">#96B5AC</color>
     <color name="keyboard_rose_primary">#923951</color>
+    <color name="keyboard_rose_on_primary">#FFFFFF</color>
     <color name="keyboard_rose_accent">#F2BED0</color>
-    <color name="keyboard_rose_secondary">#D2E9E4</color>
+    <color name="keyboard_rose_secondary">#F4D2DE</color>
     <color name="keyboard_rose_surface">#FFF6F8</color>
     <color name="keyboard_rose_text">#42232C</color>
     <color name="keyboard_rose_modifier">#F1DEE4</color>

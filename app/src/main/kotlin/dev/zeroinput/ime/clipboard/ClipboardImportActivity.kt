@@ -17,7 +17,7 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.RejectedExecutionException
 
 /** Untrusted input only: this component never lists vault contents or returns data. */
-open class ClipboardImportActivity : AppCompatActivity() {
+class ClipboardImportActivity : AppCompatActivity() {
     private val graph by lazy { (application as ZeroInputApplication).graph }
     private val worker = BoundedExecutors.singleThread("zeroinput-text-import", 1)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -41,8 +41,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
     }
 
     private fun receiveIncoming(incoming: Intent, accept: Boolean = true) {
-        val draft = if (accept) receiveDraft(incoming) else null
-        request = draft?.request
+        request = if (accept) ClipboardImportIntent.parse(incoming) else null
         incoming.replaceExtras(null as Bundle?)
         incoming.clipData = null
         if (request == null) {
@@ -50,7 +49,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
             finish()
             return
         }
-        vaultGeneration = checkNotNull(draft).generation
+        vaultGeneration = graph.secureClipboard.captureGeneration()
         screen = ClipboardImportView(this).also {
             it.onCancel = ::discardAndFinish
             it.onAction = ::performAction
@@ -65,11 +64,6 @@ open class ClipboardImportActivity : AppCompatActivity() {
         }
         mainHandler.postDelayed(expire, DRAFT_TIMEOUT_MILLIS)
     }
-
-    internal open fun receiveDraft(intent: Intent): ClipboardImportDraft? =
-        ClipboardImportIntent.parse(intent)?.let { ClipboardImportDraft(it, graph.secureClipboard.captureGeneration()) }
-
-    internal open val acceptsReplacementDraft: Boolean = false
 
     override fun onResume() {
         super.onResume()
@@ -92,14 +86,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (!acceptsReplacementDraft) {
-            discardAndFinish()
-            return
-        }
-        // Revoke the old request before accepting another draft. Its grant and
-        // callbacks must never authorize the replacement, even during authentication.
-        discard(shutdownWorker = false)
-        receiveIncoming(intent)
+        discardAndFinish()
     }
 
     @SuppressLint("MissingSuperCall") // This private page deliberately persists no state.
@@ -206,7 +193,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun discard(shutdownWorker: Boolean = true) {
+    private fun discard() {
         request?.close()
         request = null
         grant = null
@@ -219,7 +206,7 @@ open class ClipboardImportActivity : AppCompatActivity() {
         settingsListener?.close()
         settingsListener = null
         mainHandler.removeCallbacks(expire)
-        if (shutdownWorker) worker.shutdownNow()
+        worker.shutdownNow()
     }
 
     private fun showMessage(message: Int) {

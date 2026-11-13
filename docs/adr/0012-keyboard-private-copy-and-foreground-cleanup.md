@@ -17,21 +17,21 @@ system privilege restrictions. This decision extends ADR 0006 and updates ADR
 
 ## Decision
 
-Provide a copy-selection control in the private clipboard panel. It reads only
+Provide a copy-selection control in More tools and in the private clipboard panel. It reads only
 an explicitly selected, bounded range from the current nonsensitive editor.
 The selected length must be known and at most 8192 UTF-16 units; the response
 must have the same length and pass shared plain-text validation. A single bounded
 worker performs the editor call. Session, connection, selection, interactions
 and settings generation determine whether a completed result may be accepted.
 
-The accepted snapshot transfers once to a nonexported import page. Only an opaque
-token crosses the Intent boundary; a single process-local draft expires after
-five seconds unless consumed. The page owns the frozen draft after handoff and
-does not access or submit to the originating editor. Thus its own navigation can
-end the editor session without losing the deliberately captured import. Existing
-authentication followed by explicit Save is reused; no authentication result
-alone writes. The vault deletion generation is captured before the editor read,
-so a concurrent clear cannot be undone by a delayed transfer or save.
+The accepted snapshot stays in the IME. Review shows only the selection length.
+System authentication can temporarily unbind the editor. The frozen draft stays
+in memory during that bounded detour. On return to a matching nonsensitive
+editor, an explicit Save tap binds the new session and authorizes a single
+background addition. The authentication callback never writes. When the vault
+starts disabled, the review labels this choice and successful Save also enables
+it. The vault deletion generation is captured before the editor read, so a
+concurrent clear cannot be undone by a delayed save.
 
 Foreground current-item operations retain monitoring opt-in but use a short-lived
 focus lease instead of default-IME identity. Losing focus or leaving the page
@@ -105,7 +105,7 @@ metadata cannot establish erasure of independent histories or cloud copies.
 
 Regressions cover selection bounds, malformed responses, cancellation during
 reads and after delivery is queued, stale editor results, executor rejection,
-one-use transfer, nonexported entry, concurrent vault deletion, initial automatic
+review cancellation, concurrent vault deletion, initial automatic
 cleanup and foreground cleanup without background eligibility. Platform fixtures
 exercise actual IME selection, system device-credential authentication and an
 explicit Save without mutating the current system clip, followed by a second

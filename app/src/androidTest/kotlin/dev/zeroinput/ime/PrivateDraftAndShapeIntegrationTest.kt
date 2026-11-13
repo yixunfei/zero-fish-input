@@ -236,7 +236,6 @@ class PrivateDraftAndShapeIntegrationTest {
     }
 
     private fun openShape() {
-        clickDescription(UiR.string.keyboard_tools)
         clickDescription(UiR.string.shape_open)
     }
 

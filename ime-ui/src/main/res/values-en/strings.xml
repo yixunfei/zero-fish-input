@@ -225,4 +225,15 @@
     <string name="symbol_group_phonetic">Phonetics</string>
     <string name="symbol_group_latin">Latin</string>
     <string name="symbol_group_box">Box drawing</string>
+    <plurals name="secure_clipboard_copy_review">
+        <item quantity="one">%d character selected. Authenticate to save it to the secure clipboard.</item>
+        <item quantity="other">%d characters selected. Authenticate to save them to the secure clipboard.</item>
+    </plurals>
+    <string name="secure_clipboard_copy_enable">Authenticate and enable secure clipboard</string>
+    <string name="secure_clipboard_copy_authenticate">Authenticate to save</string>
+    <string name="secure_clipboard_copy_authenticating">Waiting for device authentication</string>
+    <string name="secure_clipboard_copy_save_hint">Save the selected text to the secure clipboard?</string>
+    <string name="secure_clipboard_copy_save">Save selected text</string>
+    <string name="secure_clipboard_copy_saving">Saving</string>
+    <string name="secure_clipboard_copy_cancel">Cancel copying</string>
 </resources>

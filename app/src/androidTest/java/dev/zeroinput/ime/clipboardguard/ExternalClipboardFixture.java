@@ -11,6 +11,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.textclassifier.TextClassifier;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -48,6 +49,28 @@ public final class ExternalClipboardFixture extends Activity {
         content.setPadding(32, 80, 32, 32);
         applySystemInsets(content);
         content.addView(text);
+        EditText editor = new EditText(this);
+        editor.setId(View.generateViewId());
+        editor.setText("public-editable-fixture");
+        editor.setSaveEnabled(false);
+        editor.setShowSoftInputOnFocus(false);
+        editor.setTextClassifier(TextClassifier.NO_OP);
+        editor.setCustomSelectionActionModeCallback(new ActionMode.Callback() {
+            @Override public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                editor.selectAll();
+                editor.post(() -> {
+                    if (Math.min(editor.getSelectionStart(), editor.getSelectionEnd()) == 0
+                            && Math.max(editor.getSelectionStart(), editor.getSelectionEnd()) == editor.length()) {
+                        reportNativeAction(menu, selectionStatus);
+                    } else selectionStatus.setText("Native editable selection was partial");
+                });
+                return true;
+            }
+            @Override public boolean onPrepareActionMode(ActionMode mode, Menu menu) { return false; }
+            @Override public boolean onActionItemClicked(ActionMode mode, MenuItem item) { return false; }
+            @Override public void onDestroyActionMode(ActionMode mode) { selectionStatus.setText("Native selection ended"); }
+        });
+        content.addView(editor);
         content.addView(button("Select public text", () -> {
             text.requestFocus();
             Selection.selectAll((Spannable) text.getText());

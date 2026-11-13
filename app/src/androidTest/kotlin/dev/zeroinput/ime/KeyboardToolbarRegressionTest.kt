@@ -144,12 +144,17 @@ class KeyboardToolbarRegressionTest {
     }
 
     @Test fun toolsKeepInputActionsBeforeLanguageAndKeyboardSettings() = withPanel { panel ->
-        onMain { checkNotNull(find(panel, UiR.string.keyboard_tools)).performClick() }
+        onMain {
+            panel.renderCopySelectionAvailable(true)
+            assertNotNull(find(panel, UiR.string.shape_open))
+            assertNull(find(panel, UiR.string.secure_clipboard_copy_selection))
+            checkNotNull(find(panel, UiR.string.keyboard_tools)).performClick()
+        }
         instrumentation.waitForIdleSync()
         onMain {
             val controls = listOf(
+                UiR.string.secure_clipboard_copy_selection,
                 UiR.string.handwriting_open,
-                UiR.string.shape_open,
                 UiR.string.language_switch,
                 UiR.string.keyboard_placement,
                 UiR.string.keyboard_settings,
@@ -157,6 +162,7 @@ class KeyboardToolbarRegressionTest {
                 UiR.string.ai_open,
                 UiR.string.expression_smileys,
             ).map { checkNotNull(find(panel, it)) }
+            assertNull(find(panel, UiR.string.shape_open))
             val row = controls.first().parent as ViewGroup
             assertTrue(controls.zipWithNext().all { (left, right) ->
                 row.indexOfChild(left) < row.indexOfChild(right)
@@ -177,6 +183,10 @@ class KeyboardToolbarRegressionTest {
     }
 
     @Test fun secondaryPanelControlsRemainVisible() = withPanel { panel ->
+        onMain {
+            val emoji = checkNotNull(find(panel, UiR.string.expression_smileys))
+            emoji.requestRectangleOnScreen(android.graphics.Rect(0, 0, emoji.width, emoji.height), true)
+        }
         tap(panel, UiR.string.expression_smileys)
         onMain {
             assertNotNull("Secondary panels keep their toolbar", find(panel, UiR.string.keyboard_return))
@@ -187,7 +197,6 @@ class KeyboardToolbarRegressionTest {
 
     @Test fun refreshedShapeResultsRejectTouchesFromThePreviousList() = withPanel { panel ->
         val chosen = mutableListOf<String>()
-        tap(panel, UiR.string.keyboard_tools)
         tap(panel, UiR.string.shape_open)
         onMain {
             panel.onShapeChoice = { _, value -> chosen.add(value) }

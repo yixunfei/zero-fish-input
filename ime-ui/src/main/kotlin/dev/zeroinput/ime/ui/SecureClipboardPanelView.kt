@@ -13,6 +13,13 @@ data class SecureClipboardItemUi(
     val displayName: String,
 )
 
+sealed interface ClipboardCopyUi {
+    data class Review(val length: Int, val enableOnSave: Boolean) : ClipboardCopyUi
+    data object Authenticating : ClipboardCopyUi
+    data object ConfirmSave : ClipboardCopyUi
+    data object Saving : ClipboardCopyUi
+}
+
 class SecureClipboardPanelView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -20,9 +27,13 @@ class SecureClipboardPanelView @JvmOverloads constructor(
     var onItemSelected: (String) -> Unit = {}
     var onManageRequested: () -> Unit = {}
     var onCopySelectionRequested: () -> Unit = {}
+    var onCopyConfirmationAction: () -> Unit = {}
+    var onCopyConfirmationCancelled: () -> Unit = {}
     var onPasteConfirmed: () -> Unit = {}
     var onPasteCancelled: () -> Unit = {}
     private var pasteConfirmation = false
+    private var copyConfirmation: ClipboardCopyUi? = null
+    private var renderedCopyConfirmation: ClipboardCopyUi? = null
     private var enabled = false
     private var failed = false
     private var items = emptyList<SecureClipboardItemUi>()
@@ -49,12 +60,17 @@ class SecureClipboardPanelView @JvmOverloads constructor(
 
     fun render(enabled: Boolean, items: List<SecureClipboardItemUi>, failed: Boolean = false) {
         if (list.childCount != 0 && this.enabled == enabled && this.items == items && this.failed == failed &&
-            renderedPasteConfirmation == pasteConfirmation) return
+            renderedPasteConfirmation == pasteConfirmation && renderedCopyConfirmation == copyConfirmation) return
         renderedPasteConfirmation = pasteConfirmation
+        renderedCopyConfirmation = copyConfirmation
         this.enabled = enabled
         this.items = items
         this.failed = failed
         list.removeAllViews()
+        copyConfirmation?.let {
+            renderCopyReview(it)
+            return
+        }
         if (pasteConfirmation) {
             addStatus(context.getString(R.string.secure_clipboard_confirm_hint))
             addCommand(R.string.secure_clipboard_confirm_paste) { onPasteConfirmed() }
@@ -72,6 +88,31 @@ class SecureClipboardPanelView @JvmOverloads constructor(
     }
 
     fun renderCopyAvailable(available: Boolean) { copySelection.isEnabled = available }
+
+    fun renderCopyConfirmation(state: ClipboardCopyUi?) {
+        if (copyConfirmation == state) return
+        copyConfirmation = state
+        scrollTo(0, 0)
+        render(enabled, items, failed)
+    }
+
+    private fun renderCopyReview(state: ClipboardCopyUi) {
+        when (state) {
+            is ClipboardCopyUi.Review -> {
+                addStatus(resources.getQuantityString(R.plurals.secure_clipboard_copy_review, state.length, state.length))
+                val action = if (state.enableOnSave) R.string.secure_clipboard_copy_enable
+                    else R.string.secure_clipboard_copy_authenticate
+                addCommand(action) { onCopyConfirmationAction() }
+            }
+            ClipboardCopyUi.Authenticating -> addStatus(context.getString(R.string.secure_clipboard_copy_authenticating))
+            ClipboardCopyUi.ConfirmSave -> {
+                addStatus(context.getString(R.string.secure_clipboard_copy_save_hint))
+                addCommand(R.string.secure_clipboard_copy_save) { onCopyConfirmationAction() }
+            }
+            ClipboardCopyUi.Saving -> addStatus(context.getString(R.string.secure_clipboard_copy_saving))
+        }
+        addCommand(R.string.secure_clipboard_copy_cancel) { onCopyConfirmationCancelled() }
+    }
 
     fun renderPasteConfirmation(visible: Boolean) {
         if (pasteConfirmation == visible) return

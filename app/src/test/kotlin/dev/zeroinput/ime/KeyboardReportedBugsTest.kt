@@ -89,11 +89,17 @@ class KeyboardReportedBugsTest {
         assertTrue(labels().containsAll(listOf("1", "2", "3")))
     }
 
-    @Test fun privateCopyIsVisibleWithoutOpeningMoreTools() = withActivity { activity ->
+    @Test fun privateCopyMovesFromPrimaryToolbarToMoreTools() = withActivity { activity ->
         val panel = ZeroInputView(activity)
         activity.setContentView(panel)
         panel.renderCopySelectionAvailable(true)
-        val copy = descendants(panel).first { it.contentDescription == activity.getString(UiR.string.secure_clipboard_copy_selection) && it.isShown }
+        val copy = key(panel, UiR.string.secure_clipboard_copy_selection)
+        val shape = key(panel, UiR.string.shape_open)
+        assertFalse(copy.isShown)
+        assertTrue(shape.isShown)
+        key(panel, UiR.string.keyboard_tools).performClick()
+        assertTrue(copy.isShown)
+        assertFalse(shape.isShown)
         assertTrue(copy is ImageButton)
         val touchTarget = (48 * panel.resources.displayMetrics.density).toInt()
         assertEquals(touchTarget, copy.layoutParams.width)

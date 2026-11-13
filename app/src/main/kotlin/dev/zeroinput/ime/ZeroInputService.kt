@@ -91,6 +91,23 @@ class ZeroInputService : InputMethodService() {
         name = "zeroinput-secure-clipboard",
         queueCapacity = 1,
     )
+    private val clipboardCopy by lazy {
+        dev.zeroinput.ime.clipboard.KeyboardClipboardCopy(
+            mainHandler, secureClipboardExecutor, graph.secureClipboard,
+            authenticate = { callback ->
+                dev.zeroinput.ime.auth.AuthenticationBroker.requestCancellable(this, callback = callback)
+            },
+            render = { inputView?.renderCopyConfirmation(it) },
+            onAuthenticated = ::bindCopyConfirmation,
+            onAuthenticationFailed = { Toast.makeText(this, R.string.authentication_failed, Toast.LENGTH_SHORT).show() },
+            onSaved = { success, enable ->
+                if (enable) graph.settings.secureClipboardEnabled = true
+                inputView?.let(::renderLocalPanels)
+                Toast.makeText(this, if (success) R.string.clipboard_import_saved else R.string.operation_failed,
+                    Toast.LENGTH_SHORT).show()
+            },
+        )
+    }
     /**
      * Local encrypted indexes are intentionally kept off the IME main thread.
      * Keystore access can block on first use even when the payload is small.
@@ -131,6 +148,7 @@ class ZeroInputService : InputMethodService() {
                 val privateOpen = inputView?.isPrivateDraftOpen == true
                 inputView?.closeAuxiliaryInput()
                 privateDraftToggle?.close()
+                clipboardCopy.cancel()
                 cancelPasteConsent()
                 if (privateOpen) requestHideSelf(0)
             }
@@ -359,6 +377,7 @@ class ZeroInputService : InputMethodService() {
         // Revoke queued work before posting UI reconciliation; settings can also
         // change while an authentication activity owns the foreground.
         val previousPrivacy = configuredPrivacy
+        clipboardCopy.cancel()
         privateDraft.invalidate()
         refreshConfiguredSettings()
         val privateDefaultChanged = privateDraftDefault != graph.settings.privateDraftEnabled
@@ -442,6 +461,7 @@ class ZeroInputService : InputMethodService() {
         super.onStartInput(attribute, restarting)
         val preserveKeyboardPage = restarting && activeSession != null && activeSession?.packageName == attribute.packageName
         endInputSession(reset = false)
+        clipboardCopy.editorStarted(pasteEditorIdentity(attribute))
         val token = ++sessionSequence
         val connectionBinding = SessionConnectionBinding(currentInputConnection)
         val currentSubtype = getSystemService(InputMethodManager::class.java)?.currentInputMethodSubtype
@@ -534,6 +554,7 @@ class ZeroInputService : InputMethodService() {
         reconcileChineseOptions()
         inputView?.let(::renderLocalPanels)
         bindPasteConsent()
+        bindCopyConfirmation()
         openDefaultPrivateDraft()
     }
 
@@ -571,6 +592,8 @@ class ZeroInputService : InputMethodService() {
         deviceAgentDraft.close()
         inputView?.setAiDeviceAgentMode(false)
         cancelSecureClipboardRequest()
+        clipboardCopy.leaveEditor()
+        inputView?.renderCopyConfirmation(null)
         invalidateAiRequest()
         graph.securePaste.leaveEditor()
         inputView?.renderPasteConfirmation(false)
@@ -591,6 +614,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        clipboardCopy.cancel()
         inputView?.closeAuxiliaryInput()
         shapeLookup.close()
         privateDraft.close()
@@ -655,7 +679,9 @@ class ZeroInputService : InputMethodService() {
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
         // System credential windows can route a key through the old IME binding.
-        if (privateDraftToggle != null || graph.securePaste.isAuthenticating) return super.onKeyDown(keyCode, event)
+        if (privateDraftToggle != null || graph.securePaste.isAuthenticating || clipboardCopy.isAuthenticating) {
+            return super.onKeyDown(keyCode, event)
+        }
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && inputView?.canNavigateBack == true) {
             if (event.repeatCount == 0) event.startTracking()
             return true
@@ -687,7 +713,9 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
-        if (privateDraftToggle != null || graph.securePaste.isAuthenticating) return super.onKeyUp(keyCode, event)
+        if (privateDraftToggle != null || graph.securePaste.isAuthenticating || clipboardCopy.isAuthenticating) {
+            return super.onKeyUp(keyCode, event)
+        }
         if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && event.isTracking && !event.isCanceled &&
             inputView?.navigateBack() == true) return true
         return super.onKeyUp(keyCode, event)
@@ -709,6 +737,7 @@ class ZeroInputService : InputMethodService() {
             if (inputView?.isAiOpen == true) invalidateAiRequest()
             if (inputView?.isPrivateDraftOpen == true) registerInteraction()
             cancelSecureClipboardRequest()
+            clipboardCopy.selectionChanged()
             graph.securePaste.editorChanged(pasteEditorIdentity())
             controller?.clearModelRanking()
             controller?.finishCompositionForCursorMove()
@@ -929,6 +958,8 @@ class ZeroInputService : InputMethodService() {
         }
         view.onSecureClipboardSelected = ::unlockAndCommitSecureItem
         view.onCopySelectionRequested = ::copySelectedText
+        view.onCopyConfirmationAction = ::actOnCopyConfirmation
+        view.onCopyConfirmationCancelled = { registerInteraction(); view.returnToKeyboard() }
         view.onPasteConfirmed = ::confirmSecurePaste
         view.onPasteCancelled = { registerInteraction(); inputView?.returnToKeyboard() }
         view.onSettingsRequested = {
@@ -937,6 +968,7 @@ class ZeroInputService : InputMethodService() {
             launchActivity(MainActivity::class.java)
         }
         view.onSecureClipboardManagementRequested = {
+            registerInteraction()
             launchActivity(SecureClipboardManagerActivity::class.java)
         }
     }
@@ -1599,9 +1631,9 @@ class ZeroInputService : InputMethodService() {
         else inputView?.renderPasteConfirmation(graph.securePaste.bind(session.token, identity))
     }
 
-    private fun pasteEditorIdentity(): dev.zeroinput.ime.clipboard.PasteEditorIdentity? =
-        currentInputEditorInfo?.let { info -> info.packageName?.let { name ->
-            dev.zeroinput.ime.clipboard.PasteEditorIdentity(name, info.fieldId, info.inputType)
+    private fun pasteEditorIdentity(info: EditorInfo? = currentInputEditorInfo): dev.zeroinput.ime.clipboard.PasteEditorIdentity? =
+        info?.let { it.packageName?.let { name ->
+            dev.zeroinput.ime.clipboard.PasteEditorIdentity(name, it.fieldId, it.inputType)
         } }
 
     private fun confirmSecurePaste() {
@@ -1655,6 +1687,7 @@ class ZeroInputService : InputMethodService() {
         if (!inputViewActive || session.controller.state.privacy.isSensitive) return
         val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
         val length = editorConnection?.selectedLength() ?: 0
+        val source = pasteEditorIdentity() ?: return
         val interaction = interactionSequence
         val generation = graph.secureClipboard.captureGeneration()
         val settingsGeneration = personalizationWriteGeneration.get()
@@ -1666,19 +1699,32 @@ class ZeroInputService : InputMethodService() {
             if (draft == null) {
                 Toast.makeText(this, R.string.clipboard_selection_unavailable, Toast.LENGTH_SHORT).show()
             } else {
-                val transfer = graph.clipboardSelectionTransfer
-                val token = transfer.offer(dev.zeroinput.ime.clipboard.ClipboardImportDraft(draft, generation))
-                try {
-                    startActivity(Intent(this, dev.zeroinput.ime.clipboard.ClipboardSelectionImportActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        .putExtra(dev.zeroinput.ime.clipboard.ClipboardSelectionImportActivity.EXTRA_TOKEN, token))
-                    protectSystemClipAfterPrivateCopy(session)
-                } catch (_: RuntimeException) {
-                    transfer.close()
-                    Toast.makeText(this, R.string.operation_failed, Toast.LENGTH_SHORT).show()
-                }
+                clipboardCopy.offer(draft, generation, source, session.token, graph.settings.secureClipboardEnabled)
+                protectSystemClipAfterPrivateCopy(session)
             }
         }
+    }
+
+    private fun bindCopyConfirmation() {
+        if (!clipboardCopy.awaitingReturn) return
+        val session = activeSession ?: return
+        val source = pasteEditorIdentity() ?: return
+        if (inputViewActive && !session.controller.state.privacy.isSensitive &&
+            session.connectionBinding.resolve(currentInputConnection) != null) {
+            clipboardCopy.bindReturnedEditor(session.token, source)
+        }
+    }
+
+    private fun actOnCopyConfirmation() {
+        syncSessionPrivacy()
+        val session = activeSession ?: return
+        val source = pasteEditorIdentity() ?: return
+        if (!inputViewActive || session.controller.state.privacy.isSensitive ||
+            session.connectionBinding.resolve(currentInputConnection) == null) {
+            clipboardCopy.cancel()
+            return
+        }
+        clipboardCopy.act(session.token, source)
     }
 
     /**
@@ -1841,7 +1887,7 @@ class ZeroInputService : InputMethodService() {
                     // Engine replacement revokes editor writes. An unused paste consent
                     // contains no engine state and still requires a new foreground tap.
                     modelRanking.invalidate()
-                    registerInteraction(preservePasteConsent = true)
+                    registerInteraction(preservePasteConsent = true, preserveCopyConfirmation = true)
                     transferred = session.controller.adoptPreparedEngine(result.engine)
                     if (transferred) {
                         installedEngineWarmupContext = result.request
@@ -1914,7 +1960,9 @@ class ZeroInputService : InputMethodService() {
         deviceAgentDraft.close()
         inputView?.setAiDeviceAgentMode(false)
         inputView?.cancelPendingGestures()
-        registerInteraction(preservePasteConsent = true)
+        clipboardCopy.leaveEditor()
+        inputView?.renderCopyConfirmation(null)
+        registerInteraction(preservePasteConsent = true, preserveCopyConfirmation = true)
         graph.securePaste.leaveEditor()
         nativeRetryRequested = false
         invalidatePendingPersonalization()
@@ -2069,12 +2117,13 @@ class ZeroInputService : InputMethodService() {
 
     /** Revokes work authorized in an older UI state. Called only on the IME main thread. */
     private fun registerInteraction(preserveReconversion: Boolean = false, preservePasteConsent: Boolean = false,
-        preserveWordAssociations: Boolean = false) {
+        preserveWordAssociations: Boolean = false, preserveCopyConfirmation: Boolean = false) {
         glideInput?.invalidate()
         if (!preserveWordAssociations) controller?.invalidateWordAssociations()
         modelRanking.interaction()
         interactionSequence++
         if (!preservePasteConsent) cancelPasteConsent()
+        if (!preserveCopyConfirmation) clipboardCopy.cancel()
         cancelSecureClipboardRequest()
         if (!preserveReconversion) controller?.invalidateReconversion()
     }

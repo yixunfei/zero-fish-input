@@ -403,13 +403,15 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   selected range. Known and returned lengths must match and remain within 8192
   UTF-16 units. A bounded worker avoids blocking keys. Session/connection, selection,
   interaction and settings changes cancel acceptance, including late IPC responses.
-- A frozen selection transfers once to a nonexported page through an opaque token;
-  the process-local slot expires after five seconds. No plaintext enters an Intent,
-  saved state or disk draft. The receiving page owns the captured import independently
-  of subsequent editor navigation, requires authentication then foreground Save,
-  and never rereads or writes back to the source editor. The original vault deletion
-  generation travels with the draft, so a clear during copying prevents a later save.
-  See ADR 0012. No vendor history erasure capability is inferred from these changes.
+- The IME holds one frozen selection with its original vault deletion generation
+  and shows length and state only. A draft expires after 120 seconds in review and
+  after 30 seconds in either authentication or authorized state. System credential
+  navigation can unbind the source; returning to a matching nonsensitive editor
+  requires a fresh save tap bound to the current session. Public editor metadata
+  only narrows the return destination. The callback does not write. Switching
+  editors, continuing input after binding, settings changes, cancellation, screen
+  off and service destruction invalidate the draft. The frozen text is never
+  reread, put in an Intent or restored from state. See ADR 0012.
 
 - The exported text import Activity treats every Intent as untrusted. It accepts
   only PROCESS_TEXT/SEND text/plain payloads of at most 8,192 UTF-16 code units;

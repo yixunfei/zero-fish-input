@@ -103,9 +103,9 @@ internal object ClipboardDeviceTestSupport {
         await { findText("Close public fixture") == null }
     }
 
-    fun longPressPublicText() {
+    fun longPressPublicText(label: String = "public guard fixture") {
         instrumentation.uiAutomation.waitForIdle(100, 6_000)
-        val bounds = settledPublicTextBounds()
+        val bounds = settledPublicTextBounds(label)
         val x = bounds.left + minOf(bounds.width() / 2, (32 * context.resources.displayMetrics.density).toInt())
         val y = bounds.centerY()
         val downTime = SystemClock.uptimeMillis()
@@ -117,11 +117,11 @@ internal object ClipboardDeviceTestSupport {
         }
     }
 
-    private fun settledPublicTextBounds(): Rect {
+    private fun settledPublicTextBounds(label: String): Rect {
         val bounds = Rect()
         var stableSince = SystemClock.elapsedRealtime()
         await("Public text bounds must settle in the focused source window") {
-            val text = findText("public guard fixture")
+            val text = findText(label)
             val next = Rect()
             text?.getBoundsInScreen(next)
             val ready = text?.packageName == instrumentation.context.packageName &&

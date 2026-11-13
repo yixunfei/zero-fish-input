@@ -27,6 +27,64 @@ import org.junit.runner.RunWith
 class KeyboardAppearanceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun mintAndRoseAccentsMatchTheirThemeInLightAndDark() {
+        for (night in listOf(false, true)) {
+            val context = instrumentation.targetContext
+            val configuration = android.content.res.Configuration(context.resources.configuration).apply {
+                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                    if (night) android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    else android.content.res.Configuration.UI_MODE_NIGHT_NO
+            }
+            val configured = context.createConfigurationContext(configuration)
+            for (preset in listOf(KeyboardTheme.MINT, KeyboardTheme.ROSE)) {
+                val themed = dev.zeroinput.ime.settings.KeyboardThemeContext.create(configured, preset)
+                fun color(attr: Int) = com.google.android.material.color.MaterialColors.getColor(themed, attr, 0)
+                val surface = color(com.google.android.material.R.attr.colorSurface)
+                val text = color(com.google.android.material.R.attr.colorOnSurface)
+                val accent = color(com.google.android.material.R.attr.colorSecondaryContainer)
+                assertEquals(night, androidx.core.graphics.ColorUtils.calculateLuminance(surface) < 0.2)
+                assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(text, accent) >= 4.5)
+                assertEquals(preset == KeyboardTheme.MINT, android.graphics.Color.green(accent) > android.graphics.Color.red(accent))
+            }
+        }
+    }
+
+    @Test fun customBackgroundColorPersistsOnlyAfterSave() {
+        val settings = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph.settings
+        val previous = settings.keyboardAppearance
+        onMain { settings.keyboardAppearance = KeyboardAppearance(backgroundColor = 0xFF123456.toInt()) }
+        val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardAppearanceActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyboardAppearanceActivity
+        try {
+            onMain { button(activity.window.decorView, dev.zeroinput.ime.ui.R.string.appearance_background).performClick() }
+            val device = dev.zeroinput.ime.clipboardguard.ClipboardDeviceTestSupport
+            val title = activity.getString(R.string.appearance_custom_background_color)
+            val currentLabel = activity.getString(R.string.appearance_custom_background_color_value, 0x123456)
+            fun open() {
+                device.click(currentLabel)
+                device.await { device.findText(title) != null }
+                val red = activity.getString(R.string.appearance_color_channel_red, 0x12)
+                val slider = device.roots().firstNotNullOfOrNull { root ->
+                    root.findAccessibilityNodeInfosByText(red).firstOrNull {
+                        it.className == android.widget.SeekBar::class.java.name
+                    }
+                }
+                val bounds = android.graphics.Rect().also { checkNotNull(slider).getBoundsInScreen(it) }
+                assertFalse(bounds.isEmpty)
+                val x = bounds.left + bounds.width() * 3 / 4
+                device.shell("input swipe $x ${bounds.centerY()} $x ${bounds.centerY()} 120")
+                device.await { device.findText("#123456") == null }
+            }
+            open()
+            device.click(activity.getString(R.string.cancel))
+            assertEquals(0xFF123456.toInt(), settings.keyboardAppearance.backgroundColor)
+            open()
+            device.click(activity.getString(R.string.save))
+            device.await { settings.keyboardAppearance.backgroundColor != 0xFF123456.toInt() }
+            assertEquals(settings.keyboardAppearance.backgroundColor, SettingsRepository(activity).keyboardAppearance.backgroundColor)
+        } finally { onMain { activity.finish(); settings.keyboardAppearance = previous } }
+    }
+
     @Test fun attachedPublicAssociationsRenderInBothModes() {
         for (night in listOf(false, true)) {
             val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardPreviewFixtureActivity::class.java)
@@ -79,8 +137,15 @@ class KeyboardAppearanceTest {
                 val preview = views(activity.window.decorView).filterIsInstance<ZeroInputView>().single()
                 val keyboard = views(preview).filterIsInstance<KeyboardPanel>().single()
                 val landscape = activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val rowHeight = (KeyboardHeight.COMFORTABLE.rowHeight(landscape) * keyboard.resources.displayMetrics.density).toInt()
+                val density = keyboard.resources.displayMetrics.density
+                val portraitRow = (KeyboardHeight.COMFORTABLE.rowHeight(false) * density).toInt()
+                val landscapeRow = (KeyboardHeight.COMFORTABLE.rowHeight(true) * density).toInt()
                 assertEquals(4, keyboard.childCount)
+                val rowHeight = keyboard.getChildAt(0).layoutParams.height
+                // The side-by-side preview can be narrower than its available height.
+                val expectedRows = if (landscape) setOf(portraitRow, landscapeRow, (48 * density).toInt())
+                    else setOf(portraitRow)
+                assertTrue("Unexpected preview row height: $rowHeight", rowHeight in expectedRows)
                 for (index in 0 until keyboard.childCount) {
                     val row = keyboard.getChildAt(index)
                     assertEquals("The selected height must reach every key row", rowHeight, row.layoutParams.height)

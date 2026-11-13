@@ -290,4 +290,9 @@
     <string name="ai_models_apply">Apply to draft</string>
     <string name="public_dictionary_previous_page">Previous page</string>
     <string name="public_dictionary_next_page">Next page</string>
+    <string name="appearance_custom_background_color">Custom background color</string>
+    <string name="appearance_custom_background_color_value">Custom background color · #%06X</string>
+    <string name="appearance_color_channel_red">Red %d</string>
+    <string name="appearance_color_channel_green">Green %d</string>
+    <string name="appearance_color_channel_blue">Blue %d</string>
 </resources>

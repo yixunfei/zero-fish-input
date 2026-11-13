@@ -485,13 +485,13 @@ Incognito mode and disabled learning also hide and reject external AI imports.
 The keyboard's explicit copy-selection control reads the active editor through
 `ClipboardSelectionReader` on a bounded worker. Selection length, session,
 connection and interaction/settings generation are rechecked before accepting
-the result. `ClipboardSelectionTransfer` hands one frozen draft and its original
-vault deletion generation to the nonexported `ClipboardSelectionImportActivity`
-using a one-use token; text is not placed in the Intent. The transfer expires
-after five seconds. Consumption also checks a monotonic deadline; a delayed
-Handler callback cannot extend eligibility, and an expired handoff wipes its
-owned draft. The internal page reuses the import authentication/save
-flow and owns the draft after handoff; it never rereads the source editor.
+the result. `KeyboardClipboardCopy` owns the frozen draft and original vault
+deletion generation for the keyboard's review and save controls. The panel shows
+only length and state. Authentication may unbind the original connection. On
+return the current nonsensitive editor must match public source metadata, and a
+fresh Save tap binds the actual live session. The bounded worker checks the
+request, monotonic deadline and deletion generation before committing. The
+authentication Activity receives only the broker's request ID and prompt title.
 
 `SecurePasteCoordinator` owns a pending item ID, source editor metadata, deletion
 generation and an unused one-use grant across system-authentication navigation.
