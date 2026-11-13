@@ -25,21 +25,29 @@ class IncognitoConsentTest {
             settings.incognitoMode = false
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     toggle(activity).performClick()
                     assertFalse(settings.incognitoMode)
                     assertFalse(toggle(activity).isChecked)
                     dialog(activity).findViewById<View>(android.R.id.button2).performClick()
                 }
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     assertFalse(settings.incognitoMode)
                     toggle(activity).performClick()
                 }
                 scenario.recreate()
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     assertFalse(settings.incognitoMode)
                     toggle(activity).performClick()
                 }
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     val root = dialog(activity)
                     val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
                     root.draw(android.graphics.Canvas(bitmap))
@@ -50,6 +58,8 @@ class IncognitoConsentTest {
                     dialog(activity).findViewById<View>(android.R.id.button1).performClick()
                 }
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     assertTrue(settings.incognitoMode)
                     assertTrue(toggle(activity).isChecked)
                     toggle(activity).performClick()

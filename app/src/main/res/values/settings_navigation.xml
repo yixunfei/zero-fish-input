@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appearance_section_style">风格</string>
+    <string name="appearance_section_keys">按键</string>
+    <string name="appearance_presets">风格预设</string>
+    <string name="appearance_presets_hint">一键搭配配色、材质与按键形状，保留高度、候选和背景设置。还可继续单独调整。</string>
+    <string name="settings_dictionaries">词库与语言</string>
+    <string name="settings_privacy">隐私与剪贴板</string>
+    <string name="settings_general">通用与关于</string>
+    <string name="settings_input_summary">中文输入、按键反馈、联想与符号</string>
+    <string name="settings_appearance_summary">风格配色、按键、候选与背景</string>
+    <string name="settings_dictionaries_summary">个人词组、公开词库、表情与语言包</string>
+    <string name="settings_privacy_summary">个性化、隐身、私密输入与数据清理</string>
+    <string name="settings_ai_summary">模型配置、助手与可选能力</string>
+    <string name="settings_general_summary">输入法启用、界面语言与版本信息</string>
+</resources>

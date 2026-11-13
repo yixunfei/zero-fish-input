@@ -166,7 +166,6 @@
     <string name="setting_not_selected">Not selected</string>
     <string name="section_input_method">Input method</string>
     <string name="interface_language">Interface language</string>
-    <string name="settings_nav_ai">AI</string>
     <string name="language_follow_system">System</string>
     <string name="language_simplified_chinese">Chinese</string>
     <string name="setting_system_status">System status</string>

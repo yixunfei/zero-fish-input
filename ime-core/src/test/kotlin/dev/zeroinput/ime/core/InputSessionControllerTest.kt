@@ -251,7 +251,7 @@ class InputSessionControllerTest {
         controller.close()
     }
 
-    @Test fun `no suggestions editor keeps Chinese selection without reading or learning personal data`() {
+    @Test fun `no suggestions editor personalizes Chinese conversion but learns only explicit selections`() {
         for (command in listOf(InputCommand.SelectCandidate(0), InputCommand.Space, InputCommand.Enter)) {
             val connection = ComposingRecordingConnection()
             val personal = RecordingPersonalization()
@@ -265,9 +265,11 @@ class InputSessionControllerTest {
             controller.handle(command)
             assertEquals(listOf(if (command == InputCommand.Enter) "nihao" else "你好"), connection.commits)
             assertFalse(controller.state.snapshot.isComposing)
-            assertEquals(0, personal.suggestionCalls)
-            assertTrue(personal.learned.isEmpty())
+            assertTrue(personal.suggestionCalls > 0)
+            assertEquals(if (command is InputCommand.SelectCandidate) 1 else 0, personal.learned.size)
+            assertTrue(personal.learned.all { it.allowed })
             assertTrue(personal.usedIds.isEmpty())
+            assertFalse(controller.state.privacy.personalizationAllowed)
             controller.close()
         }
     }

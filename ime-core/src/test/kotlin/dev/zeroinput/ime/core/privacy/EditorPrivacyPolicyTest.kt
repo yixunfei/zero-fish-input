@@ -92,7 +92,7 @@ class EditorPrivacyPolicyTest {
     }
 
     @Test
-    fun `filter and autocomplete editors never use personalization`() {
+    fun `filter and autocomplete editors permit conversion only personalization`() {
         val filter = EditorInfo().apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_FILTER
         }
@@ -106,11 +106,13 @@ class EditorPrivacyPolicyTest {
             assertTrue(result.suggestionsAllowed)
             assertFalse(result.learningAllowed)
             assertFalse(result.personalizationAllowed)
+            assertTrue(result.conversionPersonalizationAllowed)
+            assertFalse(result.independentAiAllowed)
         }
     }
 
     @Test
-    fun `no suggestions flag preserves conversion but disables personalization`() {
+    fun `no suggestions flag preserves conversion personalization without general learning`() {
         val editor = EditorInfo().apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
@@ -122,6 +124,7 @@ class EditorPrivacyPolicyTest {
         assertFalse(result.learningAllowed)
         assertFalse(result.personalizationAllowed)
         assertFalse(result.predictionsAllowed)
+        assertTrue(result.conversionPersonalizationAllowed)
     }
 
     @Test
@@ -135,6 +138,7 @@ class EditorPrivacyPolicyTest {
             assertTrue(result.isSensitive)
             assertFalse(result.suggestionsAllowed)
             assertFalse(result.personalizationAllowed)
+            assertFalse(result.conversionPersonalizationAllowed)
         }
     }
 
@@ -148,6 +152,40 @@ class EditorPrivacyPolicyTest {
         val result = policy.evaluate(editor, PrivacyConfiguration())
 
         assertFalse(result.personalizationAllowed)
+        assertFalse(result.conversionPersonalizationAllowed)
         assertTrue(result.predictionsAllowed)
+    }
+
+    @Test fun `conversion exception never overrides credentials identifiers unknown or privacy opt outs`() {
+        val restrictedTypes = listOf(
+            InputType.TYPE_NULL, 0x0f, InputType.TYPE_CLASS_TEXT or 0x0ff0,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI,
+        )
+        val flags = listOf(0, InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE,
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE)
+        for (type in restrictedTypes) for (flag in flags) {
+            val result = policy.evaluate(EditorInfo().apply { inputType = type or flag }, PrivacyConfiguration())
+            assertFalse(result.conversionPersonalizationAllowed)
+            assertFalse(result.personalizationAllowed)
+            assertFalse(result.independentAiAllowed)
+        }
+        for (variation in listOf(0, InputType.TYPE_TEXT_VARIATION_FILTER,
+            InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE, InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT)) {
+            for (flag in flags) {
+                val editor = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT or variation or flag }
+                for (configuration in listOf(PrivacyConfiguration(incognitoMode = true),
+                    PrivacyConfiguration(learningEnabled = false))) {
+                    assertFalse(policy.evaluate(editor, configuration).conversionPersonalizationAllowed)
+                }
+                editor.imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+                assertFalse(policy.evaluate(editor, PrivacyConfiguration()).conversionPersonalizationAllowed)
+            }
+        }
     }
 }

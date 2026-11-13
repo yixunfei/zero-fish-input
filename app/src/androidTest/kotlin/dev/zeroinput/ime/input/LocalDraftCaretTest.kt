@@ -9,6 +9,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalDraftCaretTest {
+    @Test fun deletionPreservesCompleteLongGraphemesAndRegionalIndicatorParity() = onMain {
+        withDraft(maxChars = 256) { draft, cursor ->
+            draft.start(InputLanguage.ENGLISH)
+            val cluster = "🙂" + "\u0301".repeat(63)
+            draft.appendImported(cluster + "tail")
+            draft.handle(KeyboardAction.MoveDraftCaret(cluster.length, cursor().revision))
+            draft.handle(KeyboardAction.Backspace)
+            assertEquals("tail", draft.committedText())
+            val indicator = String(Character.toChars(0x1F1E6))
+            draft.replaceCommittedText(indicator.repeat(33))
+            draft.handle(KeyboardAction.Backspace)
+            assertEquals(indicator.repeat(32), draft.committedText())
+        }
+    }
+
     @Test fun pairsAndMiddleDeletionPreserveTheSuffixAndRejectStaleClicks() = onMain {
         withDraft { draft, cursor ->
             draft.start(InputLanguage.ENGLISH)

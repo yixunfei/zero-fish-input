@@ -15,6 +15,37 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalDraftCaretPanelTest {
+    @Test fun scrolledSearchDrawsCaretAtTheVisibleTextPosition() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = EmojiPanelView(context)
+        descendants(panel).single { it.contentDescription == context.getString(dev.zeroinput.ime.ui.R.string.expression_search) }.performClick()
+        val query = "abcdefgh".repeat(8)
+        panel.renderQuery(query)
+        layout(panel)
+        val body = descendants(panel).filterIsInstance<TextView>().single { it.text.toString() == query }
+        val offset = 12
+        fun capture(caret: Int): android.graphics.Bitmap {
+            panel.renderCaret(DraftCaretUi(caret, 1), 0)
+            body.scrollTo(40, 0)
+            return android.graphics.Bitmap.createBitmap(body.width, body.height, android.graphics.Bitmap.Config.ARGB_8888).also {
+                val canvas = android.graphics.Canvas(it)
+                // A parent applies the child's scroll translation before drawing it.
+                canvas.translate(-body.scrollX.toFloat(), -body.scrollY.toFloat())
+                body.draw(canvas)
+            }
+        }
+        val hidden = capture(-1)
+        val shown = capture(offset)
+        try {
+            val x = (body.totalPaddingLeft + body.layout.getPrimaryHorizontal(offset) - body.scrollX).toInt()
+            assertTrue(x in 2 until body.width - 2)
+            val changedRows = (0 until body.height).count { y ->
+                (x - 1..x + 1).any { column -> hidden.getPixel(column, y) != shown.getPixel(column, y) }
+            }
+            assertTrue("Scrolled caret must align with its text offset", changedRows >= body.layout.getLineBottom(0) / 2)
+        } finally { hidden.recycle(); shown.recycle(); panel.clearSession() }
+    }
+
     @Test fun longSearchKeepsTheActiveCaretVisibleWithoutEllipsis() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val activity = instrumentation.startActivitySync(android.content.Intent(instrumentation.targetContext,

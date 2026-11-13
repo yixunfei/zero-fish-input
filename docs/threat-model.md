@@ -115,10 +115,17 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
 - 密码、PIN、可见密码及应用请求的无个性化输入上下文强制禁用学习和个性化数据读取；邮箱、
   URI、隐身模式及用户关闭学习时同样不读取个人词组或 emoji 历史。运行中收紧隐私设置会立即
   取消当前组合状态。
-- `TYPE_TEXT_FLAG_NO_SUGGESTIONS` does not disable public Chinese conversion in
-  known non-sensitive text fields. Personalization reads/writes, emoji history,
-  model context and next-word predictions remain disabled. Password and unknown
-  field classification still takes precedence.
+- `TYPE_TEXT_FLAG_NO_SUGGESTIONS` does not disable Chinese conversion in known
+  non-sensitive text fields. The user-approved ADR 0038 permits only bounded
+  composing-candidate personal reads and accepted explicit-choice learning in
+  NO_SUGGESTIONS, AUTO_COMPLETE and FILTER editors. General history, English
+  personal completions, implicit learning, model context and next-word predictions
+  receive no new permission. Password/PIN, unknown, email/URI, explicit no-learning,
+  incognito and disabled learning take precedence even when flags are combined.
+  The capability is not an app allowlist and cannot authorize AI or draft access.
+  Existing session/deletion revocation applies to reads, pending writes and stale
+  selections; rejected editor commits never learn. Negative tests cover those
+  combinations, implicit commits with opt-in enabled, and English isolation.
 - The preparation notice contains only static resource text,
   never editor input, and owns no editor connection or pending key replay.
 - Prediction permission travels with the immutable editor context and prepared
@@ -1397,6 +1404,14 @@ operation details from ordinary screen capture.
 
 The personal suggestion manager uses `FLAG_SECURE`, disables autofill/content capture and saved field state, and returns at most 50 rows per worker query. Pinyin matching loads only the verified public character dictionary, with bounded reading alternatives; private words and search strings are never persisted outside the existing encrypted lexicon. Queries may inspect at most the repository's 20,000 terms off the input thread. Editing/deleting invalidates queued learning, preserves repository generation checks, and rejects duplicate identities, invalid weights and deleted edit targets. Worker callbacks use immutable form values rather than reading Views. Personalization notifications contain no phrase data; the IME checks captured session identity and reevaluates privacy before refreshing. Hidden association rounds cannot be resurrected. Implicit commit learning is opt-in and disabled for restricted editors; rejected editor commits never learn.
 
+Personal-frequency priority survives native-route deduplication: model requests
+and winner delivery both reject rounds with an active personal priority. The
+marker is recalculated from the permitted bounded snapshot and cleared on privacy
+revocation or composition reset. Overlay reranking retains the existing worker,
+query limits, tombstones and disabled-dictionary filters; it grants no new private
+read or write access. Regression cases cover threshold changes, late model results,
+restricted editors, empty queries and removed dictionary selection routes.
+
 ## Interaction repair review (2026-10-30)
 
 The prominent private-copy toolbar button grants no new read authority. It uses
@@ -1418,6 +1433,8 @@ inside the prefix. Views carry display offsets and revisions, and retire gesture
 on every render, including equal revisions from different draft owners. Closed
 or restarted drafts reject old requests. Busy private views cannot emit caret
 requests. Backspace clears vacated buffer units after preserving the suffix.
+Deletion examines the bounded local prefix without cutting a surrogate or long
+grapheme at an artificial lookbehind boundary; it reads no external editor data.
 Device regressions cover mask/reveal, busy and stale touches, replacement drafts,
 grapheme boundaries and capacity failure. See
 [ADR 0037](adr/0037-isolated-draft-caret.md).

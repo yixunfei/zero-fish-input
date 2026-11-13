@@ -40,9 +40,10 @@ internal class DraftTextView(context: Context) : AppCompatTextView(context) {
         val current = layout ?: return
         if (offset > text.length) return
         val line = current.getLineForOffset(offset)
-        val x = totalPaddingLeft + current.getPrimaryHorizontal(offset) - scrollX
-        val top = totalPaddingTop + current.getLineTop(line) - scrollY
-        val bottom = totalPaddingTop + current.getLineBottom(line) - scrollY
+        // The parent already translates the canvas by this view's scroll offset.
+        val x = totalPaddingLeft + current.getPrimaryHorizontal(offset)
+        val top = totalPaddingTop + current.getLineTop(line)
+        val bottom = totalPaddingTop + current.getLineBottom(line)
         caretPaint.color = currentTextColor
         caretPaint.strokeWidth = resources.displayMetrics.density.coerceAtLeast(1f)
         canvas.drawLine(x, top.toFloat(), x, bottom.toFloat(), caretPaint)

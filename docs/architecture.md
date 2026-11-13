@@ -46,6 +46,16 @@ language-pack -> engine-dictionary
 
 ## Runtime boundaries
 
+Settings navigation uses stable SettingsCategory identifiers, with Activity-owned
+back dispatch and saved category/scroll positions. Category views retain their
+controls and callbacks when detached, so navigation does not write preferences or
+reset pending AI persistence locks. Appearance sections emit immutable existing
+KeyboardAppearance values. Style presets only replace key decoration; background
+images, height and candidates retain their independent ownership and settings.
+The preview continues to use synthetic public text without an editor or engine.
+Appearance Activity state also retains the options scroll offset. Reselecting its
+current section does not recreate controls, preserving accessibility focus.
+
 Keyboard page selection belongs to ime-ui. A same-application Android input
 restart may retain the numeric/symbol page only while the ordinary keyboard is
 open and EditorInputOptions are unchanged. This retains no editor content,
@@ -262,11 +272,15 @@ owns an independent bounded conversion session, shared as an implementation with
 AI drafts but instantiated separately. Its only commit target is a memory buffer;
 committed-text backspace uses the shared bounded grapheme boundary and clears
 removed buffer units before shortening the draft.
+Local deletion examines the complete prefix within the existing 65,536-unit
+maximum buffer, preserving long graphemes and regional-indicator pair parity.
+The external editor's 64-unit lookbehind remains unchanged.
 The same controller owns a committed-text caret for private, AI and search
 drafts. `DraftTextView` emits revision-bound tap intents without an editor
 connection. Composing text is projected at the caret in AI/search; a tap finishes
 conversion before positioning. Pair insertion and middle deletion retain the
 suffix. Masked private prefixes remain unpositionable until explicit reveal.
+Caret drawing uses content coordinates; Android applies the view scroll offset.
 See [ADR 0037](adr/0037-isolated-draft-caret.md).
 It uses full pinyin/English and an empty personalization port. Search is limited
 to 64 UTF-16 units. Keys, candidates, paging, language switching and composition
@@ -319,8 +333,9 @@ measured from queue submission.
 AI is disabled by default and requires both the user enable switch and the explicit network
 switch. Sensitive/password/PIN/unknown, incognito and privacy-tightened sessions fail closed.
 `SessionPrivacy.independentAiAllowed` is shared by the UI and request gate. Only
-NO_SUGGESTIONS in ordinary text allows an independent AI draft without permitting
-personal data; combined identifier, no-learning or user privacy restrictions still block AI.
+NO_SUGGESTIONS in ordinary text allows an independent AI draft without granting
+AI personal-data access; combined identifier, no-learning or user privacy restrictions still block AI.
+ADR 0038's separate Chinese conversion permission does not expand AI access.
 The idle candidate header and the leading toolbar expose an AI icon without scrolling.
 During composition the existing candidate capacity is preserved; Tools exposes AI.
 In restricted editors it remains a dimmed explanation action, never a workbench
@@ -388,10 +403,17 @@ silently become part of the request route. Stored configuration remains format 5
 
 librime 自身的用户词典被禁用。中文候选选择的拼音输入码和使用频率由 ZeroInput 的加密仓库
 统一保存，从而让全局关闭学习、隐私模式和编辑器的无个性化请求作用于所有引擎。
-`TYPE_TEXT_FLAG_NO_SUGGESTIONS` keeps public conversion candidates available in
-known, non-sensitive text editors; it still disables personal reads, learning,
-model ranking and next-word predictions. Password and unknown-editor checks run
-first and continue to bypass engines entirely.
+`TYPE_TEXT_FLAG_NO_SUGGESTIONS` keeps conversion candidates available in known,
+non-sensitive text editors. ADR 0038 separates `conversionPersonalizationAllowed`
+from general personalization: NO_SUGGESTIONS, AUTO_COMPLETE and FILTER permit
+Chinese composing-candidate queries and accepted explicit-choice learning only.
+Password/PIN, unknown, email/URI, no-personalized-learning, incognito and disabled
+learning override that permission. General history, English personal completions,
+model ranking, associations, AI and isolated drafts retain their old gates.
+Implicit commits still require general learning permission plus the user's opt-in.
+The immutable policy participates in prepared-engine identity and session refresh;
+worker queries and writes retain the existing session/deletion generation checks.
+Password and unknown-editor checks run first and continue to bypass engines entirely.
 `SessionPrivacy.predictionsAllowed` is passed through `EditorContext` for both
 immediate and worker-prepared engines. Built-in English and English language packs
 preserve typed composition but do not offer completions when it is false. Chinese
@@ -1148,6 +1170,15 @@ remain behind the selected target app while that app stays foreground; leaving
 that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.md).
 
 ### Personal suggestion learning and management
+
+Personal priority is tracked separately from native candidate IDs. When a visible
+candidate reaches the promotion threshold, the controller excludes that round
+from optional model scoring and rejects late model winners. Republishing after a
+data revision recalculates this flag; privacy revocation and empty compositions
+clear it. Dictionary overlays preserve exact-code, frequency and recency ordering
+of learned entries and rank the combined pool before bounded pagination, while
+retaining override selection routes for duplicate words. These operations remain
+on the existing personalization worker with the existing 20,000-entry bounds.
 
 Composing candidates also consult the prepared exact-word frequency mirror in batches of eight (at most 60 already-produced native candidates). This preserves accumulated usage across full pinyin and initials: selecting `ceshi -> 测试` promotes the native `测试` candidate under both `ceshi` and `cs`. The total and the matching input-code frequency are combined by maximum, never added twice. Native selection routes, readings and base order remain intact. No private vocabulary is enumerated or added by this lookup, and no storage format changes. The personal-frequency promotion threshold and its current value are directly available beside learning settings and above the personal phrase list. The setting changes ranking only; the independent association switch controls next-word availability.
 

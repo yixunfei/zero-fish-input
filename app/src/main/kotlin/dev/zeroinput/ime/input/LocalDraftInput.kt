@@ -313,8 +313,9 @@ internal class LocalDraftInput(
         }
         override fun deleteBeforeCursor() {
             if (caret > 0) {
-                val start = (caret - UnicodeDeletionBoundary.LOOKBEHIND_LIMIT).coerceAtLeast(0)
-                val end = caret - UnicodeDeletionBoundary.precedingLength(text.subSequence(start, caret))
+                // Unlike an external editor, this buffer is already bounded by maxChars.
+                // Truncating it can split a surrogate/grapheme or lose flag-pair parity.
+                val end = caret - UnicodeDeletionBoundary.precedingLength(text.subSequence(0, caret))
                 val removed = caret - end
                 val newLength = text.length - removed
                 for (index in end until newLength) text.setCharAt(index, text[index + removed])

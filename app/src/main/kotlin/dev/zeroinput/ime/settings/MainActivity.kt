@@ -81,7 +81,15 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(screen)
         bindScreen()
-        if (intent.getBooleanExtra(EXTRA_FUZZY_SETTINGS, false)) screen.post { screen.showFuzzySettings() }
+        val categoryBack = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() { screen.navigateTo(SettingsCategory.HOME) }
+        }
+        onBackPressedDispatcher.addCallback(this, categoryBack)
+        screen.onCategoryChanged = { categoryBack.isEnabled = it != SettingsCategory.HOME }
+        screen.restoreNavigation(savedInstanceState)
+        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_FUZZY_SETTINGS, false)) {
+            screen.post { screen.showFuzzySettings() }
+        }
         runtimeObserver = graph.rime.runtime.addStateListener {
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) render()
@@ -143,6 +151,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        screen.saveNavigation(outState)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onNewIntent(intent: Intent) {

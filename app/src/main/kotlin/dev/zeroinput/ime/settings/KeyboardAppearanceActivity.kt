@@ -39,6 +39,8 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
     private var operation: AutoCloseable? = null
     private var visible = false
     private var previewExpanded = false
+    private var selectedSection = AppearanceSection.STYLE
+    private var restoredScroll: Int? = null
     private var candidatePreviewSwitch: SwitchMaterial? = null
     private var previewTheme: dev.zeroinput.ime.ui.KeyboardTheme? = null
     private val picker = registerForActivityResult(object : ActivityResultContracts.OpenDocument() {
@@ -60,6 +62,10 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         selected = settings.keyboardAppearance
         previewExpanded = savedInstanceState?.getBoolean("candidatePreview", false) ?: false
+        selectedSection = AppearanceSection.entries.firstOrNull {
+            it.name == savedInstanceState?.getString("appearance.section")
+        } ?: AppearanceSection.STYLE
+        restoredScroll = savedInstanceState?.getInt("appearance.scroll", 0)
         setContentView(content())
         refreshOptions()
     }
@@ -67,6 +73,8 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
     override fun onPause() { keyboard?.cancelPendingGestures(); super.onPause() }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("candidatePreview", previewExpanded)
+        outState.putString("appearance.section", selectedSection.name)
+        outState.putInt("appearance.scroll", options.scrollY)
         super.onSaveInstanceState(outState)
     }
     override fun onStart() { super.onStart(); visible = true; if (::preview.isInitialized) updatePreview() }
@@ -110,7 +118,8 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
 
     private fun refreshOptions() {
         selected = settings.keyboardAppearance
-        val scroll = options.scrollY
+        val scroll = restoredScroll ?: options.scrollY
+        restoredScroll = null
         options.removeAllViews()
         options.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -129,7 +138,10 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
                 setOnCheckedChangeListener { _, enabled -> settings.glideTypingEnabled = enabled }
             })
             addView(AppearanceOptionsView(context, selected, ::select, ::chooseImage,
-                { confirmReset(false) }, { confirmReset(true) }))
+                { confirmReset(false) }, { confirmReset(true) }, selectedSection) { section ->
+                    selectedSection = section
+                    options.post { options.scrollTo(0, 0) }
+                })
         })
         options.post { options.scrollTo(0, scroll) }
         updatePreview()

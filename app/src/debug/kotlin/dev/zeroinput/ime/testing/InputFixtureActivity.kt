@@ -4,8 +4,10 @@ import android.app.Activity
 import android.os.Bundle
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import androidx.appcompat.widget.AppCompatEditText
 
 /** Instrumentation-only editor, with no saved text or exported entry point. */
 class InputFixtureActivity : Activity() {
@@ -15,7 +17,7 @@ class InputFixtureActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null)
-        editor = EditText(this).apply {
+        editor = createEditor().apply {
             inputType = intent.getIntExtra("input_type", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
             imeOptions = intent.getIntExtra("ime_options", 0)
             if (!intent.getBooleanExtra("ordinary_fixture", false)) {
@@ -39,6 +41,20 @@ class InputFixtureActivity : Activity() {
             }
         }
         editor.requestFocus()
+    }
+
+    private fun createEditor(): EditText {
+        // Ordinary platform fixtures retain the standard widget and connection.
+        if (!intent.getBooleanExtra("allow_multiline_ime_action", false)) return EditText(this)
+        return object : AppCompatEditText(this) {
+            override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+                val connection = super.onCreateInputConnection(outAttrs)
+                // Observe restartInput delivery without changing multiline input
+                // or any personalization flags in the dedicated learning fixture.
+                outAttrs.imeOptions = outAttrs.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION.inv()
+                return connection
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

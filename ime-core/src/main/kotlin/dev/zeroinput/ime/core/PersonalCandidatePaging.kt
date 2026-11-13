@@ -18,11 +18,14 @@ internal class PersonalCandidatePaging {
         private set
     var editsPending = false
         private set
+    var hasPersonalPriority = false
+        private set
     val isBrowsing: Boolean get() = offset > 0
 
     fun clear() {
         editsApplied = false
         editsPending = false
+        hasPersonalPriority = false
         input = ""
         composition = ""
         fixedSegment = false
@@ -67,6 +70,7 @@ internal class PersonalCandidatePaging {
 
     fun publish(native: EngineSnapshot, store: PersonalizationStore, language: InputLanguage,
         allowed: Boolean, promotionThreshold: Int = 1, normalize: (String) -> String?): EngineSnapshot {
+        hasPersonalPriority = false
         if (!allowed || native.rawInput.isBlank()) { clear(); return native }
         if (input != native.rawInput || composition != native.composition || fixedSegment != native.canUndoSelection) {
             clear()
@@ -122,7 +126,12 @@ internal class PersonalCandidatePaging {
         // personal page appends rows without moving earlier choices.
         val items = if (includesNative) {
             val frequencies = nativeFrequencies(store, visibleNative, language)
-            val ranked = PersonalCandidateRanking.merge(visibleNative, rows(first), input, promotionThreshold, frequencies)
+            val personal = rows(first)
+            // Deduplication preserves native selection IDs. Track the personal
+            // priority separately so optional model scoring cannot undo it.
+            hasPersonalPriority = personal.any { it.score >= promotionThreshold } ||
+                frequencies.values.any { it >= promotionThreshold }
+            val ranked = PersonalCandidateRanking.merge(visibleNative, personal, input, promotionThreshold, frequencies)
             ranked + pages.tailMap(0, false).values.flatMap(::rows)
         } else pages.values.flatMap(::rows)
         val distinctItems = items.distinctBy(Candidate::text)

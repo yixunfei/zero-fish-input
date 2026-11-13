@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.view.doOnPreDraw
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.engine.api.Candidate
@@ -52,28 +53,43 @@ class KeyboardAppearanceTest {
         val original = settings.keyboardAppearance
         var activity: KeyboardAppearanceActivity? = null
         try {
+            onMain { settings.keyboardAppearance = KeyboardAppearance() }
             activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, KeyboardAppearanceActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as KeyboardAppearanceActivity
+            val layoutReady = java.util.concurrent.CountDownLatch(1)
             onMain {
                 val root = activity.window.decorView
                 button(root, dev.zeroinput.ime.ui.R.string.keyboard_theme_rose).performClick()
+                button(root, R.string.appearance_section_keys).performClick()
                 button(root, dev.zeroinput.ime.ui.R.string.keyboard_height_comfortable).performClick()
-                assertEquals(KeyboardAppearance(KeyboardTheme.ROSE, KeyboardHeight.COMFORTABLE), SettingsRepository(activity).keyboardAppearance)
-                val checked = views(root).filterIsInstance<android.widget.RadioButton>().filter { it.isChecked }.map { it.text.toString() }
-                assertEquals(setOf(activity.getString(dev.zeroinput.ime.ui.R.string.keyboard_theme_rose),
-                    activity.getString(dev.zeroinput.ime.ui.R.string.keyboard_height_comfortable),
-                    activity.getString(dev.zeroinput.ime.ui.R.string.expanded_candidates_adaptive),
-                    activity.getString(dev.zeroinput.ime.ui.R.string.expanded_candidates_spacious),
-                    activity.getString(dev.zeroinput.ime.ui.R.string.material_flat),
-                    activity.getString(dev.zeroinput.ime.ui.R.string.background_solid),
-                    activity.getString(dev.zeroinput.ime.ui.R.string.appearance_color_auto)), checked.toSet())
-                assertEquals(7, checked.size)
+                assertEquals(KeyboardAppearance(KeyboardTheme.ROSE, KeyboardHeight.COMFORTABLE,
+                    material = KeyboardMaterial.RAISED), SettingsRepository(activity).keyboardAppearance)
+                val options = views(root).filterIsInstance<dev.zeroinput.ime.settings.AppearanceOptionsView>().single()
+                val checked = views(options).filterIsInstance<com.google.android.material.button.MaterialButton>()
+                    .filter { it.isChecked }.map { it.text.toString() }
+                assertEquals(setOf(activity.getString(R.string.appearance_section_keys),
+                    activity.getString(dev.zeroinput.ime.ui.R.string.keyboard_height_comfortable)), checked.toSet())
+                assertEquals(2, checked.size)
+                root.doOnPreDraw { layoutReady.countDown() }
+
             }
+            assertTrue("Updated preview must finish layout", layoutReady.await(5, java.util.concurrent.TimeUnit.SECONDS))
             instrumentation.waitForIdleSync()
             onMain {
                 val preview = views(activity.window.decorView).filterIsInstance<ZeroInputView>().single()
                 val keyboard = views(preview).filterIsInstance<KeyboardPanel>().single()
-                assertTrue(keyboard.height >= (208 * keyboard.resources.displayMetrics.density).toInt())
+                val landscape = activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val rowHeight = (KeyboardHeight.COMFORTABLE.rowHeight(landscape) * keyboard.resources.displayMetrics.density).toInt()
+                assertEquals(4, keyboard.childCount)
+                for (index in 0 until keyboard.childCount) {
+                    val row = keyboard.getChildAt(index)
+                    assertEquals("The selected height must reach every key row", rowHeight, row.layoutParams.height)
+                    assertTrue("Constrained rows must remain usable", row.height > 0)
+                }
+                val bounds = android.graphics.Rect()
+                assertTrue(keyboard.getGlobalVisibleRect(bounds))
+                assertEquals("Even short landscape windows must show all rows", keyboard.height, bounds.height())
+                if (!landscape) assertTrue(keyboard.height >= rowHeight * keyboard.childCount)
             }
             SystemClock.sleep(250)
             capture("appearance-settings.png")

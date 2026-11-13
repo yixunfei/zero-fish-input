@@ -8,6 +8,86 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalLearningControllerTest {
+    @Test fun `suggestion and completion flags permit explicit Chinese learning without other personalization`() {
+        for (type in conversionEditorTypes()) {
+            val store = Store()
+            val controller = controller(store, threshold = 3)
+            try {
+                controller.start(EditorInfo().apply { inputType = type }, InputLanguage.CHINESE, PrivacyConfiguration())
+                repeat(3) {
+                    controller.handle(InputCommand.Text("cs"))
+                    val index = controller.state.snapshot.candidates.indexOfFirst { it.text == "测试" }
+                    assertTrue(index >= 0)
+                    controller.handle(InputCommand.SelectCandidate(index))
+                }
+                assertEquals(3, store.count)
+                controller.handle(InputCommand.Text("cs"))
+                assertEquals("测试", controller.state.snapshot.candidates.first().text)
+                assertFalse(controller.state.privacy.personalizationAllowed)
+                assertFalse(controller.state.privacy.learningAllowed)
+                assertTrue(controller.modelCandidates().isEmpty())
+                store.count = 0
+                controller.refreshPersonalization()
+                assertEquals("产生", controller.state.snapshot.candidates.first().text)
+                store.count = 3
+                controller.refreshPersonalization()
+                assertEquals("测试", controller.state.snapshot.candidates.first().text)
+                controller.updatePrivacy(PrivacyConfiguration(incognitoMode = true))
+                val reads = store.reads
+                controller.handle(InputCommand.Text("cs"))
+                controller.handle(InputCommand.SelectCandidate(1))
+                controller.refreshPersonalization()
+                assertEquals(reads, store.reads)
+                assertEquals(3, store.writes)
+            } finally { controller.close() }
+        }
+    }
+
+    @Test fun `conversion-only editors never learn implicit commits even when opted in`() {
+        for (type in conversionEditorTypes()) for (personalOnly in listOf(false, true)) {
+            for (command in listOf(InputCommand.Space, InputCommand.Enter, InputCommand.LiteralText("。"),
+                InputCommand.PairedText("（", "）"))) {
+                val store = Store().apply { count = 3; this.personalOnly = personalOnly }
+                val controller = controller(store, optIn = true)
+                try {
+                    controller.start(EditorInfo().apply { inputType = type }, InputLanguage.CHINESE, PrivacyConfiguration())
+                    controller.handle(InputCommand.Text("cs"))
+                    controller.handle(command)
+                    assertEquals(0, store.writes)
+                    assertTrue(store.usedIds.isEmpty())
+                    controller.setLanguage(InputLanguage.ENGLISH)
+                    val reads = store.reads
+                    controller.handle(InputCommand.Text("cs"))
+                    controller.handle(InputCommand.SelectCandidate(0))
+                    assertEquals(reads, store.reads)
+                    assertEquals(0, store.writes)
+                } finally { controller.close() }
+            }
+        }
+    }
+
+    @Test fun `conversion-only personal routes learn only accepted explicit choices`() {
+        for (type in conversionEditorTypes()) for (accepted in listOf(false, true)) {
+            val store = Store().apply { count = 3; personalOnly = true }
+            val controller = controller(store, accepted = accepted)
+            try {
+                controller.start(EditorInfo().apply { inputType = type }, InputLanguage.CHINESE, PrivacyConfiguration())
+                controller.handle(InputCommand.Text("cs"))
+                assertEquals("personal:test", controller.state.snapshot.candidates.first().id)
+                controller.handle(InputCommand.SelectCandidate(0))
+                assertEquals(if (accepted) listOf("test") else emptyList<String>(), store.usedIds)
+                assertEquals(if (accepted) 1 else 0, store.writes)
+            } finally { controller.close() }
+        }
+    }
+
+    private fun conversionEditorTypes(): List<Int> = (1..7).map { mask ->
+        InputType.TYPE_CLASS_TEXT or
+            (if (mask and 1 != 0) InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS else 0) or
+            (if (mask and 2 != 0) InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE else 0) or
+            (if (mask and 4 != 0) InputType.TYPE_TEXT_VARIATION_FILTER else 0)
+    }
+
     @Test fun `space uses the visible promoted native candidate`() {
         val store = Store().apply { count = 3 }
         val controller = controller(store, optIn = true)

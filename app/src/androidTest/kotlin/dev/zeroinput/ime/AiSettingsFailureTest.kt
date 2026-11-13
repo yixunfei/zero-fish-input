@@ -199,6 +199,11 @@ class AiSettingsFailureTest {
     }
 
     private fun openSettings(activity: MainActivity) = await {
+        views(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>().single().let {
+            if (it.category != dev.zeroinput.ime.settings.SettingsCategory.AI) {
+                it.navigateTo(dev.zeroinput.ime.settings.SettingsCategory.AI)
+            }
+        }
         if (fieldOrNull(R.string.ai_endpoint_hint) == null) {
             val visible = WindowInspector.getGlobalWindowViews().lastOrNull()?.let(::views).orEmpty()
                 .filterIsInstance<TextView>().filter { it.isShown }

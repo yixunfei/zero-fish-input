@@ -16,10 +16,12 @@ data class SessionPrivacy(
     val predictionsAllowed: Boolean = suggestionsAllowed,
     /** Independent AI drafts have a separate opt-in boundary from personal data. */
     val independentAiAllowed: Boolean = !isSensitive && learningAllowed && suggestionsAllowed && predictionsAllowed,
+    /** Chinese conversion candidates and accepted explicit choices only; never history, prediction or AI authority. */
+    val conversionPersonalizationAllowed: Boolean = !isSensitive && learningAllowed && suggestionsAllowed,
 ) {
     /**
-     * Personal data is a stricter boundary than engine-generated candidates.
-     * A session that cannot learn must not read or mutate the personal store.
+     * General personalization remains stricter than the conversion-only capability.
+     * History, associations and model context must not use the conversion exception.
      */
     val personalizationAllowed: Boolean
         get() = learningAllowed && suggestionsAllowed
@@ -42,11 +44,13 @@ class EditorPrivacyPolicy {
         if (editorRequestsNoSuggestions(editorInfo.inputType)) {
             // This flag disables predictive suggestions, not conversion needed
             // to write Chinese. Password/unknown editors were rejected above;
-            // public engine candidates remain usable without personal data.
+            // conversion has its own permission; prediction and history stay disabled.
             return restricted(PrivacyReason.EDITOR_REQUEST, false).copy(
                 predictionsAllowed = false,
                 independentAiAllowed = !editorRequestsNoLearning(editorInfo) &&
                     !configuration.incognitoMode && configuration.learningEnabled && !isIdentifierField(editorInfo),
+                conversionPersonalizationAllowed = !editorRequestsNoLearning(editorInfo) &&
+                    !configuration.incognitoMode && configuration.learningEnabled && !isPrivateIdentifierField(editorInfo),
             )
         }
         if (editorRequestsNoLearning(editorInfo)) return restricted(PrivacyReason.EDITOR_REQUEST, false)
@@ -55,7 +59,8 @@ class EditorPrivacyPolicy {
             return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = false, PrivacyReason.USER_DISABLED)
         }
         if (isIdentifierField(editorInfo)) {
-            return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = false, PrivacyReason.IDENTIFIER_FIELD)
+            return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = false, PrivacyReason.IDENTIFIER_FIELD,
+                conversionPersonalizationAllowed = !isPrivateIdentifierField(editorInfo))
         }
         return SessionPrivacy(false, suggestionsAllowed = true, learningAllowed = true, PrivacyReason.NONE)
     }
@@ -92,6 +97,10 @@ class EditorPrivacyPolicy {
             variation == InputType.TYPE_TEXT_VARIATION_FILTER ||
             inputType and InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE != 0
     }
+
+    private fun isPrivateIdentifierField(editorInfo: EditorInfo): Boolean =
+        editorInfo.inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_CLASS_TEXT &&
+            editorInfo.inputType and InputType.TYPE_MASK_VARIATION in IDENTIFIER_VARIATIONS
 
     private fun isKnownEditor(inputType: Int): Boolean {
         val variation = inputType and InputType.TYPE_MASK_VARIATION

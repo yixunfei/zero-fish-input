@@ -16,8 +16,11 @@ offline. It does not generate text, decode pinyin, or replace Rime.
   by at least 1.25. Preserve all other relative order, IDs and native routes.
 - Personal priorities, related readings, partial selections, later pages, nine
   keys, explicit browsing and ongoing touches preserve original ordering.
-- Touching candidates freezes asynchronous changes until typing resumes. Tap,
-  Space and Enter select the displayed word through its original engine route.
+  Personal priority is tracked independently of candidate IDs, including learned
+  words that retain native selection routes after deduplication.
+- Touching candidates freezes asynchronous changes until typing resumes. Tap
+  and Space select the displayed word through its original engine route; Enter
+  commits literal input.
 - Password/PIN/unknown/email/URI fields, no-personalization flags, incognito
   and learning-disabled sessions cannot supply model context.
 - Cursor changes, deletion, reconversion, panel/view/session/settings changes and
