@@ -36,7 +36,16 @@ jobs:
           python3 tools/rime-prebuilt/generate.py --container
           python3 tools/rime-prebuilt/verify.py
       - name: Propose reviewed source lock update
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: bash tools/dictionaries/propose-update.sh
+      - name: Report scheduled update availability
+        if: github.event_name == 'schedule'
+        run: |
+          if git diff --quiet -- tools/dictionaries/sources.lock.json tools/resources/catalog.json engine-rime/prebuilt/rime/prebuilt; then
+            echo 'No pinned dictionary update is available.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'A dictionary update is available. Run this workflow manually to open a review PR.' >> "$GITHUB_STEP_SUMMARY"
+          fi

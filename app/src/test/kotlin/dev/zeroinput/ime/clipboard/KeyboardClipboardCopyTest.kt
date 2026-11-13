@@ -18,6 +18,19 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class KeyboardClipboardCopyTest {
+    @Test fun brokerWindowDoesNotCancelOrReceiveSaveConfirmation() = withCopy { fixture ->
+        fixture.reviewAndAuthenticate()
+        fixture.copy.leaveEditor()
+        val broker = PasteEditorIdentity("dev.zeroinput.ime", 0, android.text.InputType.TYPE_NULL)
+        fixture.copy.editorStarted(broker)
+        fixture.completeAuthentication()
+        fixture.copy.bindReturnedEditor(2, broker)
+        assertTrue(fixture.copy.awaitingReturn)
+        assertEquals(ClipboardCopyUi.Authenticating, fixture.ui)
+        fixture.copy.bindReturnedEditor(3, source)
+        assertEquals(ClipboardCopyUi.ConfirmSave, fixture.ui)
+    }
+
     @Test fun differentEditorRevokesTheDraftAndLateAuthenticationCannotRestoreIt() = withCopy { fixture ->
         fixture.reviewAndAuthenticate()
         fixture.copy.leaveEditor()
@@ -67,7 +80,7 @@ class KeyboardClipboardCopyTest {
         val draft = ClipboardImportRequest("public fixture".toCharArray())
         var ui: ClipboardCopyUi? = null
         private var authenticate: ((AuthenticationGrant?) -> Unit)? = null
-        val copy = KeyboardClipboardCopy(Handler(Looper.getMainLooper()), worker, vault,
+        val copy = KeyboardClipboardCopy(Handler(Looper.getMainLooper()), worker, vault, "dev.zeroinput.ime",
             authenticate = { authenticate = it; AutoCloseable {} }, render = { ui = it },
             onAuthenticated = {}, onAuthenticationFailed = { fail() },
             onSaved = { _, _ -> fail("A revoked draft cannot save") })

@@ -83,6 +83,10 @@ tools in ordinary chat. Existing persistence formats are unchanged.
 Public dictionary settings use a dedicated explicit download adapter and native
 catalog views. The download action resolves the selected file and imports it
 in the app. The source website has a separate browser action.
+QQ and Sogou show downloadable rows from the current page first, including
+featured home-page dictionaries. Categories, sorting and source pagination
+remain available from a separate navigation list. Back reuses a bounded
+in-memory history of public catalog pages without another request.
 `engine-dictionary/importer` owns format conversion; `language-pack`
 owns bounded public storage and atomic registry publication. `engine-api` exposes
 immutable public file snapshots with scoped lifetime. `engine-rime` consumes them

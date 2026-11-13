@@ -93,7 +93,7 @@ class ZeroInputService : InputMethodService() {
     )
     private val clipboardCopy by lazy {
         dev.zeroinput.ime.clipboard.KeyboardClipboardCopy(
-            mainHandler, secureClipboardExecutor, graph.secureClipboard,
+            mainHandler, secureClipboardExecutor, graph.secureClipboard, packageName,
             authenticate = { callback ->
                 dev.zeroinput.ime.auth.AuthenticationBroker.requestCancellable(this, callback = callback)
             },

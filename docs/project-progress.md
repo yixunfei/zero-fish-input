@@ -2,6 +2,22 @@
 
 Updated 2026-11-13.
 
+## Public catalog and remote branches (2026-11-13)
+
+- QQ and Sogou now surface downloadable dictionaries on their home and category
+  pages. Category, sorting and upstream page links have their own view. Duplicate
+  dictionary links are consolidated by source ID and returning restores the
+  previous catalog snapshot.
+- The reviewed November 9 Wanxiang update reached main through PR #1. Its pinned
+  upstream grammar asset now returns HTTP 404 and the corresponding optional
+  resource was never published. Commit `4e22558` restores the v0.7.3 lock,
+  matching native assets and published optional resource manifest.
+- The November 12 audit branch was merged into main. The pre-device-agent
+  checkpoint and weekly update branch are reachable from main. The private-copy
+  prototype has two experimental commits preserved in the local branch and a
+  verified Git bundle. The weekly workflow reports scheduled results in GitHub
+  Actions. A manual run can create a temporary branch for a review PR.
+
 ## Keyboard copy, shape lookup and appearance (2026-11-13)
 
 Shape lookup replaces copy selection in the primary toolbar. Copy selection is
@@ -422,7 +438,9 @@ exercised in this pass. Evidence is under `.tmp-evidence/goal-*` and
 
 ## Current release
 
-[v0.7.3](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.3) is the current Debug-signed testing prerelease. It includes private temporary input, offline Han shape lookup, keyboard toolbar improvements and public dictionary import fixes. See [release notes](releases/v0.7.3.md) and [release validation](releases/v0.7.3-validation.md).
+[v0.7.4](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.4) is the
+current Debug-signed testing prerelease. See [release notes](releases/v0.7.4.md)
+and [release validation](releases/v0.7.4-validation.md).
 
 ## Public dictionary import
 

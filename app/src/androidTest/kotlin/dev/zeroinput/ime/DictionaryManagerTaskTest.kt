@@ -8,9 +8,11 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.ime.dictionaries.DictionaryManagerActivity
+import dev.zeroinput.ime.clipboardguard.ClipboardDeviceTestSupport as Device
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
@@ -19,6 +21,28 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class DictionaryManagerTaskTest {
+    @Test fun liveSourceHomepagesReachTheNativeDownloadConfirmation() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("livePublicDictionary") == "true")
+        ActivityScenario.launch(DictionaryManagerActivity::class.java).use { scenario ->
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            for (source in listOf(R.string.public_dictionary_qq, R.string.public_dictionary_sogou)) {
+                await(scenario, "Installed list") { it.hasInstalledRows() }
+                scenario.onActivity { it.control(source).performClick() }
+                clickDialog(context.getString(R.string.public_dictionary_browse))
+                await(scenario, "Homepage download command") { it.downloadRows().any() }
+                scenario.onActivity { activity ->
+                    activity.control(R.string.public_dictionary_categories).performClick()
+                    assertTrue(activity.downloadRows().none())
+                    activity.control(R.string.public_dictionary_show_downloads).performClick()
+                    activity.downloadRows().first().performClick()
+                }
+                Device.await { dialogText(context.getString(R.string.public_dictionary_download)) != null }
+                Device.shell("input keyevent KEYCODE_BACK")
+                scenario.onActivity { it.control(R.string.public_dictionary_home).performClick() }
+            }
+        }
+    }
+
     @Test fun cancellingAnActiveLoadReturnsToTheInstalledDictionaries() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val store = (context.applicationContext as ZeroInputApplication).graph.publicDictionaries
@@ -65,6 +89,19 @@ class DictionaryManagerTaskTest {
 
     private fun DictionaryManagerActivity.control(label: Int): TextView = views(window.decorView)
         .filterIsInstance<TextView>().single { it.isClickable && it.text.toString() == getString(label) }
+
+    private fun DictionaryManagerActivity.downloadRows(): Sequence<TextView> = views(window.decorView)
+        .filterIsInstance<TextView>().filter {
+            it.isShown && it.isClickable && it.text.startsWith(getString(R.string.public_dictionary_download_item, ""))
+        }
+
+    private fun dialogText(text: String) =
+        Device.findText(text) ?: Device.findText(text.uppercase(java.util.Locale.getDefault()))
+
+    private fun clickDialog(text: String) {
+        Device.await("Dialog action was not displayed") { dialogText(text) != null }
+        Device.click(checkNotNull(dialogText(text)?.text).toString())
+    }
 
     private fun views(view: View): Sequence<View> = sequence {
         yield(view)

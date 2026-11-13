@@ -64,30 +64,38 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
 
     internal fun parseWebsite(source: DictionarySource, address: String, html: String): List<CatalogItem> {
         val document = Jsoup.parse(html, address)
-        val root = URI(address).path in listOf("/", "/dict/")
-        val output = LinkedHashMap<String, CatalogItem>()
+        val current = DictionaryDownloadTransport.validate(address)
+        val navigation = LinkedHashMap<String, CatalogItem>()
+        val downloads = LinkedHashMap<String, CatalogItem>()
         for (link in document.select("a[href]")) {
             val href = link.attr("href")
             val title = link.text().trim()
             if (title.isEmpty() || title.length > 160) continue
             val uri = runCatching { URI(secureResolve(address, href)) }.getOrNull() ?: continue
-            if (uri.host != URI(address).host) continue
+            if (uri.host != current.host) continue
             val category = if (source == DictionarySource.QQ) uri.path == "/list"
                 else uri.path.startsWith("/dict/cate/index/")
             val detail = if (source == DictionarySource.QQ) uri.path == "/detail"
                 else uri.path.startsWith("/dict/detail/index/")
-            if (!category && (!detail || root)) continue
+            if (!category && !detail) continue
             val url = uri.toASCIIString()
             val id = if (source == DictionarySource.QQ) {
                 queryValue(uri, if (category) "cate_id" else "dict_id") ?: continue
-            } else uri.path.trimEnd('/').substringAfterLast('/')
+            } else (if (category) SOGOU_CATEGORY else SOGOU_DETAIL)
+                .matchEntire(uri.path)?.groupValues?.get(1) ?: continue
             if (!id.matches(ID)) continue
-            // Category and pagination links share the list route; retain their full query.
-            output.putIfAbsent(url, CatalogItem(id, title, url, category, source.format))
-            require(output.size <= MAX_ITEMS)
+            val item = CatalogItem(id, title, url, category, source.format)
+            if (category) {
+                // Category and page links share a route. Preserve the query needed by the source.
+                if (uri.path.trimEnd('/') == current.path.trimEnd('/') && uri.rawQuery == current.rawQuery) continue
+                navigation.putIfAbsent(url, item)
+            } else {
+                downloads.putIfAbsent(id, item)
+            }
+            require(navigation.size + downloads.size <= MAX_ITEMS)
         }
-        require(output.isNotEmpty()) { "Source catalog unavailable" }
-        return output.values.toList()
+        require(downloads.isNotEmpty() || navigation.isNotEmpty()) { "Source catalog unavailable" }
+        return downloads.values + navigation.values
     }
 
     private fun githubTree(repo: String, prefix: String): List<CatalogItem> {
@@ -141,7 +149,7 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
         cache.mkdirs()
         val file = File.createTempFile("catalog-", ".tmp", cache)
         return try {
-            transport.download(address, file, 4 * 1024 * 1024)
+            transport.download(address, file, 4 * 1024 * 1024, timeoutMillis = 30_000)
             file.readText(Charsets.UTF_8)
         } finally { file.delete() }
     }
@@ -159,5 +167,7 @@ internal class DictionaryCatalog(private val cache: File, private val transport:
     private companion object {
         const val MAX_ITEMS = 1024
         val ID = Regex("[a-zA-Z0-9]{1,40}")
+        val SOGOU_CATEGORY = Regex("/dict/cate/index/([0-9]{1,40})(?:/(?:default|updatetime|download)(?:/[0-9]{1,8})?)?/?")
+        val SOGOU_DETAIL = Regex("/dict/detail/index/([0-9]{1,40})/?")
     }
 }

@@ -4,12 +4,12 @@
 
 ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、表情和安全剪贴板可离线使用。AI 联网和公开资源下载由用户主动启用。
 
-[下载 v0.7.3 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.3) · [发布说明](docs/releases/v0.7.3.md) · [发布验证](docs/releases/v0.7.3-validation.md)
+[下载 v0.7.4 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.4) · [发布说明](docs/releases/v0.7.4.md) · [发布验证](docs/releases/v0.7.4-validation.md)
 
 ## 安装
 
-1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.3/zero-fish-input-0.7.3-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
-2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.3-debug-universal.apk -Algorithm SHA256`。
+1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.4/zero-fish-input-0.7.4-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
+2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.4-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，点「启用」进入系统输入法设置。启用后返回应用，点「切换」并选择 **zero fish input**。设置页显示「正在使用」后，在普通文本框输入 `nihao`，点选“你好”。
 
 公开包是 Debug 签名测试版，包名为 `dev.zeroinput.ime.debug`。已在模拟器验证从官方 v0.7.1 覆盖安装。遇到签名冲突时请先确认原安装来源，卸载会清除该应用的本地数据。首次启动会在后台准备中文数据，期间可用内置基础词表离线输入。
@@ -34,6 +34,7 @@ ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、�
 - 安全剪贴板是默认关闭的私有加密库。主动添加或导入内容需要确认，每次读取正文需要认证。独立的系统剪贴板防护默认关闭，只处理元信息，可按设置提醒或清理当前项。
 - **私密临时输入**可在「隐私」或键盘一级工具栏中开启，开关时需认证。开启后，符合条件的普通文本框默认进入私密副框。副框显示当前拼音候选和最近三个字，可用「本次明文」显示整段。「保存并关闭」把草稿加密存入安全剪贴板。「保存并提交」插入当前输入框，默认也保留加密副本，可在设置中关闭。「仅提交」只写入当前输入框。私密粘贴仍需单独认证。
 - 词库管理中的公开资源下载需要主动操作，已安装的词库和模型可以离线使用。完整包内置万象核心词表和 Mini INT8。轻量包保留核心词表，Mini INT8、LTS 语法和手写资源可按需下载。
+- QQ、搜狗的首页和分类页直接列出可下载词库。点击「分类、排序与来源分页」浏览其他结果，再点选词库确认下载并导入。
 - 在「内置与下载词库」中选择来源和词库，确认「下载并导入」后，应用会校验并安装受支持的 Rime YAML、QQ `.qcel` 或搜狗 `.scel` 文件。「访问来源网页」是单独的浏览器入口。取消任务后会返回已安装列表，已完成的导入仍保留。
 - AI 工作台可从桌面独立入口或键盘打开。AI 总开关、联网和会话保存默认关闭。启用联网后，可向配置的 HTTPS 模型提交草稿和选定内容。角色、显式记忆、Skill、文件工具、远程工具和设备代理各有独立的启用或审批边界。
 
@@ -67,7 +68,7 @@ python -B tools/prepare-handwriting-stroke-model.py
   "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
 ```
 
-通用测试包包含许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.3-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
+通用测试包包含许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.4-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
 
 ```powershell
 ./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000

@@ -2,6 +2,7 @@ package dev.zeroinput.ime.clipboard
 
 import android.os.Handler
 import android.os.SystemClock
+import android.text.InputType
 import dev.zeroinput.ime.clipboard.ClipboardImportRequest.Phase
 import dev.zeroinput.ime.ui.ClipboardCopyUi
 import dev.zeroinput.security.AuthenticationGrant
@@ -14,6 +15,7 @@ internal class KeyboardClipboardCopy(
     private val main: Handler,
     private val worker: ExecutorService,
     private val vault: SecureClipboardVault,
+    private val ownPackage: String,
     private val authenticate: ((AuthenticationGrant?) -> Unit) -> AutoCloseable,
     private val render: (ClipboardCopyUi?) -> Unit,
     private val onAuthenticated: () -> Unit,
@@ -53,9 +55,11 @@ internal class KeyboardClipboardCopy(
     fun editorStarted(source: PasteEditorIdentity?) {
         val copy = current() ?: return
         if (!awaitingReturn || source == copy.source) return
-        // The platform credential window can report TYPE_NULL during its transition.
-        // It is only allowed to defer cancellation and cannot bind the draft.
-        if (source?.packageName !in CREDENTIAL_PACKAGES) cancel()
+        // The broker Activity has no editor. Android can still report its
+        // TYPE_NULL window before showing the system credential prompt.
+        val brokerWindow = isAuthenticating && source != null && source.packageName == ownPackage &&
+            source.inputType == InputType.TYPE_NULL
+        if (!brokerWindow && source?.packageName !in CREDENTIAL_PACKAGES) cancel()
     }
 
     fun bindReturnedEditor(session: Long, source: PasteEditorIdentity) {

@@ -79,7 +79,8 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
 
 - Explicit public dictionary downloads are the separately approved network
   exception in [ADR 0020](adr/0020-public-dictionaries.md). Catalog HTML is parsed
-  without execution. The separate browser action opens a fixed source page.
+  without execution. A bounded history stores only parsed public catalog rows
+  in the management Activity. The separate browser action opens a fixed source page.
   All file requests use HTTPS on the source host allowlist. The QQ download
   endpoint's legacy HTTP address is upgraded only for its known CDN package path.
   Bounded responses, strict format validation, SQLite size limits and atomic

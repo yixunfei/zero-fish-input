@@ -53,8 +53,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private var generation = 0L
     private var dirty = false
     private var currentSource: DictionarySource? = null
-    private var currentPage: String? = null
-    private val history = java.util.ArrayDeque<Pair<DictionarySource, String?>>()
+    private val history = java.util.ArrayDeque<CatalogPage>()
+    private var visibleCatalog: CatalogPage? = null
     private var refreshAfterStop = false
     private var revocationObserver: AutoCloseable? = null
     private var editEpoch = 0L
@@ -104,10 +104,11 @@ class DictionaryManagerActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 cancel()
-                if (history.isNotEmpty()) {
-                    val (source, page) = history.removeLast()
-                    browse(source, page, remember = false)
-                } else if (currentSource != null) showInstalled() else finish()
+                val page = visibleCatalog
+                if (page?.navigation == true && page.downloads.isNotEmpty()) {
+                    renderCatalog(page.copy(navigation = false, offset = 0))
+                } else if (history.isNotEmpty()) renderCatalog(history.removeLast())
+                else if (currentSource != null) showInstalled() else finish()
             }
         })
         showInstalled()
@@ -115,8 +116,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
 
     private fun showInstalled(feedback: Int? = null) {
         history.clear()
+        visibleCatalog = null
         currentSource = null
-        currentPage = null
         runTask({ InstalledView(graph.publicDictionaries.list(), graph.publicResources.list(),
             graph.builtInDictionaries.list(), graph.dictionaryEdits.read().names) },
             failure = R.string.management_load_failed, loading = feedback ?: R.string.public_dictionary_working) { snapshot ->
@@ -167,16 +168,26 @@ class DictionaryManagerActivity : AppCompatActivity() {
             .setPositiveButton(R.string.public_dictionary_browse) { _, _ -> browse(source, null) }.show()
     }
 
-    private fun browse(source: DictionarySource, page: String?, remember: Boolean = true) {
-        if (remember && currentSource == source && currentPage != page) history.addLast(source to currentPage)
+    private fun browse(source: DictionarySource, page: String?) {
+        val previous = visibleCatalog?.takeIf { it.source == source }
+        if (previous != null && previous.address == page) return
         currentSource = source
-        currentPage = page
         runTask({ catalog.list(source, page) }, failure = R.string.public_dictionary_failed) { rows ->
-            renderCatalog(source, rows, 0)
+            if (previous != null) {
+                if (history.size == MAX_CATALOG_HISTORY) history.removeFirst()
+                history.addLast(previous)
+            }
+            val (navigation, downloads) = rows.partition(CatalogItem::category)
+            renderCatalog(CatalogPage(source, page, downloads, navigation, navigation = downloads.isEmpty()))
         }
     }
 
-    private fun renderCatalog(source: DictionarySource, rows: List<CatalogItem>, offset: Int) {
+    private fun renderCatalog(page: CatalogPage) {
+        visibleCatalog = page
+        currentSource = page.source
+        val source = page.source
+        val rows = if (page.navigation) page.links else page.downloads
+        val offset = page.offset
         content.removeAllViews()
         label(sourceLabel(source))
         label(getString(when (source) {
@@ -186,19 +197,28 @@ class DictionaryManagerActivity : AppCompatActivity() {
             else -> R.string.public_dictionary_license_website
         }))
         command(getString(R.string.public_dictionary_visit_source)) { visitSource(source) }
-        command(getString(R.string.public_dictionary_categories)) { history.clear(); browse(source, null, false) }
+        if (page.address != null) command(getString(R.string.public_dictionary_catalog_home)) { browse(source, null) }
+        if (page.links.isNotEmpty() && page.downloads.isNotEmpty()) {
+            val toggle = if (page.navigation) R.string.public_dictionary_show_downloads else R.string.public_dictionary_categories
+            command(getString(toggle)) { renderCatalog(page.copy(navigation = !page.navigation, offset = 0)) }
+        }
         if (offset > 0) command(getString(R.string.public_dictionary_previous_page)) {
-            renderCatalog(source, rows, offset - CATALOG_PAGE_SIZE)
+            renderCatalog(page.copy(offset = offset - CATALOG_PAGE_SIZE))
         }
         rows.subList(offset, minOf(offset + CATALOG_PAGE_SIZE, rows.size)).forEach { item ->
             if (item.category) command(item.title) { browse(source, item.address) }
             else command(getString(R.string.public_dictionary_download_item, item.title)) { confirmInstall(source, item) }
         }
         if (offset + CATALOG_PAGE_SIZE < rows.size) command(getString(R.string.public_dictionary_next_page)) {
-            renderCatalog(source, rows, offset + CATALOG_PAGE_SIZE)
+            renderCatalog(page.copy(offset = offset + CATALOG_PAGE_SIZE))
         }
         scroll.scrollTo(0, 0)
-        status.show(getString(R.string.public_dictionary_choose))
+        status.show(getString(when {
+            rows.isEmpty() -> R.string.public_dictionary_no_downloads
+            page.navigation && page.downloads.isEmpty() -> R.string.public_dictionary_choose_category
+            page.navigation -> R.string.public_dictionary_choose_navigation
+            else -> R.string.public_dictionary_choose_download
+        }))
     }
 
     private fun visitSource(source: DictionarySource) {
@@ -302,6 +322,15 @@ class DictionaryManagerActivity : AppCompatActivity() {
         val names: Map<String, String>,
     )
 
+    private data class CatalogPage(
+        val source: DictionarySource,
+        val address: String?,
+        val downloads: List<CatalogItem>,
+        val links: List<CatalogItem>,
+        val navigation: Boolean,
+        val offset: Int = 0,
+    )
+
     override fun onStart() {
         super.onStart()
         editEpoch = graph.dictionaryEdits.generation()
@@ -322,5 +351,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
     }
     override fun onDestroy() { tasks.close(); worker.shutdownNow(); super.onDestroy() }
 
-    private companion object { const val CATALOG_PAGE_SIZE = 64 }
+    private companion object {
+        const val CATALOG_PAGE_SIZE = 64
+        const val MAX_CATALOG_HISTORY = 16
+    }
 }

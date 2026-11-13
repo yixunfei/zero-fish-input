@@ -17,10 +17,10 @@ class DictionaryCatalogTest {
             <a href="javascript:alert(1)">script</a>
         """.trimIndent())
         assertEquals(3, rows.size)
-        assertTrue(rows.first().category)
-        assertTrue(rows.first().address.endsWith("page=2"))
-        assertFalse(rows.last().category)
-        assertEquals("qq", rows.last().format)
+        assertFalse(rows.first().category)
+        assertEquals("qq", rows.first().format)
+        assertTrue(rows[1].category)
+        assertTrue(rows[1].address.endsWith("page=2"))
     }
 
     @Test fun sogouRetainsNestedCategoryAndPageRoutes() {
@@ -31,7 +31,33 @@ class DictionaryCatalogTest {
         """.trimIndent())
         assertEquals(3, rows.size)
         assertTrue(rows[1].category)
-        assertEquals("154343", rows.last().id)
+        assertEquals("154343", rows.first().id)
+        assertEquals("1", rows.last().id)
+    }
+
+    @Test fun qqHomepageAndCategoryKeepDownloadsAheadOfLargeNavigationLists() {
+        val links = (1..220).joinToString("") { """<a href="/list?cate_id=$it">Category $it</a>""" }
+        val html = links + """<a href="/detail?dict_id=s332">Words</a>
+            <a href="/detail?dict_id=s332&amp;cate_id=3">Same words</a>"""
+        for (page in listOf(DictionarySource.QQ.website, "${DictionarySource.QQ.website}list?cate_id=3")) {
+            val rows = catalog.parseWebsite(DictionarySource.QQ, page, html)
+            assertEquals("s332", rows.first().id)
+            assertEquals(1, rows.count { !it.category })
+            assertTrue(rows.none { it.address == page })
+        }
+    }
+
+    @Test fun sogouHomepageKeepsFeaturedDownloadsAndRejectsUnexpectedRoutes() {
+        val rows = catalog.parseWebsite(DictionarySource.SOGOU, DictionarySource.SOGOU.website, """
+            <a href="/dict/cate/index/1">Nature</a>
+            <a href="/dict/cate/index/1/download/2">Next</a>
+            <a href="/dict/detail/index/15206/?rf=dictindex">Words</a>
+            <a href="/dict/detail/index/15206">Same words</a>
+            <a href="/dict/detail/index/15206/unexpected/8">Other route</a>
+        """.trimIndent())
+        assertEquals(listOf("15206", "1", "1"), rows.map { it.id })
+        assertFalse(rows.first().category)
+        assertEquals("/dict/cate/index/1/download/2", URI(rows.last().address).path)
     }
 
     @Test fun qqDownloadUsesTheSelectedIdAndUpgradesOnlyItsOfficialLegacyFileRedirect() {

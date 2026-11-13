@@ -61,9 +61,14 @@ class PublicDictionaryCatalogDeviceTest {
         }
     }
 
-    @Test fun liveQqFileDownloadsAndImports() = withLiveDownload(DictionarySource.QQ) { qq }
+    @Test fun liveQqHomepageDownloadImports() = withLiveDownload(DictionarySource.QQ) {
+        it.list(DictionarySource.QQ).first { item -> !item.category && item.id == qq.id }
+    }
 
-    @Test fun liveSogouFileDownloadsAndImports() = withLiveDownload(DictionarySource.SOGOU) { sogou }
+    @Test fun liveSogouCategoryDownloadImports() = withLiveDownload(DictionarySource.SOGOU) {
+        val category = it.list(DictionarySource.SOGOU).first { item -> item.category && item.id == "1" }
+        it.list(DictionarySource.SOGOU, category.address).first { item -> !item.category && item.id == sogou.id }
+    }
 
     @Test fun liveZhwikiFileDownloadsAndImports() = withLiveDownload(DictionarySource.ZHWIKI) {
         it.list(DictionarySource.ZHWIKI).first { item -> item.id.startsWith("web-slang-") }

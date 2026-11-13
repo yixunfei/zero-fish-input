@@ -12,6 +12,9 @@ Rime Ice, fcitx5-pinyin-zhwiki, QQ and Sogou. The user confirms browsing and
 installation in the foreground. QQ/Sogou use native category and pagination rows;
 there is no arbitrary URL input or WebView. Leaving the page cancels unfinished
 work. Publication already committed to disk is retained.
+Downloadable rows appear directly on home and category pages. Source navigation
+uses a separate list so large category menus cannot hide downloads behind local
+pagination. Back restores the previous public catalog page without refetching it.
 
 The download confirmation fetches the selected file and imports it in the
 app. A separate source link can open the public catalog in a browser.
@@ -55,8 +58,9 @@ failure restores the last verified generation, also recorded atomically for
 subsequent process starts. Public settings publication and
 native activation are distinct; downloads remain installed if deployment fails.
 
-Weekly GitHub Actions resolve upstream assets, convert and verify them, and open
-or update a review PR. No automatic merge or APK publication is permitted. The
+Weekly GitHub Actions resolve, convert and verify upstream assets and report
+update availability in the run summary. Manual dispatch opens or updates a
+review PR. No automatic merge or APK publication is permitted. The
 reviewed lock is the package input; ordinary Gradle builds do not fetch data.
 Other sources are opt-in device downloads and are not redistributed in the APK.
 
