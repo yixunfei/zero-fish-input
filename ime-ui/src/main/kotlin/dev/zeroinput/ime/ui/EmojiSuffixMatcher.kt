@@ -13,14 +13,24 @@ internal class EmojiSuffixMatcher(entries: List<EmojiEntry>) {
         var longest = 0
         entries.filter { it.artworkKey != null }.forEach { entry ->
             require(entry.value.length <= 128)
-            var node = root
-            for (index in entry.value.lastIndex downTo 0) {
-                node = node.children.getOrPut(entry.value[index]) { Node() }
-            }
-            node.terminal = true
+            // Bound optional-selector expansion even if a future catalog is malformed.
+            require(entry.value.count { it == '\uFE0F' } <= 4)
+            insert(root, entry.value, entry.value.lastIndex)
             longest = maxOf(longest, entry.value.length)
         }
         maximumLength = longest
+    }
+
+    private fun insert(node: Node, value: String, index: Int) {
+        if (index < 0) {
+            node.terminal = true
+            return
+        }
+        val char = value[index]
+        insert(node.children.getOrPut(char) { Node() }, value, index - 1)
+        // Emoji presentation selectors may be omitted individually in text received
+        // from other keyboards. ZWJ, keycap and tone components remain mandatory.
+        if (char == '\uFE0F') insert(node, value, index - 1)
     }
 
     fun longestSuffixLength(text: CharSequence): Int {

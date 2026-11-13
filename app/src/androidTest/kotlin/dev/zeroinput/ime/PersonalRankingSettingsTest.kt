@@ -26,6 +26,8 @@ class PersonalRankingSettingsTest {
                 lateinit var dialogRoot: View
                 lateinit var field: EditText
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     descendants(activity.window.decorView).filterIsInstance<TextView>().single {
                         it.text.toString().startsWith(activity.getString(R.string.user_dictionary_threshold_value,
                             SettingsRepository(activity).personalPromotionThreshold))
@@ -57,11 +59,15 @@ class PersonalRankingSettingsTest {
             settings.personalPromotionThreshold = 3
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     val label = activity.getString(R.string.user_dictionary_threshold_value, 3)
                     descendants(activity.window.decorView).filterIsInstance<TextView>().single { it.text == label }.performClick()
                 }
                 instrumentation.waitForIdleSync()
                 scenario.onActivity { activity ->
+                    descendants(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+                        .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.PRIVACY)
                     val root = WindowInspector.getGlobalWindowViews().single { root ->
                         descendants(root).filterIsInstance<EditText>().any {
                             it.hint == activity.getString(R.string.user_dictionary_threshold)

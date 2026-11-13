@@ -2,7 +2,10 @@ package dev.zeroinput.ime.settings
 
 import android.content.ComponentName
 import android.content.Intent
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
@@ -10,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.Lifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
@@ -31,6 +35,11 @@ class MainActivity : AppCompatActivity() {
         queueCapacity = 8,
     )
     private lateinit var screen: SettingsScreenView
+    private val defaultImeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) render()
+        }
+    }
     private var runtimeObserver: AutoCloseable? = null
     private var languagePackObserver: AutoCloseable? = null
     private var lexiconFailureObserver: AutoCloseable? = null
@@ -72,7 +81,15 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(screen)
         bindScreen()
-        if (intent.getBooleanExtra(EXTRA_FUZZY_SETTINGS, false)) screen.post { screen.showFuzzySettings() }
+        val categoryBack = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() { screen.navigateTo(SettingsCategory.HOME) }
+        }
+        onBackPressedDispatcher.addCallback(this, categoryBack)
+        screen.onCategoryChanged = { categoryBack.isEnabled = it != SettingsCategory.HOME }
+        screen.restoreNavigation(savedInstanceState)
+        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_FUZZY_SETTINGS, false)) {
+            screen.post { screen.showFuzzySettings() }
+        }
         runtimeObserver = graph.rime.runtime.addStateListener {
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) render()
@@ -90,6 +107,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // The system picker can change the default IME while this Activity stays resumed.
+        contentResolver.registerContentObserver(
+            Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD), false, defaultImeObserver,
+        )
     }
 
     override fun onResume() {
@@ -119,13 +144,18 @@ class MainActivity : AppCompatActivity() {
                 aiConfig = result.getOrDefault(AiConfiguration())
                 aiConfigReady = result.isSuccess
                 render()
-                if (result.isSuccess && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) &&
+                if (result.isSuccess && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
                     intent.getBooleanExtra(EXTRA_AI_SETTINGS, false)) {
                     intent.removeExtra(EXTRA_AI_SETTINGS)
                     showAiSettings()
                 }
             }
         } }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        screen.saveNavigation(outState)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -403,6 +433,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        contentResolver.unregisterContentObserver(defaultImeObserver)
         incognitoDialog?.dismiss()
         incognitoDialog = null
         deletionObserver?.close()

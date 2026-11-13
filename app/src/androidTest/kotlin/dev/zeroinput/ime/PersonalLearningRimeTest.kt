@@ -19,6 +19,85 @@ import java.util.concurrent.TimeUnit
 /** Public fixture through real Rime and the production asynchronous learning adapter. */
 @RunWith(AndroidJUnit4::class)
 class PersonalLearningRimeTest {
+    @Test fun repeatedNonDefaultChoicesLearnTheirShortCodeAndSurviveReload() =
+        verifyRepeatedChoice(ChineseInputOptions(), "xz", "限制")
+
+    @Test fun nonDefaultSingleCharacterCanMoveFromALaterPageToTheFirstPage() =
+        verifyRepeatedChoice(ChineseInputOptions(candidatePageSize = 5), "xian", "限")
+
+    @Test fun nineKeyChoicesRetainTheirLearningCode() =
+        verifyRepeatedChoice(ChineseInputOptions(keyboardLayout = ChineseKeyboardLayout.NINE_KEY), "9426944", "限制")
+
+    @Test fun doublePinyinChoicesRetainTheirLearningCode() =
+        verifyRepeatedChoice(ChineseInputOptions(doublePinyinScheme = DoublePinyinScheme.MICROSOFT), "xmvi", "限制")
+
+    private fun verifyRepeatedChoice(options: ChineseInputOptions, code: String, word: String) {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val engine = graph.engineExecutor.submit<InputEngine> {
+            check(graph.rime.runtime.isReady)
+            checkNotNull(graph.rime.createNativeOrNull(options))
+        }.get(300, TimeUnit.SECONDS)
+        val worker = Executors.newSingleThreadExecutor()
+        val disk = MemoryStore()
+        val repository = UserLexiconRepository(disk)
+        val store = QueuedPersonalizationStore(repository, repository::warmUp, worker)
+        var committed = ""
+        val connection = object : EditorConnection {
+            override fun setComposingText(text: String) = Unit
+            override fun finishComposingText() = Unit
+            override fun commitText(text: String): Boolean { committed = text; return true }
+            override fun deleteBeforeCursor() = Unit
+            override fun performEditorAction(actionId: Int) = false
+            override fun sendEnterKey() = Unit
+        }
+        val controller = InputSessionController(connection, { engine }, store, personalPromotionThreshold = { 3 })
+        fun settle() {
+            repeat(3) {
+                worker.submit {}.get(10, TimeUnit.SECONDS)
+                controller.refreshPersonalization()
+            }
+        }
+        fun type() {
+            controller.reset()
+            code.forEach { controller.handle(InputCommand.Text(it.toString())) }
+            settle()
+        }
+        try {
+            controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT },
+                InputLanguage.CHINESE, PrivacyConfiguration())
+            repeat(3) { round ->
+                type()
+                if (round == 0 && code in listOf("xz", "xian")) {
+                    assertNotEquals(word, controller.state.snapshot.candidates.first().text)
+                }
+                for (page in 0 until 32) {
+                    if (controller.state.snapshot.candidates.any { it.text == word }) break
+                    controller.handle(InputCommand.ChangeCandidatePage(PageDirection.NEXT))
+                    settle()
+                }
+                val choice = controller.state.snapshot.candidates.indexOfFirst { it.text == word }
+                assertTrue("Non-default fixture candidate must be reachable", choice >= 0)
+                controller.handle(InputCommand.SelectCandidate(choice))
+                assertEquals(word, committed)
+                settle()
+                assertEquals(round + 1, worker.submit<Int> {
+                    repository.frequenciesFor(listOf(word), InputLanguage.CHINESE)[word] ?: 0
+                }.get(10, TimeUnit.SECONDS))
+            }
+            type()
+            assertEquals(word, controller.state.snapshot.candidates.first().text)
+            controller.handle(InputCommand.Space)
+            assertEquals(word, committed)
+            assertEquals(3, worker.submit<Int> {
+                UserLexiconRepository(disk).frequenciesFor(listOf(word), InputLanguage.CHINESE)[word] ?: 0
+            }.get(10, TimeUnit.SECONDS))
+        } finally {
+            controller.close()
+            store.close()
+            disk.delete(true)
+        }
+    }
+
     @Test fun repeatedFullPinyinChoicesIncreaseFrequencyAndPromoteBothFullAndInitialInput() {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         val engine = graph.engineExecutor.submit<InputEngine> {

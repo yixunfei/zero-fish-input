@@ -6,7 +6,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 
 enum class PrivateDraftAction { SAVE_AND_CLOSE, SAVE_AND_SUBMIT, SUBMIT_ONLY }
@@ -14,8 +13,13 @@ enum class PrivateDraftAction { SAVE_AND_CLOSE, SAVE_AND_SUBMIT, SUBMIT_ONLY }
 internal class PrivateDraftPanelView(context: Context) : ScrollView(context) {
     var onPreview: () -> Unit = {}
     var onFinish: (PrivateDraftAction) -> Unit = {}
+    var onCaretRequested: (KeyboardAction.MoveDraftCaret) -> Unit = {}
+    private var caret: DraftCaretUi? = null
+    fun renderCaret(value: DraftCaretUi) { caret = value }
 
-    private val draft = TextView(context).apply {
+    private val draft = DraftTextView(context).apply {
+        isClickable = true
+        onCaretRequested = { this@PrivateDraftPanelView.onCaretRequested(it) }
         minHeight = dp(48)
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(8), 0, dp(8), 0)
@@ -26,8 +30,9 @@ internal class PrivateDraftPanelView(context: Context) : ScrollView(context) {
         isSaveEnabled = false
         addView(draft, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
-    private val scrollToDraftEnd = Runnable {
-        draftScroll.scrollTo(0, (draft.height - draftScroll.height).coerceAtLeast(0))
+    private val scrollToDraftCaret = Runnable {
+        val offset = caret?.offset ?: draft.text.length
+        if (offset in 0..draft.text.length) draft.bringPointIntoView(offset)
     }
     private var fullVisible = false
     private val preview = command(R.string.private_draft_preview) { onPreview() }
@@ -74,12 +79,14 @@ internal class PrivateDraftPanelView(context: Context) : ScrollView(context) {
             draft.ellipsize = if (showBody) null else TextUtils.TruncateAt.START
             draftScroll.isVerticalScrollBarEnabled = showBody
             draft.text = label
-            draftScroll.removeCallbacks(scrollToDraftEnd)
-            if (showBody) draftScroll.post(scrollToDraftEnd) else draftScroll.scrollTo(0, 0)
         }
+        draft.renderCaret(if (busy || !hasInput) null else caret)
+        draftScroll.removeCallbacks(scrollToDraftCaret)
+        if (showBody) draftScroll.post(scrollToDraftCaret) else draftScroll.scrollTo(0, 0)
     }
 
     override fun onDetachedFromWindow() {
+        caret = null
         render("", hasInput = false, busy = false, showFull = false)
         super.onDetachedFromWindow()
     }

@@ -35,6 +35,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private lateinit var content: LinearLayout
     private lateinit var status: ManagementStatusView
     private lateinit var progress: ProgressBar
+    private lateinit var cancelButton: MaterialButton
     private lateinit var scroll: ScrollView
     private var busy = false
     private var taskFailure = R.string.management_operation_failed
@@ -42,8 +43,11 @@ class DictionaryManagerActivity : AppCompatActivity() {
         { !isFinishing && !isDestroyed && !refreshAfterStop }, { value ->
             busy = value
             progress.visibility = if (value) View.VISIBLE else View.GONE
+            cancelButton.visibility = if (value) View.VISIBLE else View.GONE
+            content.visibility = if (value) View.GONE else View.VISIBLE
         }, {
-            status.failure(taskFailure, ::showInstalled)
+            content.removeAllViews()
+            status.failure(taskFailure) { showInstalled() }
             android.widget.Toast.makeText(this, taskFailure, android.widget.Toast.LENGTH_LONG).show()
         }) }
     private var generation = 0L
@@ -83,7 +87,10 @@ class DictionaryManagerActivity : AppCompatActivity() {
         }
         val controls = LinearLayout(this)
         controls.addView(button(R.string.public_dictionary_home) { cancel(); showInstalled() })
-        controls.addView(button(R.string.public_dictionary_cancel) { cancel(); status.show(getString(R.string.public_dictionary_cancelled)) })
+        cancelButton = button(R.string.public_dictionary_cancel, ::cancelAndReloadInstalled).apply {
+            visibility = View.GONE
+        }
+        controls.addView(cancelButton)
         body.addView(controls)
         content = LinearLayout(this).apply {
             isSaveEnabled = false
@@ -106,12 +113,13 @@ class DictionaryManagerActivity : AppCompatActivity() {
         showInstalled()
     }
 
-    private fun showInstalled() {
+    private fun showInstalled(feedback: Int? = null) {
         history.clear()
         currentSource = null
         currentPage = null
         runTask({ InstalledView(graph.publicDictionaries.list(), graph.publicResources.list(),
-            graph.builtInDictionaries.list(), graph.dictionaryEdits.read().names) }, failure = R.string.management_load_failed) { snapshot ->
+            graph.builtInDictionaries.list(), graph.dictionaryEdits.read().names) },
+            failure = R.string.management_load_failed, loading = feedback ?: R.string.public_dictionary_working) { snapshot ->
             val installed = snapshot.downloaded
             val resources = snapshot.resources
             content.removeAllViews()
@@ -136,7 +144,8 @@ class DictionaryManagerActivity : AppCompatActivity() {
             }
             label(getString(R.string.public_dictionary_installed))
             installed.filterNot { it.id.startsWith("builtin_") }.forEach { management.downloaded(it, snapshot.names) }
-            status.show(getString(if (dirty) R.string.public_dictionary_pending else R.string.public_dictionary_offline))
+            val message = feedback ?: if (dirty) R.string.public_dictionary_pending else R.string.public_dictionary_offline
+            status.show(getString(message))
         }
     }
 
@@ -237,9 +246,18 @@ class DictionaryManagerActivity : AppCompatActivity() {
         cancel()
         taskFailure = failure
         progress.isIndeterminate = true
-        content.removeAllViews()
         status.show(getString(loading))
-        tasks.execute({ work() }, complete)
+        tasks.execute({ work() }) { result ->
+            status.clear()
+            complete(result)
+        }
+    }
+
+    private fun cancelAndReloadInstalled() {
+        if (!busy) return
+        cancel()
+        management.close()
+        showInstalled(R.string.public_dictionary_cancelled)
     }
 
     private fun cancel() {

@@ -186,10 +186,10 @@ class SystemClipboardPlatformTest {
                 node?.isEnabled == true
             }
             device.click(copyLabel)
-            val review = listOf(context.getString(R.string.clipboard_import_authenticate),
-                context.getString(R.string.enable_secure_clipboard))
-            device.await("The private import review page must appear") {
-                review.any { device.findText(it)?.window?.isFocused == true }
+            val review = listOf(dev.zeroinput.ime.ui.R.string.secure_clipboard_copy_authenticate,
+                dev.zeroinput.ime.ui.R.string.secure_clipboard_copy_enable).map(context::getString)
+            device.await("The keyboard must show private copy review") {
+                review.any { device.findText(it) != null }
             }
             assertEquals("A private copy must not touch the system clipboard without automatic mode",
                 fixtureTimestamp, port.timestamp())

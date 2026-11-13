@@ -115,10 +115,17 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
 - 密码、PIN、可见密码及应用请求的无个性化输入上下文强制禁用学习和个性化数据读取；邮箱、
   URI、隐身模式及用户关闭学习时同样不读取个人词组或 emoji 历史。运行中收紧隐私设置会立即
   取消当前组合状态。
-- `TYPE_TEXT_FLAG_NO_SUGGESTIONS` does not disable public Chinese conversion in
-  known non-sensitive text fields. Personalization reads/writes, emoji history,
-  model context and next-word predictions remain disabled. Password and unknown
-  field classification still takes precedence.
+- `TYPE_TEXT_FLAG_NO_SUGGESTIONS` does not disable Chinese conversion in known
+  non-sensitive text fields. The user-approved ADR 0038 permits only bounded
+  composing-candidate personal reads and accepted explicit-choice learning in
+  NO_SUGGESTIONS, AUTO_COMPLETE and FILTER editors. General history, English
+  personal completions, implicit learning, model context and next-word predictions
+  receive no new permission. Password/PIN, unknown, email/URI, explicit no-learning,
+  incognito and disabled learning take precedence even when flags are combined.
+  The capability is not an app allowlist and cannot authorize AI or draft access.
+  Existing session/deletion revocation applies to reads, pending writes and stale
+  selections; rejected editor commits never learn. Negative tests cover those
+  combinations, implicit commits with opt-in enabled, and English isolation.
 - The preparation notice contains only static resource text,
   never editor input, and owns no editor connection or pending key replay.
 - Prediction permission travels with the immutable editor context and prepared
@@ -396,13 +403,15 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   selected range. Known and returned lengths must match and remain within 8192
   UTF-16 units. A bounded worker avoids blocking keys. Session/connection, selection,
   interaction and settings changes cancel acceptance, including late IPC responses.
-- A frozen selection transfers once to a nonexported page through an opaque token;
-  the process-local slot expires after five seconds. No plaintext enters an Intent,
-  saved state or disk draft. The receiving page owns the captured import independently
-  of subsequent editor navigation, requires authentication then foreground Save,
-  and never rereads or writes back to the source editor. The original vault deletion
-  generation travels with the draft, so a clear during copying prevents a later save.
-  See ADR 0012. No vendor history erasure capability is inferred from these changes.
+- The IME holds one frozen selection with its original vault deletion generation
+  and shows length and state only. A draft expires after 120 seconds in review and
+  after 30 seconds in either authentication or authorized state. System credential
+  navigation can unbind the source; returning to a matching nonsensitive editor
+  requires a fresh save tap bound to the current session. Public editor metadata
+  only narrows the return destination. The callback does not write. Switching
+  editors, continuing input after binding, settings changes, cancellation, screen
+  off and service destruction invalidate the draft. The frozen text is never
+  reread, put in an Intent or restored from state. See ADR 0012.
 
 - The exported text import Activity treats every Intent as untrusted. It accepts
   only PROCESS_TEXT/SEND text/plain payloads of at most 8,192 UTF-16 code units;
@@ -1397,6 +1406,14 @@ operation details from ordinary screen capture.
 
 The personal suggestion manager uses `FLAG_SECURE`, disables autofill/content capture and saved field state, and returns at most 50 rows per worker query. Pinyin matching loads only the verified public character dictionary, with bounded reading alternatives; private words and search strings are never persisted outside the existing encrypted lexicon. Queries may inspect at most the repository's 20,000 terms off the input thread. Editing/deleting invalidates queued learning, preserves repository generation checks, and rejects duplicate identities, invalid weights and deleted edit targets. Worker callbacks use immutable form values rather than reading Views. Personalization notifications contain no phrase data; the IME checks captured session identity and reevaluates privacy before refreshing. Hidden association rounds cannot be resurrected. Implicit commit learning is opt-in and disabled for restricted editors; rejected editor commits never learn.
 
+Personal-frequency priority survives native-route deduplication: model requests
+and winner delivery both reject rounds with an active personal priority. The
+marker is recalculated from the permitted bounded snapshot and cleared on privacy
+revocation or composition reset. Overlay reranking retains the existing worker,
+query limits, tombstones and disabled-dictionary filters; it grants no new private
+read or write access. Regression cases cover threshold changes, late model results,
+restricted editors, empty queries and removed dictionary selection routes.
+
 ## Interaction repair review (2026-10-30)
 
 The prominent private-copy toolbar button grants no new read authority. It uses
@@ -1412,6 +1429,17 @@ prevent opening the draft.
 The secure IME shows the current composition and candidates while editing.
 The default draft display exposes the last three committed characters and masks
 earlier text. Explicit reveal lasts for the current draft and resets on close.
+Caret editing uses only the isolated buffer. Masked prefix taps are rejected;
+revealing text explicitly enables positioning there. Masking again hides a caret
+inside the prefix. Views carry display offsets and revisions, and retire gestures
+on every render, including equal revisions from different draft owners. Closed
+or restarted drafts reject old requests. Busy private views cannot emit caret
+requests. Backspace clears vacated buffer units after preserving the suffix.
+Deletion examines the bounded local prefix without cutting a surrogate or long
+grapheme at an artificial lookbehind boundary; it reads no external editor data.
+Device regressions cover mask/reveal, busy and stale touches, replacement drafts,
+grapheme boundaries and capacity failure. See
+[ADR 0037](adr/0037-isolated-draft-caret.md).
 Private candidates skip automatic accessibility announcements.
 Locking, switching editors, leaving the panel or changing settings retires the
 buffer and cancels pending writes. The draft never reads the external editor,
@@ -1439,8 +1467,10 @@ Deletion style metadata comes only from the existing 64-unit cursor-local read.
 Formatting spans and plain bracketed text cannot authorize larger deletion. A
 possible textual label only delegates one Delete gesture to its host; false
 positives therefore use host editing semantics. Explicit rejection alone permits
-a one-character fallback. A connection change after the read, or an uncertain
-key exception, must not cause a second edit. Replacement spans touching the left
+a one-character fallback. If the cursor read returns null, one Delete gesture
+is delegated to the still-bound editor. A connection change after the read or
+a rejected edit revokes the fallback. An uncertain editing exception revokes
+any further edit for that gesture. Replacement spans touching the left
 read boundary are not expanded because they may have been truncated. No cursor
 text or span is cached, learned, logged, persisted or transmitted. Host editors
 may omit spans or ignore key events, so universal custom-label deletion cannot

@@ -197,6 +197,7 @@ class AiWorkbenchPanelTest {
             val workbench = visible(panel).filterIsInstance<AiWorkbenchPanelView>().single()
             var inserts = 0
             panel.onAiInsert = { _, _, _ -> inserts++ }
+            panel.renderAiDraftCaret(dev.zeroinput.ime.ui.DraftCaretUi(7, 1))
             panel.renderAiDraft("public fixture", InputSessionState())
             panel.renderAiModels(listOf("public-long-model-name", "public-other"), "public-long-model-name")
             captureAndCheck(panel, configuration, night, "draft")

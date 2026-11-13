@@ -4,6 +4,8 @@ import dev.zeroinput.engine.api.*
 import dev.zeroinput.engine.rime.DictionaryEditReading
 import dev.zeroinput.userdata.DictionaryEditRepository
 import dev.zeroinput.userdata.UserLexiconRepository
+import dev.zeroinput.userdata.UserTerm
+import java.util.Locale
 
 /** Invoked only by QueuedPersonalizationStore, after the editor's privacy gate. */
 internal class DictionaryPersonalizationStore(
@@ -27,6 +29,9 @@ internal class DictionaryPersonalizationStore(
     fun invalidate() = synchronized(preparationLock) { preparationRevision++; requiresFiltering = true }
 
     override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int): PersonalSuggestionPage {
+        require(limit in 0..50 && offset in 0..20000)
+        val input = prefix.trim().lowercase(Locale.ROOT)
+        if (input.isEmpty() || limit == 0) return PersonalSuggestionPage()
         if (language != InputLanguage.CHINESE || !requiresFiltering) return lexicon.suggestionPage(prefix, language, offset, limit)
         val configuration = options()
         val active = activeIds()
@@ -35,24 +40,32 @@ internal class DictionaryPersonalizationStore(
         val originals = selected.mapNotNull { it.original }.map {
             it to DictionaryEditReading.displayText(it.text, configuration.script)
         }
-        val hidden = originals.filter { (word, _) -> word.reading.isEmpty() || DictionaryEditReading.matches(word.reading, prefix, configuration) }
+        val hidden = originals.filter { (word, _) -> word.reading.isEmpty() || DictionaryEditReading.matches(word.reading, input, configuration) }
             .mapTo(HashSet()) { it.second }
         val hiddenEntries = originals.mapTo(HashSet()) { (word, text) -> "$text\t${word.reading.replace(" ", "")}" }
         val frequencies = lexicon.frequencyLookupSnapshot()
         val replacements = selected.mapNotNull { entry ->
             val word = entry.replacement ?: return@mapNotNull null
-            if (!DictionaryEditReading.matches(word.reading, prefix, configuration)) return@mapNotNull null
+            if (!DictionaryEditReading.matches(word.reading, input, configuration)) return@mapNotNull null
             val text = DictionaryEditReading.displayText(word.text, configuration.script)
             val learnedFrequency = frequencies.frequenciesFor(listOf(text), language)[text] ?: 0
             PersonalSuggestion("dictionary:${entry.dictionaryId}:${entry.key}",
                 text, maxOf(word.weight, learnedFrequency), word.reading.replace(" ", ""))
         }
-        val learned = lexicon.list(language).filter { it.shortcut.startsWith(prefix) }.mapNotNull { term ->
+        val rank = compareByDescending<PersonalSuggestion> { it.input.equals(input, ignoreCase = true) }
+            .thenByDescending { it.frequency }
+        val learnedTerms = lexicon.list(language).filter { it.shortcut.startsWith(input, ignoreCase = true) }
+            .sortedWith(compareByDescending<UserTerm> { it.shortcut.equals(input, ignoreCase = true) }
+                .thenByDescending { it.frequency }.thenByDescending { it.lastUsedEpochMillis }.thenBy { it.id })
+        val learned = learnedTerms.mapNotNull { term ->
             val text = DictionaryEditReading.displayText(term.value, configuration.script)
             if (text in hidden) null else PersonalSuggestion(term.id, text, term.frequency, term.shortcut)
         }
+        // Preserve an override's selection route on duplicates, then rank the
+        // combined pool before slicing: low-weight edits must not crowd learned
+        // exact matches out of the first page. Stable ties retain lexicon recency.
         val values = (replacements.sortedWith(compareByDescending<PersonalSuggestion> { it.frequency }.thenBy { it.id }) +
-            learned).distinctBy { it.text }.take(20000)
+            learned).distinctBy { it.text }.sortedWith(rank).take(20000)
         return PersonalSuggestionPage(values.drop(offset).take(limit), values.size > offset + limit,
             suppressedDictionaryTexts = hidden, suppressedDictionaryEntries = hiddenEntries, dictionaryEditsApplied = selected.isNotEmpty())
     }

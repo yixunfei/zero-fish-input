@@ -31,6 +31,9 @@ internal object UnicodeDeletionBoundary {
         iterator.setText(text)
         val boundary = iterator.preceding(text.length)
         val platformLength = if (boundary == BreakIterator.DONE) text.length else text.length - boundary
+        // Regional indicators pair from the start of their run. A catalog suffix
+        // can otherwise pair the last unpaired indicator with half of the prior flag.
+        if (text.codePointBefore(text.length) in 0x1F1E6..0x1F1FF) return platformLength.coerceAtLeast(1)
         val emojiLength = EmojiCatalog.longestEmojiSuffixLength(text)
         return maxOf(platformLength, emojiLength, 1).coerceAtMost(text.length)
     }

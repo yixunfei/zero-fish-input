@@ -156,6 +156,16 @@
     <string name="key_done">完成</string>
     <string name="key_previous">上一项</string>
     <string name="secure_clipboard_copy_selection">复制选中文字到 ZeroInput</string>
+    <plurals name="secure_clipboard_copy_review">
+        <item quantity="other">已选取 %d 个字符，认证后可保存到安全剪贴板</item>
+    </plurals>
+    <string name="secure_clipboard_copy_enable">认证并启用安全剪贴板</string>
+    <string name="secure_clipboard_copy_authenticate">认证后保存</string>
+    <string name="secure_clipboard_copy_authenticating">等待系统身份认证</string>
+    <string name="secure_clipboard_copy_save_hint">将选中文字保存到安全剪贴板？</string>
+    <string name="secure_clipboard_copy_save">保存选中文字</string>
+    <string name="secure_clipboard_copy_saving">正在保存</string>
+    <string name="secure_clipboard_copy_cancel">取消复制</string>
     <string name="secure_clipboard_disabled">安全剪贴板未启用</string>
     <string name="secure_clipboard_empty">暂无安全片段</string>
     <string name="secure_clipboard_load_failed">无法读取片段列表，请重试或打开管理页认证后恢复</string>

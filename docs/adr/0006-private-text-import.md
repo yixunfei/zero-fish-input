@@ -3,7 +3,7 @@
 Status: accepted
 
 Extended by [ADR 0012](0012-keyboard-private-copy-and-foreground-cleanup.md)
-with a keyboard selection snapshot and a nonexported internal import entry.
+with a keyboard selection snapshot and in-keyboard confirmation.
 
 ## Context
 

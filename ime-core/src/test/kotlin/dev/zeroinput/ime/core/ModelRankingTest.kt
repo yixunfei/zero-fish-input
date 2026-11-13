@@ -21,6 +21,54 @@ class ModelRankingTest {
         snapshot = EngineSnapshot("zhishi", "zhi shi", candidates),
     )
 
+    @Test fun `model cannot override personal priority retained on a native route`() {
+        for (useWordFrequency in listOf(false, true)) {
+            var count = 3
+            val store = object : PersonalFrequencyStore {
+                override fun frequenciesFor(words: List<String>, language: InputLanguage) =
+                    if (useWordFrequency) mapOf("芝士" to count) else emptyMap()
+                override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) =
+                    if (useWordFrequency) emptyList() else listOf(PersonalSuggestion("fixture", "芝士", count, "zhishi"))
+                override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+                override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+            }
+            val controller = InputSessionController(Editor(), { Engine(state().snapshot) }, store,
+                personalPromotionThreshold = { 3 })
+            controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, InputLanguage.CHINESE, PrivacyConfiguration())
+            try {
+                assertEquals("c2", controller.state.snapshot.candidates.first().id)
+                assertTrue(controller.modelCandidates().isEmpty())
+                assertFalse(controller.applyModelWinner(controller.state.candidateRevision, 1))
+                assertEquals("c2", controller.state.snapshot.candidates.first().id)
+                count = 0
+                controller.refreshPersonalization()
+                assertEquals(candidates, controller.modelCandidates())
+            } finally { controller.close() }
+        }
+    }
+
+    @Test fun `learning during a model request rejects its late winner`() {
+        var count = 0
+        val store = object : PersonalFrequencyStore {
+            override fun frequenciesFor(words: List<String>, language: InputLanguage) = mapOf("芝士" to count)
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(Editor(), { Engine(state().snapshot) }, store)
+        controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, InputLanguage.CHINESE, PrivacyConfiguration())
+        try {
+            val requested = controller.state.candidateRevision
+            assertEquals(candidates, controller.modelCandidates())
+            count = 1
+            controller.refreshPersonalization()
+            assertFalse(controller.applyModelWinner(requested, 1))
+            assertTrue(controller.modelCandidates().isEmpty())
+            controller.updatePrivacy(PrivacyConfiguration(incognitoMode = true))
+            assertTrue(controller.modelCandidates().isEmpty())
+        } finally { controller.close() }
+    }
+
     @Test fun `frozen confidence threshold preserves ties and rejects nonfinite scores`() {
         assertEquals(2, ModelRankingPolicy.winner(floatArrayOf(-4f, -3f, -1.75f)))
         assertNull(ModelRankingPolicy.winner(floatArrayOf(-4f, -3f, -1.751f)))

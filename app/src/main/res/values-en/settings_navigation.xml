@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appearance_section_style">Style</string>
+    <string name="appearance_section_keys">Keys</string>
+    <string name="appearance_presets">Style presets</string>
+    <string name="appearance_presets_hint">Apply coordinated colors, material and key shapes. Height, candidates and backgrounds stay as configured. Fine-tune individual options below.</string>
+    <string name="settings_dictionaries">Dictionaries and languages</string>
+    <string name="settings_privacy">Privacy and clipboard</string>
+    <string name="settings_general">General and about</string>
+    <string name="settings_input_summary">Chinese input, key feedback, suggestions and symbols</string>
+    <string name="settings_appearance_summary">Colors, keys, candidates and backgrounds</string>
+    <string name="settings_dictionaries_summary">Personal phrases, public dictionaries, expressions and language packs</string>
+    <string name="settings_privacy_summary">Personalization, incognito, private input and data clearing</string>
+    <string name="settings_ai_summary">Models, assistant and optional capabilities</string>
+    <string name="settings_general_summary">Keyboard setup, interface language and version</string>
+</resources>

@@ -166,7 +166,6 @@
     <string name="setting_not_selected">Not selected</string>
     <string name="section_input_method">Input method</string>
     <string name="interface_language">Interface language</string>
-    <string name="settings_nav_ai">AI</string>
     <string name="language_follow_system">System</string>
     <string name="language_simplified_chinese">Chinese</string>
     <string name="setting_system_status">System status</string>
@@ -291,4 +290,9 @@
     <string name="ai_models_apply">Apply to draft</string>
     <string name="public_dictionary_previous_page">Previous page</string>
     <string name="public_dictionary_next_page">Next page</string>
+    <string name="appearance_custom_background_color">Custom background color</string>
+    <string name="appearance_custom_background_color_value">Custom background color · #%06X</string>
+    <string name="appearance_color_channel_red">Red %d</string>
+    <string name="appearance_color_channel_green">Green %d</string>
+    <string name="appearance_color_channel_blue">Blue %d</string>
 </resources>

@@ -8,6 +8,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.setPadding
+import androidx.core.content.withStyledAttributes
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
@@ -57,7 +58,7 @@ data class LanguagePackScreenState(
     val available: Boolean,
 )
 
-class SettingsScreenView(context: Context) : ScrollView(context) {
+class SettingsScreenView(context: Context) : LinearLayout(context) {
     var onEnableRequested: () -> Unit = {}
     var onSwitchRequested: () -> Unit = {}
     var onLearningChanged: (Boolean) -> Unit = {}
@@ -98,11 +99,63 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
 
     private var suppressSwitchCallbacks = false
     private var aiControlsEnabled = true
-    private val content = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(20), dp(18), dp(20), dp(32))
+    private val pages = mutableMapOf<SettingsCategory, LinearLayout>()
+    private val positions = mutableMapOf<SettingsCategory, Int>()
+    private val scroll = ScrollView(context).apply { isFillViewport = true }
+    private val toolbar = com.google.android.material.appbar.MaterialToolbar(context)
+    private val pageTitle = TextView(context).apply {
+        textSize = 22f
+        setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
+        setPadding(0, dp(12), 0, dp(12))
+        androidx.core.view.ViewCompat.setAccessibilityHeading(this, true)
     }
-    private val sectionAnchors = mutableMapOf<String, View>()
+    private var content = newPage()
+    var category: SettingsCategory = SettingsCategory.HOME
+        private set
+    var onCategoryChanged: (SettingsCategory) -> Unit = {}
+    private val homeStatus = valueText()
+
+    private fun newPage() = LinearLayout(context).apply {
+        orientation = VERTICAL
+        setPadding(dp(20), dp(8), dp(20), dp(32))
+    }
+
+    private fun page(category: SettingsCategory) {
+        content = newPage()
+        pages[category] = content
+    }
+
+    fun navigateTo(target: SettingsCategory) {
+        positions[category] = scroll.scrollY
+        showCategory(target)
+    }
+
+    private fun showCategory(target: SettingsCategory) {
+        category = target
+        scroll.removeAllViews()
+        scroll.addView(pages.getValue(target))
+        pageTitle.setText(target.title)
+        toolbar.navigationIcon = if (target == SettingsCategory.HOME) null
+            else androidx.appcompat.content.res.AppCompatResources.getDrawable(context, R.drawable.ic_arrow_back)
+        toolbar.navigationContentDescription = context.getString(R.string.navigate_up)
+        val position = positions[target] ?: 0
+        scroll.post { if (category == target) scroll.scrollTo(0, position) }
+        onCategoryChanged(target)
+    }
+
+    fun saveNavigation(state: android.os.Bundle) {
+        positions[category] = scroll.scrollY
+        state.putString("settings.category", category.name)
+        positions.forEach { (key, value) -> state.putInt("settings.scroll.${key.name}", value) }
+    }
+
+    fun restoreNavigation(state: android.os.Bundle?) {
+        if (state == null) return
+        SettingsCategory.entries.forEach { positions[it] = state.getInt("settings.scroll.${it.name}", 0) }
+        showCategory(SettingsCategory.entries.firstOrNull { it.name == state.getString("settings.category") }
+            ?: SettingsCategory.HOME)
+    }
+
     private val enabledStatus = valueText()
     private val currentStatus = valueText()
     private val engineStatus = valueText()
@@ -110,7 +163,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         onOptionsChanged = { onChineseOptionsChanged(it) }
     }
 
-    fun showFuzzySettings() { chineseSettings.showFuzzySettings() }
+    fun showFuzzySettings() { navigateTo(SettingsCategory.INPUT); chineseSettings.showFuzzySettings() }
 
     /** Prevents a second AI mutation from racing the encrypted settings write. */
     fun setAiControlsEnabled(enabled: Boolean) {
@@ -155,20 +208,27 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     }
 
     init {
-        isFillViewport = true
+        orientation = VERTICAL
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
         setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface, 0xfffafafa.toInt()))
-        addView(content)
+        toolbar.addView(pageTitle, androidx.appcompat.widget.Toolbar.LayoutParams(
+            LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(toolbar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        toolbar.setNavigationOnClickListener { navigateTo(SettingsCategory.HOME) }
         buildContent()
+        showCategory(SettingsCategory.HOME)
     }
 
     fun render(state: SettingsScreenState) {
         enabledStatus.setText(if (state.isEnabled) R.string.setting_enabled else R.string.setting_disabled)
         currentStatus.setText(if (state.isCurrent) R.string.setting_current else R.string.setting_not_selected)
+        homeStatus.setText(if (state.isCurrent) R.string.setting_current else if (state.isEnabled)
+            R.string.setting_not_selected else R.string.setting_disabled)
         engineStatus.text = state.engineStatus
         promotionThreshold.text = context.getString(R.string.user_dictionary_threshold_value, state.personalPromotionThreshold)
         promotionThreshold.contentDescription = promotionThreshold.text
@@ -208,21 +268,9 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     }
 
     private fun buildContent() {
-        content.addView(TextView(context).apply {
-            text = context.getString(R.string.app_name)
-            textSize = 28f
-            setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
-        })
-        content.addView(quickNavigation())
-        content.addView(TextView(context).apply {
-            text = BuildConfig.VERSION_NAME
-            textSize = 13f
-            alpha = 0.66f
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = dp(18)
-            }
-        })
-
+        buildHome()
+        page(SettingsCategory.GENERAL)
+        content.addView(valueText().apply { text = BuildConfig.VERSION_NAME; gravity = Gravity.START })
         section(context.getString(R.string.section_input_method))
         content.addView(TextView(context).apply {
             setText(R.string.interface_language)
@@ -237,6 +285,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             commandButton(context.getString(R.string.setting_switch)) { onSwitchRequested() },
         )
 
+        page(SettingsCategory.PRIVACY)
         section(context.getString(R.string.section_privacy))
         content.addView(learningSwitch)
         content.addView(committedLearningSwitch)
@@ -247,6 +296,11 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(secureClipboardSwitch)
         command(context.getString(R.string.clipboard_guard_title)) { onClipboardGuardRequested() }
 
+        command(context.getString(R.string.secure_clipboard)) { onSecureClipboardRequested() }
+        command(context.getString(R.string.clear_personal_data)) { onPersonalDataClearRequested() }
+        command(context.getString(R.string.clear_secure_clipboard)) { onSecureClipboardClearRequested() }
+
+        page(SettingsCategory.AI)
         section(context.getString(R.string.ai_title))
         content.addView(aiEnabledSwitch)
         content.addView(aiNetworkSwitch)
@@ -259,24 +313,21 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         command(context.getString(R.string.ai_device_agent_settings)) { onAiDeviceAgentSettingsRequested() }
         command(context.getString(R.string.ai_clear_data)) { onAiDataClearRequested() }
 
+        page(SettingsCategory.DICTIONARIES)
         section(context.getString(R.string.section_data))
         command(context.getString(R.string.setting_user_phrases)) { onDictionaryRequested() }
         command(context.getString(R.string.public_dictionary_title)) { onPublicDictionaryRequested() }
         command(context.getString(R.string.expression_manager_title)) { onExpressionsRequested() }
-        command(context.getString(R.string.clear_personal_data)) { onPersonalDataClearRequested() }
-        command(context.getString(R.string.secure_clipboard)) { onSecureClipboardRequested() }
-        command(context.getString(R.string.clear_secure_clipboard)) { onSecureClipboardClearRequested() }
-
         section(context.getString(R.string.section_language_packs))
         command(context.getString(R.string.setting_import_pack)) { onLanguagePackRequested() }
         content.addView(languagePackContent)
 
+        page(SettingsCategory.INPUT)
         section(context.getString(R.string.section_input))
         content.addView(hapticsSwitch)
         content.addView(soundEffectsSwitch)
         content.addView(associationSwitch)
         content.addView(pairedSymbolsSwitch)
-        command(context.getString(R.string.keyboard_appearance)) { onAppearanceRequested() }
 
         section(context.getString(R.string.chinese_input_settings))
         command(context.getString(R.string.select_builtin_chinese)) { onBuiltInEngineSelected() }
@@ -284,6 +335,7 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
         content.addView(modelSwitch)
         content.addView(TextView(context).apply { setText(R.string.experimental_model_help); textSize = 14f })
 
+        content = pages.getValue(SettingsCategory.GENERAL)
         section(context.getString(R.string.section_engine))
         statusRow(context.getString(R.string.language_chinese), engineStatus)
     }
@@ -297,48 +349,64 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
                 topMargin = dp(22)
                 bottomMargin = dp(6)
             }
-            isClickable = true
-            setOnClickListener { post { smoothScrollTo(0, top) } }
+            androidx.core.view.ViewCompat.setAccessibilityHeading(this, true)
         }
-        sectionAnchors[title] = header
         content.addView(header)
         content.addView(divider())
     }
 
-    private fun quickNavigation(): View = LinearLayout(context).apply {
-        orientation = LinearLayout.VERTICAL
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        val entries = listOf(
-            R.string.section_input to R.string.section_input,
-            R.string.section_privacy to R.string.section_privacy,
-            R.string.ai_title to R.string.settings_nav_ai,
-            R.string.section_data to R.string.section_data,
+    private fun buildHome() {
+        page(SettingsCategory.HOME)
+        statusRow(context.getString(R.string.setting_current_keyboard), homeStatus)
+        commandRow(
+            commandButton(context.getString(R.string.setting_enable)) { onEnableRequested() },
+            commandButton(context.getString(R.string.setting_switch)) { onSwitchRequested() },
         )
-        val columns = if (resources.configuration.fontScale >= 1.3f) 2 else 4
-        entries.chunked(columns).forEach { row ->
-            addView(LinearLayout(context).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                isBaselineAligned = false
-                minimumHeight = dp(52)
-                layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-                row.forEach { (key, label) -> addView(navigationButton(key, label)) }
-            })
+        SettingsCategory.entries.filter { it != SettingsCategory.HOME }.forEach { destination ->
+            categoryRow(destination.title, destination.summary) { navigateTo(destination) }
+            if (destination == SettingsCategory.INPUT) {
+                categoryRow(R.string.keyboard_appearance, R.string.settings_appearance_summary) { onAppearanceRequested() }
+            }
         }
     }
 
-    private fun navigationButton(key: Int, label: Int) = MaterialButton(context).apply {
-        id = View.generateViewId()
-        setText(label)
-        isAllCaps = false
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(2), dp(4), dp(2), dp(4))
-        minHeight = dp(48)
-        textSize = 13f
-        layoutParams = LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(4) }
-        setOnClickListener {
-            sectionAnchors[context.getString(key)]?.let { target -> post { smoothScrollTo(0, target.top) } }
-        }
+    private fun categoryRow(title: Int, summary: Int, action: () -> Unit) {
+        content.addView(object : LinearLayout(context) {
+            override fun getAccessibilityClassName(): CharSequence = android.widget.Button::class.java.name
+        }.apply {
+            tag = title
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isFocusable = true
+            minimumHeight = dp(88)
+            setPadding(0, dp(16), 0, dp(16))
+            contentDescription = context.getString(title) + ", " + context.getString(summary)
+            context.withStyledAttributes(attrs = intArrayOf(android.R.attr.selectableItemBackground)) {
+                background = getDrawable(0)
+            }
+            setOnClickListener { action() }
+            addView(LinearLayout(context).apply {
+                orientation = VERTICAL
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                addView(TextView(context).apply {
+                    setText(title)
+                    textSize = 18f
+                    setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface, Color.BLACK))
+                })
+                addView(valueText().apply {
+                    setText(summary)
+                    gravity = Gravity.START
+                    setPadding(0, dp(8), 0, 0)
+                })
+            }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            addView(android.widget.ImageView(context).apply {
+                setImageResource(R.drawable.ic_chevron_right)
+                imageTintList = android.content.res.ColorStateList.valueOf(
+                    resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, Color.DKGRAY))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LayoutParams(dp(24), dp(24)).apply { marginStart = dp(12) })
+        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        content.addView(divider())
     }
 
     private fun statusRow(label: String, value: TextView) {
@@ -415,7 +483,8 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
             languagePackContent.addView(valueText().apply {
                 setText(R.string.setting_no_packs)
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(44))
+                layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+                minHeight = dp(48)
             })
             return
         }
@@ -423,38 +492,37 @@ class SettingsScreenView(context: Context) : ScrollView(context) {
     }
 
     private fun languagePackRow(pack: LanguagePackScreenState): View = LinearLayout(context).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(68))
-        addView(LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
-            addView(TextView(context).apply {
-                text = pack.displayName
-                textSize = 15f
-                maxLines = 1
-            })
-            addView(TextView(context).apply {
-                text = buildString {
-                    append(pack.languageTag).append(" · ").append(pack.version)
-                     if (!pack.available) append(" · ").append(context.getString(R.string.language_pack_unavailable))
-                }
-                textSize = 12f
-                alpha = 0.66f
-                maxLines = 1
-            })
-        })
+        orientation = VERTICAL
+        setPadding(0, dp(8), 0, dp(12))
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         addView(MaterialSwitch(context).apply {
+            text = pack.displayName
+            textSize = 16f
+            minHeight = dp(48)
+            setSingleLine(false)
             isChecked = pack.enabled
-            isEnabled = true
-             contentDescription = context.getString(R.string.language_pack_enable, pack.displayName)
+            contentDescription = context.getString(R.string.language_pack_enable, pack.displayName)
             setOnCheckedChangeListener { _, checked -> onLanguagePackEnabledChanged(pack.key, checked) }
+        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(valueText().apply {
+            gravity = Gravity.START
+            text = buildString {
+                append(pack.languageTag).append(" · ").append(pack.version)
+                if (!pack.available) append(" · ").append(context.getString(R.string.language_pack_unavailable))
+            }
         })
-         addView(commandButton(context.getString(if (pack.selected) R.string.language_pack_in_use else R.string.language_pack_use)) {
-            if (pack.available) onLanguagePackSelected(pack.key)
-        }.apply { isEnabled = pack.available })
-         addView(commandButton(context.getString(R.string.language_pack_delete)) { onLanguagePackDeleteRequested(pack.key) })
+        addView(LinearLayout(context).apply {
+            isBaselineAligned = false
+            val use = commandButton(context.getString(if (pack.selected) R.string.language_pack_in_use else R.string.language_pack_use)) {
+                if (pack.available) onLanguagePackSelected(pack.key)
+            }.apply { isEnabled = pack.available }
+            val remove = commandButton(context.getString(R.string.language_pack_delete)) { onLanguagePackDeleteRequested(pack.key) }
+            listOf(use, remove).forEach { button ->
+                button.minWidth = 0
+                button.minimumWidth = 0
+                addView(button, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+            }
+        })
     }
 
     private fun settingSwitch(label: String, callback: (Boolean) -> Unit) = MaterialSwitch(context).apply {

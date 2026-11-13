@@ -267,9 +267,9 @@ class ZeroInputView @JvmOverloads constructor(
     private val copySelectionButton = panelIconButton(context, R.drawable.ic_copy_selection,
         R.string.secure_clipboard_copy_selection) {
         onCopySelectionRequested()
-    }.apply { visibility = GONE }
+    }.apply { visibility = GONE; filterTouchesWhenObscured = true }
     private var copySelectionAvailable = false
-    private val primaryTools: List<View> = listOf(copySelectionButton, toolsButton, privateDraftButton, secureClipboardButton,
+    private val primaryTools: List<View> = listOf(shapeButton, toolsButton, privateDraftButton, secureClipboardButton,
         aiButton, numbersButton, emojiButton)
     private val toolbarRow = createToolbar()
     private val additionalTools = (primaryTools.size until toolbarRow.childCount).map(toolbarRow::getChildAt)
@@ -601,6 +601,8 @@ class ZeroInputView @JvmOverloads constructor(
         privateDraft.render("", hasInput = false, busy = false, showFull = false)
         privateSnapshot = EngineSnapshot.Empty
         onCopySelectionRequested = {}
+        onCopyConfirmationAction = {}
+        onCopyConfirmationCancelled = {}
         onPasteConfirmed = {}
         onPasteCancelled = {}
         onSettingsRequested = {}
@@ -683,7 +685,11 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderSearchDraft(text: String, state: InputSessionState) {
         if (!isSearchEditing) return
         searchSnapshot = state.snapshot
-        emoji.renderQuery(text)
+        val composition = state.snapshot.composition
+        val committed = text.dropLast(composition.length)
+        val offset = searchCaret?.offset?.coerceIn(0, committed.length) ?: committed.length
+        emoji.renderQuery(committed.substring(0, offset) + composition + committed.substring(offset))
+        searchCaret?.let { emoji.renderCaret(it, composition.length) }
         candidateStrip.render(state.snapshot)
         keyboard.setComposing(state.snapshot.isComposing)
         renderDraftLanguage(state.language)
@@ -715,6 +721,11 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun openPrivateDraft() = showMode(PanelMode.PRIVATE_DRAFT, userInitiated = false)
+
+    private var searchCaret: DraftCaretUi? = null
+    fun renderSearchDraftCaret(value: DraftCaretUi) { searchCaret = value }
+    fun renderPrivateDraftCaret(value: DraftCaretUi) { privateDraft.renderCaret(value) }
+    fun renderAiDraftCaret(value: DraftCaretUi) { ai.renderDraftCaret(value) }
 
     fun renderPrivateDraft(text: String, hasInput: Boolean, state: InputSessionState, busy: Boolean, showFull: Boolean) {
         if (!isPrivateDraftOpen) return
@@ -815,7 +826,22 @@ class ZeroInputView @JvmOverloads constructor(
     fun renderCopySelectionAvailable(available: Boolean) {
         copySelectionAvailable = available
         secureClipboard.renderCopyAvailable(available)
-        copySelectionButton.isVisible = available && !isPrivateDraftOpen && !isShapeLookupOpen
+        updateCopySelectionButton()
+    }
+
+    var onCopyConfirmationAction: () -> Unit = {}
+    var onCopyConfirmationCancelled: () -> Unit = {}
+
+    fun renderCopyConfirmation(state: ClipboardCopyUi?) {
+        secureClipboard.renderCopyConfirmation(state)
+        if (state != null && mode != PanelMode.SECURE_CLIPBOARD) {
+            showMode(PanelMode.SECURE_CLIPBOARD, userInitiated = false)
+        }
+    }
+
+    private fun updateCopySelectionButton() {
+        copySelectionButton.isVisible = copySelectionAvailable && manualTools &&
+            (mode == PanelMode.KEYBOARD || mode == PanelMode.SECURE_CLIPBOARD)
     }
 
     fun renderPasteConfirmation(visible: Boolean) {
@@ -855,10 +881,10 @@ class ZeroInputView @JvmOverloads constructor(
         layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(48))
         primaryTools.forEach { addView(it, LayoutParams(dp(48), dp(48))) }
         fun addTool(view: View) { secondaryTools += view; addView(view, LayoutParams(dp(48), dp(48))) }
+        addView(copySelectionButton, LayoutParams(dp(48), dp(48)))
         addTool(panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.handwriting_open) {
             toggleMode(PanelMode.HANDWRITING)
         })
-        addView(shapeButton)
         addView(reconvertButton, LayoutParams(dp(48), dp(48)))
         addView(undoCandidateButton, LayoutParams(dp(48), dp(48)))
         addTool(languageButton)
@@ -915,6 +941,7 @@ class ZeroInputView @JvmOverloads constructor(
         emoji.onFavoriteRequested = { entry, selected -> onExpressionFavoriteRequested(entry, selected) }
         emoji.onManageRequested = { onExpressionManagementRequested(it) }
         emoji.onSearchModeChanged = { searchActive ->
+            searchCaret = null
             searchSnapshot = EngineSnapshot.Empty
             searchCandidatesExpanded = false
             onSearchVisibilityChanged(searchActive && mode == PanelMode.EMOJI)
@@ -922,6 +949,7 @@ class ZeroInputView @JvmOverloads constructor(
             refreshHeader()
         }
         emoji.onQueryClearRequested = { onSearchClearRequested() }
+        emoji.onCaretRequested = { if (isSearchEditing) dispatchKeyboardAction(it) }
         emoji.onUserInteraction = { onUserInteraction() }
         handwriting.onStrokesChanged = { onHandwritingStrokesChanged(it) }
         handwriting.onCandidateSelected = { onHandwritingCandidateSelected(it) }
@@ -933,8 +961,11 @@ class ZeroInputView @JvmOverloads constructor(
         shapeLookup.onChoice = { index, value -> if (isShapeLookupOpen) onShapeChoice(index, value) }
         shapeLookup.onReset = { if (isShapeLookupOpen) onShapeReset() }
         privateDraft.onPreview = { if (isPrivateDraftOpen) onPrivateDraftPreview() }
+        privateDraft.onCaretRequested = { if (isPrivateDraftOpen) dispatchKeyboardAction(it) }
         privateDraft.onFinish = { if (isPrivateDraftOpen) onPrivateDraftFinished(it) }
         secureClipboard.onCopySelectionRequested = { onCopySelectionRequested() }
+        secureClipboard.onCopyConfirmationAction = { onCopyConfirmationAction() }
+        secureClipboard.onCopyConfirmationCancelled = { onCopyConfirmationCancelled() }
         secureClipboard.onPasteConfirmed = { onPasteConfirmed() }
         secureClipboard.onPasteCancelled = { onPasteCancelled() }
         secureClipboard.onManageRequested = {
@@ -948,6 +979,7 @@ class ZeroInputView @JvmOverloads constructor(
         ai.onSubmit = { action, input, target -> onAiSubmit(action, input, target) }
         ai.onCancel = { onAiCancel() }
         ai.onDeviceAgentDraftChanged = { onAiDeviceAgentDraftChanged(it) }
+        ai.onDraftCaretRequested = { if (isAiOpen) dispatchKeyboardAction(it) }
         ai.onDeviceAgentTaskSubmitted = { onAiDeviceAgentTaskSubmitted(it) }
         ai.onInsert = { value, includeThinking, sections -> onAiInsert(value, includeThinking, sections) }
         ai.onUseDraftSelection = { source, start, end ->
@@ -1221,10 +1253,10 @@ class ZeroInputView @JvmOverloads constructor(
         val start = if (returnButton.isVisible) dp(48) else 0
         if (toolbarParams.marginStart != start) { toolbarParams.marginStart = start; toolbar.layoutParams = toolbarParams }
         toolsButton.isVisible = !manualTools && !isShapeLookupOpen && !isPrivateDraftOpen
-        copySelectionButton.isVisible = copySelectionAvailable && !isShapeLookupOpen && !isPrivateDraftOpen
+        updateCopySelectionButton()
         aiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen
         emojiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen
-        shapeButton.isVisible = manualTools && mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
+        shapeButton.isVisible = !manualTools && mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
         privateDraftButton.isVisible = isPrivateDraftOpen ||
             mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
         secureClipboardButton.isVisible = !sensitive && (mode == PanelMode.KEYBOARD || manualTools)
@@ -1270,7 +1302,7 @@ class ZeroInputView @JvmOverloads constructor(
         val editing = searchActive || aiEditing || shapeTyping || isPrivateDraftOpen
         val splitSearch = editing && viewportPlan.splitDetailPanel
         // AI keeps three primary commands visible; reserve their width in a short landscape window.
-        val detailWeight = if (aiEditing) 5f else 1f
+        val detailWeight = if (aiEditing) 5f * resources.configuration.fontScale.coerceIn(1f, 1.5f) else 1f
         val keyboardWeight = if (aiEditing) 7f else 2f
         val compactPanel = dp(if (viewportPlan.candidateInline) EMOJI_SEARCH_HEIGHT_DP else PANEL_HEIGHT_DP)
         val defaultHeight = when {

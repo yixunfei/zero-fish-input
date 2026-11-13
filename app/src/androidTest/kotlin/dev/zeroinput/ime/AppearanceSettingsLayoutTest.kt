@@ -70,6 +70,7 @@ class AppearanceSettingsLayoutTest {
                         reset.requestRectangleOnScreen(android.graphics.Rect(0, 0, reset.width, reset.height), true)
                         assertTrue(reset.getGlobalVisibleRect(android.graphics.Rect()))
                         scroll.scrollTo(0, 0)
+                        captureControls(activity, scroll.getChildAt(0), value)
                         // Only default public decoration is rendered; no stored user image is loaded.
                         val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
                         try {
@@ -89,6 +90,20 @@ class AppearanceSettingsLayoutTest {
             shell("settings put system accelerometer_rotation $auto")
             onMain { settings.keyboardAppearance = appearance }
         }
+    }
+
+    private fun captureControls(activity: KeyboardAppearanceActivity, controls: View, rotation: Int) {
+        val bitmap = Bitmap.createBitmap(controls.width, controls.height, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(com.google.android.material.color.MaterialColors.getColor(
+                controls, com.google.android.material.R.attr.colorSurface))
+            controls.draw(canvas)
+            val folder = File(activity.getExternalFilesDir(null), "keyboard-fixtures").apply { mkdirs() }
+            File(folder, "appearance-controls-$rotation.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally { bitmap.recycle() }
     }
 
     private fun shell(command: String): String = instrumentation.uiAutomation.executeShellCommand(command).use {

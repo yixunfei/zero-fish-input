@@ -42,6 +42,8 @@ macOS implementation and permissions are not copied into the Android input metho
   and learning-disabled sessions fail closed. The user approved independent AI
   drafts in ordinary text editors that only request NO_SUGGESTIONS. This exception
   never permits personalization or overrides combined privacy restrictions.
+  ADR 0038 separately permits limited Chinese conversion personalization in
+  eligible editors; it grants no AI, history or model-context access.
   A result remains in
   the workbench until the user taps **Insert result**, which revalidates the
   current editor session before committing it.

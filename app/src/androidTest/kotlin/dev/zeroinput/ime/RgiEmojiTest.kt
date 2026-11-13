@@ -56,6 +56,28 @@ class RgiEmojiTest {
         } finally { handle.close() }
     }
 
+    @Test fun deletionKeepsOptionalPresentationSequencesWhole() {
+        for (value in listOf("👩‍❤‍💋‍👩", "👩‍❤️‍💋‍👩", "🏳‍🌈", "1\u20E3")) {
+            assertEquals(value.length, EmojiCatalog.longestEmojiSuffixLength("public-prefix" + value))
+            assertEquals(value.length,
+                dev.zeroinput.ime.input.UnicodeDeletionBoundary.precedingLength("public-prefix" + value))
+        }
+        assertEquals(1, dev.zeroinput.ime.input.UnicodeDeletionBoundary.precedingLength("123"))
+    }
+
+    @Test fun flagDeletionRespectsRegionalIndicatorPairingFromTheStartOfEachRun() {
+        val c = "🇨"
+        val n = "🇳"
+        for (prefix in listOf("", "public-prefix", "👩‍👩‍👧‍👦")) {
+            for (count in 1..12) {
+                val run = (0 until count).joinToString("") { if (it % 2 == 0) c else n }
+                assertEquals(if (count % 2 == 0) 4 else 2,
+                    dev.zeroinput.ime.input.UnicodeDeletionBoundary.precedingLength(prefix + run))
+            }
+        }
+        assertEquals(2, dev.zeroinput.ime.input.UnicodeDeletionBoundary.precedingLength("🇨🇳 🇨"))
+    }
+
     @Test fun preparedPublicCatalogHasEveryRgiSequenceAndComponent() {
         assertTrue(EmojiCatalog.isReady)
         assertEquals("18.0", EmojiCatalog.unicodeVersion)

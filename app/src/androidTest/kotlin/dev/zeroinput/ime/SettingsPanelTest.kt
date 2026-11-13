@@ -16,6 +16,7 @@ import dev.zeroinput.engine.api.ChineseKeyboardLayout
 import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.ime.settings.SettingsRepository
 import dev.zeroinput.ime.settings.SettingsScreenState
+import dev.zeroinput.ime.settings.SettingsCategory
 import dev.zeroinput.ime.settings.SettingsScreenView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,6 +40,8 @@ class SettingsPanelTest {
             instrumentation.waitForIdleSync()
             val owner = activity
             onMain {
+                descendants(owner.window.decorView).filterIsInstance<SettingsScreenView>().single()
+                    .navigateTo(SettingsCategory.PRIVACY)
                 descendants(owner.window.decorView).filterIsInstance<TextView>().single {
                     it.text == owner.getString(R.string.clear_secure_clipboard)
                 }.performClick()
@@ -166,6 +169,7 @@ class SettingsPanelTest {
             aiEnabled = true,
             aiNetworkAllowed = true,
         ))
+        panel.navigateTo(SettingsCategory.AI)
         val switches = descendants(panel).filterIsInstance<MaterialSwitch>()
         val enabled = switches.single { it.text == target.getString(R.string.ai_enabled) }
         val network = switches.single { it.text == target.getString(R.string.ai_network) }
@@ -202,7 +206,10 @@ class SettingsPanelTest {
         val context = ContextThemeWrapper(target.createConfigurationContext(configuration), R.style.Theme_ZeroInput)
         val panel = SettingsScreenView(context)
         panel.render(SettingsScreenState(false, false, true, false, false, true,
-            engineStatus = context.getString(R.string.engine_status_ready)))
+            engineStatus = context.getString(R.string.engine_status_ready),
+            languagePacks = listOf(dev.zeroinput.ime.settings.LanguagePackScreenState(
+                "public-fixture", "Public language pack with a long display name", "en", "1.0", true, false, true))))
+        panel.navigateTo(SettingsCategory.INPUT)
         val width = (320 * context.resources.displayMetrics.density).toInt()
         panel.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(width * 2, View.MeasureSpec.EXACTLY))
@@ -216,7 +223,7 @@ class SettingsPanelTest {
         association.performClick()
         assertTrue(!enabled)
         val groups = all.filterIsInstance<MaterialButtonToggleGroup>()
-        assertEquals(5, groups.size)
+        assertEquals(4, groups.size)
         for (group in groups) {
             val buttons = descendants(group).filterIsInstance<MaterialButton>()
             assertEquals(1, buttons.count { it.isChecked })
@@ -225,60 +232,99 @@ class SettingsPanelTest {
             assertTrue("Checked mode needs a distinct visual state", tint.getColorForState(
                 intArrayOf(android.R.attr.state_checked), 0) != tint.getColorForState(intArrayOf(), 0))
         }
-        val languageGroup = groups.single { group ->
-            descendants(group).filterIsInstance<MaterialButton>().any {
-                it.text == context.getString(R.string.language_follow_system)
-            }
-        }
-        assertEquals(1, descendants(languageGroup).filterIsInstance<MaterialButton>().count { it.isChecked })
         all.filterIsInstance<MaterialButtonToggleGroup>().forEach { group ->
             val heights = (0 until group.childCount).map { group.getChildAt(it).height }
             assertTrue("Mode buttons must share a row height", heights.distinct().size <= 1)
         }
-        savePublicFixtures(panel, locale, night, scale)
-        all.filterIsInstance<TextView>().filter { it.isClickable && it.text.isNotEmpty() }.forEach {
-            val available = it.width - it.compoundPaddingLeft - it.compoundPaddingRight
-            val layout = checkNotNull(it.layout)
-            // This panel uses only built-in resource labels and synthetic state.
-            val diagnostic = "Setting labels must fit a 320dp screen: locale=${locale.toLanguageTag()}, " +
-                "night=$night, scale=$scale, view=${it.javaClass.simpleName}, label=${it.text}, " +
-                "width=${it.width}, available=$available"
-            assertTrue(diagnostic, layout.lineCount > 0)
-            for (line in 0 until layout.lineCount) {
-                assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
-                assertTrue(diagnostic, layout.getLineWidth(line) <= available + 1)
+        for (category in SettingsCategory.entries) {
+            panel.navigateTo(category)
+            panel.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(width * 2, View.MeasureSpec.EXACTLY))
+            panel.layout(0, 0, panel.measuredWidth, panel.measuredHeight)
+            val visible = descendants(panel)
+            if (category == SettingsCategory.GENERAL) {
+                val languageGroup = visible.filterIsInstance<MaterialButtonToggleGroup>().single()
+                assertEquals(1, descendants(languageGroup).filterIsInstance<MaterialButton>().count { it.isChecked })
             }
-            assertEquals(diagnostic, it.text.length, layout.getLineEnd(layout.lineCount - 1))
-            assertTrue(diagnostic, layout.height <= it.height - it.compoundPaddingTop - it.compoundPaddingBottom)
+            visible.filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE && it.text.isNotEmpty() }.forEach {
+                assertLabelFits(it, "Setting label: ${locale.language}, $night, $scale, $category, ${it.text}")
+            }
+            savePublicFixtures(panel, locale, night, scale)
         }
     }
 
-    private fun savePublicFixtures(panel: SettingsScreenView, locale: Locale, night: Boolean, scale: Float) {
-        val controls = descendants(panel).filterIsInstance<TextView>()
-        val targets = listOf(null, controls.first { it.text == panel.context.getString(R.string.setting_learn_from_committed_text) },
-            controls.first { it.text == panel.context.getString(R.string.keyboard_full) })
-        targets.forEachIndexed { index, target ->
-            val rect = android.graphics.Rect()
-            if (target != null) {
-                target.getDrawingRect(rect)
-                panel.offsetDescendantRectToMyCoords(target, rect)
-            }
-            panel.scrollTo(0, if (target == null) 0 else rect.top - 100)
-            if (target != null) {
-                assertTrue("Screenshot must include its target", rect.top >= panel.scrollY &&
-                    rect.bottom <= panel.scrollY + panel.height)
-            }
-            val bitmap = android.graphics.Bitmap.createBitmap(panel.width, panel.height, android.graphics.Bitmap.Config.ARGB_8888)
-            try {
-                val canvas = android.graphics.Canvas(bitmap)
-                canvas.translate(0f, -panel.scrollY.toFloat())
-                panel.draw(canvas)
-                java.io.File(panel.context.cacheDir, "settings-${locale.language}-$night-$scale-$index.png").outputStream().use {
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
-                }
-            } finally { bitmap.recycle() }
+    private fun assertLabelFits(view: TextView, diagnostic: String) {
+        val available = view.width - view.compoundPaddingLeft - view.compoundPaddingRight
+        val layout = checkNotNull(view.layout)
+        assertTrue(diagnostic, layout.lineCount > 0)
+        for (line in 0 until layout.lineCount) {
+            assertEquals(diagnostic, 0, layout.getEllipsisCount(line))
+            // getLineWidth includes the invisible trailing space at a soft wrap.
+            // getLineMax measures visible extent while retaining leading margins.
+            assertTrue(diagnostic, layout.getLineMax(line) <= available + 1)
         }
-        panel.scrollTo(0, 0)
+        assertEquals(diagnostic, view.text.length, layout.getLineEnd(layout.lineCount - 1))
+        assertTrue(diagnostic, layout.height <= view.height - view.compoundPaddingTop - view.compoundPaddingBottom)
+    }
+
+    @Test fun labelMeasurementStillRejectsVisibleOverflowEllipsisAndClippedHeight() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        var result: Result<Unit>? = null
+        instrumentation.runOnMainSync {
+            result = runCatching {
+                val context = ContextThemeWrapper(instrumentation.targetContext, R.style.Theme_ZeroInput)
+                fun label(width: Int, height: Int, ellipsis: Boolean = false): TextView = TextView(context).apply {
+                    text = "Public fixture label with deliberately overflowing text"
+                    textSize = 24f
+                    setSingleLine(true)
+                    if (ellipsis) ellipsize = android.text.TextUtils.TruncateAt.END
+                    measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                    layout(0, 0, measuredWidth, measuredHeight)
+                }
+                for (view in listOf(label(50, 100), label(50, 100, true), label(2000, 1))) {
+                    org.junit.Assert.assertThrows(AssertionError::class.java) { assertLabelFits(view, "Public negative fixture") }
+                }
+            }
+        }
+        checkNotNull(result).getOrThrow()
+    }
+
+    private fun savePublicFixtures(panel: SettingsScreenView, locale: Locale, night: Boolean, scale: Float) {
+        val bitmap = android.graphics.Bitmap.createBitmap(panel.width, panel.height, android.graphics.Bitmap.Config.ARGB_8888)
+        try {
+            panel.draw(android.graphics.Canvas(bitmap))
+            java.io.File(panel.context.cacheDir, "settings-${locale.language}-$night-$scale-${panel.category.name}.png").outputStream().use {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally { bitmap.recycle() }
+    }
+
+    @Test fun categoryNavigationPreservesPendingLocksAndRestoresSelectionWithoutMutations() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput)
+        val panel = SettingsScreenView(context)
+        var mutations = 0
+        panel.onAiEnabledChanged = { mutations++ }
+        panel.onLearningChanged = { mutations++ }
+        panel.render(SettingsScreenState(false, false, true, false, false, true,
+            engineStatus = context.getString(R.string.engine_status_ready), aiEnabled = true, aiNetworkAllowed = true))
+        panel.setAiControlsEnabled(false)
+        assertTrue(descendants(panel).none { it is MaterialSwitch })
+        descendants(panel).single { it.tag == R.string.ai_title }.performClick()
+        assertEquals(SettingsCategory.AI, panel.category)
+        val aiSwitch = descendants(panel).filterIsInstance<MaterialSwitch>().single {
+            it.text == context.getString(R.string.ai_enabled)
+        }
+        assertTrue(aiSwitch.isChecked && !aiSwitch.isEnabled)
+        panel.navigateTo(SettingsCategory.HOME)
+        panel.navigateTo(SettingsCategory.AI)
+        assertTrue(!aiSwitch.isEnabled)
+        val saved = android.os.Bundle()
+        panel.saveNavigation(saved)
+        val restored = SettingsScreenView(context)
+        restored.restoreNavigation(saved)
+        assertEquals(SettingsCategory.AI, restored.category)
+        assertEquals(0, mutations)
     }
 
     private fun descendants(view: View): List<View> = if (view is ViewGroup) {

@@ -70,6 +70,8 @@ class AiLiveSettingsFlowTest {
     }
 
     private fun enterProvider(activity: MainActivity, endpoint: String, key: String, model: String) {
+        onMain { views(activity.window.decorView).filterIsInstance<dev.zeroinput.ime.settings.SettingsScreenView>()
+            .single().navigateTo(dev.zeroinput.ime.settings.SettingsCategory.AI) }
         await { views(activity.window.decorView).filterIsInstance<TextView>().any {
             it.text == activity.getString(R.string.ai_settings) && it.isEnabled } }
         onMain { views(activity.window.decorView).filterIsInstance<TextView>().first {

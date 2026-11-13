@@ -166,7 +166,7 @@
             android:taskAffinity=""
             android:theme="@style/Theme.ZeroInput.PrivateImport"
             android:windowSoftInputMode="stateAlwaysHidden|adjustResize">
-            <intent-filter>
+            <intent-filter android:label="@string/copy_to_zeroinput">
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
@@ -177,15 +177,6 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".clipboard.ClipboardSelectionImportActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTask"
-            android:taskAffinity=""
-            android:theme="@style/Theme.ZeroInput.PrivateImport"
-            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
         <activity
             android:name=".ai.AiComposeActivity"

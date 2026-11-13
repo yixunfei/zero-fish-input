@@ -27,6 +27,23 @@ class ClipboardExternalImportTest {
     }
 
     @Test
+    fun nativeSelectionMenuOffersPrivateImportWhenAnEditableFieldSelectsAll() {
+        Device.startSource()
+        try {
+            Device.longPressPublicText("public-editable-fixture")
+            try {
+                Device.await("The native menu should include ZeroInput after full selection") {
+                    Device.findText("Native ZeroInput text action available") != null
+                }
+            } catch (failure: AssertionError) {
+                val statuses = listOf("Native ZeroInput text action unavailable", "Native selection ended",
+                    "Native editable selection was partial", "Source ready", "Source inactive")
+                throw AssertionError(statuses.filter { Device.findText(it) != null }.joinToString(), failure)
+            }
+        } finally { closeSource() }
+    }
+
+    @Test
     fun systemTextSharesheetFromAnotherApplicationCanOpenThePrivateImportReview() {
         Device.startSource()
         try {

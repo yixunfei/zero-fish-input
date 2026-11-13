@@ -25,8 +25,13 @@ internal class LocalDraftInput(
     private val multiline: Boolean = true,
     private val maskCommitted: Boolean = false,
     private val onLengthLimit: () -> Unit = {},
+    private val renderCaret: (dev.zeroinput.ime.ui.DraftCaretUi) -> Unit = {},
 ) : AutoCloseable {
     private val text = StringBuilder(if (maskCommitted) maxChars else 16)
+    private var caret = 0
+    private var caretRevision = 0L
+    private var hiddenPrefix = 0
+    private var displayedPrefix = 0
     private var lengthLimitReached = false
     var showFullPrivateDraft = false
         private set
@@ -72,6 +77,7 @@ internal class LocalDraftInput(
     fun handle(action: KeyboardAction) {
         val input = controller ?: return
         when (action) {
+            is KeyboardAction.MoveDraftCaret -> moveCaret(action.offset, action.revision)
             is KeyboardAction.Text -> input.handle(InputCommand.Text(action.value))
             is KeyboardAction.LiteralText -> input.handle(InputCommand.LiteralText(action.value))
             is KeyboardAction.PairedText -> input.handle(InputCommand.PairedText(action.opening, action.closing))
@@ -90,7 +96,24 @@ internal class LocalDraftInput(
 
     fun command(command: InputCommand) {
         controller?.handle(command)
+        controller?.state?.let(::emit)
         resumePreparation()
+    }
+
+    private fun moveCaret(displayOffset: Int, revision: Long) {
+        val input = controller ?: return
+        if (revision != caretRevision || displayOffset < displayedPrefix) return
+        var offset = displayOffset - displayedPrefix + hiddenPrefix
+        if (offset !in 0..text.length) return
+        val previousCaret = caret
+        val previousLength = text.length
+        finishComposition()
+        if (lengthLimitReached || input.state.snapshot.isComposing) return
+        if (offset >= previousCaret) offset += text.length - previousLength
+        val boundaries = android.icu.text.BreakIterator.getCharacterInstance(java.util.Locale.ROOT)
+        boundaries.setText(text.toString())
+        caret = if (boundaries.isBoundary(offset)) offset else boundaries.preceding(offset).coerceAtLeast(0)
+        emit(input.state)
     }
 
     fun clearComposition(): Boolean {
@@ -156,6 +179,7 @@ internal class LocalDraftInput(
         input.reset()
         wipeText()
         text.append(value)
+        caret = text.length
         emit(input.state)
         resumePreparation()
         return true
@@ -164,7 +188,8 @@ internal class LocalDraftInput(
     fun appendImported(value: String): Boolean {
         if (value.length + text.length > maxChars || controller == null) return false
         controller?.reset()
-        text.append(value)
+        text.insert(caret, value)
+        caret += value.length
         controller?.state?.let(::emit)
         resumePreparation()
         return true
@@ -196,6 +221,11 @@ internal class LocalDraftInput(
     private fun emit(state: InputSessionState) {
         val preedit = preeditOf(state)
         val committed = if (maskCommitted && !showFullPrivateDraft) maskedPrivateDraft(text) else text.toString()
+        hiddenPrefix = if (maskCommitted && !showFullPrivateDraft) privateDraftTailStart(text) else 0
+        displayedPrefix = hiddenPrefix.coerceAtMost(32)
+        caretRevision++
+        renderCaret(dev.zeroinput.ime.ui.DraftCaretUi(
+            if (caret < hiddenPrefix) -1 else displayedPrefix + caret - hiddenPrefix, caretRevision))
         render(committed, preedit, state)
     }
 
@@ -270,15 +300,28 @@ internal class LocalDraftInput(
                 onLengthLimit()
                 return false
             }
-            this@LocalDraftInput.text.append(text)
+            this@LocalDraftInput.text.insert(caret, text)
+            caret += text.length
             return true
         }
-        override fun commitPairedText(text: String, cursorOffset: Int): Boolean = commitText(text)
+        override fun commitPairedText(text: String, cursorOffset: Int): Boolean {
+            if (cursorOffset !in 0..text.length) return false
+            val start = caret
+            if (!commitText(text)) return false
+            caret = start + cursorOffset
+            return true
+        }
         override fun deleteBeforeCursor() {
-            if (text.isNotEmpty()) {
-                val end = text.offsetByCodePoints(text.length, -1)
-                for (index in end until text.length) text.setCharAt(index, '\u0000')
-                text.setLength(end)
+            if (caret > 0) {
+                // Unlike an external editor, this buffer is already bounded by maxChars.
+                // Truncating it can split a surrogate/grapheme or lose flag-pair parity.
+                val end = caret - UnicodeDeletionBoundary.precedingLength(text.subSequence(0, caret))
+                val removed = caret - end
+                val newLength = text.length - removed
+                for (index in end until newLength) text.setCharAt(index, text[index + removed])
+                for (index in newLength until text.length) text.setCharAt(index, '\u0000')
+                text.setLength(newLength)
+                caret = end
             }
         }
         override fun performEditorAction(actionId: Int): Boolean = false
@@ -288,6 +331,8 @@ internal class LocalDraftInput(
     private fun wipeText() {
         for (index in 0 until text.length) text.setCharAt(index, '\u0000')
         text.setLength(0)
+        caret = 0
+        caretRevision++
     }
 
     private companion object {
@@ -303,9 +348,14 @@ internal class LocalDraftInput(
 }
 
 internal fun maskedPrivateDraft(text: CharSequence): String {
+    val tail = privateDraftTailStart(text)
+    return "•".repeat(tail.coerceAtMost(32)) + text.subSequence(tail, text.length)
+}
+
+private fun privateDraftTailStart(text: CharSequence): Int {
     var tail = text.length
     repeat(3) {
         if (tail > 0) tail = Character.offsetByCodePoints(text, tail, -1)
     }
-    return "•".repeat(tail.coerceAtMost(32)) + text.subSequence(tail, text.length)
+    return tail
 }

@@ -30,6 +30,13 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     var onManageRequested: (String?) -> Unit = {}
     var onSearchModeChanged: (Boolean) -> Unit = {}
     var onQueryClearRequested: () -> Unit = {}
+    var onCaretRequested: (KeyboardAction.MoveDraftCaret) -> Unit = {}
+    fun renderCaret(value: DraftCaretUi, preeditLength: Int) {
+        queryLabel.renderCaret(if (state.searchActive) value else null, preeditLength)
+        queryCaretOffset = value.offset + preeditLength
+        queryLabel.removeCallbacks(scrollToQueryCaret)
+        if (state.searchActive) queryLabel.post(scrollToQueryCaret)
+    }
     var onUserInteraction: () -> Unit = {}
 
     private val state = ExpressionBrowserState()
@@ -38,6 +45,12 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     private var filterWorker: ThreadPoolExecutor? = null
     private var filterTask: Future<*>? = null
     private var renderGeneration = 0L
+    private var queryCaretOffset = 0
+    private val scrollToQueryCaret = Runnable {
+        if (state.searchActive && queryCaretOffset in 0..queryLabel.text.length) {
+            queryLabel.bringPointIntoView(queryCaretOffset)
+        }
+    }
     val isSearchActive: Boolean get() = state.searchActive
     private val categoryButtons = linkedMapOf<EmojiCategory, MaterialButton>()
     private val groupButtons = linkedMapOf<KaomojiGroup?, MaterialButton>()
@@ -48,11 +61,11 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     private val iconButtons = mutableListOf<AppCompatImageButton>()
     private val adapter = EmojiAdapter({ onEmojiSelected(it) }, { entry, selected -> onFavoriteRequested(entry, selected) },
         { onManageRequested(it) }, { onUserInteraction() })
-    private val queryLabel = TextView(context).apply {
+    private val queryLabel = DraftTextView(context).apply {
+        onCaretRequested = { if (state.searchActive) this@EmojiPanelView.onCaretRequested(it) }
         textSize = 14f
         gravity = Gravity.CENTER_VERTICAL
-        maxLines = 1
-        ellipsize = android.text.TextUtils.TruncateAt.END
+        setSingleLine()
         isSaveEnabled = false
         layoutParams = LayoutParams(0, dp(48), 1f)
         isClickable = true
@@ -123,6 +136,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     }
 
     fun clearSession() {
+        queryLabel.renderCaret(null)
         browser.cancelSwipe()
         adapter.submit(emptyList(), emptySet(), false)
         state.clearSession()
@@ -217,6 +231,11 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     }
 
     private fun refresh() {
+        if (!state.searchActive) {
+            queryLabel.renderCaret(null)
+            queryLabel.removeCallbacks(scrollToQueryCaret)
+            queryLabel.scrollTo(0, 0)
+        }
         queryLabel.text = if (state.searchActive) state.query.ifEmpty { context.getString(R.string.expression_search_hint) }
             else context.getString(state.category.label)
         searchButton.isSelected = state.searchActive
@@ -330,6 +349,7 @@ class EmojiPanelView @JvmOverloads constructor(context: Context, attrs: Attribut
     }
 
     override fun onDetachedFromWindow() {
+        queryLabel.removeCallbacks(scrollToQueryCaret)
         renderGeneration++
         preparation?.close()
         preparation = null

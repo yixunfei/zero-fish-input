@@ -61,6 +61,9 @@ already-produced native candidates in the prepared frequency mirror. It reuses
 existing encrypted usage across input codes without enumerating private words,
 changing the stored format or adding input-thread I/O. The existing editor
 privacy gate applies before both prefix suggestions and frequency reads.
+Model scoring cannot override a personal priority after native-route
+deduplication. Overlay ranking remains worker-bound and preserves query limits,
+disabled-dictionary filtering and deletion markers before pagination.
 
 Pinyin cursor and range editing use only the current engine's bounded raw input.
 The focus-free composition view does not expose clipboard/text menus, save view
@@ -135,8 +138,9 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
   授权和条目标识；确认时才绑定当前输入连接并读取正文。授权 30 秒过期，不跨进程恢复；
   返回绑定后的编辑、会话切换、取消、设置变化及数据删除都会使操作失效。
 - 键盘复制仅在用户点击后读取当前非敏感输入框选区，长度上限 8192 个 UTF-16 代码单元；
-  读取在有界后台线程进行，会话、选区或设置变化使结果失效。非导出页面接收一次性内存草稿，
-  延续原删除代次，认证并确认后才能保存，不读写系统剪贴板；超时、取消和销毁清除临时缓冲区。
+  读取在有界后台线程进行，会话、选区或设置变化使结果失效。IME 持有一次性内存草稿，
+  键盘只显示选区长度和操作状态。系统认证期间暂时保留快照，返回匹配编辑器后重新绑定会话并确认保存。
+  原删除代次约束后台写入；超时、取消、锁屏、编辑器变化和服务销毁清除临时缓冲区。
 - “复制到 ZeroInput”与文本分享仅提供待确认内容的接收入口。外部调用不代表用户授权，
   必须在 ZeroInput 内认证后主动确认保存；入口不能查询、返回或导出已有条目、标签与正文。
   超限、附件和无效请求拒绝处理，草稿不写入页面恢复状态，旧认证和已清除代次不能触发新写入。
@@ -176,14 +180,17 @@ without retaining context. See ADR 0016/0017 and docs/threat-model.md.
   “插入结果”才提交到当前编辑器；切换会话、设置、服务销毁、清除 AI 数据或编辑器都会使旧
   请求失效。AI 配置（含 API key）与可选会话历史使用相互独立的 AES-GCM/Keystore 存储，会话保存默认关闭，
   API key 不进入日志、Intent、异常或诊断。
-  仅禁用预测建议的普通文本框可使用独立 AI 草稿，个人数据仍禁用；组合的敏感、标识符、无个性化及用户隐私限制仍拒绝 AI。
+  仅禁用预测建议的普通文本框可使用独立 AI 草稿，AI 仍不能访问个人数据；组合的敏感、标识符、无个性化及用户隐私限制仍拒绝 AI。ADR 0038 的中文候选词频权限不扩展 AI 权限。
   设置中的主动模型检测复用唯一传输，仅发送固定短测试文本，不包含草稿、会话或附件，也不保存或插入结果。
   检测限制输出与超时，关闭弹窗、进入后台、修改配置及清除数据会取消；错误仅显示固定分类，不读取服务端错误正文。
   配置弹窗在临时切换应用时保留当前页面内的有界草稿，仅点击保存后才更新加密配置；
   取消、退出页面或页面销毁时清空输入框，不写入页面恢复状态，继续禁用截屏、自动填充和内容捕获。
 - 未知编辑器类型与变体按敏感输入处理，不创建候选引擎、不读取或学习个人数据。
-- 普通输入框的 `NO_SUGGESTIONS` 标志保留中文转换所需的公开候选，但禁用个人词组读取、
-  学习、历史、模型上下文、英文预测和词联想；该策略同时传递给即时引擎和后台准备的引擎。
+- 普通输入框的 `NO_SUGGESTIONS` 标志保留中文转换。用户于 2026-11-13 按 ADR 0038 批准
+  `NO_SUGGESTIONS`、`AUTO_COMPLETE`、`FILTER` 下独立的中文组合候选词频权限：允许有界个人候选读取，
+  仅在显式选择且编辑器接受提交后学习。隐式提交、英文个人补全、其他历史、模型上下文和词联想不获新权限。
+  密码／PIN、未知、邮箱／URI、明确禁止个性化、隐身及关闭学习优先拒绝，包括组合标志；不使用应用白名单。
+  原队列、会话及删除代次校验继续生效，拒绝提交不学习，AI 和隔离草稿不获权限。策略同时参与即时与后台引擎的身份校验。
   密码与未知输入类型仍优先禁止引擎。准备进度与首次输入提醒只显示固定文案，不缓存或重放按键。Rime 就绪检测仅在
   后台使用固定公开测试文字，不连接编辑器、不学习、不记录正文，检测后清空组合状态。
 - 用户词组导入使用固定结构的流式解析，限制为 5 MiB、20,000 条；非法字段、嵌套、重复项和
@@ -495,3 +502,11 @@ after cancellation. Tool availability is an informational view of existing gates
 it grants no permission. Task examples fill drafts only, and screenshots require
 fresh consent for every task. A dispatched platform write may already have taken
 effect when stopped; check its result before starting another task.
+
+## Isolated draft editing (2026-11-12)
+
+Caret placement and middle editing affect only the active private, keyboard AI
+or expression-search buffer. They do not read or move an external editor cursor.
+Masked private prefixes require the existing explicit reveal before positioning;
+busy views and obsolete gestures cannot move the caret. Session revocation and
+buffer clearing remain unchanged. See [ADR 0037](docs/adr/0037-isolated-draft-caret.md).

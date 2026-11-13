@@ -46,6 +46,16 @@ language-pack -> engine-dictionary
 
 ## Runtime boundaries
 
+Settings navigation uses stable SettingsCategory identifiers, with Activity-owned
+back dispatch and saved category/scroll positions. Category views retain their
+controls and callbacks when detached, so navigation does not write preferences or
+reset pending AI persistence locks. Appearance sections emit immutable existing
+KeyboardAppearance values. Style presets only replace key decoration; background
+images, height and candidates retain their independent ownership and settings.
+The preview continues to use synthetic public text without an editor or engine.
+Appearance Activity state also retains the options scroll offset. Reselecting its
+current section does not recreate controls, preserving accessibility focus.
+
 Keyboard page selection belongs to ime-ui. A same-application Android input
 restart may retain the numeric/symbol page only while the ordinary keyboard is
 open and EditorInputOptions are unchanged. This retains no editor content,
@@ -164,6 +174,8 @@ public-image cache supplies older Android versions independently of system fonts
 Variant selection emits the exact sequence. Cursor deletion combines bounded system
 grapheme segmentation with the bundled RGI suffix trie; it reads at most 64 UTF-16
 units only for the user's explicit Backspace action and retains no context history.
+Regional-indicator runs retain the system grapheme boundary: a flag suffix must
+not regroup an unpaired final indicator with half of the preceding flag.
 
 1. `ZeroInputService` 是唯一输入法服务并持有当前输入会话。每个会话都有单调递增的令牌，
    安全剪贴板在认证后返回编辑器，由用户再次确认时绑定当前令牌、实际 `InputConnection` 和
@@ -258,7 +270,19 @@ engine/schema effective-mask contract remain unchanged.
 Expression search labels are explicit internal edit targets. `app/input/LocalDraftInput`
 owns an independent bounded conversion session, shared as an implementation with
 AI drafts but instantiated separately. Its only commit target is a memory buffer;
-it uses full pinyin/English and an empty personalization port. Search is limited
+committed-text backspace uses the shared bounded grapheme boundary and clears
+removed buffer units before shortening the draft.
+Local deletion examines the complete prefix within the existing 65,536-unit
+maximum buffer, preserving long graphemes and regional-indicator pair parity.
+The external editor's 64-unit lookbehind remains unchanged.
+The same controller owns a committed-text caret for private, AI and search
+drafts. `DraftTextView` emits revision-bound tap intents without an editor
+connection. Composing text is projected at the caret in AI/search; a tap finishes
+conversion before positioning. Pair insertion and middle deletion retain the
+suffix. Masked private prefixes remain unpositionable until explicit reveal.
+Caret drawing uses content coordinates; Android applies the view scroll offset.
+See [ADR 0037](adr/0037-isolated-draft-caret.md).
+It uses full pinyin/English and an empty personalization port. Search is limited
 to 64 UTF-16 units. Keys, candidates, paging, language switching and composition
 clear all route to that draft while editing. Panel/session/view/settings/subtype
 and privacy changes close the search session and invalidate warm-up delivery.
@@ -309,8 +333,9 @@ measured from queue submission.
 AI is disabled by default and requires both the user enable switch and the explicit network
 switch. Sensitive/password/PIN/unknown, incognito and privacy-tightened sessions fail closed.
 `SessionPrivacy.independentAiAllowed` is shared by the UI and request gate. Only
-NO_SUGGESTIONS in ordinary text allows an independent AI draft without permitting
-personal data; combined identifier, no-learning or user privacy restrictions still block AI.
+NO_SUGGESTIONS in ordinary text allows an independent AI draft without granting
+AI personal-data access; combined identifier, no-learning or user privacy restrictions still block AI.
+ADR 0038's separate Chinese conversion permission does not expand AI access.
 The idle candidate header and the leading toolbar expose an AI icon without scrolling.
 During composition the existing candidate capacity is preserved; Tools exposes AI.
 In restricted editors it remains a dimmed explanation action, never a workbench
@@ -378,10 +403,17 @@ silently become part of the request route. Stored configuration remains format 5
 
 librime 自身的用户词典被禁用。中文候选选择的拼音输入码和使用频率由 ZeroInput 的加密仓库
 统一保存，从而让全局关闭学习、隐私模式和编辑器的无个性化请求作用于所有引擎。
-`TYPE_TEXT_FLAG_NO_SUGGESTIONS` keeps public conversion candidates available in
-known, non-sensitive text editors; it still disables personal reads, learning,
-model ranking and next-word predictions. Password and unknown-editor checks run
-first and continue to bypass engines entirely.
+`TYPE_TEXT_FLAG_NO_SUGGESTIONS` keeps conversion candidates available in known,
+non-sensitive text editors. ADR 0038 separates `conversionPersonalizationAllowed`
+from general personalization: NO_SUGGESTIONS, AUTO_COMPLETE and FILTER permit
+Chinese composing-candidate queries and accepted explicit-choice learning only.
+Password/PIN, unknown, email/URI, no-personalized-learning, incognito and disabled
+learning override that permission. General history, English personal completions,
+model ranking, associations, AI and isolated drafts retain their old gates.
+Implicit commits still require general learning permission plus the user's opt-in.
+The immutable policy participates in prepared-engine identity and session refresh;
+worker queries and writes retain the existing session/deletion generation checks.
+Password and unknown-editor checks run first and continue to bypass engines entirely.
 `SessionPrivacy.predictionsAllowed` is passed through `EditorContext` for both
 immediate and worker-prepared engines. Built-in English and English language packs
 preserve typed composition but do not offer completions when it is false. Chinese
@@ -453,13 +485,13 @@ Incognito mode and disabled learning also hide and reject external AI imports.
 The keyboard's explicit copy-selection control reads the active editor through
 `ClipboardSelectionReader` on a bounded worker. Selection length, session,
 connection and interaction/settings generation are rechecked before accepting
-the result. `ClipboardSelectionTransfer` hands one frozen draft and its original
-vault deletion generation to the nonexported `ClipboardSelectionImportActivity`
-using a one-use token; text is not placed in the Intent. The transfer expires
-after five seconds. Consumption also checks a monotonic deadline; a delayed
-Handler callback cannot extend eligibility, and an expired handoff wipes its
-owned draft. The internal page reuses the import authentication/save
-flow and owns the draft after handoff; it never rereads the source editor.
+the result. `KeyboardClipboardCopy` owns the frozen draft and original vault
+deletion generation for the keyboard's review and save controls. The panel shows
+only length and state. Authentication may unbind the original connection. On
+return the current nonsensitive editor must match public source metadata, and a
+fresh Save tap binds the actual live session. The bounded worker checks the
+request, monotonic deadline and deletion generation before committing. The
+authentication Activity receives only the broker's request ID and prompt title.
 
 `SecurePasteCoordinator` owns a pending item ID, source editor metadata, deletion
 generation and an unused one-use grant across system-authentication navigation.
@@ -971,6 +1003,9 @@ Management pages share `app/management/ManagementTaskRunner` for bounded worker
 delivery and request-generation revocation, plus content-free localized list
 feedback. Read failures remain distinct from empty results. Reload actions only
 read local lists; they never replay a save, delete, import or network request.
+Canceling a dictionary task invalidates its pending results and reloads the
+installed list locally. A completed resource check clears the busy indicator
+and shows the previous list behind its confirmation dialog.
 Private clipboard reload always returns through its existing fresh system
 authentication entry. Personal phrase rows and drafts are cleared when the page
 stops, and retired row bindings cannot finish an old click. Unchanged expression
@@ -1136,6 +1171,15 @@ that target revokes the task. See [ADR 0025](adr/0025-ai-device-agent-boundary.m
 
 ### Personal suggestion learning and management
 
+Personal priority is tracked separately from native candidate IDs. When a visible
+candidate reaches the promotion threshold, the controller excludes that round
+from optional model scoring and rejects late model winners. Republishing after a
+data revision recalculates this flag; privacy revocation and empty compositions
+clear it. Dictionary overlays preserve exact-code, frequency and recency ordering
+of learned entries and rank the combined pool before bounded pagination, while
+retaining override selection routes for duplicate words. These operations remain
+on the existing personalization worker with the existing 20,000-entry bounds.
+
 Composing candidates also consult the prepared exact-word frequency mirror in batches of eight (at most 60 already-produced native candidates). This preserves accumulated usage across full pinyin and initials: selecting `ceshi -> 测试` promotes the native `测试` candidate under both `ceshi` and `cs`. The total and the matching input-code frequency are combined by maximum, never added twice. Native selection routes, readings and base order remain intact. No private vocabulary is enumerated or added by this lookup, and no storage format changes. The personal-frequency promotion threshold and its current value are directly available beside learning settings and above the personal phrase list. The setting changes ranking only; the independent association switch controls next-word availability.
 
 Personal suggestions are indexed by input code and queried through the bounded personalization worker. `PersonalCandidateRanking` combines the engine's rank prior, input match and a logarithmic frequency bonus starting at the configured threshold, which defaults to 1. Complete exact full-pinyin matches keep precedence over approximate native matches. The first personal page participates in reranking, and later personal pages append to it. The same frequency bonus reranks the bounded public next-word list. Worker completions emit a content-free notification, and the platform checks session identity and privacy before refreshing the composition or a still-visible association round. The English engine produces public prefix completions, and the controller owns its personal ranking.
@@ -1170,7 +1214,9 @@ Backspace requests at most 64 UTF-16 units with style metadata. Complete visible
 replacement spans with a known left boundary can be deleted as one unit. Bounded
 label-like suffixes without a usable span are dispatched as a Delete key to the
 host, never deleted by guessed label length. Explicit key rejection falls back
-to one character; exceptions and accepted keys are never replayed.
+to one character. When the host returns no cursor text, the adapter delegates
+one Delete key to the still-bound host. Exceptions and accepted keys are never
+replayed. A rejected edit can fall back only while its editor remains bound.
 
 Dictionary replacement selections now resolve their opaque ID against current
 active edits on the existing personalization worker and learn into the encrypted
