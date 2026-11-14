@@ -189,9 +189,9 @@ class ManagementFeedbackPlatformTest {
                                 View.MeasureSpec.makeMeasureSpec((height * density).toInt(), View.MeasureSpec.EXACTLY))
                             root.layout(0, 0, root.measuredWidth, root.measuredHeight)
                             val actions = descendants(root).filterIsInstance<TextView>().filter {
-                                it.id == R.id.management_status_retry ||
+                                it.visibility == View.VISIBLE && (it.id == R.id.management_status_retry ||
                                     it.text == activity.getString(R.string.public_dictionary_home) ||
-                                    it.text == activity.getString(R.string.public_dictionary_cancel)
+                                    it.text == activity.getString(R.string.public_dictionary_cancel))
                             }
                             assertTrue(actions.isNotEmpty())
                             for (action in actions) {

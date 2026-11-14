@@ -150,12 +150,14 @@ class ZeroInputService : InputMethodService() {
                 privateDraftToggle?.close()
                 clipboardCopy.cancel()
                 cancelPasteConsent()
+                cancelSecureClipboardRequest()
                 if (privateOpen) requestHideSelf(0)
             }
         }
     }
     private var languagePackObserver: AutoCloseable? = null
     private var settingsObserver: AutoCloseable? = null
+    private var aiThinkingObserver: AutoCloseable? = null
     private var personalizationObserver: AutoCloseable? = null
     private var personalCandidatesObserver: AutoCloseable? = null
     private var runtimeObserver: AutoCloseable? = null
@@ -339,6 +341,7 @@ class ZeroInputService : InputMethodService() {
         }
         aiObserver = graph.observeAiConfiguration { mainHandler.post { invalidateAiRequest() } }
         settingsObserver = graph.settings.addChangeListener(::handleSettingsChange)
+        aiThinkingObserver = graph.settings.observeAiThinkingVisibility { inputView?.setAiThinkingVisible(it) }
         personalCandidatesObserver = graph.personalization.observeChanges {
             val expected = activeSession
             mainHandler.post {
@@ -648,6 +651,7 @@ class ZeroInputService : InputMethodService() {
         languagePackObserver?.close()
         languagePackObserver = null
         settingsObserver?.close()
+        aiThinkingObserver?.close()
         settingsObserver = null
         personalizationObserver?.close()
         personalizationObserver = null
@@ -701,11 +705,14 @@ class ZeroInputService : InputMethodService() {
                 }
             }
             if (action != null) {
-                handleKeyboardAction(action)
+                val view = inputView?.takeIf { inputViewActive && isInputViewShown }
+                if (view != null) view.dispatchKeyboardAction(action) else handleKeyboardAction(action)
                 return true
             }
         }
-        if (inputView?.let { it.isPrivateDraftOpen || it.isShapeLookupOpen } == true &&
+        if (inputViewActive && inputView?.let {
+                it.isPrivateDraftOpen || it.isShapeLookupOpen || it.isSearchEditing || it.isAiOpen
+            } == true &&
             (event.isPrintingKey || keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
                 keyCode == android.view.KeyEvent.KEYCODE_DEL || keyCode == android.view.KeyEvent.KEYCODE_FORWARD_DEL ||
                 keyCode == android.view.KeyEvent.KEYCODE_TAB)) return true

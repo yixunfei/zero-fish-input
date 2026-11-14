@@ -37,14 +37,20 @@ internal object LanguagePackParser {
         return LanguagePackManifest(
             formatVersion = format.toInt(),
             id = validateIdentifier(root.requiredString("id"), "id"),
-            displayName = root.requiredString("displayName").trim().also {
-                require(it.isNotEmpty() && it.length <= 80) { "Invalid display name" }
-            },
+            displayName = validateDisplayName(root.requiredString("displayName")),
             languageTag = validateLanguageTag(root.requiredString("languageTag")),
             version = validateIdentifier(root.requiredString("version"), "version"),
             engineId = validateIdentifier(root.requiredString("engineId"), "engine id"),
             files = files,
         )
+    }
+
+    private fun validateDisplayName(value: String): String {
+        require(value.none {
+            it.isISOControl() || it.category == CharCategory.FORMAT ||
+                it.category == CharCategory.LINE_SEPARATOR || it.category == CharCategory.PARAGRAPH_SEPARATOR
+        }) { "Invalid display name" }
+        return value.trim().also { require(it.length in 1..80) { "Invalid display name" } }
     }
 
     private fun JSONObject.requiredString(name: String): String = opt(name) as? String

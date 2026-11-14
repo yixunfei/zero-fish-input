@@ -8,6 +8,40 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 
 class AsyncCandidateRankerTest {
+    @Test fun `resource change releases an idle scorer on its worker`() {
+        val worker = ManualExecutor()
+        val scorer = Scorer()
+        val ranker = AsyncCandidateRanker({ scorer }, { false }, { _, _ -> }, { worker }, { 0L })
+        ranker.setEnabled(true)
+        ranker.request(1, "学习".toCharArray(), words())
+        worker.run()
+        ranker.resourcesChanged()
+        assertEquals(0, scorer.closes)
+        worker.run()
+        assertEquals(1, scorer.closes)
+    }
+
+    @Test fun `scorer error wipes input and allows recovery after resource change`() {
+        val worker = ManualExecutor()
+        val broken = Scorer().apply { during = { throw AssertionError("Fixture scorer error") } }
+        val healthy = Scorer()
+        var active = broken
+        val completed = mutableListOf<Long>()
+        val ranker = AsyncCandidateRanker({ active }, { it.run(); true },
+            { revision, _ -> completed += revision }, { worker }, { 0L })
+        ranker.setEnabled(true)
+        val input = "学习".toCharArray()
+        ranker.request(1, input, words())
+        assertThrows(AssertionError::class.java) { worker.run() }
+        assertTrue(input.all { it == '\u0000' })
+        active = healthy
+        ranker.resourcesChanged()
+        ranker.request(2, "学习".toCharArray(), words())
+        worker.run()
+        assertEquals(listOf(2L), completed)
+        assertEquals(1, broken.closes)
+    }
+
     @Test fun `resource publication retries missing model and discards old queued result`() {
         val worker = ManualExecutor()
         val delivery = ArrayDeque<Runnable>()

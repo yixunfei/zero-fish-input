@@ -122,7 +122,9 @@ internal class RimeInputEngine(
             selectedInput = input
             if (selectedIndices.size < 64) selectedIndices += segment else clearSelectionHistory()
         }
-        readUpdate(consumed).copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty(),
+        val update = readUpdate(consumed)
+        if (!consumed || update.committedText.isEmpty()) update.copy(learnable = false)
+        else update.copy(committedInput = reading.ifBlank { input }, learnable = reading.isNotEmpty(),
             learningInput = learningInput)
     }
 

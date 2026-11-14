@@ -26,6 +26,7 @@ import dev.zeroinput.ai.api.DeviceStage6OperationRequest
 import dev.zeroinput.ai.api.DeviceStage6Result
 import dev.zeroinput.ai.api.DeviceStage6ResultStatus
 import dev.zeroinput.ime.ai.AiAttachmentReader
+import dev.zeroinput.ime.ai.takeWholeCodePoints
 
 /** Android adapter for direct, target-scoped stage 6 operations. */
 internal class AndroidDeviceStage6Platform(private val context: Context) : DeviceStage6Platform {
@@ -177,21 +178,25 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
                 val result = queries.query(Telephony.Sms.CONTENT_URI, SMS_PROJECTION,
                     "${Telephony.Sms.ADDRESS}=?", arrayOf(address), "${Telephony.Sms.DATE} DESC")?.use { cursor ->
                     if (!cursor.moveToFirst()) return failed("SMS is unavailable")
-                    success("SMS ${cursor.getString(1)}: ${cursor.getString(2)}".take(DeviceStage6ResultLimit))
+                    success("SMS ${cursor.getString(1).orEmpty()}: ${cursor.getString(2).orEmpty()}"
+                        .takeWholeCodePoints(DeviceStage6ResultLimit))
                 } ?: failed("SMS is unavailable")
                 if (!stillValid()) expired() else result
             }
             DeviceStage6Operation.SEND -> {
-            if (!hasPermission(Manifest.permission.SEND_SMS)) return rejected("SMS send permission is unavailable")
+                if (!hasPermission(Manifest.permission.SEND_SMS)) return rejected("SMS send permission is unavailable")
                 val address = request.target.id.takeIf(String::isNotBlank) ?: return rejected("SMS address is required")
                 val body = request.fields["body"]?.takeIf(String::isNotBlank) ?: return rejected("SMS body is required")
                 if (body.length > AiLimits.MAX_INPUT_CHARS) return rejected("SMS body is too long")
                 if (!stillValid()) return expired()
-            val smsManager = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java)
-                else @Suppress("DEPRECATION") SmsManager.getDefault()
+                val smsManager = (if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java)
+                    else @Suppress("DEPRECATION") SmsManager.getDefault())
+                    ?: return unavailable("SMS service is unavailable")
+                if (smsManager.divideMessage(body).singleOrNull() != body) {
+                    return rejected("SMS body exceeds one message")
+                }
                 if (!stillValid()) return expired()
-                smsManager?.sendTextMessage(address, null, body, null, null)
-                ?: return unavailable("SMS service is unavailable")
+                smsManager.sendTextMessage(address, null, body, null, null)
                 success("SMS send requested")
             }
             DeviceStage6Operation.DELETE -> rejected("SMS deletion is not enabled")
@@ -209,7 +214,8 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
             val result = queries.query(CallLog.Calls.CONTENT_URI, CALL_PROJECTION,
                 "${CallLog.Calls.NUMBER}=?", arrayOf(number), "${CallLog.Calls.DATE} DESC")?.use { cursor ->
                 if (!cursor.moveToFirst()) failed("Call is unavailable")
-                else success("Call ${cursor.getString(1)} ${cursor.getLong(2)}".take(DeviceStage6ResultLimit))
+                else success("Call ${cursor.getString(1).orEmpty()} ${cursor.getLong(2)}"
+                    .takeWholeCodePoints(DeviceStage6ResultLimit))
             } ?: failed("Call is unavailable")
             if (!stillValid()) expired() else result
         }
@@ -453,13 +459,13 @@ internal class AndroidDeviceStage6Platform(private val context: Context) : Devic
         val description = fields["description"]?.takeIf(String::isNotBlank)
         if (title == null && start == null && description == null) return null
         return android.content.ContentValues().apply {
-            title?.let { put(CalendarContract.Events.TITLE, it.take(128)) }
+            title?.let { put(CalendarContract.Events.TITLE, it.takeWholeCodePoints(128)) }
             if (start != null && end != null) {
                 put(CalendarContract.Events.DTSTART, start)
                 put(CalendarContract.Events.DTEND, end)
                 put(CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().id)
             }
-            description?.let { put(CalendarContract.Events.DESCRIPTION, it.take(256)) }
+            description?.let { put(CalendarContract.Events.DESCRIPTION, it.takeWholeCodePoints(256)) }
         }
     }
 

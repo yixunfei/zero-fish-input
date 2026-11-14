@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     private var aiConfigReady = false
     private var aiReadGeneration = 0L
     private var aiDialog: AiProviderSettingsDialog? = null
+    private var deletionDialog: androidx.appcompat.app.AlertDialog? = null
     private var languagePackOperationGeneration = 0L
     private val operations = SettingsTaskRunner(
         worker = worker,
@@ -223,8 +224,7 @@ class MainActivity : AppCompatActivity() {
         screen.onChineseOptionsChanged = { graph.settings.chineseInputOptions = it; render() }
         screen.onModelRankingChanged = { graph.settings.experimentalModelRanking = it; render() }
         screen.onBuiltInEngineSelected = {
-            graph.settings.lastLanguagePackKey = null
-            graph.settings.lastLanguage = InputLanguage.CHINESE
+            graph.settings.selectBuiltInLanguage(InputLanguage.CHINESE)
             render()
         }
         screen.onDictionaryRequested = { startActivity(Intent(this, UserDictionaryActivity::class.java)) }
@@ -260,8 +260,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, R.string.language_pack_unsupported, Toast.LENGTH_SHORT).show()
                     render()
                 } else {
-                    graph.settings.lastLanguage = language
-                    graph.settings.lastLanguagePackKey = key
+                    graph.settings.selectLanguage(language, key)
                     Toast.makeText(this, R.string.language_pack_selected, Toast.LENGTH_SHORT).show()
                     render()
                 }
@@ -341,7 +340,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmClearPersonalData() {
-        MaterialAlertDialogBuilder(this)
+        deletionDialog?.dismiss()
+        deletionDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.clear_personal_data)
             .setMessage(R.string.clear_personal_data_message)
             .setNegativeButton(R.string.cancel, null)
@@ -352,6 +352,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmClearSecureClipboard() {
+        deletionDialog?.dismiss()
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.clear_secure_clipboard)
             .setMessage(R.string.clear_secure_clipboard_message)
@@ -364,6 +365,7 @@ class MainActivity : AppCompatActivity() {
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).filterTouchesWhenObscured = true
         }
+        deletionDialog = dialog
         dialog.show()
     }
 
@@ -433,6 +435,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        deletionDialog?.dismiss()
+        deletionDialog = null
         contentResolver.unregisterContentObserver(defaultImeObserver)
         incognitoDialog?.dismiss()
         incognitoDialog = null

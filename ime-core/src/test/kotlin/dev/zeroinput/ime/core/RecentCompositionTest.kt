@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecentCompositionTest {
+    @Test fun `Microsoft double pinyin semicolon can be reopened`() {
+        val draft = RecentComposition()
+        draft.remember("b;", "冰")
+        assertEquals("b;", draft.consume { input, _ -> input })
+    }
+
     @Test fun `only the most recent complete Chinese draft can be consumed once`() {
         val draft = RecentComposition()
         draft.remember("ni", "你")

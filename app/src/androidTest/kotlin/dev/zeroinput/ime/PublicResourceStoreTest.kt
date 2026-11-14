@@ -13,6 +13,47 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class PublicResourceStoreTest {
+    @Test fun damagedRegistryDisablesResourcesUntilExplicitReinstall() {
+        withStore { store, directory ->
+            val archive = File(directory, "test.zip")
+            val pack = pack(archive, "rime/wanxiang-lts-zh-hans.gram", byteArrayOf(1, 2, 3))
+            store.install(pack, archive)
+            File(directory, "public-resources/registry.json").writeText("{\"wanxiang-lts\":")
+            assertTrue(store.list().none { it.enabled })
+            assertNull(store.acquire(pack.id))
+            store.install(pack, archive)
+            requireNotNull(store.acquire(pack.id)).close()
+            assertTrue(store.list().single { it.pack.id == pack.id }.enabled)
+        }
+    }
+
+    @Test fun registryRenameFailureDoesNotPublishOrDiscardTheVerifiedBlob() {
+        withStore { store, directory ->
+            val archive = File(directory, "test.zip")
+            val pack = pack(archive, "rime/wanxiang-lts-zh-hans.gram", byteArrayOf(1, 2, 3))
+            val registry = File(directory, "public-resources/registry.json").apply { mkdirs() }
+            File(registry, "fixture").writeText("Prevent rename onto the nonempty directory")
+
+            assertThrows(java.io.IOException::class.java) { store.install(pack, archive) }
+            assertEquals(0L, store.revision)
+            assertTrue(File(registry.parentFile, pack.files.single().sha256).isFile)
+            assertTrue(registry.deleteRecursively())
+            store.install(pack, archive)
+            assertEquals(1L, store.revision)
+            requireNotNull(store.acquire(pack.id)).close()
+        }
+    }
+
+    private fun withStore(run: (PublicResourceStore, File) -> Unit) {
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = java.nio.file.Files.createTempDirectory(base.cacheDir.toPath(), "resource-test-").toFile()
+        val context = object : ContextWrapper(base) {
+            override fun getApplicationContext() = this
+            override fun getNoBackupFilesDir() = directory
+        }
+        try { run(PublicResourceStore(context), directory) } finally { directory.deleteRecursively() }
+    }
+
     @Test fun atomicInstallRejectsDamageAndKeepsLeasedFilesUntilReadersClose() {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = File(base.cacheDir, "resource-test-${System.nanoTime()}").apply { mkdirs() }

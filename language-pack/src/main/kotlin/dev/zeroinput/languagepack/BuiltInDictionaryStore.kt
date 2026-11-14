@@ -7,7 +7,6 @@ import dev.zeroinput.engine.api.PublicDictionarySnapshot
 import dev.zeroinput.engine.api.PublicDictionarySource
 import org.json.JSONObject
 import java.io.File
-import java.util.concurrent.CancellationException
 
 data class BuiltInDictionary(
     val table: String, val version: String, val enabled: Boolean, val deleted: Boolean,
@@ -114,12 +113,7 @@ class BuiltInDictionaryStore(context: Context, private val downloads: PublicDict
 
     private fun writeState(values: Map<String, String>) {
         root.mkdirs()
-        val output = state.startWrite()
-        try {
-            output.write(JSONObject(values).toString().toByteArray(Charsets.UTF_8))
-            if (Thread.currentThread().isInterrupted) throw CancellationException()
-            state.finishWrite(output)
-        } catch (error: Exception) { state.failWrite(output); throw error }
+        state.writeRegistry(JSONObject(values).toString())
         onPublished()
     }
 }

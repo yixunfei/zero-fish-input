@@ -385,6 +385,14 @@ and immutable Releases are allowed. Files are bounded and hash-verified before
 atomic installation. Executable downloads remain prohibited. See
 [ADR 0021](docs/adr/0021-optional-public-resources.md).
 
+An interrupted registry commit retains its previously published state.
+A malformed resource registry disables all packs pending explicit recovery.
+Language-pack startup recovery checks the restored package before exposure
+and removes interrupted staging data.
+
+The keyboard revokes in-flight secure paste on screen-off and discards any
+late plaintext result.
+
 Package compression keeps all core dictionaries offline. XZ decoding is bounded
 and hash-verified before atomic activation on a worker. Optional Mini downloads
 contain only the reviewed model and vocabulary. Graph updates require a compatible

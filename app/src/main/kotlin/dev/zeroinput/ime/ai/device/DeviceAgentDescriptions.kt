@@ -1,5 +1,7 @@
 package dev.zeroinput.ime.ai.device
 
+import dev.zeroinput.ime.ai.takeWholeCodePoints
+
 import android.content.Context
 import dev.zeroinput.ai.api.*
 import dev.zeroinput.ime.R
@@ -50,7 +52,7 @@ internal class DeviceAgentDescriptions(private val context: Context? = null) {
     fun action(call: DeviceActionCall, snapshot: DeviceScreenSnapshot, selectedAttachmentName: String? = null): String {
         DeviceStage6ToolCatalog.find(call.toolName)?.let { entry ->
             val target = selectedAttachmentName?.takeIf { entry.fixedTarget == "selected_uri" }
-                ?: entry.targetId(call.arguments).take(160)
+                ?: entry.targetId(call.arguments).takeWholeCodePoints(160)
             val fields = entry.fields(call.arguments).entries.joinToString { (key, value) ->
                 "${stage6Field(key)}=${stage6FieldValue(key, value)}"
             }
@@ -143,7 +145,7 @@ internal class DeviceAgentDescriptions(private val context: Context? = null) {
     private fun stage6FieldValue(key: String, value: String): String = when (key) {
         "start_epoch_ms", "end_epoch_ms", "new_start_epoch_ms", "new_end_epoch_ms" ->
             value.toLongOrNull()?.let { runCatching { DateFormat.getDateTimeInstance().format(Date(it)) }.getOrNull() }
-                ?: value.take(160)
-        else -> value.take(160)
+                ?: value.takeWholeCodePoints(160)
+        else -> value.takeWholeCodePoints(160)
     }
 }

@@ -100,11 +100,6 @@ class UserDictionaryActivity : AppCompatActivity() {
         super.onStop()
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.clear()
-    }
-
     override fun onDestroy() {
         tasks.close()
         phraseDialog?.dismiss()
@@ -129,6 +124,7 @@ class UserDictionaryActivity : AppCompatActivity() {
         }
         body.addView(promotionThreshold)
         renderThreshold()
+        // The picker request can survive recreation. Private query text stays in this view only.
         searchField = dictionaryField(R.string.user_dictionary_search, maxLength = 64, maxLines = 3).apply {
             setSingleLine(false)
             maxLines = 3
@@ -146,6 +142,8 @@ class UserDictionaryActivity : AppCompatActivity() {
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                     searchRevision++
                     pageOffset = 0
+                    hasMore = false
+                    updatePaging()
                     adapter.submit(emptyList())
                     removeCallbacks(searchRefresh)
                     postDelayed(searchRefresh, SEARCH_DELAY_MS)
@@ -218,11 +216,14 @@ class UserDictionaryActivity : AppCompatActivity() {
     }
 
     private fun confirmExport() {
-        UserDictionaryTransferDialogs.export(this) { exporter.launch("zeroinput-phrases.zlex") }.show()
+        phraseDialog = UserDictionaryTransferDialogs.export(this) { exporter.launch("zeroinput-phrases.zlex") }
+            .also { it.show() }
     }
 
     private fun confirmImport() {
-        UserDictionaryTransferDialogs.import(this) { importer.launch(arrayOf("application/octet-stream", "application/x-zeroinput-lexicon")) }.show()
+        phraseDialog = UserDictionaryTransferDialogs.import(this) {
+            importer.launch(arrayOf("application/octet-stream", "application/x-zeroinput-lexicon"))
+        }.also { it.show() }
     }
 
     private fun exportTo(uri: Uri) {
@@ -276,6 +277,7 @@ class UserDictionaryActivity : AppCompatActivity() {
             }
             .create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        phraseDialog = dialog
         dialog.show()
     }
 

@@ -106,12 +106,7 @@ internal class DictionaryManagementRows(
             .setPositiveButton(android.R.string.ok) { _, _ -> action() }.show().secure()
     }
     private fun operation(work: () -> Unit) {
-        val submittedDialog = dialog
-        run(work) {
-            submittedDialog?.dismiss()
-            if (dialog === submittedDialog) dialog = null
-            refresh()
-        }
+        run(work, refresh)
     }
     fun close() { dialog?.dismiss(); dialog = null }
     private fun AlertDialog.secure(): AlertDialog = apply { window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE) }

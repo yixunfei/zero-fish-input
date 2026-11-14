@@ -670,8 +670,8 @@ class InputSessionController(
         if (!committed) return
         runCatching { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
-        if (committed && allowLearning && privacy.learningAllowed && privacy.personalizationAllowed &&
-            (language == InputLanguage.ENGLISH || rawComposition.all { it.code in 0x3400..0x9fff })) {
+        if (allowLearning && privacy.learningAllowed && privacy.personalizationAllowed &&
+            (language == InputLanguage.ENGLISH || rawComposition.codePoints().allMatch(Character::isIdeographic))) {
             runCatching {
                 personalization.learn(before.rawInput.ifBlank { rawComposition }, rawComposition, language, true)
             }.onFailure { learningFailureCount++ }
@@ -725,12 +725,10 @@ class InputSessionController(
             }
             is CandidateRoute.Personal -> {
                 val reading = route.input.ifBlank { state.snapshot.rawInput }
-                candidateWindow.clear()
-                activeEngine.reset()
-                val committed = commitPredictableText(route.text)
-                if (committed && language == InputLanguage.CHINESE && activeEngine is CompositionEditingEngine &&
+                if (!commitLocalCandidate(activeEngine, route.text)) return
+                if (language == InputLanguage.CHINESE && activeEngine is CompositionEditingEngine &&
                     connection is ReconversionEditorConnection) recentComposition.remember(reading, route.text)
-                if (committed && learn && canPersonalizeCandidates()) {
+                if (learn && canPersonalizeCandidates()) {
                     runCatching {
                         personalization.recordUse(route.id, learningAllowed = true)
                     }.onFailure { learningFailureCount++ }
@@ -768,13 +766,18 @@ class InputSessionController(
                         .any { it.id == route.id && it.text == route.text }
                 }.getOrDefault(false)
                 if (!stillAvailable) { publish(rawEngineSnapshot); return }
-                candidateWindow.clear()
-                activeEngine.reset()
-                commitPredictableText(route.text)
-                publish(EngineSnapshot.Empty)
+                if (commitLocalCandidate(activeEngine, route.text)) publish(EngineSnapshot.Empty)
             }
             null -> Unit
         }
+    }
+
+    private fun commitLocalCandidate(activeEngine: InputEngine, text: String): Boolean {
+        if (!commitPredictableText(text)) return false
+        candidateWindow.clear()
+        runCatching { activeEngine.reset() }
+            .onFailure { if (engine === activeEngine) closeEngine() }
+        return true
     }
 
     private fun handleSensitive(command: InputCommand) {

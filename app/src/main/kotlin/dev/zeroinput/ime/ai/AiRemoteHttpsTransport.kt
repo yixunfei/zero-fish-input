@@ -76,7 +76,13 @@ internal class AiRemoteHttpsTransport(private val resolve: (String) -> List<Inet
                 require(response.headers.byteCount() <= 16_384)
                 require(response.headers.values("Mcp-Session-Id").size <= 1)
                 val session = response.header("Mcp-Session-Id")?.also(::requireSession)
-                if (response.code == 202) { require((response.body?.contentLength() ?: 0) == 0L); return@use AiRemoteReply(202, "", session) }
+                if (response.code == 202) {
+                    response.body?.let { body ->
+                        require(body.contentLength() <= 0 && body.byteStream().read() == -1)
+                    }
+                    cancellation.check()
+                    return@use AiRemoteReply(202, "", session)
+                }
                 require(response.code == 200)
                 val body = requireNotNull(response.body)
                 require(body.contentLength() <= 262_144)

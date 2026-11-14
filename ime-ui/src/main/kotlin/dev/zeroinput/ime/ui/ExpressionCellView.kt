@@ -16,6 +16,7 @@ internal class ExpressionCellView @JvmOverloads constructor(context: Context, at
     var bindingRevision = -1L
     private var gestureRevision = -1L
     private var gesturePending = false
+    private val clearGesture = Runnable { gesturePending = false }
     private var artworkKey: String? = null
     private var artwork: Bitmap? = null
     private var artworkRequest: Closeable? = null
@@ -63,6 +64,8 @@ internal class ExpressionCellView @JvmOverloads constructor(context: Context, at
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(clearGesture)
+        gesturePending = false
         artworkRequest?.close()
         artworkRequest = null
         super.onDetachedFromWindow()
@@ -70,12 +73,19 @@ internal class ExpressionCellView @JvmOverloads constructor(context: Context, at
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            removeCallbacks(clearGesture)
             gestureRevision = bindingRevision
             gesturePending = true
         } else if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
             gesturePending = false
         }
-        return super.dispatchTouchEvent(event)
+        val handled = super.dispatchTouchEvent(event)
+        // View can post its click from ACTION_UP. Keep the revision until
+        // that click has had a chance to run, including across a row rebind.
+        if (event.actionMasked == MotionEvent.ACTION_UP) {
+            if (!isAttachedToWindow || !post(clearGesture)) gesturePending = false
+        }
+        return handled
     }
 
     override fun performClick(): Boolean {

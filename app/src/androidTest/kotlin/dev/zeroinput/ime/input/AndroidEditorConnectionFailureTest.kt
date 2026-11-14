@@ -134,7 +134,7 @@ class AndroidEditorConnectionFailureTest {
         }
     }
 
-    @Test fun reconversionAlwaysAttemptsBatchCleanupAndRejectsThrowingCalls() {
+    @Test fun reconversionEndsOnlyAnOpenedBatchAndRejectsThrowingCalls() {
         for (failure in listOf("begin", "before", "region", "end")) {
             val connection = Fixture(failure)
             val adapter = AndroidEditorConnection(0, 0) { connection }
@@ -143,7 +143,7 @@ class AndroidEditorConnectionFailureTest {
 
             assertFalse(adapter.reopenCommittedText("x"))
 
-            assertEquals(1, connection.batchEnds)
+            assertEquals(if (failure == "begin") 0 else 1, connection.batchEnds)
             assertFalse(adapter.reopenCommittedText("x"))
         }
     }

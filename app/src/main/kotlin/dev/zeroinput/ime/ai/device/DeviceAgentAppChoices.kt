@@ -1,5 +1,7 @@
 package dev.zeroinput.ime.ai.device
 
+import dev.zeroinput.ime.ai.takeWholeCodePoints
+
 import android.content.Intent
 import android.content.pm.PackageManager
 import dev.zeroinput.ai.api.DeviceAgentPolicy
@@ -17,7 +19,7 @@ internal object DeviceAgentAppChoices {
             .filter { evaluator.checkTarget(policy, it.activityInfo.packageName).allowed }
             .map {
                 DeviceAgentAppChoice(
-                    it.loadLabel(manager).toString().filterNot(Char::isISOControl).take(96),
+                    it.loadLabel(manager).toString().filterNot(Char::isISOControl).takeWholeCodePoints(96),
                     it.activityInfo.packageName,
                 )
             }.sortedWith(compareBy<DeviceAgentAppChoice> { it.label }.thenBy { it.packageName }).take(128).toList()

@@ -935,6 +935,9 @@ share one runtime and all Wanxiang core dictionaries. `engine-api/PublicResource
 exposes worker-only resource leases; `language-pack/PublicResourceStore` validates,
 publishes and shares immutable data, while app dictionary settings own explicit
 GitHub requests. `engine-rime` and `model-scoring` receive the source by injection.
+Registry publication checks the atomic rename before notifying readers. A damaged
+registry disables packs until an explicit enable or verified reinstall. Interrupted
+language-pack replacements recover the previous version under the installer lock.
 Full bundles Mini only; LTS and handwriting are download-only in both APK
 bundles. Reviewed Emoji artwork remains bundled in mobile APKs alongside the
 catalog and text insertion path. Native libraries stay

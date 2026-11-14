@@ -80,7 +80,7 @@ class EnglishInputEngine(
 
     private fun handleText(text: String): EngineUpdate {
         if (text.length == 1 && (text[0].isLetter() || text == "'")) {
-            if (buffer.length >= MAX_BUFFER_LENGTH) return unchanged(consumed = true)
+            if (buffer.length >= MAX_BUFFER_LENGTH) return unchanged(consumed = false)
             buffer.append(text)
             page = 0
             currentSnapshot = createSnapshot()

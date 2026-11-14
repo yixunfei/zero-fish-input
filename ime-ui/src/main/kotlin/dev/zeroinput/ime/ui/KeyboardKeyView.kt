@@ -87,6 +87,7 @@ internal class KeyboardKeyView @JvmOverloads constructor(context: Context, attrs
     fun cancelTouch() {
         holding = false
         isPressed = false
+        gestureRevision = null
         gestureAction = null
         removeCallbacks(longPress)
     }

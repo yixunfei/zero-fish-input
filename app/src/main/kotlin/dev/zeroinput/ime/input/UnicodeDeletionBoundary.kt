@@ -19,7 +19,12 @@ internal object UnicodeDeletionBoundary {
         // alone do not authorize deleting a larger piece of ordinary text.
         if (value is android.text.Spanned && value.isNotEmpty()) {
             val length = value.getSpans(value.length - 1, value.length, android.text.style.ReplacementSpan::class.java)
-                .filter { value.getSpanEnd(it) == value.length && value.getSpanStart(it) > 0 }
+                .filter {
+                    val start = value.getSpanStart(it)
+                    // A span touching the left edge of a full window may have been clipped.
+                    value.getSpanEnd(it) == value.length && start in 0 until value.length &&
+                        (start > 0 || value.length < LOOKBEHIND_LIMIT)
+                }
                 .maxOfOrNull { value.length - value.getSpanStart(it) }
             if (length != null) return length
         }

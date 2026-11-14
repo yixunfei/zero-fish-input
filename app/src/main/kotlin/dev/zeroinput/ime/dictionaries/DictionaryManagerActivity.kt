@@ -37,6 +37,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private lateinit var progress: ProgressBar
     private lateinit var cancelButton: MaterialButton
     private lateinit var scroll: ScrollView
+    private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var busy = false
     private var taskFailure = R.string.management_operation_failed
     private val tasks by lazy { ManagementTaskRunner(worker, { runOnUiThread(it) },
@@ -129,15 +130,15 @@ class DictionaryManagerActivity : AppCompatActivity() {
             snapshot.builtin.forEach { management.builtIn(it, snapshot.names) }
             ResourceSettingsRows(this, graph.publicResources, transport, content, ::command,
                 { work, complete -> runTask(work) { complete() } }, { changed(); showInstalled() },
-                ::downloadProgress).show(resources)
+                ::downloadProgress, ::showDialog).show(resources)
             command(getString(R.string.public_dictionary_restore)) {
-                MaterialAlertDialogBuilder(this).setMessage(R.string.public_dictionary_restore_confirm)
+                showDialog(MaterialAlertDialogBuilder(this).setMessage(R.string.public_dictionary_restore_confirm)
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         runTask({ graph.publicDictionaries.disableAll(); graph.builtInDictionaries.restoreAll() }) {
                             changed(); showInstalled()
                         }
-                    }.show()
+                    }.create())
             }
             label(getString(R.string.public_dictionary_sources))
             DictionarySource.entries.forEach { source ->
@@ -151,7 +152,7 @@ class DictionaryManagerActivity : AppCompatActivity() {
     }
 
     private fun confirmRedownload(table: String?, item: InstalledPublicDictionary?) {
-        MaterialAlertDialogBuilder(this).setMessage(R.string.dictionary_redownload_confirm)
+        showDialog(MaterialAlertDialogBuilder(this).setMessage(R.string.dictionary_redownload_confirm)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.dictionary_redownload) { _, _ ->
                 val progress = downloadProgress()
@@ -159,13 +160,13 @@ class DictionaryManagerActivity : AppCompatActivity() {
                     if (table != null) downloads.redownloadBuiltIn(table, progress)
                     else downloads.redownload(requireNotNull(item), progress)
                 }, failure = R.string.public_dictionary_failed) { changed(); showInstalled() }
-            }.show()
+            }.create())
     }
 
     private fun confirmBrowse(source: DictionarySource) {
-        MaterialAlertDialogBuilder(this).setTitle(sourceLabel(source)).setMessage(R.string.public_dictionary_network_notice)
+        showDialog(MaterialAlertDialogBuilder(this).setTitle(sourceLabel(source)).setMessage(R.string.public_dictionary_network_notice)
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.public_dictionary_browse) { _, _ -> browse(source, null) }.show()
+            .setPositiveButton(R.string.public_dictionary_browse) { _, _ -> browse(source, null) }.create())
     }
 
     private fun browse(source: DictionarySource, page: String?) {
@@ -231,9 +232,9 @@ class DictionaryManagerActivity : AppCompatActivity() {
     }
 
     private fun confirmInstall(source: DictionarySource, item: CatalogItem) {
-        MaterialAlertDialogBuilder(this).setTitle(item.title).setMessage(R.string.public_dictionary_install_notice)
+        showDialog(MaterialAlertDialogBuilder(this).setTitle(item.title).setMessage(R.string.public_dictionary_install_notice)
             .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.public_dictionary_download) { _, _ -> install(source, item) }.show()
+            .setPositiveButton(R.string.public_dictionary_download) { _, _ -> install(source, item) }.create())
     }
 
     private fun install(source: DictionarySource, item: CatalogItem) {
@@ -262,7 +263,11 @@ class DictionaryManagerActivity : AppCompatActivity() {
 
     private fun <T> runTask(work: () -> T, failure: Int = R.string.management_operation_failed,
         loading: Int = R.string.public_dictionary_working, complete: (T) -> Unit) {
-        if (busy) return
+        if (busy) {
+            android.widget.Toast.makeText(this, R.string.public_dictionary_working, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        closeDialogs()
         cancel()
         taskFailure = failure
         progress.isIndeterminate = true
@@ -283,6 +288,19 @@ class DictionaryManagerActivity : AppCompatActivity() {
     private fun cancel() {
         generation++
         tasks.cancel()
+    }
+
+    private fun showDialog(value: androidx.appcompat.app.AlertDialog) {
+        closeDialogs()
+        dialog = value
+        value.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        value.show()
+    }
+
+    private fun closeDialogs() {
+        dialog?.dismiss()
+        dialog = null
+        management.close()
     }
     private fun changed() { dirty = true }
     private fun label(text: String) { content.addView(TextView(this).apply { this.text = text; setPadding(0, dp(16), 0, dp(8)) }) }
@@ -347,7 +365,11 @@ class DictionaryManagerActivity : AppCompatActivity() {
     }
     override fun onStop() {
         revocationObserver?.close(); revocationObserver = null
-        refreshAfterStop = true; cancel(); management.close(); content.removeAllViews(); super.onStop()
+        refreshAfterStop = true
+        cancel()
+        closeDialogs()
+        content.removeAllViews()
+        super.onStop()
     }
     override fun onDestroy() { tasks.close(); worker.shutdownNow(); super.onDestroy() }
 

@@ -9,6 +9,17 @@ import java.nio.charset.CharacterCodingException
 import dev.zeroinput.engine.api.InputLanguage
 
 class LanguagePackParserTest {
+    @Test fun `display names reject controls and directional formatting`() {
+        for (value in listOf("One\nTwo", "name\u202E", "\u2066name\u2069", "name\u2028next")) {
+            val manifest = org.json.JSONObject()
+                .put("formatVersion", 1).put("id", "test").put("displayName", value)
+                .put("languageTag", "en").put("version", "1").put("engineId", "test")
+                .put("files", org.json.JSONArray().put(org.json.JSONObject()
+                    .put("path", "dictionary.txt").put("sha256", "0".repeat(64)).put("size", 0)))
+            assertThrows(IllegalArgumentException::class.java) { LanguagePackParser.parse(manifest.toString()) }
+        }
+    }
+
     @Test
     fun `accepts a UTF-8 BOM before the manifest object`() {
         val manifest = LanguagePackParser.parse(

@@ -106,11 +106,13 @@ class AndroidEditorConnection(
         val connection = current() ?: return false
         if (connection !== committedConnection) { invalidateReconversion(); return false }
         invalidateReconversion()
-        var ended = false
+        if (platformCall { connection.beginBatchEdit() } != true) {
+            invalidateContext()
+            return false
+        }
+        val ended: Boolean
         val reopened = try {
-            if (platformCall { connection.beginBatchEdit() } == true) {
-                reopenWithinBatch(connection, expectedText, range)
-            } else { invalidateContext(); false }
+            reopenWithinBatch(connection, expectedText, range)
         } finally {
             // false normally means the outermost batch ended; only an exception is failure.
             ended = platformCall { connection.endBatchEdit() } != null

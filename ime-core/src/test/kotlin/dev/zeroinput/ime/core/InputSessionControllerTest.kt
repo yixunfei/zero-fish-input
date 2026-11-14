@@ -390,6 +390,43 @@ class InputSessionControllerTest {
     }
 
     @Test
+    fun `declined personal and kaomoji candidates preserve composition for retry`() {
+        for (personal in listOf(true, false)) {
+            var accept = false
+            val editor = RecordingConnection()
+            val connection = object : EditorConnection by editor {
+                override fun commitText(text: String) = accept && editor.commitText(text)
+            }
+            val engine = object : InputEngine by TestEngine() {
+                override val descriptor = EngineDescriptor("rime.luna-pinyin", "Rime", "1", setOf(InputLanguage.CHINESE))
+            }
+            val store = RecordingPersonalization(
+                if (personal) listOf(PersonalSuggestion("fixture", "您好", 6, "nihao")) else emptyList()
+            )
+            val expressions = KaomojiCandidateSource { _, _ ->
+                if (personal) emptyList() else listOf(KaomojiSuggestion("public:hello", "(^_^)"))
+            }
+            val controller = InputSessionController(connection, { engine }, store, kaomojiCandidates = expressions)
+            controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+            controller.handle(InputCommand.Text("nihao"))
+            val before = controller.state.snapshot
+            val text = if (personal) "您好" else "(^_^)"
+            val index = before.candidates.indexOfFirst {
+                if (personal) it.id.startsWith("personal:") else it.text == text
+            }
+            assertTrue(index >= 0)
+            controller.handle(InputCommand.SelectCandidate(index))
+            assertEquals(before, controller.state.snapshot)
+            assertEquals("nihao", engine.snapshot.rawInput)
+            assertTrue(store.usedIds.isEmpty())
+            accept = true
+            controller.handle(InputCommand.SelectCandidate(index))
+            assertEquals(listOf(text), editor.commits)
+            assertFalse(controller.state.snapshot.isComposing)
+        }
+    }
+
+    @Test
     fun `failed personal text conversion hides the suggestion and leaves base candidates usable`() {
         val personalization = RecordingPersonalization(listOf(PersonalSuggestion("fixture", "中國", 3, "zhongguo")))
         val engine = object : InputEngine by TestEngine(), CandidateTextNormalizer {

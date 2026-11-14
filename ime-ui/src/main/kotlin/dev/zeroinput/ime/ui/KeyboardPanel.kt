@@ -347,6 +347,7 @@ class KeyboardPanel @JvmOverloads constructor(context: Context, attrs: Attribute
         keys.forEach { it.isEnabled = false; it.onAction = {}; it.setOnLongClickListener(null) }
         removeAllViews()
         keys.clear()
+        backspaceRepeater?.cancel()
         backspaceRepeater = null
         geometry = updated
         rows.forEach { specs ->

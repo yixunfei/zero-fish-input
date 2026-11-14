@@ -40,10 +40,12 @@ class AsyncCandidateRanker(
     private val scorerGeneration = AtomicLong()
     private var preparedScorerGeneration = -1L
 
-    /** Invalidates pending results and recreates the model on its owning worker. */
+    /** Invalidates pending results and releases the old model on its owning worker. */
     fun resourcesChanged() = synchronized(lock) {
+        if (closed) return@synchronized
         scorerGeneration.incrementAndGet()
         cancelLocked()
+        if (executor != null) scheduleLocked()
     }
 
     fun setEnabled(value: Boolean) = synchronized(lock) {
@@ -89,40 +91,55 @@ class AsyncCandidateRanker(
     }
 
     private fun drain() {
-        while (true) {
-            val request = synchronized(lock) {
-                if (!enabled || closed) {
-                    // close() is done outside the lock; the next iteration checks re-enabling.
-                    null
-                } else pending.also { pending = null }
+        try {
+            drainRequests()
+        } catch (error: Error) {
+            try {
+                releaseScorer()
+            } finally {
+                failed = true
+                synchronized(lock) {
+                    cancelLocked()
+                    draining = false
+                }
             }
-            if (request != null) {
-                try { score(request) } finally { request.close() }
-                continue
-            }
-            val release = synchronized(lock) { !enabled || closed }
-            if (release) {
-                try { scorer?.close() } catch (_: Exception) { /* Content-free failure. */ }
-                scorer = null
-                failed = false
-            }
-            synchronized(lock) {
-                if (pending != null || ((!enabled || closed) && scorer != null)) return@synchronized
-                draining = false
-                return
-            }
+            throw error
         }
+    }
+
+    private fun drainRequests() {
+        while (true) {
+            val nextGeneration = synchronized(lock) {
+                if (!enabled || closed) -1L else scorerGeneration.get()
+            }
+            if (preparedScorerGeneration != nextGeneration) {
+                releaseScorer()
+                failed = false
+                preparedScorerGeneration = nextGeneration
+            }
+            val request = synchronized(lock) {
+                val currentGeneration = if (!enabled || closed) -1L else scorerGeneration.get()
+                if (preparedScorerGeneration != currentGeneration) return@synchronized null
+                val next = pending
+                if (next == null) {
+                    draining = false
+                    return
+                }
+                pending = null
+                next
+            }
+            if (request != null) try { score(request) } finally { request.close() }
+        }
+    }
+
+    private fun releaseScorer() {
+        val previous = scorer
+        scorer = null
+        try { previous?.close() } catch (_: Exception) { /* Content-free failure. */ }
     }
 
     private fun score(request: Request) {
         val cancelled = { generation.get() != request.generation || now() > request.deadline }
-        val currentScorerGeneration = scorerGeneration.get()
-        if (preparedScorerGeneration != currentScorerGeneration) {
-            try { scorer?.close() } catch (_: Exception) { /* Content-free failure. */ }
-            scorer = null
-            failed = false
-            preparedScorerGeneration = currentScorerGeneration
-        }
         if (failed || cancelled()) return
         try {
             val active = scorer ?: createScorer().also { scorer = it }
@@ -137,6 +154,9 @@ class AsyncCandidateRanker(
             failed = true
         } catch (_: LinkageError) {
             failed = true
+        } catch (_: OutOfMemoryError) {
+            failed = true
+            releaseScorer()
         }
     }
 

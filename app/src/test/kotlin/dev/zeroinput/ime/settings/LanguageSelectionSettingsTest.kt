@@ -24,4 +24,16 @@ class LanguageSelectionSettingsTest {
         assertTrue(observed.isNotEmpty())
         assertTrue(observed.all { it.first == InputLanguage.ENGLISH && it.second == null })
     }
+
+    @Test fun everyNotificationSeesTheNewLanguageAndPackageTogether() {
+        val settings = SettingsRepository(RuntimeEnvironment.getApplication())
+        settings.selectBuiltInLanguage(InputLanguage.CHINESE)
+        val observed = mutableListOf<Pair<InputLanguage, String?>>()
+        settings.addChangeListener { observed += settings.lastLanguage to settings.lastLanguagePackKey }.use {
+            settings.selectLanguage(InputLanguage.ENGLISH, "public-fixture@1")
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+        assertTrue(observed.isNotEmpty())
+        assertTrue(observed.all { it == (InputLanguage.ENGLISH to "public-fixture@1") })
+    }
 }

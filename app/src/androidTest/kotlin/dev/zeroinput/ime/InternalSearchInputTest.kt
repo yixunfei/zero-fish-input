@@ -26,6 +26,18 @@ import dev.zeroinput.ime.ui.R as UiR
 class InternalSearchInputTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun hardwareKeysEditOnlyTheSearchDraft() = withEditor { activity ->
+        openToolsIfNeeded()
+        onMain { assertTrue(labelled(UiR.string.expression_smileys).performClick()) }
+        DeviceTouch.tapVisible { labelled(UiR.string.expression_search_input) }
+        await { panel()?.isSearchEditing == true }
+        shell("input keyevent KEYCODE_N KEYCODE_I KEYCODE_ENTER")
+        await { (labelled(UiR.string.expression_search_input) as TextView).text.toString() == "ni" }
+        shell("input keyevent KEYCODE_DEL")
+        await { (labelled(UiR.string.expression_search_input) as TextView).text.toString() == "n" }
+        onMain { assertTrue(activity.editor.text.isEmpty()) }
+    }
+
     @Test fun realSearchConvertsChineseWithoutWritingIntoTheExternalEditorAndClearsOnSessionChange() = withEditor { activity ->
         openToolsIfNeeded()
         DeviceTouch.tap { labelled(UiR.string.expression_smileys) }

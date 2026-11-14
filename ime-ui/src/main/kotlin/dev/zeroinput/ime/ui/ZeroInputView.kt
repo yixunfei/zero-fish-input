@@ -640,6 +640,8 @@ class ZeroInputView @JvmOverloads constructor(
         onAiSettingsRequested = {}
         onAiAssistantRequested = {}
         onAiDeviceAgentRequested = {}
+        onAiDeviceAgentDraftChanged = {}
+        onAiDeviceAgentTaskSubmitted = {}
         onAiAddContentRequested = {}
         onAiImportContentRequested = {}
         onAiRemoveAttachment = {}
@@ -1019,7 +1021,8 @@ class ZeroInputView @JvmOverloads constructor(
         }
     }
 
-    private fun dispatchKeyboardAction(action: KeyboardAction) {
+    fun dispatchKeyboardAction(action: KeyboardAction) {
+        if (released) return
         if (manualTools) { manualTools = false; refreshHeader() }
         if (isShapeLookupOpen) {
             onShapeAction(action)

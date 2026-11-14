@@ -92,8 +92,9 @@ internal class ExpandingRimeEngine(
             lastPages[source] = page
             return moveSource(source + 1, backwards = false)
         }
-        page += if (direction == PageDirection.NEXT) 1 else -1
-        val update = active.browsePage(page)
+        val target = page + if (direction == PageDirection.NEXT) 1 else -1
+        val update = active.browsePage(target)
+        if (update.consumed) page = target
         return publishRelated(update.consumed)
     }
 
@@ -153,14 +154,19 @@ internal class ExpandingRimeEngine(
             next += if (backwards) -1 else 1
         }
         if (backwards) { source = -1; return publish(EngineUpdate(primary.snapshot)) }
-        if (source >= 0) {
-            active.restoreComposition(values[source])
-            active.browsePage(page)
+        if (source < 0) {
+            snapshot = primary.snapshot.copy(hasNextPage = false)
+            return EngineUpdate(snapshot, consumed = false)
         }
-        // The attempted page was not consumed. Do not retain the previous
-        // source's candidates, which would make Space select stale text.
+        active.restoreComposition(values[source])
+        if (active.browsePage(page).consumed) {
+            val restored = publishRelated(false)
+            snapshot = restored.snapshot.copy(hasNextPage = false)
+            return restored.copy(snapshot = snapshot)
+        }
+        // Hide candidates if the previous related page could not be restored.
         snapshot = snapshot.copy(candidates = emptyList(), highlightedIndex = 0,
-            hasPreviousPage = source > 0, hasNextPage = false)
+            hasPreviousPage = true, hasNextPage = false)
         return EngineUpdate(snapshot, consumed = false)
     }
 

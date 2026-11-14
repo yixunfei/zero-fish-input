@@ -4,6 +4,22 @@ import java.io.File
 
 /** Owns activation rollback without touching the original until it has been moved safely. */
 internal object LanguagePackDirectoryReplacement {
+    private val backupName = Regex("\\.([A-Za-z0-9][A-Za-z0-9._-]{0,63})\\.backup--?[0-9]+")
+
+    fun recover(parent: File) {
+        parent.listFiles().orEmpty().filter { it.isDirectory }
+            .sortedByDescending { it.lastModified() }
+            .forEach { backup ->
+                val version = backupName.matchEntire(backup.name)?.groupValues?.get(1) ?: return@forEach
+                val destination = File(parent, version)
+                if (!destination.exists()) {
+                    check(backup.renameTo(destination)) { "Unable to restore the previous language pack" }
+                } else if (destination.isDirectory) {
+                    backup.deleteRecursively()
+                }
+            }
+    }
+
     fun replace(staging: File, destination: File) {
         destination.parentFile?.mkdirs()
         val backup = File(destination.parentFile, ".${destination.name}.backup-${System.nanoTime()}")

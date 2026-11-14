@@ -11,6 +11,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FallbackPinyinEngineTest {
+    @Test fun `full and double pinyin commit digits without converting them to letters`() {
+        for (scheme in dev.zeroinput.engine.api.DoublePinyinScheme.entries) {
+            val engine = FallbackPinyinEngine(ChineseInputOptions(doublePinyinScheme = scheme))
+            for (digit in '2'..'9') {
+                val update = engine.handle(EngineKey.Character(digit.toString()))
+                assertEquals(digit.toString(), update.committedText)
+                assertFalse(update.snapshot.isComposing)
+            }
+        }
+    }
+
     @Test fun `mixed nasal recovery offers the corrected phrase after the literal mixed spelling`() {
         val engine = FallbackPinyinEngine()
         val snapshot = engine.restoreComposition("nmeng").snapshot

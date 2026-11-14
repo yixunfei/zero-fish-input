@@ -37,6 +37,7 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
     private var keyboard: ZeroInputView? = null
     private var selected = KeyboardAppearance()
     private var operation: AutoCloseable? = null
+    private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var visible = false
     private var previewExpanded = false
     private var selectedSection = AppearanceSection.STYLE
@@ -78,7 +79,14 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
     override fun onStart() { super.onStart(); visible = true; if (::preview.isInitialized) updatePreview() }
-    override fun onStop() { visible = false; preview.visibility = View.INVISIBLE; binding.close(); super.onStop() }
+    override fun onStop() {
+        dialog?.dismiss()
+        dialog = null
+        visible = false
+        preview.visibility = View.INVISIBLE
+        binding.close()
+        super.onStop()
+    }
     override fun onDestroy() {
         operation?.close()
         binding.close()
@@ -138,7 +146,7 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
                 setOnCheckedChangeListener { _, enabled -> settings.glideTypingEnabled = enabled }
             })
             addView(AppearanceOptionsView(context, selected, ::select, ::chooseImage,
-                { confirmReset(false) }, { confirmReset(true) }, selectedSection) { section ->
+                { confirmReset(false) }, { confirmReset(true) }, selectedSection, ::showDialog) { section ->
                     selectedSection = section
                     options.post { options.scrollTo(0, 0) }
                 })
@@ -189,7 +197,7 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
     }
 
     private fun confirmReset(all: Boolean) {
-        MaterialAlertDialogBuilder(this)
+        showDialog(MaterialAlertDialogBuilder(this)
             .setTitle(if (all) UiR.string.appearance_reset_title else UiR.string.appearance_remove_title)
             .setMessage(if (all) UiR.string.appearance_reset_message else UiR.string.appearance_remove_message)
             .setNegativeButton(android.R.string.cancel, null)
@@ -202,7 +210,13 @@ class KeyboardAppearanceActivity : AppCompatActivity() {
                     if (!success) message(UiR.string.appearance_delete_failed)
                     refreshOptions()
                 }
-            }.show()
+            }.create())
+    }
+
+    private fun showDialog(value: androidx.appcompat.app.AlertDialog) {
+        dialog?.dismiss()
+        dialog = value
+        value.show()
     }
 
     private fun setBusy(busy: Boolean) {

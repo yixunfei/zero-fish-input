@@ -10,7 +10,7 @@ internal class RecentComposition {
     fun remember(reading: String, committed: String) {
         clear()
         if (reading.length !in 1..128 || committed.length !in 1..128) return
-        if (reading.any { it !in 'a'..'z' && it !in '2'..'9' && it != '\'' }) return
+        if (!ChinesePreeditCode.accepts(reading)) return
         if (committed.codePoints().anyMatch { !Character.isIdeographic(it) }) return
         input = reading.toCharArray()
         text = committed.toCharArray()

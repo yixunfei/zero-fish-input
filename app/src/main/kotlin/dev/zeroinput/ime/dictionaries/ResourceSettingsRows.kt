@@ -22,6 +22,7 @@ internal class ResourceSettingsRows(
     private val run: (() -> Unit, () -> Unit) -> Unit,
     private val refresh: () -> Unit,
     private val downloadProgress: () -> (Long, Long) -> Unit,
+    private val showDialog: (androidx.appcompat.app.AlertDialog) -> Unit,
 ) {
     fun show(items: List<PublicResourceStatus>) {
         content.addView(TextView(context).apply { setText(R.string.public_resource_title); setPadding(0, 24, 0, 8) })
@@ -45,15 +46,15 @@ internal class ResourceSettingsRows(
             })
             command(context.getString(R.string.public_resource_check)) { check(item) }
             if (item.downloaded) command(context.getString(R.string.public_dictionary_remove)) {
-                MaterialAlertDialogBuilder(context).setMessage(R.string.public_resource_remove_confirm)
+                showDialog(MaterialAlertDialogBuilder(context).setMessage(R.string.public_resource_remove_confirm)
                     .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(android.R.string.ok) { _, _ -> run({ store.remove(item.pack.id) }, refresh) }.show()
+                    .setPositiveButton(android.R.string.ok) { _, _ -> run({ store.remove(item.pack.id) }, refresh) }.create())
             }
         }
     }
 
     private fun check(item: PublicResourceStatus) {
-        MaterialAlertDialogBuilder(context).setTitle(title(item.pack.id))
+        showDialog(MaterialAlertDialogBuilder(context).setTitle(title(item.pack.id))
             .setMessage(R.string.public_resource_network_notice).setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.public_resource_check) { _, _ ->
                 var available: PublicResourcePack? = null
@@ -64,16 +65,16 @@ internal class ResourceSettingsRows(
                         available = PublicResourceCatalog.parse(file.readText()).single { it.id == item.pack.id }
                     } finally { file.delete() }
                 }, { confirmDownload(requireNotNull(available), item) })
-            }.show()
+            }.create())
     }
 
     private fun confirmDownload(pack: PublicResourcePack, previous: PublicResourceStatus) {
         if (pack.version == previous.pack.version && (previous.downloaded || previous.bundled)) {
-            MaterialAlertDialogBuilder(context).setMessage(R.string.public_resource_current)
-                .setPositiveButton(android.R.string.ok, null).show()
+            showDialog(MaterialAlertDialogBuilder(context).setMessage(R.string.public_resource_current)
+                .setPositiveButton(android.R.string.ok, null).create())
             return
         }
-        MaterialAlertDialogBuilder(context).setTitle(title(pack.id))
+        showDialog(MaterialAlertDialogBuilder(context).setTitle(title(pack.id))
             .setMessage(context.getString(R.string.public_resource_download_notice,
                 pack.bytes / 1024 / 1024, pack.license))
             .setNegativeButton(android.R.string.cancel, null)
@@ -86,7 +87,7 @@ internal class ResourceSettingsRows(
                         store.install(pack, file)
                     } finally { file.delete() }
                 }, refresh)
-            }.show()
+            }.create())
     }
 
     private fun title(id: String): String = context.getString(when (id) {

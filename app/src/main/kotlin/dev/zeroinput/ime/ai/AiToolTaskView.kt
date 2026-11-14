@@ -141,7 +141,8 @@ internal class AiToolTaskView(context: Context) : LinearLayout(context) {
         }
     }
     private fun append(text: String) {
-        timeline.text = listOf(timeline.text.toString(), text).filter(String::isNotBlank).joinToString("\n\n").takeLast(100_000)
+        timeline.text = listOf(timeline.text.toString(), text).filter(String::isNotBlank)
+            .joinToString("\n\n").takeLastWholeCodePoints(100_000)
     }
     fun clear() { prompt.text?.clear(); clearHistory(); showSetup(true); wasRunning = false }
     fun error() { status.setText(R.string.ai_tool_unavailable) }

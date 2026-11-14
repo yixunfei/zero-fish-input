@@ -63,7 +63,8 @@ checks the relevant runtime or special permission immediately before access.
 - Camera and microphone: one in-memory JPEG frame or at most one second of
   PCM/WAV audio; no recording, preview persistence or background capture.
 - SMS and telephony: read the newest record for one explicit number, send one
-  SMS or start one call; no bulk scan, deletion or call recording.
+  SMS or start one call. The platform's single-message encoding limit is
+  checked before dispatch. No bulk scan, deletion or call recording.
 - Contacts and calendar: read an explicitly named contact/event and perform
   the fixed create/update/delete operations listed in the tool catalog; no
   provider crawl or agent history.

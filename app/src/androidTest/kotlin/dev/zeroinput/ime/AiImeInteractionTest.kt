@@ -28,6 +28,16 @@ class AiImeInteractionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val graph get() = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
 
+    @Test fun hardwareKeysEditOnlyTheAiDraft() = withEditor { activity ->
+        tap { labelled(UiR.string.ai_open) }
+        await { panel().isAiEditing }
+        shell("input keyevent KEYCODE_N KEYCODE_I KEYCODE_ENTER")
+        await { draft().text.toString() == "ni" }
+        shell("input keyevent KEYCODE_DEL")
+        await { draft().text.toString() == "n" }
+        onMain { assertTrue(activity.editor.text.isEmpty()) }
+    }
+
     @Test fun typingBeforeDraftWarmupStillConvertsChineseAndLeavesTheHostUntouched() = withEditor { editor ->
         val runtimeDeadline = SystemClock.uptimeMillis() + 60_000
         while (!graph.rime.runtime.isReady && SystemClock.uptimeMillis() < runtimeDeadline) {

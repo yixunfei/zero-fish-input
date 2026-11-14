@@ -2,6 +2,7 @@ package dev.zeroinput.ime.clipboard
 
 import android.content.Intent
 import android.view.accessibility.AccessibilityNodeInfo
+import dev.zeroinput.ime.R
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.clipboardguard.ClipboardDeviceTestSupport as Device
 import dev.zeroinput.ime.testing.InputFixtureActivity
@@ -14,15 +15,19 @@ class SecurePasteReturnTest {
     @Test
     fun cancelTypingEditorSwitchSettingsAndDeletionRevokeTheReturnedPaste() {
         assumeTrue(androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("clipboardTestPin") == "2468")
-        for (case in listOf("cancel", "typing", "editor", "settings", "deletion", "queuedTyping", "queuedHide")) withFixture { activity, id ->
+        for (case in listOf("cancel", "typing", "editor", "settings", "deletion",
+            "queuedTyping", "queuedHide", "queuedScreenOff")) withFixture { activity, id ->
             val graph = (Device.context.applicationContext as ZeroInputApplication).graph
             val description = Device.context.getString(dev.zeroinput.ime.ui.R.string.secure_clipboard_open)
             Device.await { Device.roots().any { findDescription(it, description) != null } }
             checkNotNull(Device.roots().firstNotNullOfOrNull { findDescription(it, description) })
                 .performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Device.click(graph.secureClipboard.summaries().single().displayName)
-            Device.await {
-                Device.roots().any { it.window?.isFocused == true && hasPasswordField(it) }
+            Device.click(Device.context.getString(R.string.secure_clipboard_ordinal, 1))
+            Device.await("System credential input should be visible") {
+                Device.roots().any { it.window?.isFocused == true && hasPasswordField(it) } ||
+                    Device.shell("dumpsys window").lineSequence().any {
+                        it.contains("mCurrentFocus=") && it.contains("BiometricPrompt}")
+                    }
             }
             Device.instrumentation.uiAutomation.waitForIdle(100, 3_000)
             Device.shell("input text 2468")
@@ -45,7 +50,7 @@ class SecurePasteReturnTest {
                     }
                     "settings" -> Device.onMain { graph.settings.hapticFeedbackEnabled = !haptics }
                     "deletion" -> { graph.secureClipboard.remove(id, grant()); Device.click(confirm) }
-                    "queuedTyping", "queuedHide" -> revokeBlockedPaste(activity, confirm, case == "queuedTyping")
+                    "queuedTyping", "queuedHide", "queuedScreenOff" -> revokeBlockedPaste(activity, confirm, case)
                 }
                 Device.await("A revoked operation must remove the paste confirmation") { Device.findText(confirm) == null }
                 oldButton.performAction(AccessibilityNodeInfo.ACTION_CLICK)
@@ -60,7 +65,7 @@ class SecurePasteReturnTest {
         }
     }
 
-    private fun revokeBlockedPaste(activity: InputFixtureActivity, confirm: String, typing: Boolean) {
+    private fun revokeBlockedPaste(activity: InputFixtureActivity, confirm: String, action: String) {
         val vault = (Device.context.applicationContext as ZeroInputApplication).graph.secureClipboard
         val locked = java.util.concurrent.CountDownLatch(1)
         val release = java.util.concurrent.CountDownLatch(1)
@@ -75,24 +80,42 @@ class SecurePasteReturnTest {
                 })
             } catch (_: java.util.concurrent.CancellationException) { /* Expected; nothing was written. */ }
         }
+        var screenTurnedOff = false
         try {
             assertTrue(locked.await(3, java.util.concurrent.TimeUnit.SECONDS))
             Device.click(confirm)
             Device.await { Device.findText(confirm) == null }
-            if (typing) Device.onMain { activity.editor.append("public typed") }
-            else Device.onMain {
-                activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-                    .hideSoftInputFromWindow(activity.editor.windowToken, 0)
+            when (action) {
+                "queuedTyping" -> Device.onMain { activity.editor.append("public typed") }
+                "queuedHide" -> Device.onMain {
+                    activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                        .hideSoftInputFromWindow(activity.editor.windowToken, 0)
+                }
+                "queuedScreenOff" -> {
+                    Device.shell("input keyevent KEYCODE_SLEEP")
+                    screenTurnedOff = true
+                    val power = activity.getSystemService(android.os.PowerManager::class.java)
+                    Device.await("Fixture must turn the display off") { !power.isInteractive }
+                }
             }
             Device.instrumentation.uiAutomation.waitForIdle(200, 3_000)
             release.countDown()
             blocker.get(3, java.util.concurrent.TimeUnit.SECONDS)
             val deadline = android.os.SystemClock.elapsedRealtime() + 1_000L
             while (android.os.SystemClock.elapsedRealtime() < deadline) {
-                Device.onMain { assertEquals(if (typing) "public typed" else "", activity.editor.text.toString()) }
+                Device.onMain {
+                    assertEquals(if (action == "queuedTyping") "public typed" else "", activity.editor.text.toString())
+                }
                 android.os.SystemClock.sleep(20)
             }
-        } finally { release.countDown(); worker.shutdownNow() }
+        } finally {
+            release.countDown()
+            worker.shutdownNow()
+            if (screenTurnedOff) {
+                Device.shell("input keyevent KEYCODE_WAKEUP")
+                Device.shell("wm dismiss-keyguard")
+            }
+        }
     }
 
     private fun withFixture(test: (InputFixtureActivity, String) -> Unit) {

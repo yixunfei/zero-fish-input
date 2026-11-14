@@ -82,25 +82,33 @@ internal object BackgroundImageCodec {
     /** A small separable box blur on a downsampled display copy; always runs on the worker. */
     fun blur(source: Bitmap, amount: Int): Bitmap {
         if (amount <= 0) return source
-        val ratio = minOf(1f, 320f / maxOf(source.width, source.height))
-        val small = source.scale((source.width * ratio).toInt().coerceAtLeast(1),
-            (source.height * ratio).toInt().coerceAtLeast(1), true)
+        try {
+            val ratio = minOf(1f, 320f / maxOf(source.width, source.height))
+            val small = source.scale((source.width * ratio).toInt().coerceAtLeast(1),
+                (source.height * ratio).toInt().coerceAtLeast(1), true)
+            return try { blurCopy(small, amount) } finally { if (small !== source) small.recycle() }
+        } finally {
+            source.recycle()
+        }
+    }
+
+    private fun blurCopy(small: Bitmap, amount: Int): Bitmap {
         val width = small.width
         val height = small.height
         val pixels = IntArray(width * height)
-        val work = IntArray(pixels.size)
+        var work: IntArray? = null
         try {
+            val scratch = IntArray(pixels.size).also { work = it }
             small.getPixels(pixels, 0, width, 0, 0, width, height)
             val radius = (amount / 2).coerceIn(1, 10)
             repeat(2) {
-                blurPass(pixels, work, width, height, radius, true)
-                blurPass(work, pixels, width, height, radius, false)
+                blurPass(pixels, scratch, width, height, radius, true)
+                blurPass(scratch, pixels, width, height, radius, false)
             }
             return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
         } finally {
-            pixels.fill(0); work.fill(0)
-            if (small !== source) small.recycle()
-            source.recycle()
+            pixels.fill(0)
+            work?.fill(0)
         }
     }
 

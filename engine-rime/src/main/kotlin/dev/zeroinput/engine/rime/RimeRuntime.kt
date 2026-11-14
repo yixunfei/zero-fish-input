@@ -27,6 +27,7 @@ class RimeRuntime(context: Context,
     /** A publication signal only; native work waits until no editor owns an engine. */
     fun dictionariesChanged() { dictionaryRevision.incrementAndGet() }
 
+    /** Call on the same serialized engine worker as initialization and native preparation. */
     fun prepareDictionariesIfIdle() {
         val requestedRevision = dictionaryRevision.get()
         val shouldCheck = synchronized(lock) {

@@ -4,6 +4,23 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AiThinkingTextTest {
+    @Test fun `large coalesced chunks and partial markers stay separated`() {
+        val stream = AiThinkingText.Stream()
+        val answer = "a".repeat(16_000)
+        val reasoning = "r".repeat(16_000)
+        assertEquals(AiThinkingText.StreamPart(answer, ""), stream.append("$answer<TH"))
+        assertEquals(AiThinkingText.StreamPart("", reasoning), stream.append("INK>$reasoning</THINK"))
+        assertEquals(AiThinkingText.StreamPart("ok<text", ""), stream.append(">ok<text"))
+    }
+
+    @Test fun `truncation keeps supplementary characters intact in both directions`() {
+        val value = "A\uD83D\uDE42Z"
+        assertEquals("A", value.takeWholeCodePoints(2))
+        assertEquals("A\uD83D\uDE42", value.takeWholeCodePoints(3))
+        assertEquals("Z", value.takeLastWholeCodePoints(2))
+        assertEquals("\uD83D\uDE42Z", value.takeLastWholeCodePoints(3))
+    }
+
     @Test fun `stream separates markers even when each marker arrives in pieces`() {
         val stream = AiThinkingText.Stream()
         val answer = StringBuilder()

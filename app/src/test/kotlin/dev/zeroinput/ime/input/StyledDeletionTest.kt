@@ -23,12 +23,18 @@ class StyledDeletionTest {
     }
 
     @Test fun doesNotExpandFormattingOrReplacementThatMayBeClipped() {
-        val text = SpannableString("[微笑]")
+        val text = SpannableString("x".repeat(UnicodeDeletionBoundary.LOOKBEHIND_LIMIT))
         text.setSpan(icon(), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         assertEquals(1, UnicodeDeletionBoundary.precedingLength(text))
         val styled = SpannableString("a[微笑]")
         styled.setSpan(StyleSpan(android.graphics.Typeface.BOLD), 1, styled.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         assertEquals(1, UnicodeDeletionBoundary.precedingLength(styled))
+    }
+
+    @Test fun deletesACompleteReplacementStartingAtZeroInAShortWindow() {
+        val text = SpannableString("[微笑]")
+        text.setSpan(icon(), 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        assertEquals(text.length, UnicodeDeletionBoundary.precedingLength(text))
     }
 
     private fun icon() = object : ReplacementSpan() {

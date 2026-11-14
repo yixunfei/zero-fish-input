@@ -3,6 +3,7 @@ package dev.zeroinput.ime.ai.page
 import android.graphics.Bitmap
 import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /** A single explicit screenshot capture is converted locally before any AI request. */
@@ -40,16 +41,23 @@ internal class PageScreenshotBroker(
             deliver(token, null)
             return token
         }
+        val captured = AtomicBoolean()
         try {
-            reader.capture(sourcePackage, current) { bitmap ->
+            reader.capture(sourcePackage, current) bitmapReady@{ bitmap ->
+                if (!captured.compareAndSet(false, true)) {
+                    bitmap?.recycle()
+                    return@bitmapReady
+                }
                 if (bitmap == null) {
                     deliverIfCurrent(token, current, deliver, null)
-                    return@capture
+                    return@bitmapReady
                 }
                 try {
                     executor.execute {
                         val result = try {
                             if (!current()) null else ocr.recognize(bitmap, current)
+                        } catch (_: RuntimeException) {
+                            null
                         } finally {
                             bitmap.recycle()
                         }
@@ -61,7 +69,7 @@ internal class PageScreenshotBroker(
                 }
             }
         } catch (_: RuntimeException) {
-            deliverIfCurrent(token, current, deliver, null)
+            if (captured.compareAndSet(false, true)) deliverIfCurrent(token, current, deliver, null)
         }
         return token
     }

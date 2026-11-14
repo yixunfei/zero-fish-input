@@ -14,7 +14,10 @@ class LanguagePackInstaller(
     private val context: Context,
 ) {
     private val lock = Any()
+    private val archiveLock = Any()
     private val installedRoot = File(context.noBackupFilesDir, "language-packs/installed")
+    private val stagingRoot = File(context.noBackupFilesDir, "language-packs/.staging")
+    private val archiveRoot by lazy { File(context.cacheDir, "language-pack-import") }
     private val stateFile = File(context.noBackupFilesDir, "language-packs/enabled.json")
     /** Last verified filesystem scan; null means discovery has not completed. */
     private var installedCache: List<InstalledLanguagePack>? = null
@@ -26,10 +29,13 @@ class LanguagePackInstaller(
         return source.use(::install)
     }
 
-    fun install(input: InputStream): InstalledLanguagePack {
+    fun install(input: InputStream): InstalledLanguagePack = synchronized(archiveLock) {
+        archiveRoot.listFiles().orEmpty().filter { it.name.matches(Regex("pack-[0-9]+\\.zip")) }
+            .forEach { it.delete() }
         val archive = copyArchiveToTemporaryFile(input)
         try {
-            return synchronized(lock) {
+            synchronized(lock) {
+                recoverInterruptedInstallations()
                 ZipEntryTypePolicy.validate(archive, MAX_ZIP_ENTRIES)
                 validateAndInstall(archive).also(::mergeInstalledCache)
             }
@@ -56,6 +62,7 @@ class LanguagePackInstaller(
     }
 
     private fun scanInstalled(): List<InstalledLanguagePack> {
+        recoverInterruptedInstallations()
         val enabled = readEnabledState()
         val result = installedRoot.listFiles { file -> file.isDirectory }.orEmpty()
             .flatMap { idDirectory ->
@@ -65,6 +72,14 @@ class LanguagePackInstaller(
             }
             .sortedWith(compareBy({ it.manifest.displayName }, { it.manifest.id }, { it.manifest.version }))
         return result.also { installedCache = it }
+    }
+
+    private fun recoverInterruptedInstallations() {
+        stagingRoot.listFiles().orEmpty().filter {
+            it.name.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,63}--?[0-9]+"))
+        }.forEach { it.deleteRecursively() }
+        installedRoot.listFiles().orEmpty().filter { it.isDirectory && IDENTIFIER.matches(it.name) }
+            .forEach { LanguagePackDirectoryReplacement.recover(it) }
     }
 
     /**
@@ -88,6 +103,7 @@ class LanguagePackInstaller(
 
     fun setEnabled(id: String, version: String, enabled: Boolean): Boolean = runCatching {
         synchronized(lock) {
+            recoverInterruptedInstallations()
             val directory = directoryFor(id, version)
             if (!directory.isDirectory || readInstalled(directory, readEnabledState()) == null) return@synchronized false
             val state = readEnabledState()
@@ -111,6 +127,7 @@ class LanguagePackInstaller(
 
     fun remove(id: String, version: String): Boolean = runCatching {
         synchronized(lock) {
+            recoverInterruptedInstallations()
             val directory = directoryFor(id, version)
             if (!directory.isDirectory) return@synchronized false
             val removed = directory.deleteRecursively()
@@ -128,8 +145,7 @@ class LanguagePackInstaller(
     }.getOrDefault(false)
 
     private fun copyArchiveToTemporaryFile(input: InputStream): File {
-        val directory = File(context.cacheDir, "language-pack-import").apply(File::mkdirs)
-        val output = File.createTempFile("pack-", ".zip", directory)
+        val output = File.createTempFile("pack-", ".zip", archiveRoot.apply(File::mkdirs))
         var total = 0L
         try {
             FileOutputStream(output).use { destination ->
@@ -230,7 +246,7 @@ class LanguagePackInstaller(
     }
 
     private fun createStagingDirectory(manifest: LanguagePackManifest): File {
-        val root = File(context.noBackupFilesDir, "language-packs/.staging").apply(File::mkdirs)
+        val root = stagingRoot.apply(File::mkdirs)
         return File(root, "${manifest.id}-${System.nanoTime()}").apply {
             require(mkdirs()) { "Unable to create language pack staging directory" }
         }

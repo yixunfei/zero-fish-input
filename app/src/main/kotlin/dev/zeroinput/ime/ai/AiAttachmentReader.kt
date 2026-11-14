@@ -29,7 +29,7 @@ internal object AiAttachmentReader {
         }
         val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null, cancellation)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
-        }.orEmpty().take(128).filterNot(Char::isISOControl).ifBlank { "attachment" }
+        }.orEmpty().takeWholeCodePoints(128).filterNot(Char::isISOControl).ifBlank { "attachment" }
         val buffer = ByteArray(maxBytes + 1)
         try {
             var size = 0

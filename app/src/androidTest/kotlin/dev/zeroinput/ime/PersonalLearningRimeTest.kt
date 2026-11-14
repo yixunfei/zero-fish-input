@@ -19,6 +19,37 @@ import java.util.concurrent.TimeUnit
 /** Public fixture through real Rime and the production asynchronous learning adapter. */
 @RunWith(AndroidJUnit4::class)
 class PersonalLearningRimeTest {
+    @Test fun exhaustedRelatedReadingsKeepTheLastPrimaryCandidatesSelectable() {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val engine = graph.engineExecutor.submit<InputEngine> {
+            checkNotNull(graph.rime.createNativeOrNull(ChineseInputOptions()))
+        }.get(300, TimeUnit.SECONDS)
+        try {
+            engine.start(EditorContext(InputLanguage.CHINESE, false, false, "fixture"))
+            for (key in "aa") engine.handle(EngineKey.Character(key.toString()))
+            repeat(32) {
+                if (engine.snapshot.hasNextPage) {
+                    val before = engine.snapshot
+                    val update = engine.changePage(PageDirection.NEXT)
+                    if (!update.consumed) {
+                        graph.engineExecutor.submit {}.get(20, TimeUnit.SECONDS)
+                        val exhausted = engine.changePage(PageDirection.NEXT)
+                        assertFalse(exhausted.consumed)
+                        assertFalse(exhausted.snapshot.hasNextPage)
+                        assertEquals(before.candidates, exhausted.snapshot.candidates)
+                        assertTrue(exhausted.snapshot.candidates.isNotEmpty())
+                        val selected = engine.selectCandidate(0)
+                        assertTrue(selected.consumed)
+                        assertTrue(selected.committedText == before.candidates.first().text ||
+                            selected.snapshot.canUndoSelection)
+                        return
+                    }
+                }
+            }
+            fail("The fixture must reach the last primary candidate page")
+        } finally { engine.close() }
+    }
+
     @Test fun repeatedNonDefaultChoicesLearnTheirShortCodeAndSurviveReload() =
         verifyRepeatedChoice(ChineseInputOptions(), "xz", "限制")
 

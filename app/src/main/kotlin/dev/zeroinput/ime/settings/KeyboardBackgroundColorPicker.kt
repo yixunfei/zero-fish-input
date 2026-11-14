@@ -10,7 +10,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.zeroinput.ime.R
 import java.util.Locale
 
-internal fun showKeyboardBackgroundColorPicker(context: Context, initial: Int, apply: (Int) -> Unit) {
+internal fun keyboardBackgroundColorDialog(
+    context: Context,
+    initial: Int,
+    apply: (Int) -> Unit,
+): androidx.appcompat.app.AlertDialog {
     val channels = intArrayOf(Color.red(initial), Color.green(initial), Color.blue(initial))
     fun color() = Color.rgb(channels[0], channels[1], channels[2])
     fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
@@ -49,10 +53,10 @@ internal fun showKeyboardBackgroundColorPicker(context: Context, initial: Int, a
         }
     }
     refreshSwatch()
-    MaterialAlertDialogBuilder(context)
+    return MaterialAlertDialogBuilder(context)
         .setTitle(R.string.appearance_custom_background_color)
         .setView(android.widget.ScrollView(context).apply { addView(body) })
         .setNegativeButton(R.string.cancel, null)
         .setPositiveButton(R.string.save) { _, _ -> apply(color()) }
-        .show()
+        .create()
 }

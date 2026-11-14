@@ -24,6 +24,7 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
     private val leases = mutableMapOf<String, Int>()
     private val verifier = ResourceFileVerifier(::digest)
     private val counter = AtomicLong()
+    private var cleanedStaging = false
     override val revision: Long get() = counter.get()
     var onPublished: () -> Unit = {}
 
@@ -75,6 +76,7 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
     }
 
     fun install(pack: PublicResourcePack, archive: File) = synchronized(monitor) {
+        cleanInterruptedStaging()
         PublicResourceCatalog.pack(pack.json())
         require(archive.isFile && archive.length() == pack.bytes &&
             archive.inputStream().use { digest(it) } == pack.sha256)
@@ -143,17 +145,42 @@ class PublicResourceStore(context: Context) : PublicResourceSource {
     private fun directory(): File = root.apply { check(isDirectory || mkdirs()) }
     private fun blob(hash: String): File = File(directory(), hash)
     private fun stagingFile(): File = File.createTempFile("prepare-", ".tmp", directory())
+
+    private fun cleanInterruptedStaging() {
+        if (cleanedStaging) return
+        root.listFiles().orEmpty().filter {
+            it.name.matches(Regex("install-[0-9]+|prepare-[0-9]+\\.tmp"))
+        }.forEach { it.deleteRecursively() }
+        cleanedStaging = true
+    }
+
     private fun readState(): JSONObject {
+        cleanInterruptedStaging()
         val file = AtomicFile(File(root, "registry.json"))
-        return try { file.openRead().use { JSONObject(String(readBounded(it), Charsets.UTF_8)) } }
+        return try {
+            file.openRead().use { input ->
+                val state = LanguagePackJson.parse(String(readBounded(input), Charsets.UTF_8)) as? JSONObject
+                    ?: throw IllegalArgumentException("Invalid resource registry")
+                state.keys().forEach { id ->
+                    val row = state.getJSONObject(id)
+                    require(row.opt("enabled") is Boolean)
+                    if (row.has("pack")) require(PublicResourceCatalog.pack(row.getJSONObject("pack")).id == id)
+                }
+                state
+            }
+        }
         catch (_: java.io.FileNotFoundException) { JSONObject() }
+        catch (_: org.json.JSONException) { disabledRegistry() }
+        catch (_: IllegalArgumentException) { disabledRegistry() }
+        catch (_: java.net.URISyntaxException) { disabledRegistry() }
+    }
+
+    private fun disabledRegistry(): JSONObject = JSONObject().also { state ->
+        bundledCatalog().forEach { state.put(it.id, JSONObject().put("enabled", false)) }
     }
 
     private fun writeState(value: JSONObject) {
-        val file = AtomicFile(File(directory(), "registry.json"))
-        val stream = file.startWrite()
-        try { stream.write(value.toString().toByteArray(Charsets.UTF_8)); file.finishWrite(stream) }
-        catch (error: Exception) { file.failWrite(stream); throw error }
+        AtomicFile(File(directory(), "registry.json")).writeRegistry(value.toString())
     }
 
     private fun published() { counter.incrementAndGet(); onPublished() }

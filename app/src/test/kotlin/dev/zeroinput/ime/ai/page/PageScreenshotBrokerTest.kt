@@ -7,6 +7,20 @@ import org.junit.Test
 import java.util.concurrent.Executor
 
 class PageScreenshotBrokerTest {
+    @Test fun captureThatCallsBackAndThenThrowsDeliversOnce() {
+        val broker = PageScreenshotBroker(
+            Executor { it.run() }, { it(); true }, { true },
+            LocalPageOcr { _, _ -> error("OCR must not run") },
+        )
+        broker.attach(PageScreenshotSource { _, _, next ->
+            next(null)
+            throw IllegalStateException("Fixture capture failed after callback")
+        })
+        var deliveries = 0
+        broker.capture("public.app") { _, value -> assertNull(value); deliveries++ }
+        assertEquals(1, deliveries)
+    }
+
     @Test fun `capture without an attached source fails closed`() {
         val broker = PageScreenshotBroker(
             Executor { it.run() }, { it(); true }, { true },

@@ -55,6 +55,14 @@ class SettingsRepository(context: Context) {
         get() = aiDisplayPreferences.getBoolean(KEY_AI_THINKING_VISIBLE, true)
         set(value) { aiDisplayPreferences.edit().putBoolean(KEY_AI_THINKING_VISIBLE, value).apply() }
 
+    fun observeAiThinkingVisibility(listener: (Boolean) -> Unit): AutoCloseable {
+        val observer = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_AI_THINKING_VISIBLE) listener(aiThinkingVisible)
+        }
+        aiDisplayPreferences.registerOnSharedPreferenceChangeListener(observer)
+        return AutoCloseable { aiDisplayPreferences.unregisterOnSharedPreferenceChangeListener(observer) }
+    }
+
     var deviceAgentEnabled: Boolean
         get() = preferences.getBoolean(KEY_DEVICE_AGENT_ENABLED, false)
         set(value) = edit(KEY_DEVICE_AGENT_ENABLED, value)
@@ -164,7 +172,11 @@ class SettingsRepository(context: Context) {
 
     /** Observers always see the new built-in language together with the cleared package. */
     fun selectBuiltInLanguage(language: InputLanguage) {
-        preferences.edit().putString(KEY_LANGUAGE, language.name).remove(KEY_LANGUAGE_PACK).apply()
+        selectLanguage(language, null)
+    }
+
+    fun selectLanguage(language: InputLanguage, packKey: String?) {
+        preferences.edit().putString(KEY_LANGUAGE, language.name).putString(KEY_LANGUAGE_PACK, packKey).apply()
     }
 
     fun keyboardPlacement(landscape: Boolean): KeyboardPlacement {

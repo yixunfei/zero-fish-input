@@ -16,21 +16,27 @@ internal object AiThinkingText {
             val thinking = StringBuilder()
             var cursor = 0
             while (cursor < pending.length) {
-                val tail = pending.substring(cursor)
+                val output = if (insideThinking) thinking else answer
+                if (pending[cursor] != '<') {
+                    output.append(pending[cursor++])
+                    continue
+                }
                 val marker = if (insideThinking) CLOSE else OPEN
-                if (tail.startsWith(marker, ignoreCase = true)) {
+                if (pending.startsWith(marker, cursor, ignoreCase = true)) {
                     cursor += marker.length
                     insideThinking = !insideThinking
                     continue
                 }
-                if (!insideThinking && tail.startsWith(CLOSE, ignoreCase = true)) {
+                if (!insideThinking && pending.startsWith(CLOSE, cursor, ignoreCase = true)) {
                     cursor += CLOSE.length
                     continue
                 }
-                if (tail.length < OPEN.length && OPEN.startsWith(tail, ignoreCase = true) ||
-                    tail.length < CLOSE.length && CLOSE.startsWith(tail, ignoreCase = true)) break
-                if (insideThinking) thinking.append(pending[cursor]) else answer.append(pending[cursor])
-                cursor++
+                if (pending.length - cursor < CLOSE.length) {
+                    val tail = pending.substring(cursor)
+                    if (tail.length < OPEN.length && OPEN.startsWith(tail, ignoreCase = true) ||
+                        tail.length < CLOSE.length && CLOSE.startsWith(tail, ignoreCase = true)) break
+                }
+                output.append(pending[cursor++])
             }
             if (cursor > 0) pending.delete(0, cursor)
             return StreamPart(answer.toString(), thinking.toString())

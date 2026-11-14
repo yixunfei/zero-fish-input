@@ -9,6 +9,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LanguagePackDirectoryReplacementTest {
+    @Test fun `startup recovers a moved original and removes a superseded backup`() = withDirectories { root ->
+        val moved = File(root, ".v1.backup-123").apply { mkdir() }
+        File(moved, "dictionary.txt").writeText("original")
+        val superseded = File(root, ".v2.backup-456").apply { mkdir() }
+        val active = File(root, "v2").apply { mkdir() }
+        File(active, "dictionary.txt").writeText("replacement")
+        val unrelated = File(root, ".keep").apply { mkdir() }
+
+        LanguagePackDirectoryReplacement.recover(root)
+
+        assertEquals("original", File(root, "v1/dictionary.txt").readText())
+        assertEquals("replacement", File(active, "dictionary.txt").readText())
+        assertFalse(moved.exists())
+        assertFalse(superseded.exists())
+        assertTrue(unrelated.exists())
+    }
+
     @Test fun `failure moving the installed directory preserves the original package`() = withDirectories { root ->
         val destination = FailingRename(File(root, "installed").path).apply { mkdir() }
         File(destination, "dictionary.txt").writeText("original")

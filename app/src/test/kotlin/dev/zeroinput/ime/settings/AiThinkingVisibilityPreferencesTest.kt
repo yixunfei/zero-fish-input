@@ -29,4 +29,20 @@ class AiThinkingVisibilityPreferencesTest {
         settings.aiThinkingVisible = true
         assertTrue(SettingsRepository(context).aiThinkingVisible)
     }
+
+    @Test fun reasoningVisibilityNotifiesItsOwnObserverUntilClosed() {
+        val settings = SettingsRepository(context)
+        val observed = mutableListOf<Boolean>()
+        val editorSettings = mutableListOf<Unit>()
+        settings.addChangeListener { editorSettings += Unit }.use {
+            settings.observeAiThinkingVisibility { observed += it }.use {
+                SettingsRepository(context).aiThinkingVisible = false
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            }
+            settings.aiThinkingVisible = true
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+        org.junit.Assert.assertEquals(listOf(false), observed)
+        assertTrue(editorSettings.isEmpty())
+    }
 }

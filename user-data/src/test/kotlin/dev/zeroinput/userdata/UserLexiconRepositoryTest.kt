@@ -61,6 +61,12 @@ class UserLexiconRepositoryTest {
         assertTrue(repository.search("ceshi").isEmpty())
     }
 
+    @Test fun `management search matches uppercase phrase text by lowercase prefix`() {
+        val repository = UserLexiconRepository(MemoryStore())
+        val phrase = repository.addPhrase("greet", "Hello world", InputLanguage.ENGLISH)
+        assertEquals(phrase.id, repository.searchPage("hello").items.single().id)
+    }
+
     @Test fun `invalid edit duplicate or removed target never changes stored values`() {
         val repository = UserLexiconRepository(MemoryStore(), TrackingExportCipher())
         val first = repository.addPhrase("cs", "测试", InputLanguage.CHINESE, 3)

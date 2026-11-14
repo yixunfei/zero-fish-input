@@ -179,12 +179,7 @@ class PublicDictionaryStore(context: Context) : PublicDictionarySource {
         items.forEach { item -> array.put(JSONObject().put("id", item.id).put("title", item.title)
             .put("source", item.source).put("version", item.version).put("sha256", item.sha256)
             .put("entries", item.entries).put("bytes", item.bytes).put("enabled", item.enabled)) }
-        val output = state.startWrite()
-        try {
-            output.write(array.toString().toByteArray(Charsets.UTF_8))
-            checkCancelled()
-            state.finishWrite(output)
-        } catch (error: Exception) { state.failWrite(output); throw error }
+        state.writeRegistry(array.toString())
         // Publication is irrevocable at this point, even if the requesting Activity has stopped.
         onPublished()
     }

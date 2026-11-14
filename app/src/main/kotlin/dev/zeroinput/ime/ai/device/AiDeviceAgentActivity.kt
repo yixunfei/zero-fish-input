@@ -1,5 +1,7 @@
 package dev.zeroinput.ime.ai.device
 
+import dev.zeroinput.ime.ai.takeWholeCodePoints
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -586,7 +588,7 @@ class AiDeviceAgentActivity : AppCompatActivity() {
                 null,
                 cancellation,
             )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-                .orEmpty().take(128).filterNot(Char::isISOControl).ifBlank { "selected item" }
+                .orEmpty().takeWholeCodePoints(128).filterNot(Char::isISOControl).ifBlank { "selected item" }
             cancellation.throwIfCanceled()
             return SelectedDocument(uri.toString(), mimeType, displayName)
         }

@@ -133,7 +133,7 @@ class UserLexiconRepository(
             val page = source.asSequence().filter { term ->
                 if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
                 normalized.isEmpty() || term.shortcut.lowercase(Locale.ROOT).startsWith(normalized) ||
-                    term.value.startsWith(normalized) ||
+                    term.value.startsWith(normalized, ignoreCase = true) ||
                     term.language == InputLanguage.CHINESE && readingMatches(term.value, normalized)
             }.drop(offset).take(limit + 1).toList()
             UserTermPage(page.take(limit), page.size > limit)

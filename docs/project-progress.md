@@ -442,6 +442,31 @@ exercised in this pass. Evidence is under `.tmp-evidence/goal-*` and
 current Debug-signed testing prerelease. See [release notes](releases/v0.7.4.md)
 and [release validation](releases/v0.7.4-validation.md).
 
+## November 13 code review follow-up
+
+Reviewed all 41 findings against `64fc1d0`. Fixed 37 findings across input
+routing, engine recovery, candidate ranking, settings lifecycle, public resource
+storage and AI. Leaving the dictionary page still cancels work as specified in
+[ADR 0020](adr/0020-public-dictionaries.md). The shared Rime worker contract is
+documented at dictionary preparation. The pinned librime menu and spelling
+lookup share the same filtered candidate indices. Kotlin's parameterless
+`lowercase()` uses the invariant locale.
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest `
+  :engine-english:test :engine-api:test :engine-dictionary:test :ai-api:test `
+  privacyCheck :app:lintDebug :app:processReleaseMainManifest `
+  "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
+```
+
+The Debug APK and test APK built with native Rime. The JVM reports contain
+1,071 passes and two opt-in skips. Debug Lint and the Debug/Release merged
+manifest privacy checks passed. Two API 37 x86_64 emulators passed 44 checks
+with one opt-in public dictionary skip. Device coverage included hardware key
+routing, the last primary Rime page, registry rename failure and recovery,
+settings layouts, and a screen-off during a blocked authenticated paste.
+Evidence and per-finding dispositions are in `.tmp-evidence/`.
+
 ## Public dictionary import
 
 The catalog now distinguishes download and import from visiting the source

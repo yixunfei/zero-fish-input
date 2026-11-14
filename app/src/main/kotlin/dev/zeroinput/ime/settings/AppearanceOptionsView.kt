@@ -26,6 +26,7 @@ internal class AppearanceOptionsView(
     private val removeImage: () -> Unit,
     private val reset: () -> Unit,
     initialSection: AppearanceSection = AppearanceSection.STYLE,
+    private val showDialog: (androidx.appcompat.app.AlertDialog) -> Unit = { it.show() },
     private val sectionChanged: (AppearanceSection) -> Unit = {},
 ) : LinearLayout(context) {
     constructor(context: Context) : this(context, KeyboardAppearance(), { _, _ -> }, {}, {}, {})
@@ -161,10 +162,10 @@ internal class AppearanceOptionsView(
                 val themed = KeyboardThemeContext.create(context, value.theme)
                 val color = value.backgroundColor ?: com.google.android.material.color.MaterialColors.getColor(
                     themed, com.google.android.material.R.attr.colorSurface, android.graphics.Color.WHITE)
-                showKeyboardBackgroundColorPicker(context, color) {
+                showDialog(keyboardBackgroundColorDialog(context, color) {
                     update(value.copy(backgroundColor = it))
                     renderSection()
-                }
+                })
             }
         }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         button(R.string.appearance_choose_image, chooseImage)

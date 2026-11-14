@@ -156,34 +156,40 @@ internal class DeviceStage6Controller(
         deliver: (DeviceStage6Result) -> Unit,
     ): AiRequestHandle {
         val cancellation = DeviceStage6Cancellation()
-        val handleGeneration = synchronized(lock) {
+        val rejection = synchronized(lock) {
+            fun reject(status: DeviceStage6ResultStatus, message: String) = DeviceStage6Result(status, message)
             if (closed || grant.taskId != request.taskId || grant.generation != request.generation ||
-                grant.generation != generation) return rejected(deliver, DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
+                grant.generation != generation) return@synchronized reject(DeviceStage6ResultStatus.EXPIRED, "Task grant expired")
             // The coordinator prefixes the model call id ("stage6-"), so the bound
             // must leave room for that prefix on top of MAX_CALL_ID_CHARS.
             if (!approvalId.matches(Regex("[A-Za-z0-9._-]{1,160}"))) {
-                return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Approval is invalid")
+                return@synchronized reject(DeviceStage6ResultStatus.REJECTED, "Approval is invalid")
             }
             if (maxAttachmentBytes !in 0..AiLimits.MAX_ATTACHMENT_BYTES) {
-                return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Attachment budget is invalid")
+                return@synchronized reject(DeviceStage6ResultStatus.REJECTED, "Attachment budget is invalid")
             }
             if (!consumedApprovals.getOrPut(request.taskId) { mutableSetOf() }.add(approvalId)) {
-                return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Approval already used")
+                return@synchronized reject(DeviceStage6ResultStatus.REJECTED, "Approval already used")
             }
             val decision = policy.check(policySnapshot, grant, request, unlocked(), foregroundPackage(), approved)
             if (!decision.allowed) {
-                return rejected(deliver, status(decision.reason), decision.reason.name)
+                return@synchronized reject(status(decision.reason), decision.reason.name)
             }
             if (activeTaskId != null && activeTaskId != request.taskId) {
-                return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Another task owns stage 6 access")
+                return@synchronized reject(DeviceStage6ResultStatus.REJECTED, "Another task owns stage 6 access")
             }
             activeTaskId = request.taskId
             if (!running.add(request.taskId)) {
-                return rejected(deliver, DeviceStage6ResultStatus.REJECTED, "Another data operation is running")
+                return@synchronized reject(DeviceStage6ResultStatus.REJECTED, "Another data operation is running")
             }
             cancellations[request.taskId] = cancellation
-            generation
+            null
         }
+        rejection?.let {
+            deliver(it)
+            return object : AiRequestHandle { override fun cancel() = Unit }
+        }
+        val handleGeneration = grant.generation
         try {
             executor.execute {
                 val stillValid = {
@@ -251,11 +257,6 @@ internal class DeviceStage6Controller(
             cancellations.values.toList().also { cancellations.clear() }
         }
         toCancel.forEach { it.cancel() }
-    }
-
-    private fun rejected(deliver: (DeviceStage6Result) -> Unit, status: DeviceStage6ResultStatus, message: String): AiRequestHandle {
-        deliver(DeviceStage6Result(status, message))
-        return object : AiRequestHandle { override fun cancel() = Unit }
     }
 
     private fun status(reason: DeviceStage6PolicyReason): DeviceStage6ResultStatus = when (reason) {

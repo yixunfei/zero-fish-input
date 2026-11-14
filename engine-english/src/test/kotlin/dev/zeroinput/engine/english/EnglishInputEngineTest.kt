@@ -10,6 +10,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishInputEngineTest {
+    @Test fun `character at the buffer limit remains available for editor fallback`() {
+        val engine = EnglishInputEngine()
+        engine.start(context)
+        repeat(64) { engine.handle(EngineKey.Character("a")) }
+        val update = engine.handle(EngineKey.Character("b"))
+        assertFalse(update.consumed)
+        assertEquals("a".repeat(64), update.snapshot.rawInput)
+    }
+
     @Test fun `bundled lexicon contains a broad offline vocabulary`() {
         assertTrue(DefaultEnglishLexicon.words.size > 500)
     }

@@ -400,6 +400,9 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
 
 ## Private text import boundary
 
+Screen-off revokes a confirmed keyboard paste while decryption is queued or
+in progress. A late worker result is discarded before it can reach the editor.
+
 - The keyboard copy action reads only the active nonsensitive editor's explicitly
   selected range. Known and returned lengths must match and remain within 8192
   UTF-16 units. A bounded worker avoids blocking keys. Session/connection, selection,
@@ -1057,6 +1060,13 @@ bundled and hash-checked with the catalog. These operations cannot
 read private input, clipboard or learned vocabulary. Network tests and corrupted
 archive/cancellation/removal tests cover the boundary.
 
+Registry writes confirm the atomic rename before emitting a revision or
+collecting blobs. A malformed resource registry makes all packs unavailable
+until the user explicitly enables a bundled pack or reinstalls verified data.
+Language-pack recovery restores a moved prior version if activation was
+interrupted, revalidates it on scan, and discards orphaned staging data.
+Imported display names reject controls and directional formatting.
+
 ## Compressed tables and Mini downloads (ADR 0022)
 
 XZ decoder memory is bounded to 16 MiB, each output to 50 MB, and original and
@@ -1404,6 +1414,10 @@ characters or plus placement are rejected before any SMS or dial operation. Stag
 is bound to the captured snapshot token, so a changed scene cannot consume an old
 approval. Approval/status overlays set `FLAG_SECURE` to exclude their target and
 operation details from ordinary screen capture.
+
+SMS dispatch accepts one platform-sized message for the approved recipient.
+Bodies requiring multiple SMS segments are rejected before dispatch. Rejection
+callbacks run after releasing the stage 6 controller's lock.
 
 The personal suggestion manager uses `FLAG_SECURE`, disables autofill/content capture and saved field state, and returns at most 50 rows per worker query. Pinyin matching loads only the verified public character dictionary, with bounded reading alternatives; private words and search strings are never persisted outside the existing encrypted lexicon. Queries may inspect at most the repository's 20,000 terms off the input thread. Editing/deleting invalidates queued learning, preserves repository generation checks, and rejects duplicate identities, invalid weights and deleted edit targets. Worker callbacks use immutable form values rather than reading Views. Personalization notifications contain no phrase data; the IME checks captured session identity and reevaluates privacy before refreshing. Hidden association rounds cannot be resurrected. Implicit commit learning is opt-in and disabled for restricted editors; rejected editor commits never learn.
 

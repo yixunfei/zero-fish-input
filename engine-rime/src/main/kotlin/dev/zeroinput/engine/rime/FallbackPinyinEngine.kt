@@ -139,8 +139,7 @@ internal class FallbackPinyinEngine(
     override fun close() { reset() }
 
     private fun character(text: String): EngineUpdate {
-        val letter = text.singleOrNull()?.lowercaseChar()
-        val normalized = letter?.let { if (!nineKey && it in '2'..'9') nineKeyRepresentative(it) else it }
+        val normalized = text.singleOrNull()?.lowercaseChar()
         if (normalized != null && (normalized in 'a'..'z' || normalized == '\'' ||
                 nineKey && normalized in '2'..'9' ||
                 doublePinyinScheme == DoublePinyinScheme.MICROSOFT && normalized == ';')) {
@@ -168,11 +167,6 @@ internal class FallbackPinyinEngine(
     private fun commitRawInput(): EngineUpdate {
         val raw = input.toString()
         return EngineUpdate(reset(), raw, learnable = false)
-    }
-
-    private fun nineKeyRepresentative(digit: Char): Char = when (digit) {
-        '2' -> 'a'; '3' -> 'd'; '4' -> 'g'; '5' -> 'j';
-        '6' -> 'm'; '7' -> 'p'; '8' -> 't'; '9' -> 'w'; else -> digit
     }
 
     private fun consumedLength(): Int = segments.sumOf { it.consumed }
