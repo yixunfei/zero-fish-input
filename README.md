@@ -4,12 +4,12 @@
 
 ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、表情和安全剪贴板可离线使用。AI 联网和公开资源下载由用户主动启用。
 
-[下载 v0.7.4 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.4) · [发布说明](docs/releases/v0.7.4.md) · [发布验证](docs/releases/v0.7.4-validation.md)
+[下载 v0.7.5 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.5) · [发布说明](docs/releases/v0.7.5.md) · [发布验证](docs/releases/v0.7.5-validation.md)
 
 ## 安装
 
-1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.4/zero-fish-input-0.7.4-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
-2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.4-debug-universal.apk -Algorithm SHA256`。
+1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.5/zero-fish-input-0.7.5-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
+2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.5-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，点「启用」进入系统输入法设置。启用后返回应用，点「切换」并选择 **zero fish input**。设置页显示「正在使用」后，在普通文本框输入 `nihao`，点选“你好”。
 
 公开包是 Debug 签名测试版，包名为 `dev.zeroinput.ime.debug`。已在模拟器验证从官方 v0.7.1 覆盖安装。遇到签名冲突时请先确认原安装来源，卸载会清除该应用的本地数据。首次启动会在后台准备中文数据，期间可用内置基础词表离线输入。
@@ -68,7 +68,7 @@ python -B tools/prepare-handwriting-stroke-model.py
   "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
 ```
 
-通用测试包包含许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.4-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
+通用测试包包含许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.5-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
 
 ```powershell
 ./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000

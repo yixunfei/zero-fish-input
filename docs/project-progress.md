@@ -438,9 +438,9 @@ exercised in this pass. Evidence is under `.tmp-evidence/goal-*` and
 
 ## Current release
 
-[v0.7.4](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.4) is the
-current Debug-signed testing prerelease. See [release notes](releases/v0.7.4.md)
-and [release validation](releases/v0.7.4-validation.md).
+[v0.7.5](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.5) is the
+current Debug-signed testing prerelease. See [release notes](releases/v0.7.5.md)
+and [release validation](releases/v0.7.5-validation.md).
 
 ## November 13 code review follow-up
 
