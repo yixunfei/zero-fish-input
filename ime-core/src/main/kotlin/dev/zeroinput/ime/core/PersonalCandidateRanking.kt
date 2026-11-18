@@ -14,7 +14,8 @@ internal object PersonalCandidateRanking {
         val hasExactPinyin = native.any { it.pinyinMatch?.exact == true }
         // A text match deduplicates the row, not its selection ownership. Keep the
         // engine identity so selection retains the reading and native editing route.
-        return (native + personal).distinctBy(Candidate::text)
+        val distinctNative = native.distinctBy(Candidate::id)
+        return (distinctNative + personal.filter { it.text !in nativeRanks }.distinctBy(Candidate::text))
             .sortedWith(compareByDescending<Candidate> { candidate ->
                 hasExactPinyin && (candidate.pinyinMatch?.exact == true ||
                     candidate.text !in nativeRanks && candidate.input == input)

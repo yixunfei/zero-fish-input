@@ -40,6 +40,7 @@ class EncryptedFileStore(
 
     override fun write(plaintext: ByteArray) = writeIfActive(plaintext) {}
 
+    /** Consumes [plaintext] on every exit. [beforeCommit] revalidates authorization immediately before publication. */
     fun writeIfActive(plaintext: ByteArray, allowKeyCreation: Boolean = true, beforeCommit: () -> Unit) = synchronized(lock) {
         var encrypted: ByteArray? = null
         var output: java.io.FileOutputStream? = null

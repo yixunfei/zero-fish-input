@@ -1,5 +1,6 @@
 package dev.zeroinput.ime.clipboardguard
 
+import dev.zeroinput.ime.concurrency.recoverable
 import android.content.ComponentName
 import android.content.Context
 import android.database.ContentObserver
@@ -24,6 +25,13 @@ internal class ClipboardGuardRuntime(
     private val createClipboard: () -> SystemClipboardPort = { AndroidSystemClipboard(context) },
     private val isDefaultIme: () -> Boolean = { isSelectedIme(context) },
     private val worker: ExecutorService = BoundedExecutors.singleThread("zeroinput-clipboard-guard", 8),
+    private val registerDefaultImeObserver: (ContentObserver) -> Unit = { observer ->
+        context.contentResolver.registerContentObserver(
+            Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD), false, observer)
+    },
+    private val unregisterDefaultImeObserver: (ContentObserver) -> Unit = { observer ->
+        context.contentResolver.unregisterContentObserver(observer)
+    },
 ) : AutoCloseable {
     private val submissionLock = Any()
     private val main = Handler(Looper.getMainLooper())
@@ -95,6 +103,7 @@ internal class ClipboardGuardRuntime(
                     main.post { result(if (expected == revision.get() && isActive()) next else next.copy(ticket = null)) }
                 }
             } catch (failure: RuntimeException) {
+                if (failure is java.util.concurrent.CancellationException) throw failure
                 main.post { result(state.copy(status = ClipboardGuardStatus.FAILED, ticket = null, accessIssue = null)) }
                 throw failure
             } finally { inspectQueued.set(false) }
@@ -184,10 +193,10 @@ internal class ClipboardGuardRuntime(
             publish(ClipboardGuardState(current))
             return
         }
-        context.contentResolver.registerContentObserver(
-            Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD), false, defaultImeObserver,
-        )
+        // Registration can reach the system before Binder reports failure.
+        // Cleanup must own the observer before making that uncertain call.
         observingDefaultIme = true
+        registerDefaultImeObserver(defaultImeObserver)
         if (!isDefaultIme()) {
             publish(ClipboardGuardState(current, ClipboardGuardStatus.NOT_DEFAULT))
             return
@@ -252,10 +261,12 @@ internal class ClipboardGuardRuntime(
     }
 
     private fun detachPlatform() {
-        runCatching { registration?.close() }
+        recoverable { registration?.close() }
         registration = null
         if (observingDefaultIme) {
-            context.contentResolver.unregisterContentObserver(defaultImeObserver)
+            recoverable {
+                unregisterDefaultImeObserver(defaultImeObserver)
+            }.getOrThrow()
             observingDefaultIme = false
         }
     }
@@ -266,10 +277,12 @@ internal class ClipboardGuardRuntime(
             worker.execute {
                 try {
                     action()
-                } catch (_: RuntimeException) {
+                } catch (failure: Throwable) {
                     lease = revision.incrementAndGet()
                     detachPlatform()
                     session = null
+                    if (failure is InterruptedException) Thread.currentThread().interrupt()
+                    if (failure is java.util.concurrent.CancellationException || failure !is RuntimeException) throw failure
                     publish(ClipboardGuardState(options, ClipboardGuardStatus.FAILED))
                 }
             }

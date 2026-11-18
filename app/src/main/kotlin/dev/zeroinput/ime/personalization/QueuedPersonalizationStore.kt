@@ -7,6 +7,7 @@ import dev.zeroinput.engine.api.PersonalSuggestion
 import dev.zeroinput.engine.api.PersonalizationStore
 import dev.zeroinput.engine.api.PagedPersonalizationStore
 import dev.zeroinput.engine.api.PersonalSuggestionPage
+import dev.zeroinput.ime.concurrency.recoverable
 import dev.zeroinput.ime.concurrency.BoundedExecutors
 import java.util.LinkedHashMap
 import java.util.Locale
@@ -109,7 +110,7 @@ internal class QueuedPersonalizationStore(
         schedulePreload()
         if (!ready) return emptyMap()
         val snapshot = frequencyLookup ?: return emptyMap()
-        return runCatching { snapshot.frequenciesFor(wanted, language) }
+        return recoverable { snapshot.frequenciesFor(wanted, language) }
             .getOrDefault(emptyMap())
             .filter { (word, frequency) -> word in wanted && frequency > 0 }
     }
@@ -139,7 +140,7 @@ internal class QueuedPersonalizationStore(
         invalidateSuggestionCache(clearPending = true)
         enqueue {
             if (isGenerationCurrent(operationGeneration)) {
-                val result = runCatching {
+                val result = recoverable {
                     withDelegate {
                         if (!isGenerationCurrent(operationGeneration)) null else {
                             delegate.learn(shortcut, value, language, learningAllowed = true)
@@ -165,7 +166,7 @@ internal class QueuedPersonalizationStore(
         invalidateSuggestionCache(clearPending = true)
         enqueue {
             if (isGenerationCurrent(operationGeneration)) {
-                val result = runCatching {
+                val result = recoverable {
                     withDelegate {
                         if (!isGenerationCurrent(operationGeneration)) null else {
                             delegate.recordUse(id, learningAllowed = true)
@@ -272,8 +273,7 @@ internal class QueuedPersonalizationStore(
 
     private fun enqueueClear(await: Boolean): java.util.concurrent.Future<*>? {
         if (closed.get()) {
-            if (await) error("Personalization store is closed")
-            return null
+            error("Personalization store is closed")
         }
         generation.incrementAndGet()
         val clearPreparationRevision = preparationRevision.incrementAndGet()
@@ -297,7 +297,7 @@ internal class QueuedPersonalizationStore(
             if (!closed.get()) {
                 // If clearing fails, keeping the store unavailable is safer
                 // than exposing data that the user asked us to remove.
-                val clearResult = runCatching {
+                val clearResult = recoverable {
                     withDelegate {
                         delegate.clear()
                         (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
@@ -356,7 +356,9 @@ internal class QueuedPersonalizationStore(
                     synchronized(stateLock) {
                         if (preloadGeneration == clearStamp) clearBlocked = true
                     }
-                    null
+                    // Never run storage on the IME caller or report an unperformed
+                    // deletion as accepted. An explicit retry can enqueue it again.
+                    throw error
                 }
             }
         }
@@ -381,30 +383,36 @@ internal class QueuedPersonalizationStore(
                 }
                 return@enqueue
             }
-            val preparedFrequencyRevision = frequencyRevision.get()
-            val result = runCatching {
-                withDelegate {
-                    if (isPreparationCurrent(stamp)) {
-                        preload()
-                        (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
-                    } else {
-                        null
+            try {
+                val preparedFrequencyRevision = frequencyRevision.get()
+                val result = recoverable {
+                    withDelegate {
+                        if (isPreparationCurrent(stamp)) {
+                            preload()
+                            (delegate as? PersonalFrequencyStore)?.frequencyLookupSnapshot()
+                        } else {
+                            null
+                        }
                     }
                 }
-            }
-            synchronized(stateLock) {
-                if (preloadGeneration == stamp) {
-                    preloadGeneration = null
+                synchronized(stateLock) {
+                    if (preloadGeneration == stamp) {
+                        preloadGeneration = null
+                    }
+                    if (isPreparationCurrent(stamp) && result.isSuccess) {
+                        suggestionCache.clear()
+                        if (preparedFrequencyRevision == frequencyRevision.get()) frequencyLookup = result.getOrNull()
+                        ready = true
+                    } else if (isPreparationCurrent(stamp)) {
+                        ready = false
+                    }
                 }
-                if (isPreparationCurrent(stamp) && result.isSuccess) {
-                    suggestionCache.clear()
-                    if (preparedFrequencyRevision == frequencyRevision.get()) frequencyLookup = result.getOrNull()
-                    ready = true
-                } else if (isPreparationCurrent(stamp)) {
-                    ready = false
+                if (isPreparationCurrent(stamp) && result.isSuccess) notifyChanges()
+            } finally {
+                synchronized(stateLock) {
+                    if (preloadGeneration == stamp) preloadGeneration = null
                 }
             }
-            if (isPreparationCurrent(stamp) && result.isSuccess) notifyChanges()
         }) {
             synchronized(stateLock) {
                 if (preloadGeneration == stamp) {
@@ -425,7 +433,7 @@ internal class QueuedPersonalizationStore(
         if (!enqueue {
                 try {
                     if (isQueryCurrent(queryGeneration, queryRevision)) {
-                        val values = runCatching {
+                        val values = recoverable {
                             withDelegate {
                                 if (isQueryCurrent(queryGeneration, queryRevision)) {
                                     (delegate as? PagedPersonalizationStore)?.suggestionPage(
@@ -506,7 +514,7 @@ internal class QueuedPersonalizationStore(
 
     private fun notifyChanges() {
         if (closed.get()) return
-        changeListeners.forEach { listener -> runCatching { listener() } }
+        changeListeners.forEach { listener -> recoverable { listener() } }
     }
 
     private data class QueryKey(

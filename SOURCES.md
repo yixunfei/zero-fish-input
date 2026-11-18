@@ -20,6 +20,11 @@ provide a separate notices archive. Preserve them when redistributing binaries.
 
 ## Corresponding third-party sources
 
+Local message crypto: Bouncy Castle `r1rv87` at
+https://github.com/bcgit/bc-java/tree/r1rv87 and Tink `v1.21.0` at
+https://github.com/tink-crypto/tink-java/tree/v1.21.0. Both are used as pinned,
+unmodified Maven artifacts; complete applicable license texts ship in the APK.
+
 - OkHttp: https://github.com/lysine-dev/okhttp/tree/parent-4.12.1 (upstream square/okhttp redirects here)
 - Okio: https://github.com/square/okio/tree/parent-3.6.0
 

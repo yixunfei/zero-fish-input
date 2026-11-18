@@ -140,12 +140,13 @@ class ZeroInputService : InputMethodService() {
         }
     }
     private var privateDraftDefault = false
+    private var textStego: dev.zeroinput.ime.textstego.StegoWorkspace? = null
     private var privateDraftToggle: dev.zeroinput.ime.auth.AuthenticationBroker.RequestHandle? = null
     private var screenOffRegistered = false
     private val screenOff = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                val privateOpen = inputView?.isPrivateDraftOpen == true
+                val privateOpen = inputView?.let { it.isPrivateDraftOpen || it.isTextStegoOpen } == true
                 inputView?.closeAuxiliaryInput()
                 privateDraftToggle?.close()
                 clipboardCopy.cancel()
@@ -382,6 +383,7 @@ class ZeroInputService : InputMethodService() {
         val previousPrivacy = configuredPrivacy
         clipboardCopy.cancel()
         privateDraft.invalidate()
+        textStego?.invalidate()
         refreshConfiguredSettings()
         val privateDefaultChanged = privateDraftDefault != graph.settings.privateDraftEnabled
         privateDraftDefault = graph.settings.privateDraftEnabled
@@ -621,6 +623,8 @@ class ZeroInputService : InputMethodService() {
         inputView?.closeAuxiliaryInput()
         shapeLookup.close()
         privateDraft.close()
+        textStego?.close()
+        textStego = null
         privateDraftToggle?.close()
         privateDraftToggle = null
         if (screenOffRegistered) unregisterReceiver(screenOff)
@@ -711,7 +715,7 @@ class ZeroInputService : InputMethodService() {
             }
         }
         if (inputViewActive && inputView?.let {
-                it.isPrivateDraftOpen || it.isShapeLookupOpen || it.isSearchEditing || it.isAiOpen
+                it.isPrivateDraftOpen || it.isTextStegoOpen || it.isShapeLookupOpen || it.isSearchEditing || it.isAiOpen
             } == true &&
             (event.isPrintingKey || keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
                 keyCode == android.view.KeyEvent.KEYCODE_DEL || keyCode == android.view.KeyEvent.KEYCODE_FORWARD_DEL ||
@@ -743,6 +747,11 @@ class ZeroInputService : InputMethodService() {
             inputView?.clearHandwriting()
             if (inputView?.isAiOpen == true) invalidateAiRequest()
             if (inputView?.isPrivateDraftOpen == true) registerInteraction()
+            if (inputView?.isTextStegoOpen == true) {
+                textStego?.close()
+                inputView?.closeAuxiliaryInput()
+                updateScreenCapturePolicy()
+            }
             cancelSecureClipboardRequest()
             clipboardCopy.selectionChanged()
             graph.securePaste.editorChanged(pasteEditorIdentity())
@@ -876,6 +885,7 @@ class ZeroInputService : InputMethodService() {
         view.onKeyboardAction = ::handleKeyboardAction
         view.onHideKeyboardRequested = { if (view === inputView && inputViewActive) requestHideSelf(0) }
         view.onClearCompositionRequested = clearComposition@{
+            if (view.isTextStegoOpen) return@clearComposition textStego?.clearComposition() == true
             if (view.isPrivateDraftOpen) return@clearComposition privateDraft.clearComposition()
             if (view.isShapeLookupOpen) return@clearComposition false
             if (view.isSearchEditing) return@clearComposition searchDraft.clearComposition()
@@ -933,6 +943,7 @@ class ZeroInputService : InputMethodService() {
 
     private fun bindLocalPanelActions(view: ZeroInputView) {
         view.renderPrivateDraftSetting(graph.settings.privateDraftEnabled)
+        bindTextStego(view)
         view.onPrivateDraftRequested = { enabled -> requestPrivateDraft(view, enabled) }
         view.onPrivateDraftVisibilityChanged = { visible ->
             if (!visible) privateDraft.hide()
@@ -1121,7 +1132,7 @@ class ZeroInputService : InputMethodService() {
     private fun updateScreenCapturePolicy() {
         window?.window?.let { imeWindow ->
             // Keep protection across panel transitions while private input is enabled.
-            if (graph.settings.incognitoMode || graph.settings.privateDraftEnabled) {
+            if (graph.settings.incognitoMode || graph.settings.privateDraftEnabled || inputView?.isTextStegoOpen == true) {
                 imeWindow.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
             } else imeWindow.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
@@ -1178,6 +1189,74 @@ class ZeroInputService : InputMethodService() {
         return view === inputView && inputViewActive && isSessionActive(session, connection) &&
             dev.zeroinput.ime.input.isPrivateDraftEditor(info, session.controller.state.privacy, configuredPrivacy.incognitoMode) &&
             window?.window != null
+    }
+
+    private fun bindTextStego(view: ZeroInputView) {
+        textStego?.close()
+        val workspace = dev.zeroinput.ime.textstego.StegoWorkspace({ graph }, mainHandler, view,
+            canUse = { eligibleForPrivateDraft(view) && isDeviceUnlocked() },
+            commitTarget = { textStegoCommitTarget(view) },
+            notifyUser = { Toast.makeText(this, it, Toast.LENGTH_LONG).show() },
+            onSource = { action ->
+                if (action == dev.zeroinput.ime.ui.StegoAction.SELECTION) readStegoSelection(view)
+                else {
+                    val kind = if (action == dev.zeroinput.ime.ui.StegoAction.KEY_FILE)
+                        dev.zeroinput.ime.textstego.StegoHandoff.Kind.FILE else dev.zeroinput.ime.textstego.StegoHandoff.Kind.VAULT
+                    launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(kind, editor = pasteEditorIdentity()))
+                }
+            }, onSave = { value -> launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(
+                dev.zeroinput.ime.textstego.StegoHandoff.Kind.SAVE, value)) })
+        textStego = workspace
+        view.onTextStegoRequested = {
+            syncSessionPrivacy()
+            if (eligibleForPrivateDraft(view) && isDeviceUnlocked()) { registerInteraction(); view.openTextStego() }
+            else Toast.makeText(this, R.string.stego_unavailable, Toast.LENGTH_SHORT).show()
+        }
+        view.onTextStegoVisibilityChanged = { visible ->
+            updateScreenCapturePolicy()
+            if (visible) {
+                // An empty composition must not replace the user's selected carrier.
+                // reset() clears an editor composing span through setComposingText.
+                if (controller?.state?.snapshot?.isComposing == true) controller?.reset()
+                val file = graph.stegoHandoff.takeFile(pasteEditorIdentity())
+                try { workspace.open(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions, file = file) }
+                finally { file?.fill(0) }
+            } else workspace.close()
+        }
+    }
+
+    private fun textStegoCommitTarget(view: ZeroInputView): ((String) -> Boolean)? {
+        if (!view.isTextStegoOpen || !eligibleForPrivateDraft(view) || !isDeviceUnlocked()) return null
+        val session = activeSession ?: return null
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return null
+        val interaction = interactionSequence
+        return { value -> view.isTextStegoOpen && eligibleForPrivateDraft(view) && isDeviceUnlocked() &&
+            interaction == interactionSequence && isSessionActive(session, connection) &&
+            runCatching { connection.commitText(value, 1) }.getOrDefault(false) }
+    }
+
+    private fun readStegoSelection(view: ZeroInputView) {
+        if (!view.isTextStegoOpen || !eligibleForPrivateDraft(view) || !isDeviceUnlocked()) return
+        val session = activeSession ?: return
+        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
+        val interaction = interactionSequence
+        val length = editorConnection?.selectedLength() ?: 0
+        selectionReader.read(length, { connection.getSelectedText(0) }, {
+            view === inputView && view.isTextStegoOpen && isSessionActive(session, connection) &&
+                interactionSequence == interaction && eligibleForPrivateDraft(view) && isDeviceUnlocked() &&
+                editorConnection?.selectedLength() == length
+        }) { draft ->
+            val chars = draft?.takeForStego()
+            if (chars == null) Toast.makeText(this, R.string.stego_import_selection_failed, Toast.LENGTH_SHORT).show()
+            else try { textStego?.importCarrier(String(chars)) } finally { chars.fill('\u0000') }
+        }
+    }
+
+    private fun launchStegoSource(request: dev.zeroinput.ime.textstego.StegoHandoff.Request) {
+        val token = graph.stegoHandoff.put(request)
+        inputView?.closeAuxiliaryInput()
+        startActivity(Intent(this, dev.zeroinput.ime.textstego.StegoSourceActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(dev.zeroinput.ime.textstego.StegoSourceActivity.EXTRA_TOKEN, token))
     }
 
     private fun isDeviceUnlocked(): Boolean =
@@ -1407,6 +1486,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun handleKeyboardAction(action: KeyboardAction) {
+        if (inputView?.isTextStegoOpen == true) { textStego?.type(action); return }
         if (inputView?.isPrivateDraftOpen == true) {
             privateDraft.type(action)
             return
@@ -1457,6 +1537,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun handleControllerCommand(command: InputCommand) {
+        if (inputView?.isTextStegoOpen == true) { textStego?.command(command); return }
         if (inputView?.isPrivateDraftOpen == true) {
             privateDraft.command(command)
             return

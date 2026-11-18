@@ -6,6 +6,39 @@ import java.io.ByteArrayInputStream
 import java.io.File
 
 class PublicDictionaryParserTest {
+    @Test fun cellRecordTruncationUsesTheExistingBoundedFormatFailure() {
+        val bytes = java.nio.ByteBuffer.allocate(0x2628 + 14).order(java.nio.ByteOrder.LITTLE_ENDIAN).apply {
+            putInt(0x1540)
+            put(byteArrayOf(0x44, 0x43, 0x53, 1))
+            position(0x1540)
+            putInt(720)
+            repeat(720) { index ->
+                putShort(index.toShort())
+                val text = (if (index == 719) "hao" else "a").toByteArray(Charsets.UTF_16LE)
+                putShort(text.size.toShort()); put(text)
+            }
+            assertEquals(0x2628, position())
+            for (value in listOf(1, 2, 0, 2, '你'.code, 2, 1)) putShort(value.toShort())
+        }.array()
+        val parser = CellDictionaryParser(CellDictionaryParser.Source.QQ)
+        val rows = mutableListOf<PublicDictionaryEntry>()
+        parser.parse(bytes.inputStream(), rows::add)
+        assertEquals(listOf(PublicDictionaryEntry("你", "a", 1)), rows)
+        for (removed in 1..13) assertThrows(IllegalArgumentException::class.java) {
+            parser.parse(bytes.copyOf(bytes.size - removed).inputStream()) {}
+        }
+    }
+
+    @Test(timeout = 1000) fun zeroProgressCellStreamFailsWithoutSpinning() {
+        val input = object : java.io.InputStream() {
+            override fun read() = 0
+            override fun read(bytes: ByteArray, offset: Int, length: Int) = 0
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            CellDictionaryParser(CellDictionaryParser.Source.QQ).parse(input) {}
+        }
+    }
+
     @Test fun tonesAndUmlautsNormalizeWithoutChangingWords() {
         val entries = parse("---\nname: fixture\n...\n女儿\tnǚ ér\t42\n")
         assertEquals(PublicDictionaryEntry("女儿", "nv er", 42), entries.single())

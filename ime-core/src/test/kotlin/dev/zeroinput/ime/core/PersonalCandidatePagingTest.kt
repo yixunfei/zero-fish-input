@@ -5,6 +5,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PersonalCandidatePagingTest {
+    @Test fun `cancelled and fatal personal queries cannot become normal empty pages`() {
+        for (failure in listOf(java.util.concurrent.CancellationException(), AssertionError("fixture"))) {
+            val store = object : PersonalizationStore {
+                override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int): List<PersonalSuggestion> = throw failure
+                override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+                override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+            }
+            assertThrows(failure.javaClass) {
+                PersonalCandidatePaging().publish(EngineSnapshot("ni", "ni"), store, InputLanguage.CHINESE, true) { it }
+            }
+        }
+    }
+
     @Test fun `returning to native pages preserves their next edge after personal exhaustion`() {
         val paging = PersonalCandidatePaging()
         val store = Store()

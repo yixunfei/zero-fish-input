@@ -8,6 +8,27 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 
 class AsyncCandidateRankerTest {
+    @Test fun `unexpected worker exception wipes buffers and permits another request`() {
+        val worker = ManualExecutor()
+        var failClock = false
+        val completed = mutableListOf<Long>()
+        val ranker = AsyncCandidateRanker({ Scorer() }, { it.run(); true },
+            { revision, _ -> completed += revision }, { worker }, { if (failClock) error("Clock unavailable") else 0L })
+        ranker.setEnabled(true)
+        val context = "学习".toCharArray()
+        ranker.request(1, context, words())
+        failClock = true
+        assertThrows(IllegalStateException::class.java) { worker.run() }
+        assertTrue(context.all { it == '\u0000' })
+        failClock = false
+        ranker.resourcesChanged()
+        ranker.request(2, "学习".toCharArray(), words())
+        worker.run()
+        assertEquals(listOf(2L), completed)
+        ranker.close()
+        worker.run()
+    }
+
     @Test fun `resource change releases an idle scorer on its worker`() {
         val worker = ManualExecutor()
         val scorer = Scorer()

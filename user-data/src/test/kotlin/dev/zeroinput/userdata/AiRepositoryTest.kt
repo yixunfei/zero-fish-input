@@ -21,6 +21,20 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiRepositoryTest {
+    @Test fun providersWithoutASelectionRemainEditableAndCannotSupplyCredentials() {
+        val store = MemoryStore()
+        val repository = AiConfigurationRepository(store)
+        val value = AiConfiguration(providers = listOf(providerProfile()))
+        repository.write(value)
+        assertEquals(value, repository.read())
+        assertNull(repository.read().activeProvider())
+        assertEquals("", repository.read().activeKey())
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.write(value.copy(selectedProviderId = "missing"))
+        }
+        assertEquals(value, repository.read())
+    }
+
     @Test fun sameRepositoryNeverReturnsOldCredentialsAfterStorageChangesOrFailures() {
         val store = MemoryStore()
         val repository = AiConfigurationRepository(store)
@@ -121,12 +135,12 @@ class AiRepositoryTest {
     }
 
     @Test
-    fun providerWithoutSelectionOrInvalidModelCapabilityIsRejected() {
+    fun unknownProviderSelectionOrInvalidModelCapabilityIsRejected() {
         val repository = AiConfigurationRepository(MemoryStore())
         val profile = AiProviderProfile("one", "First", "https://example.test/v1/chat/completions",
             "key", listOf("text"), "text")
         assertThrows(IllegalArgumentException::class.java) {
-            repository.write(AiConfiguration(providers = listOf(profile)))
+            repository.write(AiConfiguration(providers = listOf(profile), selectedProviderId = "missing"))
         }
         assertThrows(IllegalArgumentException::class.java) {
             repository.write(AiConfiguration(providers = listOf(profile.copy(imageModels = setOf("missing"))),

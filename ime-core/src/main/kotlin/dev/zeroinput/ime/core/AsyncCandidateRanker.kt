@@ -82,18 +82,19 @@ class AsyncCandidateRanker(
         try {
             val worker = executor ?: executorFactory().also { executor = it }
             worker.execute(::drain)
-        } catch (_: RuntimeException) {
+        } catch (failure: Throwable) {
             // Worker construction and thread creation can fail before execute
             // rejects anything. Release owned input and allow a later retry.
             draining = false
             cancelLocked()
+            if (failure is java.util.concurrent.CancellationException || failure !is RuntimeException) throw failure
         }
     }
 
     private fun drain() {
         try {
             drainRequests()
-        } catch (error: Error) {
+        } catch (error: Throwable) {
             try {
                 releaseScorer()
             } finally {
@@ -135,7 +136,7 @@ class AsyncCandidateRanker(
     private fun releaseScorer() {
         val previous = scorer
         scorer = null
-        try { previous?.close() } catch (_: Exception) { /* Content-free failure. */ }
+        recoverable { previous?.close() }
     }
 
     private fun score(request: Request) {
@@ -150,6 +151,11 @@ class AsyncCandidateRanker(
                 val winner = ModelRankingPolicy.winner(scores) ?: return
                 offer(Result(request.generation, request.revision, winner, request.deadline))
             } finally { scores.fill(0f) }
+        } catch (cancelled: java.util.concurrent.CancellationException) {
+            throw cancelled
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw interrupted
         } catch (_: Exception) {
             failed = true
         } catch (_: LinkageError) {

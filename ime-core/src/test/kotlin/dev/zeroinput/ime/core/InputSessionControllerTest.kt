@@ -25,6 +25,69 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InputSessionControllerTest {
+    @Test fun `cancellation and fatal engine failures do not commit preedit or replay the key`() {
+        for (failure in listOf(java.util.concurrent.CancellationException(), AssertionError("fixture"))) {
+            val delegate = TestEngine()
+            var fail = false
+            val engine = object : InputEngine by delegate {
+                override fun handle(key: EngineKey): EngineUpdate {
+                    if (fail) throw failure
+                    return delegate.handle(key)
+                }
+            }
+            val connection = RecordingConnection()
+            val controller = InputSessionController(connection, { engine }, RecordingPersonalization())
+            controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+            controller.handle(InputCommand.Text("ni"))
+            val before = controller.state.snapshot
+            fail = true
+            org.junit.Assert.assertThrows(failure.javaClass) { controller.handle(InputCommand.Text("x")) }
+            assertTrue(connection.commits.isEmpty())
+            assertEquals(before, controller.state.snapshot)
+            controller.close()
+        }
+    }
+
+    @Test fun `direct language and pack changes preserve preedit and rejected commits keep the old engine`() {
+        for (pack in listOf(null, "fixture@1")) {
+            var accepts = false
+            val commits = mutableListOf<String>()
+            val connection = object : EditorConnection by RecordingConnection() {
+                override fun commitText(text: String): Boolean {
+                    if (!accepts) return false
+                    commits += text
+                    return true
+                }
+            }
+            val controller = InputSessionController(connection, { TestEngine() }, RecordingPersonalization())
+            controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+            controller.handle(InputCommand.Text("ni"))
+            val before = controller.state
+            controller.setLanguage(InputLanguage.ENGLISH, pack)
+            assertEquals(before, controller.state)
+            accepts = true
+            controller.setLanguage(InputLanguage.ENGLISH, pack)
+            assertEquals(listOf("ni"), commits)
+            assertEquals(InputLanguage.ENGLISH, controller.state.language)
+            controller.close()
+        }
+    }
+
+    @Test fun `fatal rendering failure propagates without committing or retiring the engine`() {
+        var failure: Error? = null
+        val connection = RecordingConnection()
+        val controller = InputSessionController(connection, { TestEngine() }, RecordingPersonalization(),
+            onStateChanged = { failure?.let { throw it } })
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        failure = AssertionError("fixture")
+        org.junit.Assert.assertThrows(AssertionError::class.java) { controller.handle(InputCommand.Text("ni")) }
+        assertTrue(connection.commits.isEmpty())
+        failure = null
+        controller.handle(InputCommand.Text("hao"))
+        assertEquals("nihao", controller.state.snapshot.rawInput)
+        controller.close()
+    }
+
     @Test fun `declined character update cannot clear editor preedit before a rejected flush`() {
         var preedit = ""
         val connection = object : EditorConnection by RecordingConnection() {
@@ -171,13 +234,13 @@ class InputSessionControllerTest {
         controller.close()
     }
 
-    @Test fun `configuration language change still cancels composition`() {
+    @Test fun `configuration language change preserves unfinished input without learning`() {
         val connection = RecordingConnection()
         val controller = InputSessionController(connection, { TestEngine() }, RecordingPersonalization())
         controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
         controller.handle(InputCommand.Text("ni"))
         controller.setLanguage(InputLanguage.ENGLISH)
-        assertTrue(connection.commits.isEmpty())
+        assertEquals(listOf("ni"), connection.commits)
         assertFalse(controller.state.snapshot.isComposing)
         controller.close()
     }

@@ -6,6 +6,8 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 
 | Component | Pinned version | License | License text | Purpose |
 | --- | --- | --- | --- | --- |
+| Bouncy Castle lightweight crypto | 1.87 | MIT | `bouncycastle-MIT.txt` | Offline message AES/Kuznyechik/Twofish/Camellia/SM4 GCM, Argon2id and HKDF; no provider installation |
+| Tink Android | 1.21.0 | Apache-2.0 | `Apache-2.0.txt` | Offline XChaCha20-Poly1305 with message-owned fresh nonces; no keyset storage or network adapters |
 | OkHttp / Okio JVM | 4.12.1 / 3.6.0 | Apache-2.0 | `Apache-2.0.txt` | E4 opt-in HTTPS tools with socket-bound public DNS checks; no initialization networking or Android components |
 | librime | 1.13.1 (`1c233581`) | BSD-3-Clause | `librime-BSD-3-Clause.txt` | 中文输入引擎 |
 | darts-clone | librime bundled copy | BSD-3-Clause | `darts-clone-BSD-3-Clause.txt` | librime 数据结构 |
@@ -31,6 +33,23 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 | Tegaki Chinese stroke model data | 0.3 simplified-light / traditional | LGPL-2.1 | `Tegaki-LGPL-2.1.txt` | Offline simplified/traditional handwriting tables |
 | rimeinn/rime-kaomoji expression data | `e66d8f26ee47b4a2a840983b7d71ed69b5ecf756` | LGPL-3.0 | `rime-kaomoji-LGPL-3.0.txt`, `GPL-3.0.txt` | 离线颜文字分类数据，原始与适配后的数据源码随 APK 分发 |
 | Android NDK runtime | 28.2.13676358 | 多许可证 | `android-ndk-NOTICE.txt` | `libc++_shared.so` 与 native 运行时 |
+
+The message implementation requires maintained Argon2id, generic GCM and XChaCha
+primitives that Android's platform providers do not supply together. Bouncy Castle
+and Tink are pinned Maven JARs, without Android components, initializers, native
+libraries or automatic networking. Only lightweight engines and Tink's explicit
+nonce AEAD are used; the system security provider list is unchanged. Tink's unused
+optional Gson/annotation dependencies are not requested. Debug JAR input sizes are
+7,337,657 and 3,334,699 bytes; release shrinking determines APK overhead. This
+managed implementation retains provider/VM memory-erasure and side-channel limits;
+the unusual generic GCM profiles carry no certification claim. Upstream sources:
+https://github.com/bcgit/bc-java/tree/r1rv87 and
+https://github.com/tink-crypto/tink-java/tree/v1.21.0.
+Reviewed SHA-256 values on 2026-11-18:
+`12d2d3dd82a9ec15e92ec7c7943ee64f6097c6dc12c07e984f1693b77565b9aa`
+and `61d60f28640b16a92f74c5c34191432f639da4fd79ce7b50a4b7af35fbafaf7d`.
+The independent host-only RustCrypto vector tool pins its crate graph in
+`tools/stego-vectors/Cargo.lock`; none of those crates is shipped in an APK.
 
 OkHttp is needed for actual-socket DNS enforcement; a separate DNS preflight with
 the platform URL connection would permit rebinding. The maintained 4.x patch

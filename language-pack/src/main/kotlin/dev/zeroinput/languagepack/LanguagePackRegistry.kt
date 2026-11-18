@@ -14,9 +14,9 @@ class LanguagePackRegistry(
     fun refresh() {
         val refreshed = buildMap {
             installer.refreshInstalled().filter(InstalledLanguagePack::enabled).forEach { pack ->
-                runCatching { LanguagePackEngineFactory(pack) }
+                recoverable { LanguagePackEngineFactory(pack) }
                     .getOrNull()
-                    ?.takeIf { runCatching { it.isAvailable() }.getOrDefault(false) }
+                    ?.takeIf { recoverable { it.isAvailable() }.getOrDefault(false) }
                     ?.let { put(pack.key, it) }
             }
         }
@@ -26,7 +26,7 @@ class LanguagePackRegistry(
     fun contains(packKey: String?): Boolean = packKey != null && factories.containsKey(packKey)
 
     fun create(packKey: String?): InputEngine? = packKey?.let { key ->
-        runCatching { factories[key]?.create() }.getOrNull()
+        recoverable { factories[key]?.create() }.getOrNull()
     }
 
     fun descriptors(): List<EngineDescriptor> = factories.values

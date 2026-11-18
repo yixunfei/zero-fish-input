@@ -63,6 +63,10 @@ internal class WordAssociationSession(
                 val word = normalize(value.text)
                 NextWordSuggestion(word, if (value.commitText.startsWith(' ')) " " + word else word)
             }.filter { it.text.length in 1..24 && it.text.all(Char::isLetter) }.distinctBy { it.text }
+        } catch (cancelled: java.util.concurrent.CancellationException) { throw cancelled
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw interrupted
         } catch (_: Exception) { emptyList() }
         suggestions = rerank(language, suggestions)
         candidates = suggestions.mapIndexed { index, value ->
@@ -76,7 +80,7 @@ internal class WordAssociationSession(
      */
     private fun rerank(language: InputLanguage, values: List<NextWordSuggestion>): List<NextWordSuggestion> {
         if (values.size < 2) return values
-        val frequencies = runCatching { frequencyProvider(language, values.map(NextWordSuggestion::text)) }
+        val frequencies = recoverable { frequencyProvider(language, values.map(NextWordSuggestion::text)) }
             .getOrDefault(emptyMap())
         if (frequencies.isEmpty()) return values
         val native = values.mapIndexed { index, value -> Candidate("next:$index", value.text) }

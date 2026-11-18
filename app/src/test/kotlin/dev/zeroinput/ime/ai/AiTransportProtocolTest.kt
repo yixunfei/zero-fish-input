@@ -12,6 +12,41 @@ import java.net.URI
 import java.util.concurrent.*
 
 class AiTransportProtocolTest {
+    @Test fun timeoutDisconnectsBlockedBodyWhenCancellationExecutorRejects() {
+        val executor = Executors.newSingleThreadExecutor()
+        val entered = CountDownLatch(1)
+        val disconnected = CountDownLatch(1)
+        val completed = CountDownLatch(1)
+        var timeout: (() -> Unit)? = null
+        val delegate = Exchange()
+        val exchange = object : AiTransportExchange by delegate {
+            override fun send(body: ByteArray?) { if (body != null) output().use { it.write(body) } }
+            private fun output() = object : java.io.OutputStream() {
+                override fun write(value: Int) {
+                    entered.countDown()
+                    var released = false
+                    while (!released) try { released = disconnected.await(3, TimeUnit.SECONDS) }
+                    catch (_: InterruptedException) { /* Model a socket write that ignores thread interruption. */ }
+                    throw java.io.IOException("closed")
+                }
+            }
+            override fun disconnect() { disconnected.countDown() }
+        }
+        val profile = AiProviderProfile("fixture", "Fixture", "https://example.test/v1", "fixture-key", listOf("model"), "model")
+        val config = AiConfiguration(enabled = true, networkAllowed = true, providers = listOf(profile), selectedProviderId = profile.id)
+        try {
+            val provider = OpenAiCompatibleProvider({ config }, executor,
+                cancellationExecutor = Executor { throw RejectedExecutionException() }, exchangeFactory = { exchange },
+                scheduleTimeout = { _, callback -> timeout = callback; AutoCloseable {} })
+            provider.stream(AiRequest(null, AiAction.ASK, "fixture")) { if (it is AiStreamEvent.Failed) completed.countDown() }
+            assertTrue(entered.await(3, TimeUnit.SECONDS))
+            checkNotNull(timeout).invoke()
+            assertTrue(completed.await(3, TimeUnit.SECONDS))
+            assertTrue(disconnected.await(3, TimeUnit.SECONDS))
+            executor.submit {}.get(3, TimeUnit.SECONDS)
+        } finally { disconnected.countDown(); executor.shutdownNow() }
+    }
+
     @Test fun workerErrorsDeliverOneSafeTerminalFailureAndReleaseRequestBytes() {
         Fixture().use { f ->
             f.exchange.failure = StackOverflowError("secret response")
@@ -63,6 +98,7 @@ class AiTransportProtocolTest {
             java.net.UnknownHostException("secret-host") to AiNetworkFailure.DNS,
             javax.net.ssl.SSLHandshakeException("secret-certificate") to AiNetworkFailure.TLS,
             java.net.SocketTimeoutException("secret-timeout") to AiNetworkFailure.TIMEOUT,
+            java.io.InterruptedIOException("secret-call-timeout") to AiNetworkFailure.TIMEOUT,
         )) Fixture().use { f ->
             f.exchange.failure = failure
             val error = (f.stream().last() as AiStreamEvent.Failed).error as AiProviderError.Network
@@ -293,9 +329,10 @@ class AiTransportProtocolTest {
             assertTrue(timeoutMs > 0)
             assertEquals(method == "POST", bodySize != null)
         }
-        override fun timeout(timeoutMs: Int) { assertTrue(timeoutMs > 0) }
-        override fun connect() { failure?.let { throw it } }
-        override fun output() = written
+        override fun send(body: ByteArray?) {
+            failure?.let { throw it }
+            if (body != null) written.write(body)
+        }
         override fun status() = code
         override fun contentType() = type
         override fun input() = ByteArrayInputStream(response.toByteArray()).also { reads++ }

@@ -20,7 +20,7 @@ internal class DictionaryDownloadTransport : DictionaryFileDownload {
         try {
             repeat(6) {
                 checkActive(deadline)
-                val connection = uri.toURL().openConnection() as HttpsURLConnection
+                val connection = uri.toURL().openConnection(java.net.Proxy.NO_PROXY) as HttpsURLConnection
                 try {
                     connection.instanceFollowRedirects = false
                     connection.connectTimeout = 15_000

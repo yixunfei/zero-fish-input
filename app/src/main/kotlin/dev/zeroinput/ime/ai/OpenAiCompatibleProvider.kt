@@ -5,7 +5,6 @@ import dev.zeroinput.ime.ai.device.DeviceAgentProtocolCodec
 import dev.zeroinput.userdata.AiConfiguration
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.charset.CodingErrorAction
@@ -177,8 +176,8 @@ class OpenAiCompatibleProvider internal constructor(
         operation.future.set(task)
         try {
             operation.installTimer(scheduleTimeout(config.timeoutMs) {
-                operation.fail(java.net.SocketTimeoutException().asProviderError())
-                operation.abort()
+                try { operation.fail(java.net.SocketTimeoutException().asProviderError()) }
+                finally { operation.abort() }
             })
             executor.execute(task)
         } catch (_: RejectedExecutionException) {
@@ -201,18 +200,12 @@ class OpenAiCompatibleProvider internal constructor(
                 if (body == null) "application/json" else "text/event-stream, application/json", operation.remaining(), body?.size,
                 checkNotNull(config.activeProvider()).protocol)
             operation.check()
-            http.connect()
+            http.send(body)
             operation.check()
-            if (body != null) {
-                http.timeout(operation.remaining())
-                http.output().use { it.write(body) }
-            }
-            http.timeout(operation.remaining())
             val status = http.status()
             if (status !in 200..299) throw responseError(status,
                 if (body == null) AiNetworkOperation.MODELS else AiNetworkOperation.GENERATION)
             operation.check()
-            http.timeout(operation.remaining())
             return read(http).also { operation.check() }
         } finally {
             operation.connection.compareAndSet(http, null)
@@ -259,8 +252,9 @@ class OpenAiCompatibleProvider internal constructor(
             future.get()?.cancel(true)
             resources.cancel()
             connection.getAndSet(null)?.let { http ->
-                try { cancellationExecutor.execute { runCatching { http.disconnect() } } }
-                catch (_: RejectedExecutionException) { /* Worker finally/read timeout closes it. */ }
+                val disconnect = { dev.zeroinput.ime.concurrency.recoverable { http.disconnect() }; Unit }
+                try { cancellationExecutor.execute(disconnect) }
+                catch (_: RejectedExecutionException) { disconnect() }
             }
             // Cancellation belongs to this operation, never unrelated queued model tests.
             dev.zeroinput.ime.concurrency.BoundedExecutors.purge(executor)
@@ -276,31 +270,58 @@ class OpenAiCompatibleProvider internal constructor(
     }
 
     private class PlatformExchange(uri: URI) : AiTransportExchange {
-        private val http = uri.toURL().openConnection() as HttpURLConnection
+        private val request = okhttp3.Request.Builder().url(uri.toURL())
+        private var client: okhttp3.OkHttpClient? = null
+        private val call = AtomicReference<okhttp3.Call?>(null)
+        private val closed = AtomicBoolean()
+        private var response: okhttp3.Response? = null
+        private var method = "GET"
         override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?, protocol: AiProtocol) {
-            http.instanceFollowRedirects = false
-            http.useCaches = false
-            http.connectTimeout = timeoutMs
-            http.readTimeout = timeoutMs
-            http.requestMethod = method
-            http.setRequestProperty("Accept", accept)
+            this.method = method
+            val attempted = AtomicBoolean()
+            client = okhttp3.OkHttpClient.Builder()
+                .proxy(java.net.Proxy.NO_PROXY)
+                .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+                .cookieJar(okhttp3.CookieJar.NO_COOKIES).cache(null)
+                .protocols(listOf(okhttp3.Protocol.HTTP_1_1))
+                .connectionPool(okhttp3.ConnectionPool(0, 1, java.util.concurrent.TimeUnit.SECONDS))
+                .connectTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                .readTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                .writeTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                .callTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                .addNetworkInterceptor { chain ->
+                    if (!attempted.compareAndSet(false, true)) throw java.io.IOException("AI retry forbidden")
+                    chain.proceed(chain.request())
+                }
+                .build()
+            request.header("Accept", accept).header("Cache-Control", "no-store")
             if (protocol == AiProtocol.ANTHROPIC_MESSAGES) {
-                http.setRequestProperty("x-api-key", key)
-                http.setRequestProperty("anthropic-version", "2023-06-01")
-            } else http.setRequestProperty("Authorization", "Bearer $key")
-            if (bodySize != null) {
-                http.doOutput = true
-                http.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                http.setFixedLengthStreamingMode(bodySize)
-            }
+                request.header("x-api-key", key).header("anthropic-version", "2023-06-01")
+            } else request.header("Authorization", "Bearer $key")
+            if (bodySize != null) request.header("Content-Type", "application/json; charset=utf-8")
         }
-        override fun timeout(timeoutMs: Int) { http.readTimeout = timeoutMs }
-        override fun connect() = http.connect()
-        override fun output() = http.outputStream
-        override fun status() = http.responseCode
-        override fun contentType(): String? = http.contentType
-        override fun input() = http.inputStream
-        override fun disconnect() = http.disconnect()
+        override fun send(body: ByteArray?) {
+            check(!closed.get())
+            val payload = body?.let { bytes -> object : okhttp3.RequestBody() {
+                override fun contentType(): okhttp3.MediaType? = null
+                override fun contentLength(): Long = bytes.size.toLong()
+                override fun writeTo(sink: okio.BufferedSink) { sink.write(bytes) }
+            } }
+            val active = checkNotNull(client).newCall(request.method(method, payload).build())
+            call.set(active)
+            if (closed.get()) active.cancel()
+            response = active.execute()
+        }
+        override fun status() = checkNotNull(response).code
+        override fun contentType(): String? = response?.header("Content-Type")
+        override fun input() = checkNotNull(response?.body).byteStream()
+        override fun disconnect() {
+            closed.set(true)
+            call.get()?.cancel()
+            response?.close()
+            client?.connectionPool?.evictAll()
+            client?.dispatcher?.executorService?.shutdown()
+        }
     }
 
     private fun validateConfiguration(config: AiConfiguration, request: AiRequest?) {
@@ -348,6 +369,7 @@ class OpenAiCompatibleProvider internal constructor(
     private fun Throwable.asProviderError(): AiProviderError = when (this) {
         is AiProviderError -> this
         is java.net.SocketTimeoutException -> AiProviderError.Network("AI request timed out", reason = AiNetworkFailure.TIMEOUT)
+        is java.io.InterruptedIOException -> AiProviderError.Network("AI request timed out", reason = AiNetworkFailure.TIMEOUT)
         is java.net.UnknownHostException -> AiProviderError.Network("AI host lookup failed", reason = AiNetworkFailure.DNS)
         is javax.net.ssl.SSLException -> AiProviderError.Network("AI secure connection failed", reason = AiNetworkFailure.TLS)
         is java.io.IOException -> AiProviderError.Network("AI network request failed")

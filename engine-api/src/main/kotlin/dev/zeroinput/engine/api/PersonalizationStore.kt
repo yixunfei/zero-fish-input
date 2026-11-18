@@ -26,7 +26,13 @@ interface PersonalizationStore {
      */
     fun invalidatePendingWrites() = Unit
 
-    /** Clears all personal entries.  Implementations may perform this asynchronously. */
+    /**
+     * Requests deletion of all personal entries. Asynchronous implementations
+     * may return after acceptance, which is not proof of durable completion.
+     * They throw if the request cannot be accepted (for example worker rejection
+     * or closure), and keep stale data unavailable until an explicit retry succeeds.
+     * User-visible completion must use the implementation's durable worker API.
+     */
     fun clear() = Unit
 
     /**

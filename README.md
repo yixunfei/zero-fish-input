@@ -18,6 +18,7 @@ ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、�
 
 - **中文**支持全拼、简拼、模糊音、简繁切换、九键，以及全键盘下的微软双拼和自然码。输入 `nmen` 可选“你们”，`nmeng` 的首屏可选“柠檬”和“你们”。空格提交高亮候选，回车提交原始拼音。
 - **候选与组合**支持滑动继续浏览、展开候选、移动拼音光标和逐段选字。上屏后可从工具栏重选上一词，具体取决于宿主编辑器支持。
+- **切换语言**会保留未完成的输入；编辑器拒绝提交时保留当前组合。词库编辑结果尚未就绪时，空格保持组合，结果出现后可再次选词；全部候选被过滤时，空格提交原文并补空格。
 - **数字与符号**可直接切换。符号首屏放置 27 个常用符号，点 `‹`、`›` 或左右滑动翻页，点分组名直接跳转。点左括号默认补齐一对并把光标放在中间。可在「设置 → 输入 → 成对符号自动补全」关闭。
 - **英语与个性化**支持离线英文候选、滑行输入、词联想、加密用户词组和词频管理。词库管理可查看来源、编辑词条和控制公开词库启用状态。
 - **词频学习**：普通输入中点选候选会记录使用次数，达到提升阈值后参与排序，默认阈值为 1。个人优先级会保留在模型排序和词库编辑混排中；空格、回车的自动学习需单独开启。应用仅关闭预测或自行补全时，普通聊天／搜索框仍可学习显式选择的中文候选，此类输入不学习空格等隐式提交。密码、未知、邮箱／网址、明确禁止个性化、隐身、关闭学习以及私密输入、AI 和键盘内搜索草稿不学习。
@@ -27,6 +28,21 @@ ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、�
 - **设置导航与外观**：首页按输入、键盘外观、词库与语言、隐私与剪贴板、AI、通用与关于分类，分类标题和说明整行可点。返回分类或旋转后保留浏览位置。外观页支持实时预览、按键与候选样式，以及 RGB 自定义背景色。薄荷绿和樱花粉均有深浅配色；预设保留高度、候选和用户背景设置。
 - **草稿编辑**私密输入、键盘 AI 草稿和表情搜索可点击正文定位光标，在中间插入文字或退格；成对括号会将光标放在括号中间。有未完成拼音时，点击会先完成当前转换。私密输入中被遮住的部分需先点击「本次明文」才能定位。
 - **同型字查找**可在「更多工具」中选部首或输入拼音选近似字，连续滑动浏览按部件和结构排序的带拼音候选，点选后插入。
+
+## 隐写模式
+
+在普通文本框的键盘工具栏点击「隐写模式」，分别输入公开文本、秘密正文和主凭据。
+「加密选项」可选择 AES、XChaCha20、Kuznyechik、Twofish、Camellia、SM4，配置一至六层的顺序及各算法支持的密钥位数。
+支持口令、32 字节 Base64url 随机共享密钥、密钥文件及两种组合凭据；选择文件会先清除秘密草稿，请在编辑正文前选择。
+生成预览后，点击「确认提交隐写文本」只插入编码文本，不触发发送。凭据不保存，丢失后无法恢复。
+
+解密可在选中完整载体后导入选区，或通过选字／分享入口选择「本地解密隐写文本」，也可认证后读取一个安全剪贴板条目。
+结果默认隐藏并只在本机显示。插入明文需单独确认，保存正文需系统认证后再次确认。
+不支持读取系统剪贴板正文或直接提取页面。退出模式、切换会话、修改设置、锁屏或超时会清除临时内容。
+
+Unicode 隐写与可见 Base64url 均可被检测，也可能被目标应用改写或移除。自然措辞载体因尚无通过容量、语义及检测门槛的资源而不可用，不会自动切换其他载体。
+秘密正文上限 2048 UTF-8 字节，公开文本上限 512 UTF-16 单位／1536 UTF-8 字节，单个密钥文件 32 字节至 1 MiB。
+使用与验证范围见[隐写验收记录](docs/text-steganography-validation.md)。此处描述当前源码功能；上方已发布的 v0.7.6 链接不代表包含这些未发布改动。
 
 ## 隐私与可选联网
 
@@ -86,5 +102,9 @@ python -B tools/prepare-handwriting-stroke-model.py
 
 AI settings discard unsaved provider drafts when the settings window stops;
 reopen the provider editor to edit them again. Failed saves reload persisted providers with AI and network switches off before allowing another edit; unchanged configuration reloads preserve queued requests. Text language-pack dictionaries
-must keep each line within 4096 characters and 16 fields. Test APK packaging now
+must keep each line within 4096 characters and 16 fields. JSON dictionaries load
+incrementally, with at most 16 container levels, 4096 characters per token,
+50,000 keys per object and 100,000 simultaneously retained object keys. They keep
+the existing 16 MiB per-file, 32 MiB total and 50,000 output-entry limits; data
+after the output limit is still validated. Test APK packaging now
 checks Rime, the C++ runtime and both ONNX libraries for every requested ABI.

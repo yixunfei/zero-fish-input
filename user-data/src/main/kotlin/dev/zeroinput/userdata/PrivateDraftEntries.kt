@@ -30,6 +30,8 @@ internal class PrivateDraftEntries(private val context: Context) {
         val bytes = ByteArray(utf8.remaining())
         try {
             utf8.get(bytes)
+            // Reject stale authorization before Keystore work, then recheck at
+            // publication because cancellation can race with encryption.
             beforeWrite()
             store(id).writeIfActive(bytes, allowKeyCreation, beforeWrite)
         } finally {

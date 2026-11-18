@@ -3,7 +3,11 @@ package dev.zeroinput.ime
 import android.content.ContextWrapper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.zeroinput.engine.api.EditorContext
+import dev.zeroinput.engine.api.EngineKey
+import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.languagepack.LanguagePackEngineFactory
+import dev.zeroinput.languagepack.LanguagePackFile
 import dev.zeroinput.languagepack.LanguagePackInstaller
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -108,6 +112,60 @@ class LanguagePackJsonPlatformTest {
         assertEquals(listOf(replacement), installer.listInstalled())
         assertArrayEquals(DICTIONARY, File(replacement.directory, DICTIONARY_PATH).readBytes())
         assertTrue(LanguagePackEngineFactory(replacement).isAvailable())
+    }
+
+    @Test fun streamingDictionaryPreservesRecordPrecedenceAndMappedValuesOnAndroid() = withInstaller { installer ->
+        val original = install(installer, manifest())
+        val file = File(original.directory, "stream.json").apply {
+            writeText("""[{"ni":["你","妮"]},{"extra":"ignored","value":"好","shortcut":"hao"}]""")
+        }
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        val pack = original.copy(manifest = original.manifest.copy(
+            files = listOf(LanguagePackFile(file.name, sha256, file.length()))))
+        val factory = LanguagePackEngineFactory(pack)
+        assertTrue(factory.isAvailable())
+        val engine = factory.create()
+        try {
+            engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
+            "ni".forEach { engine.handle(EngineKey.Character(it.toString())) }
+            assertEquals(listOf("你", "妮"), engine.snapshot.candidates.map { it.text })
+            engine.reset()
+            "hao".forEach { engine.handle(EngineKey.Character(it.toString())) }
+            assertEquals(listOf("好"), engine.snapshot.candidates.map { it.text })
+            engine.reset()
+            "extra".forEach { engine.handle(EngineKey.Character(it.toString())) }
+            assertTrue(engine.snapshot.candidates.isEmpty())
+        } finally { engine.close() }
+    }
+
+    @Test fun invalidStreamingDictionaryRejectsTheWholePackWithCorrectHashes() = withInstaller { installer ->
+        val original = install(installer, manifest())
+        val file = File(original.directory, "stream.json")
+        for (document in listOf("""{"hao":"好"} {}""", """{"hao":"好","\u0068ao":"坏"}""",
+            """{"hao":"\u１２３４"}""", "{\"hao\":\"${"a".repeat(4097)}\"}")) {
+            file.writeText(document)
+            val sha256 = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+                .joinToString("") { "%02x".format(it) }
+            val pack = original.copy(manifest = original.manifest.copy(files = original.manifest.files +
+                LanguagePackFile(file.name, sha256, file.length())))
+            assertFalse(LanguagePackEngineFactory(pack).isAvailable())
+        }
+    }
+
+    @Test fun signedStagingNamesAreRecoveredWithoutTouchingUnrelatedDirectories() = withInstaller { installer ->
+        // The installer fixture uses a dedicated noBackup root; resolve its owned
+        // staging directory through the installed package, never app-wide storage.
+        val installed = install(installer, manifest())
+        val root = checkNotNull(installed.directory.parentFile?.parentFile?.parentFile)
+        val staging = File(root, ".staging").apply { mkdirs() }
+        val owned = listOf("pack2--1", "pack---9223372036854775808", "${"x".repeat(64)}-0").map {
+            File(staging, it).apply { check(mkdir()) }
+        }
+        val unrelated = File(staging, "unrelated").apply { check(mkdir()) }
+        installer.refreshInstalled()
+        assertTrue(owned.none(File::exists))
+        assertTrue(unrelated.isDirectory)
     }
 
     private fun withInstaller(block: (LanguagePackInstaller) -> Unit) {

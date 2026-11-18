@@ -1,0 +1,23 @@
+<resources>
+    <string name="stego_open">Text steganography</string>
+    <string name="stego_encrypt">Encrypt</string>
+    <string name="stego_decrypt">Decrypt locally</string>
+    <string name="stego_close">Close and clear</string>
+    <string name="stego_cover">Public cover</string>
+    <string name="stego_secret">Secret text</string>
+    <string name="stego_credential">Master credential</string>
+    <string name="stego_carrier">Encoded message</string>
+    <string name="stego_reveal">Reveal text</string>
+    <string name="stego_mask">Mask text</string>
+    <string name="stego_options">Encryption options</string>
+    <string name="stego_decrypt_options">Decryption credentials</string>
+    <string name="stego_key_file">Key file</string>
+    <string name="stego_selection">Import selection</string>
+    <string name="stego_vault">Read private vault</string>
+    <string name="stego_prepare">Preview / decrypt</string>
+    <string name="stego_confirm">Confirm encoded insertion</string>
+    <string name="stego_edit">Edit again</string>
+    <string name="stego_save">Authenticate and save text</string>
+    <string name="stego_insert">Confirm plaintext insertion</string>
+    <string name="stego_draft_hint">Choose a field and type with the keyboard below</string>
+</resources>

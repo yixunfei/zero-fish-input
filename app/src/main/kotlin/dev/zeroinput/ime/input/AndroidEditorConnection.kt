@@ -91,7 +91,8 @@ class AndroidEditorConnection(
             selection.expectSelection(target)
             if (platformCall { connection.setSelection(target, target) } != true) {
                 invalidateContext()
-                return false
+                // The text is already accepted. Caret support cannot undo it or
+                // authorize callers to replay the insertion.
             }
         }
         return true

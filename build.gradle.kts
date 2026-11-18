@@ -29,16 +29,88 @@ fun systemClipboardViolation(path: String, text: String): String? {
 
 fun networkViolation(path: String, text: String): String? {
     // These TLS exception values contain no I/O capability; transports remain restricted in every source set.
-    val network = Regex("""(?:java\.net\.(?:URL\b|URLConnection\b|(?:Server)?Socket\b|MulticastSocket\b|Datagram|Http|http\b)|java\.nio\.channels\.(?:(?:Asynchronous)?(?:Server)?SocketChannel|DatagramChannel)\b|javax\.net\.(?!ssl\.SSL(?:Exception|HandshakeException)\b)|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|\b(?:getByName|getAllByName|getLocalHost|getHostName|getCanonicalHostName)\b|\.\s*(?:hostName|canonicalHostName)\b|Class\.forName\s*\(\s*[\"']java\.net\.)""")
+    val network = Regex("""(?:java\.net\.(?:URL\b|URLConnection\b|InetSocketAddress\b|(?:Server)?Socket\b|MulticastSocket\b|Datagram|Http|http\b)|java\.nio\.channels\.(?:(?:Asynchronous)?(?:Server)?SocketChannel|DatagramChannel|NetworkChannel)\b|javax\.net\.(?!ssl\.SSL(?:Exception|HandshakeException)\b)|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|\b(?:getByName|getAllByName|getLocalHost|getHostName|getCanonicalHostName)\b|\.\s*(?:hostName|canonicalHostName)\b|Class\.forName\s*\(\s*[\"']java\.net\.)""")
     val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
     val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
     val remote = "app/src/main/kotlin/dev/zeroinput/ime/ai/AiRemoteHttpsTransport.kt"
+    if (path in setOf(provider, dictionaries, remote)) {
+        val forbidden = Regex("""WebView|android\.webkit|DownloadManager|\b(?:(?:Datagram|Multicast|Server)?Socket|(?:Socket|Datagram|Network)Channel|SSLContext|SSLSocketFactory|X509TrustManager|HostnameVerifier)\b""")
+        val followups = Regex("""(?:followRedirects|followSslRedirects|retryOnConnectionFailure)\s*\(\s*([^)]*)\)""")
+        val assignments = Regex("""instanceFollowRedirects\s*=\s*([^\s;]+)""")
+        val proxies = Regex("""\.proxy\s*\(\s*([^)]*)\)""")
+        if (forbidden.containsMatchIn(text) || followups.findAll(text).any { it.groupValues[1].trim() != "false" } ||
+            assignments.findAll(text).any { it.groupValues[1] != "false" } ||
+            proxies.findAll(text).any { it.groupValues[1].trim().removePrefix("java.net.") != "Proxy.NO_PROXY" })
+            return "Approved transports cannot add browsers, sockets, proxies, redirects or retries"
+    }
     if (network.containsMatchIn(text) && path != provider && path != dictionaries && path != remote) return "Runtime network transport is restricted to approved adapters"
     if (text.contains("android.permission.INTERNET") && path != "app/src/main/AndroidManifest.xml") {
         return "Only the approved app manifest may declare networking"
     }
     return null
 }
+
+fun nativeTransportViolation(text: String): String? {
+    val network = Regex("""#\s*include\s*[<"](?:sys/socket\.h|netdb\.h|arpa/inet\.h|netinet/|curl/)|\b(?:socket|connect|getaddrinfo|gethostbyname|sendto|recvfrom|curl_easy_perform|popen|system|execve)\s*\(""")
+    return if (network.containsMatchIn(text)) "Native network and shell bypasses are forbidden" else null
+}
+
+fun dataTransportViolation(text: String): String? = if (Regex("""(?:java\.net\.(?:URL|Socket|Http)|okhttp3\.|retrofit2\.|ktor\.client|android\.webkit|android\.permission\.INTERNET)""")
+    .containsMatchIn(text)) "Data assets cannot introduce runtime transport references" else null
+
+fun transportConstraintViolation(path: String, text: String): String? {
+    val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
+    val remote = "app/src/main/kotlin/dev/zeroinput/ime/ai/AiRemoteHttpsTransport.kt"
+    val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
+    val required = when (path) {
+        provider, remote -> listOf("followRedirects(false)", "followSslRedirects(false)", "retryOnConnectionFailure(false)",
+            "Proxy.NO_PROXY", "connectTimeout(", "readTimeout(", "writeTimeout(", "callTimeout(", "compareAndSet(false, true)")
+        dictionaries -> listOf("instanceFollowRedirects = false", "Proxy.NO_PROXY", "connectTimeout =", "readTimeout =", "redirect(uri, location)")
+        else -> return null
+    }
+    return if (required.any { !text.contains(it) }) "Approved transport lost a required timeout or connection constraint" else null
+}
+
+/** Build logic may fetch pinned build inputs; it cannot create another runtime transport. */
+fun buildTransportViolation(text: String): String? {
+    val literals = Regex("\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|//[^\\r\\n]*|/\\*[\\s\\S]*?\\*/")
+    val code = literals.replace(text, " ")
+    return if (Regex("""\b(?:java\.net\.(?:URL|Socket|ServerSocket|URLConnection)|okhttp3\.(?:OkHttpClient|Request)|HttpURLConnection|Runtime\.getRuntime\(\)\.exec|ProcessBuilder)\b""")
+            .containsMatchIn(code)) "Build scripts cannot introduce runtime network or shell adapters" else null
+}
+
+fun toolingTransportViolation(path: String, text: String): String? {
+    systemClipboardViolation(path, text)?.let { return it }
+    if (path.endsWith("CMakeLists.txt") || path.endsWith(".cmake")) {
+        val network = Regex("""(?i)\b(?:FetchContent|ExternalProject)|\bfile\s*\(\s*(?:DOWNLOAD|UPLOAD)\b|\b(?:find_package|target_link_libraries)\s*\([^)]*\b(?:curl|libcurl|websocket|Qt\w*Network)\b|\bexecute_process\s*\(""")
+        return nativeTransportViolation(text) ?: if (network.containsMatchIn(text))
+            "CMake cannot fetch inputs, launch shell commands or add network libraries" else null
+    }
+    if (path.endsWith(".toml")) {
+        val catalog = if (path == "gradle/libs.versions.toml") text.lineSequence().filterNot {
+            Regex("""okhttp = "[0-9]+\.[0-9]+\.[0-9]+"""").matches(it) ||
+                it == """okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }"""
+        }.joinToString("\n") else text
+        return networkViolation(path, catalog)
+    }
+    // Host build/release fetches have different authority from Android runtime
+    // transport. Keep their existing audited entry points exact and independent.
+    val fetchers = setOf("tools/bootstrap-rime.ps1", "tools/evaluate-small-model.py",
+        "tools/dictionaries/prepare.py", "tools/dictionaries/test_prepare.py", "tools/prepare-emoji.py",
+        "tools/prepare-handwriting-model.py", "tools/prepare-handwriting-fixtures.py",
+        "tools/prepare-handwriting-stroke-model.py", "tools/prepare-ocr-evaluation.py",
+        "tools/onnxruntime/build.py", "tools/resources/fetch-mini.py", "tools/resources/publish.py")
+    val forbidden = Regex("""(?i)\bsocket\s*\.|\b(?:TcpClient|UdpClient|WebClient|HttpClient|WebView)\b|\b(?:requests|httpx|aiohttp|http\.client)\s*[.(]|\b(?:curl|wget)\b""")
+    if (forbidden.containsMatchIn(text)) return "Host tooling cannot add socket, browser or alternate HTTP clients"
+    val fetch = Regex("""\burllib\.request\b|\burlopen\s*\(|\bInvoke-(?:WebRequest|RestMethod)\b""", RegexOption.IGNORE_CASE)
+    if (fetch.containsMatchIn(text) && path !in fetchers) return "Host fetches are restricted to reviewed build/release tools"
+    // Packaging tools inspect the approved manifest permission as metadata.
+    return dataTransportViolation(text.replace("android.permission.INTERNET", ""))
+}
+
+fun isPrivacyBuildFile(path: String): Boolean = path.endsWith(".gradle.kts") ||
+    path.substringAfterLast('/') == "CMakeLists.txt" ||
+    path.substringAfterLast('.', "") in setOf("gradle", "cmake", "toml", "ps1", "py", "sh")
 
 fun pageAccessViolation(path: String, text: String): String? {
     val adapter = "app/src/main/kotlin/dev/zeroinput/ime/ai/page/PageReferenceService.kt"
@@ -48,6 +120,8 @@ fun pageAccessViolation(path: String, text: String): String? {
         "clipboard/ClipboardExternalImportTest.kt", "clipboard/ClipboardSelectionCopyTest.kt", "clipboard/SecurePasteReturnTest.kt",
         "clipboardguard/ClipboardDeviceTestSupport.kt", "clipboardguard/ClipboardGuardOverlayTest.kt",
         "clipboardguard/SystemClipboardPlatformTest.kt",
+        // Opt-in, task-owned public PIN fixture; no application page reads or service.
+        "textstego/StegoVaultPlatformTest.kt",
     ).map { "app/src/androidTest/kotlin/dev/zeroinput/ime/$it" }.toSet()
     val keyFiltering = Regex("""\b(?:onKeyEvent|canRequestFilterKeyEvents|requestFilterKeyEvents|FLAG_REQUEST_FILTER_KEY_EVENTS)\b""")
     if (keyFiltering.containsMatchIn(text)) return "Accessibility key filtering is forbidden"
@@ -415,15 +489,46 @@ tasks.register("testPrivacyBoundary") {
             "java.net.MulticastSocket(0)", "java.net.URLConnection", "okhttp3.OkHttpClient", "android.webkit.WebView")) {
             check(networkViolation(business, source) != null)
             check(networkViolation("other/$provider", source) != null)
-            check(networkViolation(provider, source) == null)
             val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
-            check(networkViolation(dictionaries, source) == null)
             check(networkViolation("other/$dictionaries", source) != null)
             val remote = "app/src/main/kotlin/dev/zeroinput/ime/ai/AiRemoteHttpsTransport.kt"
-            check(networkViolation(remote, source) == null)
             check(networkViolation("other/$remote", source) != null)
             check(networkViolation("app/src/main/kotlin/dev/zeroinput/ime/ai/AiMcpClient.kt", source) != null)
         }
+        for (path in listOf(provider,
+            "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt",
+            "app/src/main/kotlin/dev/zeroinput/ime/ai/AiRemoteHttpsTransport.kt")) {
+            for (bad in listOf("WebView", "DatagramSocket(value)", "http.instanceFollowRedirects = true",
+                ".followRedirects(true)", ".retryOnConnectionFailure(true)", ".proxy(value)")) {
+                check(networkViolation(path, bad) != null)
+            }
+            val actual = rootProject.file(path).readText()
+            check(networkViolation(path, actual) == null)
+            check(transportConstraintViolation(path, actual) == null)
+            check(transportConstraintViolation(path, actual.replace("connectTimeout", "removedTimeout")) != null)
+        }
+        for (bad in listOf("#include <sys/socket.h>", "getaddrinfo(value)", "connect(fd, address)", "system(value)"))
+            check(nativeTransportViolation(bad) != null)
+        check(nativeTransportViolation("std::string offline;") == null)
+        check(dataTransportViolation("retrofit") == null)
+        check(dataTransportViolation("retrofit2.Retrofit") != null)
+        check(buildTransportViolation("val client = java.net.Socket()") != null)
+        check(buildTransportViolation("val fixture = \"java.net.Socket()\"") == null)
+        for (path in listOf("engine-rime/src/main/cpp/CMakeLists.txt", "tools/rime-prebuilt/CMakeLists.txt",
+            "tools/example.py", "tools/example.ps1", "gradle/libs.versions.toml", "buildSrc/build.gradle.kts")) {
+            check(isPrivacyBuildFile(path))
+        }
+        for (source in listOf("file(DOWNLOAD url file)", "include(FetchContent)",
+            "target_link_libraries(target PRIVATE CURL::libcurl)", "execute_process(COMMAND curl url)")) {
+            check(toolingTransportViolation("engine-rime/src/main/cpp/CMakeLists.txt", source) != null)
+        }
+        check(toolingTransportViolation("tools/new.py", "import urllib.request") != null)
+        check(toolingTransportViolation("tools/new.ps1", "Invoke-WebRequest url") != null)
+        check(toolingTransportViolation("tools/bootstrap-rime.ps1", "Invoke-WebRequest url") == null)
+        check(toolingTransportViolation("tools/bootstrap-rime.ps1", "socket.connect(value)") != null)
+        check(toolingTransportViolation("tools/new.py", "getPrimaryClip()") != null)
+        check(toolingTransportViolation("gradle/new.toml", "module = \"com.squareup.okhttp3:okhttp\"") != null)
+        check(toolingTransportViolation("gradle/libs.versions.toml", rootProject.file("gradle/libs.versions.toml").readText()) == null)
         for (source in listOf("java.net.URI", "java.nio.channels.FileChannel", "java.nio.channels.SeekableByteChannel", "java.net.InetAddress", "InetAddress.getByAddress(bytes)"))
             check(networkViolation(business, source) == null)
         for (path in listOf(business, "app/src/test/kotlin/TransportTest.kt")) {
@@ -441,6 +546,11 @@ tasks.register("testPrivacyBoundary") {
             check(pageAccessViolation("other/$page", capability) != null)
             check(pageAccessViolation(page, capability) == null)
         }
+        val stegoFixture = "app/src/androidTest/kotlin/dev/zeroinput/ime/textstego/StegoVaultPlatformTest.kt"
+        check(pageAccessViolation(stegoFixture, "android.view.accessibility.AccessibilityNodeInfo") == null)
+        check(pageAccessViolation(stegoFixture, "android.accessibilityservice.AccessibilityService") != null)
+        check(pageAccessViolation(stegoFixture.replace("/androidTest/", "/main/"), "android.view.accessibility.AccessibilityNodeInfo") != null)
+        check(pageAccessViolation("other/$stegoFixture", "android.view.accessibility.AccessibilityNodeInfo") != null)
         for (action in listOf("performAction(1)", "dispatchGesture(value)", "takeScreenshot(0)", "performGlobalAction(1)",
             "service::performAction", "service::dispatchGesture", "service::takeScreenshot", "service::performGlobalAction")) {
             check(pageAccessViolation(page, action) != null)
@@ -456,20 +566,40 @@ tasks.register("testPrivacyBoundary") {
 }
 
 fun Project.scanPrivacySources(violations: MutableList<String>) {
-    val sourceRoots = subprojects.map { it.file("src") }
+    val sourceRoots = (listOf(file("src"), file("buildSrc/src")) + subprojects.map { it.file("src") }).distinct()
 
     sourceRoots.filter(File::exists).forEach { root ->
         root.walkTopDown()
-            .filter { it.isFile && it.extension in setOf("kt", "java", "xml") }
+            .filter { it.isFile && it.extension.lowercase() in setOf("kt", "java", "xml", "cpp", "h", "hpp", "cc", "c", "cxx", "json", "yaml", "yml", "txt") }
             .forEach { file ->
                 val text = file.readText()
                 val path = file.relativeTo(rootProject.projectDir).invariantSeparatorsPath
                 systemClipboardViolation(path, text)?.let { violations += "$path: $it" }
-                networkViolation(path, text)?.let { violations += "$path: $it" }
+                val transport = if (file.extension.lowercase() in setOf("json", "yaml", "yml", "txt"))
+                    dataTransportViolation(text) else networkViolation(path, text)
+                transport?.let { violations += "$path: $it" }
+                transportConstraintViolation(path, text)?.let { violations += "$path: $it" }
+                if (file.extension.lowercase() in setOf("cpp", "h", "hpp", "cc", "c", "cxx")) {
+                    nativeTransportViolation(text)?.let { violations += "$path: $it" }
+                }
                 pageAccessViolation(path, text)?.let { violations += "$path: $it" }
                 assistantAccessViolation(path, text)?.let { violations += "$path: $it" }
                 virtualScreenViolation(path, text)?.let { violations += "$path: $it" }
             }
+    }
+}
+
+fun Project.checkBuildPrivacySources(violations: MutableList<String>) {
+    rootProject.projectDir.walkTopDown().onEnter {
+        it.name !in setOf("build", ".git", ".gradle", ".cxx", "third_party", ".tmp-evidence", "node_modules")
+    }.filter { it.isFile && isPrivacyBuildFile(it.invariantSeparatorsPath) }.forEach { script ->
+        val path = script.relativeTo(rootProject.projectDir).invariantSeparatorsPath
+        val text = script.readText()
+        val violation = if (path.endsWith(".gradle.kts") || path.endsWith(".gradle"))
+            buildTransportViolation(text) else toolingTransportViolation(path, text)
+        violation?.let {
+            violations += "$path: $it"
+        }
     }
 }
 
@@ -598,6 +728,7 @@ tasks.register("privacyCheck") {
     doLast {
         val violations = mutableListOf<String>()
         scanPrivacySources(violations)
+        checkBuildPrivacySources(violations)
         checkMergedPrivacyManifests(violations)
         checkPrivacyResources(violations)
         check(violations.isEmpty()) { violations.joinToString("\n") }

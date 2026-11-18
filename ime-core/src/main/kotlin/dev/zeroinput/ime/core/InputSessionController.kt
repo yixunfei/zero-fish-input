@@ -126,7 +126,7 @@ class InputSessionController(
         evaluatedFor = configuration
         if (updated == privacy) return false
         privacy = updated
-        runCatching { engine?.reset() }
+        recoverable { engine?.reset() }
             .onFailure { closeEngine() }
         connection.clearComposingText()
         replaceEngine()
@@ -171,12 +171,11 @@ class InputSessionController(
                 InputCommand.Space -> {
                     if (personalPaging.editsPending) {
                         // Do not select an engine candidate before dictionary edits
-                        // have been checked, but never discard an explicit space.
-                        handleEnter(activeEngine)
+                        // have been checked or turn unfinished pinyin into a commit.
                         return
                     }
                     if (personalPaging.editsApplied && state.snapshot.isComposing && state.snapshot.candidates.isEmpty()) {
-                        handleEnter(activeEngine)
+                        commitUnconsumedKey(activeEngine, state.snapshot, state.snapshot, " ")
                         return
                     }
                     if (state.snapshot.isComposing && state.snapshot.candidates.isNotEmpty() &&
@@ -189,14 +188,14 @@ class InputSessionController(
                 InputCommand.Enter -> handleEnter(activeEngine, allowLearning = implicitLearningAllowed())
                 InputCommand.ReconvertLast -> reconvert(activeEngine)
                 InputCommand.UndoSelection -> (activeEngine as? CompositionEditingEngine)?.let {
-                    apply(it.undoSelection(), allowLearning = false)
+                    apply(engineOperation { it.undoSelection() }, allowLearning = false)
                 }
                 InputCommand.SelectSyllable -> (activeEngine as? CompositionEditingEngine)?.let {
-                    apply(it.selectSyllable(), allowLearning = false)
+                    apply(engineOperation { it.selectSyllable() }, allowLearning = false)
                 }
                 is InputCommand.SelectComposition -> (activeEngine as? CompositionCursorEngine)?.let {
                     personalPaging.clear()
-                    apply(it.selectComposition(command.selection), allowLearning = false)
+                    apply(engineOperation { it.selectComposition(command.selection) }, allowLearning = false)
                 }
                 is InputCommand.SelectCandidate -> {
                     if (command.candidateId == null ||
@@ -208,13 +207,13 @@ class InputSessionController(
                     if (!rawEngineSnapshot.isComposing) return
                     if (personalPaging.changePage(command.direction, candidateWindow.snapshot(rawEngineSnapshot))) {
                         publish(rawEngineSnapshot)
-                    } else apply(candidateWindow.changePage(activeEngine, rawEngineSnapshot, command.direction), allowLearning = false)
+                    } else apply(engineOperation { candidateWindow.changePage(activeEngine, rawEngineSnapshot, command.direction) }, allowLearning = false)
                 }
                 is InputCommand.SelectReading -> (activeEngine as? ReadingSelectionEngine)?.let {
-                    apply(it.selectReading(command.index), allowLearning = false)
+                    apply(engineOperation { it.selectReading(command.index) }, allowLearning = false)
                 }
             }
-        } catch (_: Throwable) {
+        } catch (_: EngineOperationFailure) {
             // Native engines are optional and can fail after a session has
             // already started (for example when a JNI call loses its native
             // context).  Basic editing must remain usable in that case.
@@ -224,17 +223,17 @@ class InputSessionController(
     }
 
     fun switchLanguage() {
+        setLanguage(if (language == InputLanguage.CHINESE) InputLanguage.ENGLISH else InputLanguage.CHINESE)
+    }
+
+    fun setLanguage(target: InputLanguage, packKey: String? = null) {
+        if (language == target && languagePackKey == packKey) return
         if (state.snapshot.isComposing) {
             // Explicit switching preserves the user's unfinished input without learning.
             // commitText replaces the composing span; a rejected commit keeps this session.
             val raw = fallbackComposition(state.snapshot)
             if (raw.isNotEmpty() && !connection.commitText(raw)) return
         }
-        setLanguage(if (language == InputLanguage.CHINESE) InputLanguage.ENGLISH else InputLanguage.CHINESE)
-    }
-
-    fun setLanguage(target: InputLanguage, packKey: String? = null) {
-        if (language == target && languagePackKey == packKey) return
         language = target
         languagePackKey = packKey
         connection.clearComposingText()
@@ -245,7 +244,7 @@ class InputSessionController(
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
-        runCatching { engine?.reset() }
+        recoverable { engine?.reset() }
             .onFailure { closeEngine() }
         connection.clearComposingText()
         publish(EngineSnapshot.Empty)
@@ -262,7 +261,7 @@ class InputSessionController(
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
-        runCatching { engine?.reset() }.onFailure { closeEngine() }
+        recoverable { engine?.reset() }.onFailure { closeEngine() }
         publish(EngineSnapshot.Empty)
         return true
     }
@@ -273,7 +272,7 @@ class InputSessionController(
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
-        runCatching { engine?.reset() }.onFailure { closeEngine() }
+        recoverable { engine?.reset() }.onFailure { closeEngine() }
         connection.finishComposingText()
         publish(EngineSnapshot.Empty)
     }
@@ -324,7 +323,7 @@ class InputSessionController(
         val promoted = ModelRankingPolicy.promote(state.snapshot, candidate.id) ?: return false
         rebuildRoutes(promoted)
         state = state.copy(snapshot = promoted, modelRanked = true, candidateRevision = state.candidateRevision + 1)
-        runCatching { onStateChanged(state) }
+        recoverable { onStateChanged(state) }
         return true
     }
 
@@ -348,11 +347,11 @@ class InputSessionController(
         val editor = connection as? ReconversionEditorConnection ?: return
         if (state.snapshot.isComposing || !privacy.suggestionsAllowed) return
         recentComposition.consume { reading, text ->
-            val restored = editing.restoreComposition(reading)
+            val restored = engineOperation { editing.restoreComposition(reading) }
             if (restored.consumed && restored.snapshot.isComposing && editor.reopenCommittedText(text)) {
                 apply(restored)
             } else {
-                activeEngine.reset()
+                engineOperation { activeEngine.reset() }
                 recentComposition.clear()
                 publish(EngineSnapshot.Empty)
             }
@@ -426,9 +425,12 @@ class InputSessionController(
             return false
         }
         val candidate = prepared.takeEngine() ?: return false
-        val restored = runCatching {
-            (candidate as? CompositionEditingEngine)?.restoreComposition(input)
-        }.getOrNull()
+        val restored = try {
+            recoverable { (candidate as? CompositionEditingEngine)?.restoreComposition(input) }.getOrNull()
+        } catch (failure: Throwable) {
+            closeSafely(candidate)
+            throw failure
+        }
         if (!isRestoredComposition(restored, input)) {
             closeSafely(candidate)
             return false
@@ -481,9 +483,9 @@ class InputSessionController(
 
         val requestedPackKey = languagePackKey
         val packEngine = requestedPackKey?.let { key ->
-            runCatching { languagePackProvider(key) }.getOrNull()
+            recoverable { languagePackProvider(key) }.getOrNull()
         }?.let { candidate ->
-            val supportsLanguage = runCatching {
+            val supportsLanguage = recoverable {
                 language in candidate.descriptor.languages
             }.getOrDefault(false)
             if (supportsLanguage) {
@@ -498,7 +500,7 @@ class InputSessionController(
         // the registry publishes a refresh.  Once discovery is known to be
         // complete, an absent key is stale and is cleared so the session state
         // cannot advertise a package that is no longer installed.
-        val discoveryComplete = runCatching { languagePackDiscoveryComplete() }.getOrDefault(true)
+        val discoveryComplete = recoverable { languagePackDiscoveryComplete() }.getOrDefault(true)
         if (requestedPackKey != null && packEngine == null && discoveryComplete) {
             languagePackKey = null
         }
@@ -513,7 +515,7 @@ class InputSessionController(
             languagePackKey = null
         }
 
-        val baseEngine = runCatching { engineProvider(language) }.getOrNull()
+        val baseEngine = recoverable { engineProvider(language) }.getOrNull()
         val snapshot = baseEngine?.let(::startEngine)
         if (snapshot != null) {
             engine = baseEngine
@@ -527,7 +529,7 @@ class InputSessionController(
     }
 
     private fun installImmediateEngine() {
-        val immediate = runCatching { engineProvider(language) }.getOrNull()
+        val immediate = recoverable { engineProvider(language) }.getOrNull()
         val snapshot = immediate?.let(::startEngine)
         if (snapshot != null) {
             engine = immediate
@@ -545,7 +547,7 @@ class InputSessionController(
             prepared.packageName == editorInfo.packageName &&
             prepared.privacy == privacy &&
             prepared.snapshot.isComposing.not() &&
-            runCatching { language in prepared.descriptor.languages }.getOrDefault(false)
+            recoverable { language in prepared.descriptor.languages }.getOrDefault(false)
 
     private companion object {
         const val MAX_HANDOFF_PINYIN_LENGTH = 128
@@ -564,7 +566,7 @@ class InputSessionController(
         allowLearning: Boolean = implicitLearningAllowed(),
     ) {
         if ((state.modelRanked || personalPaging.editsApplied) && key is EngineKey.Character &&
-            key.text.singleOrNull()?.let { !activeEngine.acceptsCompositionCharacter(it) } == true) {
+            key.text.singleOrNull()?.let { !engineOperation { activeEngine.acceptsCompositionCharacter(it) } } == true) {
             if (state.snapshot.candidates.isNotEmpty()) {
                 selectCandidate(activeEngine, state.snapshot.highlightedIndex, learn = allowLearning)
             } else if (state.snapshot.isComposing) {
@@ -576,7 +578,7 @@ class InputSessionController(
         // already rendered to the user.
         val before = state.snapshot
         val learningShortcut = before.rawInput.ifBlank { before.composition }
-        val update = activeEngine.handle(key)
+        val update = engineOperation { activeEngine.handle(key) }
         if (update.consumed || update.committedText.isNotEmpty()) {
             apply(update, learningShortcut, allowLearning)
             return
@@ -627,9 +629,9 @@ class InputSessionController(
                 recentComposition.remember(reading, update.committedText)
             }
             if (committed && allowLearning && canPersonalizeCandidates() && update.learnable) {
-                runCatching {
+                recoverable {
                     val learnedValue = update.committedText.trimEnd(' ')
-                    if (learnedValue.isEmpty()) return@runCatching
+                    if (learnedValue.isEmpty()) return@recoverable
                     personalization.learn(
                         shortcut = update.learningInput.ifBlank { reading.ifBlank { learnedValue } },
                         value = learnedValue,
@@ -668,11 +670,11 @@ class InputSessionController(
         // editor accepts the replacement, so a rejected Enter can be retried.
         val committed = commitRawComposition(rawComposition)
         if (!committed) return
-        runCatching { activeEngine.reset() }
+        recoverable { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         if (allowLearning && privacy.learningAllowed && privacy.personalizationAllowed &&
             (language == InputLanguage.ENGLISH || rawComposition.codePoints().allMatch(Character::isIdeographic))) {
-            runCatching {
+            recoverable {
                 personalization.learn(before.rawInput.ifBlank { rawComposition }, rawComposition, language, true)
             }.onFailure { learningFailureCount++ }
         }
@@ -721,7 +723,7 @@ class InputSessionController(
                 // mutable property; native adapters may expose a stale
                 // snapshot between callbacks.
                 val learningShortcut = state.snapshot.rawInput
-                apply(candidateWindow.select(activeEngine, route.reference, rawEngineSnapshot), learningShortcut, learn)
+                apply(engineOperation { candidateWindow.select(activeEngine, route.reference, rawEngineSnapshot) }, learningShortcut, learn)
             }
             is CandidateRoute.Personal -> {
                 val reading = route.input.ifBlank { state.snapshot.rawInput }
@@ -729,7 +731,7 @@ class InputSessionController(
                 if (language == InputLanguage.CHINESE && activeEngine is CompositionEditingEngine &&
                     connection is ReconversionEditorConnection) recentComposition.remember(reading, route.text)
                 if (learn && canPersonalizeCandidates()) {
-                    runCatching {
+                    recoverable {
                         personalization.recordUse(route.id, learningAllowed = true)
                     }.onFailure { learningFailureCount++ }
                 }
@@ -747,7 +749,7 @@ class InputSessionController(
                 // and phrase management but cannot surface through pinyin
                 // prefix matching until the table gains a reading column.
                 if (committed && learn && privacy.personalizationAllowed) {
-                    runCatching {
+                    recoverable {
                         personalization.learn(
                             shortcut = selected.text,
                             value = selected.text,
@@ -761,7 +763,7 @@ class InputSessionController(
             is CandidateRoute.Kaomoji -> {
                 if (language != InputLanguage.CHINESE || !privacy.suggestionsAllowed ||
                     route.personal && !privacy.personalizationAllowed) return
-                val stillAvailable = runCatching {
+                val stillAvailable = recoverable {
                     kaomojiCandidates.suggestions(state.snapshot.rawInput, privacy.personalizationAllowed)
                         .any { it.id == route.id && it.text == route.text }
                 }.getOrDefault(false)
@@ -775,7 +777,7 @@ class InputSessionController(
     private fun commitLocalCandidate(activeEngine: InputEngine, text: String): Boolean {
         if (!commitPredictableText(text)) return false
         candidateWindow.clear()
-        runCatching { activeEngine.reset() }
+        recoverable { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         return true
     }
@@ -815,7 +817,7 @@ class InputSessionController(
             canPersonalizeCandidates(),
             promotionThreshold = personalPromotionThreshold().coerceAtLeast(1),
         ) { text ->
-            runCatching { (engine as? CandidateTextNormalizer)?.normalizeCandidateText(text) ?: text }.getOrNull()
+            recoverable { (engine as? CandidateTextNormalizer)?.normalizeCandidateText(text) ?: text }.getOrNull()
         }
         if (!associationsAllowed()) associations.clear()
         if (composed.isComposing) associations.hide()
@@ -831,12 +833,9 @@ class InputSessionController(
         state = InputSessionState(language, privacy, visibleSnapshot, languagePackKey, engine?.descriptor,
             canReconvert = recentComposition.available && !visibleSnapshot.isComposing,
             candidateRevision = state.candidateRevision + 1)
-        // State is authoritative before the notification runs, and a rendering
-        // observer is not part of the conversion path.  Letting it throw out of
-        // handle() reaches recoverFromEngineFailure, which commits the pre-edit
-        // as literal text and then commits every later key unmodified, so a
-        // display-only fault would disable conversion for the whole session.
-        runCatching { onStateChanged(state) }
+        // Rendering cannot trigger conversion fallback. Ordinary observer faults
+        // leave the published state usable; cancellation and fatal failures propagate.
+        recoverable { onStateChanged(state) }
     }
 
     private fun withKaomoji(snapshot: EngineSnapshot): EngineSnapshot {
@@ -845,7 +844,7 @@ class InputSessionController(
         val input = snapshot.rawInput
         if (input.length !in 2..32 || input.any { it !in 'a'..'z' }) return snapshot
         val seen = snapshot.candidates.mapTo(HashSet()) { it.text }
-        val extra = runCatching { kaomojiCandidates.suggestions(input, privacy.personalizationAllowed) }
+        val extra = recoverable { kaomojiCandidates.suggestions(input, privacy.personalizationAllowed) }
             .getOrDefault(emptyList())
             .take(4).filter { it.text.isNotEmpty() && seen.add(it.text) }
             .map { Candidate("kaomoji:${it.id}", it.text) }
@@ -879,7 +878,7 @@ class InputSessionController(
             ?: return true
         val rawComposition = fallbackComposition(effectiveSnapshot)
         if (!commitRawComposition(rawComposition)) return false
-        runCatching { activeEngine.reset() }
+        recoverable { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         publish(EngineSnapshot.Empty)
         return true
@@ -928,24 +927,30 @@ class InputSessionController(
         }
     }
 
-    private fun startEngine(candidate: InputEngine): EngineSnapshot? = runCatching {
-        candidate.start(
-            EditorContext(language, privacy.isSensitive, privacy.learningAllowed, editorInfo.packageName,
-                predictionsAllowed = privacy.predictionsAllowed),
-        )
-    }.getOrNull()
+    private fun startEngine(candidate: InputEngine): EngineSnapshot? = try {
+        recoverable {
+            candidate.start(
+                EditorContext(language, privacy.isSensitive, privacy.learningAllowed, editorInfo.packageName,
+                    predictionsAllowed = privacy.predictionsAllowed),
+            )
+        }.getOrNull()
+    } catch (failure: Throwable) {
+        closeSafely(candidate)
+        throw failure
+    }
 
     private fun closeEngine() {
         associations.clear()
         candidateWindow.clear()
         personalPaging.clear()
         invalidateReconversion(publishState = false)
-        engine?.let(::closeSafely)
+        val previous = engine
         engine = null
+        previous?.let(::closeSafely)
     }
 
     private fun closeSafely(candidate: InputEngine) {
-        runCatching { candidate.close() }
+        recoverable { candidate.close() }
     }
 
     private fun recoverFromEngineFailure(failedEngine: InputEngine) {

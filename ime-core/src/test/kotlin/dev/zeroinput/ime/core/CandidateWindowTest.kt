@@ -5,6 +5,41 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CandidateWindowTest {
+    @Test fun `same text with different readings retains both routes through personalization`() {
+        val delegate = Pages()
+        val engine = object : InputEngine by delegate {
+            private fun reading(snapshot: EngineSnapshot) = snapshot.copy(candidates = snapshot.candidates.take(1).map {
+                it.copy(text = "行", input = if (it.id == "entry0") "xing" else "hang")
+            })
+            override fun start(context: EditorContext) = reading(delegate.start(context))
+            override fun changePage(direction: PageDirection) = delegate.changePage(direction).let {
+                it.copy(snapshot = reading(it.snapshot))
+            }
+        }
+        val commits = mutableListOf<String>()
+        val editor = object : EditorConnection {
+            override fun setComposingText(text: String) = Unit
+            override fun finishComposingText() = Unit
+            override fun commitText(text: String): Boolean { commits += text; return true }
+            override fun deleteBeforeCursor() = Unit
+            override fun performEditorAction(actionId: Int) = false
+            override fun sendEnterKey() = Unit
+        }
+        val store = object : PersonalizationStore {
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        InputSessionController(editor, { engine }, store).use { controller ->
+            controller.start(android.view.inputmethod.EditorInfo().apply { inputType = android.text.InputType.TYPE_CLASS_TEXT },
+                InputLanguage.CHINESE, dev.zeroinput.ime.core.privacy.PrivacyConfiguration())
+            controller.handle(InputCommand.ChangeCandidatePage(PageDirection.NEXT))
+            val candidates = controller.state.snapshot.candidates
+            assertEquals(listOf("xing", "hang"), candidates.map { it.input })
+            assertEquals(2, candidates.map { it.id }.distinct().size)
+        }
+    }
+
     @Test fun `page dependent preedit separators do not reset browsing or selection`() {
         val engine = Pages().apply { formatByPage = true }
         val window = CandidateWindow()

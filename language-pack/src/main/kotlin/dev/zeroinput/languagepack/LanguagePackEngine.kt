@@ -10,8 +10,6 @@ import dev.zeroinput.engine.api.InputEngine
 import dev.zeroinput.engine.api.InputEngineFactory
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.PageDirection
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -132,11 +130,6 @@ private class LanguagePackInputEngine(
     }
 }
 
-private data class PackDictionaryEntry(
-    val shortcut: String,
-    val value: String,
-)
-
 private object LanguagePackDictionaryLoader {
     private const val MAX_ENTRIES = 50_000
     private const val MAX_LINE_CHARS = 4096
@@ -149,78 +142,65 @@ private object LanguagePackDictionaryLoader {
         var remainingBytes = MAX_TOTAL_TEXT_BYTES
         pack.manifest.files.forEach { declared ->
             if (declared.size !in 1..MAX_TEXT_FILE_BYTES || declared.size > remainingBytes) return emptyList()
-            val file = runCatching { PackPathPolicy.resolveInside(pack.directory, declared.path) }.getOrNull()
+            val file = recoverable { PackPathPolicy.resolveInside(pack.directory, declared.path) }.getOrNull()
                 ?: return emptyList()
-            val text = readVerified(file, declared) ?: return emptyList()
+            if (!readVerified(file, declared, result)) return emptyList()
             remainingBytes -= declared.size
-            when (file.extension.lowercase()) {
-                "json" -> if (!parseJson(text, result)) return emptyList()
-                "txt", "yaml" -> text.lineSequence().forEach { line ->
-                    if (!isBoundedLine(line)) return emptyList()
-                    if (result.size < MAX_ENTRIES) parseLine(line, result)
-                }
-                else -> return emptyList()
-            }
         }
         return result.toList()
     }
 
     /** Verify the bytes actually parsed, including files beyond the candidate budget. */
-    private fun readVerified(file: File, declared: LanguagePackFile): String? = runCatching {
+    private fun readVerified(file: File, declared: LanguagePackFile,
+        result: MutableSet<PackDictionaryEntry>): Boolean = recoverable {
         require(file.isFile && file.length() == declared.size)
-        val text = file.inputStream().use { LanguagePackManifestReader.read(it, declared.size.toInt()) }
-        val bytes = text.toByteArray(StandardCharsets.UTF_8)
-        require(bytes.size.toLong() == declared.size)
-        val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        require(hash == declared.sha256)
-        text
-    }.getOrNull()
-
-    private fun parseJson(json: String, output: MutableSet<PackDictionaryEntry>): Boolean =
-        runCatching {
-            val value = LanguagePackJson.parse(json)
-            require(value is JSONObject || value is JSONArray) { "Invalid language pack dictionary" }
-            if (output.size >= MAX_ENTRIES) return@runCatching
-            val parsed = LinkedHashSet<PackDictionaryEntry>()
-            parseJsonValue(value, parsed)
-            parsed.asSequence().take(MAX_ENTRIES - output.size).forEach(output::add)
-        }.isSuccess
-
-    private fun parseJsonValue(value: Any, output: MutableSet<PackDictionaryEntry>) {
-        when (value) {
-            is JSONObject -> {
-                if (value.has("shortcut") && value.has("value")) {
-                    add(value.optString("shortcut"), value.optString("value"), output)
-                } else {
-                    value.keys().asSequence().forEach { key ->
-                        val child = value.opt(key) ?: return@forEach
-                        when (child) {
-                            is String -> {
-                                when {
-                                    looksLikeShortcut(key) -> add(key, child, output)
-                                    looksLikeShortcut(child) -> add(child, key, output)
-                                    else -> add(key, child, output)
-                                }
-                            }
-                            is JSONArray -> child.asSequence().forEach { item ->
-                                if (item is JSONObject) parseJsonValue(item, output)
-                                else add(key, item.toString(), output)
-                            }
-                            else -> parseJsonValue(child, output)
-                        }
+        val digest = MessageDigest.getInstance("SHA-256")
+        var total = 0L
+        file.inputStream().buffered().use { source ->
+            val bounded = object : java.io.FilterInputStream(source) {
+                override fun read(): Int = `in`.read().also { if (it >= 0) { total++; require(total <= declared.size) } }
+                override fun read(bytes: ByteArray, offset: Int, length: Int): Int =
+                    `in`.read(bytes, offset, minOf(length.toLong(), declared.size - total + 1).toInt()).also {
+                        if (it > 0) { total += it; require(total <= declared.size) }
                     }
-                }
             }
-            is JSONArray -> value.asSequence().forEach { item ->
-                when (item) {
-                    is JSONObject -> parseJsonValue(item, output)
-                    is JSONArray -> {
-                        val pair = item.asSequence().take(2).toList()
-                        if (pair.size == 2) addPair(pair[0].toString(), pair[1].toString(), output)
-                    }
+            val decoder = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+            java.io.InputStreamReader(java.security.DigestInputStream(bounded, digest), decoder).buffered().use { reader ->
+                when (file.extension.lowercase()) {
+                    "json" -> result.addAll(LanguagePackDictionaryJson.read(reader, MAX_ENTRIES - result.size))
+                    "txt", "yaml" -> readLines(reader, result)
+                    else -> error("Unsupported dictionary format")
                 }
             }
         }
+        require(total == declared.size)
+        val hash = digest.digest().joinToString("") { "%02x".format(it) }
+        require(hash == declared.sha256)
+        true
+    }.getOrDefault(false)
+
+    /** Validate every line, including data beyond the output budget, without allocating an unbounded line. */
+    private fun readLines(reader: java.io.Reader, result: MutableSet<PackDictionaryEntry>) {
+        val line = StringBuilder()
+        fun accept() {
+            val text = line.toString()
+            require(isBoundedLine(text))
+            if (result.size < MAX_ENTRIES) parseLine(text, result)
+            line.setLength(0)
+        }
+        while (true) {
+            if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
+            val value = reader.read()
+            if (value < 0) break
+            val character = value.toChar()
+            if (character == '\n' || character == '\r') accept() else {
+                require(line.length < MAX_LINE_CHARS)
+                line.append(character)
+            }
+        }
+        accept()
     }
 
     private fun isBoundedLine(raw: String): Boolean {
@@ -259,34 +239,12 @@ private object LanguagePackDictionaryLoader {
         if (separator != null) add(line.substring(0, separator), line.substring(separator + 1), output)
     }
 
-    private fun looksLikeShortcut(value: String): Boolean =
-        value.length <= 64 &&
-            value.all { it.isLetterOrDigit() || it == '\'' || it == '_' || it == '-' } &&
-            (value.any { it in 'a'..'z' || it in 'A'..'Z' } || value.all(Char::isDigit))
-
     private fun addPair(first: String, second: String, output: MutableSet<PackDictionaryEntry>) {
-        when {
-            looksLikeShortcut(first) -> add(first, second, output)
-            looksLikeShortcut(second) -> add(second, first, output)
-            else -> add(first, second, output)
-        }
+        if (output.size < MAX_ENTRIES) PackDictionaryEntry.pair(first, second)?.let(output::add)
     }
 
     private fun add(shortcut: String, value: String, output: MutableSet<PackDictionaryEntry>) {
-        if (output.size >= MAX_ENTRIES) return
-        val cleanShortcut = shortcut.trim().lowercase()
-        val cleanValue = value.trim()
-        if (cleanShortcut.isEmpty() || cleanValue.isEmpty()) return
-        if (cleanShortcut.length > 64 || cleanValue.length > 128) return
-        if (cleanShortcut.any(Char::isISOControl) || cleanValue.any(Char::isISOControl)) return
-        output += PackDictionaryEntry(cleanShortcut, cleanValue)
-    }
-
-    private fun JSONArray.asSequence(): Sequence<Any> = sequence {
-        for (index in 0 until length()) {
-            val item = opt(index)
-            if (item != null) yield(item)
-        }
+        if (output.size < MAX_ENTRIES) PackDictionaryEntry.create(shortcut, value)?.let(output::add)
     }
 
     private val WHITESPACE = Regex("\\s+")

@@ -33,7 +33,8 @@ jobjectArray JNICALL NewObjectArray(JNIEnv*, jsize, jclass klass, jobject) {
   assert(klass);
   return Fail() ? nullptr : reinterpret_cast<jobjectArray>(2);
 }
-jstring JNICALL NewString(JNIEnv*, const jchar*, jsize) {
+jstring JNICALL NewString(JNIEnv*, const jchar* value, jsize) {
+  assert(value);
   return Fail() ? nullptr : reinterpret_cast<jstring>(3);
 }
 void JNICALL SetObjectArrayElement(JNIEnv*, jobjectArray array, jsize, jobject value) {
@@ -74,6 +75,27 @@ int main() {
   table.GetStringChars = GetStringChars;
   table.ReleaseStringChars = ReleaseStringChars;
   JNIEnv env{&table};
+  Reset();
+  assert(zero_jni::ToJString(&env, ""));
+  Reset();
+  assert(zero_jni::ToJString(&env, nullptr));
+  const auto decode = [](const std::string& input) {
+    const auto* cursor = reinterpret_cast<const unsigned char*>(input.data());
+    const auto* end = cursor + input.size();
+    return zero_jni::DecodeUtf8CodePoint(cursor, end);
+  };
+  assert(decode("\xc3\xa9") == 0xe9);
+  assert(decode("\xe4\xb8\xad") == 0x4e2d);
+  assert(decode("\xf0\x9f\x98\x80") == 0x1f600);
+  for (const auto* invalid : {"\x80", "\xc0\xaf", "\xe0\x80\xaf", "\xed\xa0\x80",
+                             "\xf4\x90\x80\x80", "\xf5\x80\x80\x80", "\xe4\xb8"}) {
+    assert(decode(invalid) == 0xfffd);
+  }
+  const std::string broken = "\xc2" "A";
+  const auto* cursor = reinterpret_cast<const unsigned char*>(broken.data());
+  const auto* end = cursor + broken.size();
+  assert(zero_jni::DecodeUtf8CodePoint(cursor, end) == 0xfffd);
+  assert(zero_jni::DecodeUtf8CodePoint(cursor, end) == 'A');
   const std::vector<std::string> values{"public", "fixture"};
   Reset();
   assert(zero_jni::ToStringArray(&env, values));

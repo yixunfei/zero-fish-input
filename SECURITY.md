@@ -519,6 +519,30 @@ Masked private prefixes require the existing explicit reveal before positioning;
 busy views and obsolete gestures cannot move the caret. Session revocation and
 buffer clearing remain unchanged. See [ADR 0037](docs/adr/0037-isolated-draft-caret.md).
 
+## Text steganography, 2026-11-18
+
+Hidden messages use offline authenticated encryption, isolated drafts and
+transient credentials. Every selected layer and the exact cover must authenticate
+before any secret is displayed. The default result is local and masked; editor
+insertion and authenticated vault saving are separate explicit actions. Credentials
+are never saved; losing a required factor makes recovery impossible.
+
+Unicode hidden characters and visible Base64url are detectable and can be altered
+or removed by destination apps. There is no undetectability or delivery guarantee.
+Natural wording remains unavailable until reviewed resources pass the design's
+capacity, semantics and detector gates. Generic GCM/cascades do not add key-bit
+strengths or imply certification. Managed crypto/engine/View copies cannot promise
+complete erasure, constant-time behavior or protection against a compromised OS.
+
+Only bounded editor selection, plain-text share/PROCESS_TEXT and newly authenticated
+private-vault reads supply carriers. The proposed system-clipboard body exception
+was explicitly declined; there is no system Paste/Copy operation in these fields.
+No new permission, exported component, network or AI access is introduced.
+File grants are temporary and never persisted. Lock/settings/session/source changes
+revoke operations, pending results and file factors. See
+[ADR 0039](docs/adr/0039-text-steganography.md) and the
+[validation record](docs/text-steganography-validation.md).
+
 ### Audit hardening, 2026-11-18
 
 AI application snapshots retain no provider keys and the encrypted configuration
@@ -535,3 +559,22 @@ content-free errors and resource leases. Distribution checks require all native
 libraries in every requested ABI. Android 8 empty-item suppression is limited to
 the clear interval and at most one second; same-interval replacements and the
 platform's non-atomic compare-and-clear remain limitations without payload reads.
+
+The follow-up review keeps cancellation and fatal failures out of normal input
+fallback values and reports rejected asynchronous deletion. Existing clipboard
+read grants remain consumed before decryption; failed deletion needs fresh
+authentication. Model transport now applies write and whole-call deadlines using
+the existing OkHttp dependency, with no proxy, cookies, cache, redirects or
+retries and no new endpoint authorization. Privacy checks include native sources,
+data assets and Gradle logic, plus constraints inside approved adapters. Static
+matching remains a defense in depth and cannot prove the absence of obfuscation.
+See [follow-up verification](docs/audits/2026-11-18-followup-verification.md).
+
+The second review reproduced full-tree JSON dictionary memory exhaustion under
+a 128 MiB JVM heap. Dictionary parsing now folds strict streaming events into
+bounded rows and retains syntax/hash validation after the row budget. Explicit
+token/object-key limits bound parsing state. Owned CMake, host scripts and
+version catalogs also enter the privacy gate; existing host build/release
+fetches retain separate exact entry points. These checks do not treat unused
+vendored network code as an enabled Android transport or prove all runtime
+behavior. Current status is in the [updated audit](docs/audits/2026-11-17-code-audit.md).

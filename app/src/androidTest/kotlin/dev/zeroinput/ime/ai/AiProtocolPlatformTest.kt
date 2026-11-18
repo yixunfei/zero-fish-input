@@ -121,9 +121,7 @@ class AiProtocolPlatformTest {
             assertEquals("public-key", key)
             written.reset()
         }
-        override fun timeout(timeoutMs: Int) = Unit
-        override fun connect() = Unit
-        override fun output() = written
+        override fun send(body: ByteArray?) { if (body != null) written.write(body) }
         override fun status() = code
         override fun contentType() = if (streaming) "text/event-stream" else "application/json"
         override fun input() = ByteArrayInputStream(response.toByteArray()).also { reads++ }

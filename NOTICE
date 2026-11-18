@@ -1,6 +1,11 @@
 zero fish input (formerly ZeroInput)
 Copyright 2026 ZeroInput contributors
 
+Portable local message encryption includes Bouncy Castle 1.87,
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc., under MIT
+(LICENSES/bouncycastle-MIT.txt), and Tink Android 1.21.0,
+Copyright Google LLC, under Apache-2.0 (LICENSES/Apache-2.0.txt).
+
 Optional explicit remote tools include OkHttp 4.12.1 and Okio 3.6.0,
 Copyright Square, Inc., licensed under Apache-2.0.
 See LICENSES/Apache-2.0.txt and THIRD_PARTY.md.

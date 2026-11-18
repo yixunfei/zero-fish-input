@@ -43,7 +43,7 @@ class RimeRuntime(context: Context,
         // Publications are revision signals, not proof that the native asset
         // identity changed. Resolve the generation first while the runtime is
         // idle, so a no-op publication does not retire a ready native runtime.
-        val unchanged = runCatching { resolveAssetDirectories() == workingDirectories }
+        val unchanged = recoverable { resolveAssetDirectories() == workingDirectories }
             .getOrDefault(false)
         synchronized(lock) {
             if (activeEngines.get() != 0 || initializationInFlightGeneration != null) return
@@ -100,7 +100,7 @@ class RimeRuntime(context: Context,
 
     fun addStateListener(listener: (RimeRuntimeState) -> Unit): AutoCloseable {
         stateListeners += listener
-        runCatching { listener(state) }
+        recoverable { listener(state) }
         return object : AutoCloseable {
             override fun close() {
                 stateListeners -= listener
@@ -116,7 +116,11 @@ class RimeRuntime(context: Context,
             initializationGeneration += 1
             initializationInFlightGeneration = initializationGeneration
             initializationError = null
-            setState(RimeRuntimeState.INITIALIZING)
+            try { setState(RimeRuntimeState.INITIALIZING) }
+            catch (failure: Throwable) {
+                finishInitializationLocked(initializationGeneration)
+                throw failure
+            }
             initializationGeneration
         }
         if (!BuildConfig.HAS_NATIVE_RIME) {
@@ -147,6 +151,8 @@ class RimeRuntime(context: Context,
             } catch (error: Exception) {
                 candidateLease?.close()
                 synchronized(lock) { finalizeNativeLocked() }
+                if (error is java.util.concurrent.CancellationException) throw error
+                if (error is InterruptedException) { Thread.currentThread().interrupt(); throw error }
                 if (previous == null) throw error
                 // A failed extension must not retire the last verified public vocabulary.
                 verifyDirectories(previous, generation)
@@ -174,10 +180,14 @@ class RimeRuntime(context: Context,
                 finishInitializationLocked(generation)
             }
             // Cleanup is best effort and must not turn a verified runtime into a failure.
-            runCatching { assets.markVerified(directories); assets.removeUnused(setOf(directories)) }
+            recoverable { assets.markVerified(directories); assets.removeUnused(setOf(directories)) }
             true
         } catch (error: Throwable) {
-            failInitialization(generation, error)
+            val result = failInitialization(generation, error)
+            if (error is java.util.concurrent.CancellationException) throw error
+            if (error is InterruptedException) { Thread.currentThread().interrupt(); throw error }
+            if (error is Error && error !is LinkageError) throw error
+            result
         }
     }
 
@@ -229,6 +239,8 @@ class RimeRuntime(context: Context,
                 installer.removeUnused(setOf(id))
                 preparedSchemaId = id
             } catch (error: Exception) {
+                if (error is java.util.concurrent.CancellationException) throw error
+                if (error is InterruptedException) { Thread.currentThread().interrupt(); throw error }
                 markFailed(error)
                 return null
             }
@@ -250,6 +262,8 @@ class RimeRuntime(context: Context,
                 throw error
             }
         } catch (error: Exception) {
+            if (error is java.util.concurrent.CancellationException) throw error
+            if (error is InterruptedException) { Thread.currentThread().interrupt(); throw error }
             markFailed(error)
             null
         }
@@ -342,13 +356,13 @@ class RimeRuntime(context: Context,
         if (!nativeInitialized) return
         nativeInitialized = false
         nativeInitializationGeneration = null
-        runCatching { NativeRimeBridge.nativeFinalize() }
+        recoverable { NativeRimeBridge.nativeFinalize() }
     }
 
     private fun setState(value: RimeRuntimeState) {
         state = value
         stateListeners.forEach { listener ->
-            runCatching { listener(value) }
+            recoverable { listener(value) }
         }
     }
 }

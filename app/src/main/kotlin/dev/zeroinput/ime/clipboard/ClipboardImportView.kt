@@ -22,6 +22,7 @@ import dev.zeroinput.userdata.SecureClipboardVault
 internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     var onAction: () -> Unit = {}
     var onAiAction: () -> Unit = {}
+    var onStegoAction: () -> Unit = {}
     var onCancel: () -> Unit = {}
 
     private val status = TextView(context).apply { textSize = 16f }
@@ -61,6 +62,13 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         setOnClickListener { onAiAction() }
         visibility = GONE
     }
+    private val stegoAction = MaterialButton(context).apply {
+        setText(R.string.stego_import_decrypt)
+        isAllCaps = false
+        minHeight = dp(48)
+        filterTouchesWhenObscured = true
+        setOnClickListener { onStegoAction() }
+    }
 
     init {
         orientation = VERTICAL
@@ -92,6 +100,9 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         addView(aiAction, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
             setMargins(dp(20), 0, dp(20), dp(16))
         })
+        addView(stegoAction, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            setMargins(dp(20), 0, dp(20), dp(16))
+        })
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
@@ -108,6 +119,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     }
 
     fun showAuthorized(value: String) {
+        stegoAction.visibility = GONE
         status.setText(R.string.clipboard_import_confirm)
         content.text = value
         content.visibility = VISIBLE
@@ -120,6 +132,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     fun label(): String = labelInput.text?.toString().orEmpty()
 
     fun showBusy(authenticating: Boolean) {
+        stegoAction.visibility = GONE
         clearText()
         action.isEnabled = false
         aiAction.visibility = GONE
@@ -127,6 +140,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
     }
 
     fun clearText() {
+        stegoAction.visibility = GONE
         content.text = ""
         content.visibility = GONE
         labelInput.text?.clear()

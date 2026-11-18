@@ -227,11 +227,15 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   tool-call finish reasons even when followed by DONE. Such output is not an
   insertable or persistable completion. Conversation titles do not split UTF-16
   surrogate pairs at the existing length bound.
-- Language-pack manifest and JSON dictionaries are checked before recursive
-  parsing for a maximum of 16 container levels and standard JSON tokens. Bare
+- Language-pack manifests and JSON dictionaries share a strict syntax reader
+  with a maximum of 16 container levels and standard JSON tokens. Bare
   keys, single-quoted strings, comments, NUL and trailing documents are rejected.
   JSON dictionaries use bounded strict UTF-8 decoding; invalid JSON cannot be
   reinterpreted as a line dictionary or activated alongside otherwise valid rows.
+  Dictionary JSON folds events into bounded rows without a full document tree.
+  Tokens have at most 4096 characters; each object has at most 50,000 distinct
+  keys and at most 100,000 keys remain live across nested objects. The 50,000-row
+  output budget never suppresses syntax, UTF-8, duplicate-key or hash validation.
 - Optional ranking worker-construction failures wipe pending owned inputs and
   reset scheduling state, allowing later retry without retaining model context.
 - Settings mutations report content-free failures for storage errors and rejected
@@ -1502,6 +1506,34 @@ authentication change is introduced.
 
 ## Audit controls and residual limits (2026-11-18)
 
+- Follow-up fixes preserve cancellation and interruption through optional input,
+  personal paging, observers, language-pack and runtime operations; fatal errors
+  cannot be converted into successful empty states or engine-triggered commits.
+  Cleanup-and-rethrow boundaries still release owned native and worker resources.
+- A rejected asynchronous personalization deletion is observable and does not
+  claim durable success. Reads stay unavailable until explicit retry. No disk or
+  Keystore fallback is added to an IME caller. Clipboard deletion still consumes
+  its one-use grant before reading existing encrypted bodies; failure requires
+  fresh authentication. Encrypted writes consume their buffers on every exit.
+- Model requests have bounded write and whole-call timeouts in the existing
+  adapter, in addition to the monotonic application deadline. The bundled OkHttp
+  client disables proxy, cookies, cache, redirects and retries; a network
+  interceptor rejects extra dispatches. Rejected cancellation still cancels the
+  active call. No model endpoint, credential source or permission is added.
+- Privacy checks cover native sources, root/buildSrc source trees, data assets
+  and Gradle build logic, owned CMake/host scripts and version catalogs. New host
+  HTTP fetches outside existing reviewed tools are rejected; CMake fetches,
+  network libraries and shell commands are rejected. Vendor sources remain
+  pinned inputs with selected build targets, not an application adapter allowlist.
+  Native socket/shell patterns and forbidden capabilities
+  inside approved transports are rejected; adapter constraints have negative
+  tests. Data checks distinguish qualified capabilities from dictionary words.
+  These remain static heuristics, not proof against arbitrary obfuscation.
+- Signed staging names are valid under the existing backtracking regex. Legacy
+  AI configuration deletion remains the user-approved ADR 0024 reset; no migration
+  or persistent-format change is introduced. A missing provider selection is an
+  editable state with no active provider and cannot supply request credentials.
+
 - AI repository reads are uncached. Published application snapshots strip every
   provider key; only key-presence metadata remains. Request workers resolve the
   selected key after submission and reject a revoked/replaced snapshot both
@@ -1531,3 +1563,34 @@ authentication change is introduced.
   remain platform limitations.
 - Packaging checks the complete required library set for each explicitly
   requested ABI. ABI presence alone does not establish native Rime availability.
+
+## Text steganography (ADR 0039, 2026-11-18)
+
+Additional protected assets are secret drafts, message credentials/file factors,
+the fully authenticated local result, and pending authenticated vault saves.
+Carriers are untrusted public text. The cover, lengths, credential/KDF IDs and
+encrypted-metadata length are public; ciphertext does not hide the existence of
+the Unicode/Base64 carrier. No body/credential/algorithm failure detail is logged.
+
+| Attack or failure | Control and observable result |
+| --- | --- |
+| Changed cover, payload/tag, stage order/width, metadata or inner layer | Domain-separated keys/AAD, authenticated metadata and all layer tags; no partial secret or trial fallback |
+| Hostile bootstrap/KDF/UTF-8/size | Public budgets and enum pairs checked before derivation; fixed profiles, resource acknowledgement and worker headroom check; refuse without lowering cost |
+| Rapid cancellation/reopen or blocked file provider | One process-wide slot per crypto/source worker until work exits; revocable operation lease, cancellation signal/descriptor close, late owned buffers cleared |
+| Stale preview, cursor/session/connection change or duplicate tap | Exact live binding and interaction checks; consume before one external commit; no Send, retry, reread, learning or plaintext fallback |
+| Selected carrier overwritten when entering mode | Clear only a real existing composition; never issue an empty composing replacement for a plain selection |
+| Private candidates reappear after closing the mode | Replace the shared strip with the external editor snapshot before status rendering; clear the stego snapshot on close/release and retain no extra panel text-state object |
+| Malicious external Intent or AI crossover | Existing bounded plain-text-only gateway, explicit local branch and denied AI permission for carrier markers; private nonexported host returns no plaintext |
+| Key file changed, truncated, misreported or slow | Actual streamed 32-byte..1-MiB budget, length-delimited digest, exact factors, bounded deadline and temporary single-URI grant; no persisted path/permission |
+| Vault deletion/auth replay/background result | New one-use grant per read/save, another foreground click, captured generation and active/deadline checks before and after I/O; auth callback stages only a grant |
+| Lock, settings change, recreation or leaving the mode | Drop drafts, credentials, factors and results; mutable worker results clear on cancellation; no saved view state/autofill/content capture |
+| Untrusted destination strips selectors | Local self-check cannot prove channel retention; report detectable/unverified transport, never automatically resubmit or substitute plaintext |
+
+The user declined the proposed system-clipboard body-read exception. No new
+clipboard adapter, permission, export, network or AI data path is present.
+Result insertion deliberately exposes plaintext to the chosen external editor
+after a separate warning; standalone decryption supports local view or separately
+authenticated save only. Natural wording remains unavailable pending actual
+resource/corpus/capacity/semantic/detector evidence. Managed providers and strings
+do not guarantee complete erasure or constant-time execution. Generic GCM profiles
+and layered encryption carry no certification or additive-strength claim.

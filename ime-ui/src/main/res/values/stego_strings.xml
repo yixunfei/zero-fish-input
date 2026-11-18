@@ -1,0 +1,23 @@
+<resources>
+    <string name="stego_open">隐写模式</string>
+    <string name="stego_encrypt">加密隐写</string>
+    <string name="stego_decrypt">本地解密</string>
+    <string name="stego_close">关闭清除</string>
+    <string name="stego_cover">公开文本</string>
+    <string name="stego_secret">秘密正文</string>
+    <string name="stego_credential">主凭据</string>
+    <string name="stego_carrier">待解密文本</string>
+    <string name="stego_reveal">显示全文</string>
+    <string name="stego_mask">隐藏全文</string>
+    <string name="stego_options">加密选项</string>
+    <string name="stego_decrypt_options">解密凭据</string>
+    <string name="stego_key_file">密钥文件</string>
+    <string name="stego_selection">导入选区</string>
+    <string name="stego_vault">从安全剪贴板读取</string>
+    <string name="stego_prepare">生成预览／解密</string>
+    <string name="stego_confirm">确认提交隐写文本</string>
+    <string name="stego_edit">重新编辑</string>
+    <string name="stego_save">认证后保存正文</string>
+    <string name="stego_insert">确认插入明文</string>
+    <string name="stego_draft_hint">点击字段名称，使用下方键盘输入</string>
+</resources>

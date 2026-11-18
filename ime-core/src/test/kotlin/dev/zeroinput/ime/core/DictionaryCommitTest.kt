@@ -15,12 +15,12 @@ class DictionaryCommitTest {
     }
     @Test fun allDeletedCandidatesFallBackToRawInputForSpaceAndPunctuation() {
         val page = PersonalSuggestionPage(suppressedDictionaryTexts = setOf("你好"), dictionaryEditsApplied = true)
-        assertEquals(listOf("nihao"), commit(page, InputCommand.Space))
+        assertEquals(listOf("nihao", " "), commit(page, InputCommand.Space))
         assertEquals(listOf("nihao", ","), commit(page, InputCommand.Text(",")))
     }
-    @Test fun pendingDictionaryEditsCommitRawInputWithoutSelectingUnfilteredCandidates() {
+    @Test fun pendingDictionaryEditsKeepCompositionWithoutSelectingUnfilteredCandidates() {
         val page = PersonalSuggestionPage(ready = false, dictionaryEditsApplied = true)
-        assertEquals(listOf("nihao"), commit(page, InputCommand.Space))
+        assertTrue(commit(page, InputCommand.Space).isEmpty())
     }
 
     private fun commit(page: PersonalSuggestionPage, command: InputCommand): List<String> {

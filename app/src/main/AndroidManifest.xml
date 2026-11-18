@@ -178,6 +178,12 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".textstego.StegoSourceActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:allowTaskReparenting="false" android:taskAffinity=""
+            android:theme="@style/Theme.ZeroInput.PrivateImport"
+            android:windowSoftInputMode="stateAlwaysHidden|adjustNothing" />
+
         <activity
             android:name=".ai.AiComposeActivity"
             android:label="@string/ai_import_title"

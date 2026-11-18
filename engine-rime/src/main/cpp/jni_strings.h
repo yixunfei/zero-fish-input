@@ -54,19 +54,25 @@ inline std::uint32_t DecodeUtf8CodePoint(const unsigned char*& cursor,
                                   const unsigned char* end) {
   const unsigned char first = *cursor++;
   if (first < 0x80) return first;
-  int continuation_count = first < 0xe0 ? 1 : (first < 0xf0 ? 2 : 3);
-  std::uint32_t value = first & (0x7f >> continuation_count);
-  if (cursor + continuation_count > end) return 0xfffd;
+  if (first < 0xc2 || first > 0xf4) return 0xfffd;
+  const int continuation_count = first < 0xe0 ? 1 : (first < 0xf0 ? 2 : 3);
+  std::uint32_t value = first & (0x3f >> continuation_count);
+  if (end - cursor < continuation_count) return 0xfffd;
   for (int index = 0; index < continuation_count; ++index) {
-    const unsigned char next = *cursor++;
+    const unsigned char next = *cursor;
     if ((next & 0xc0) != 0x80) return 0xfffd;
+    ++cursor;
     value = (value << 6) | (next & 0x3f);
   }
-  return value <= 0x10ffff ? value : 0xfffd;
+  const std::uint32_t minimum = continuation_count == 1 ? 0x80 :
+      (continuation_count == 2 ? 0x800 : 0x10000);
+  return value >= minimum && value <= 0x10ffff &&
+      !(value >= 0xd800 && value <= 0xdfff) ? value : 0xfffd;
 }
 
 inline jstring ToJString(JNIEnv* env, const char* value) {
-  if (!value || !*value) return env->NewString(nullptr, 0);
+  static const jchar empty = 0;
+  if (!value || !*value) return env->NewString(&empty, 0);
   const auto* cursor = reinterpret_cast<const unsigned char*>(value);
   const auto* end = cursor + std::char_traits<char>::length(value);
   std::vector<jchar> output;

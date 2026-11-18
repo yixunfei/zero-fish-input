@@ -27,9 +27,7 @@ class AiToolTransportTest {
                 override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?, protocol: AiProtocol) {
                     assertEquals("POST", method); assertEquals("fixture-key", key)
                 }
-                override fun timeout(timeoutMs: Int) = Unit
-                override fun connect() = Unit
-                override fun output() = body
+                override fun send(bytes: ByteArray?) { if (bytes != null) body.write(bytes) }
                 override fun status() = 200
                 override fun contentType() = "application/json"
                 override fun input() = ByteArrayInputStream("""{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Public answer"}}]}""".toByteArray())

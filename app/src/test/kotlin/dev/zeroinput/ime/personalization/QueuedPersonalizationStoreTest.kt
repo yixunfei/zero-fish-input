@@ -17,6 +17,25 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 class QueuedPersonalizationStoreTest {
+    @Test fun `cancelled preload is retryable and fatal listener errors propagate`() {
+        val executor = TestExecutorService()
+        var cancel = true
+        val store = QueuedPersonalizationStore(FakeStore(), preload = {
+            if (cancel) throw java.util.concurrent.CancellationException()
+        }, executor = executor)
+        try {
+            store.warmFrequencyLookup()
+            org.junit.Assert.assertThrows(java.util.concurrent.CancellationException::class.java) { executor.runNext() }
+            cancel = false
+            store.warmFrequencyLookup()
+            assertTrue(executor.hasTasks())
+            executor.runNext()
+            store.observeChanges { throw AssertionError("fixture") }.use {
+                org.junit.Assert.assertThrows(AssertionError::class.java) { store.invalidatePreparedData() }
+            }
+        } finally { store.close() }
+    }
+
     @Test fun `readiness and query completion notify once and closed registration receives nothing`() {
         val executor = TestExecutorService()
         val store = QueuedPersonalizationStore(FakeStore(), preload = {}, executor = executor)
@@ -224,6 +243,24 @@ class QueuedPersonalizationStoreTest {
         } finally {
             store.close()
         }
+    }
+
+    @Test
+    fun `rejected asynchronous clear reports failure and an explicit retry restores reads`() {
+        val delegate = FakeStore()
+        val executor = TestExecutorService().apply { rejectSubmissions = true }
+        val store = QueuedPersonalizationStore(delegate, preload = {}, executor = executor)
+        try {
+            org.junit.Assert.assertThrows(java.util.concurrent.RejectedExecutionException::class.java) { store.clear() }
+            assertFalse(delegate.cleared)
+            assertTrue(store.suggestionsFor("ni", InputLanguage.CHINESE, 3).isEmpty())
+            executor.rejectSubmissions = false
+            store.clear()
+            executor.runNext()
+            assertTrue(delegate.cleared)
+            store.suggestionsFor("ni", InputLanguage.CHINESE, 3)
+            assertTrue(executor.hasTasks())
+        } finally { store.close() }
     }
 
     @Test

@@ -91,6 +91,9 @@ class AppGraph(context: Context) : AutoCloseable {
     )
 
     val settings = SettingsRepository(applicationContext)
+    internal val stegoHandoff by lazy {
+        dev.zeroinput.ime.textstego.StegoHandoff(applicationContext, settings) { secureClipboard.captureGeneration() }
+    }
     internal val keyboardBackgrounds = dev.zeroinput.ime.settings.KeyboardBackgroundStore(applicationContext, settings)
     internal val clipboardGuardPreferences = ClipboardGuardPreferences(applicationContext)
     internal val clipboardGuard = ClipboardGuardRuntime(applicationContext, clipboardGuardPreferences)
@@ -489,6 +492,7 @@ class AppGraph(context: Context) : AutoCloseable {
         listOf(rime.descriptor, english.descriptor) + languagePackRegistry.descriptors()
 
     override fun close() {
+        stegoHandoff.destroy()
         settingsDeletions.close()
         pageReferences.invalidate()
         pageReferenceExecutor.shutdownNow()

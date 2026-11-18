@@ -78,7 +78,7 @@ internal class PersonalCandidatePaging {
             composition = native.composition
             fixedSegment = native.canUndoSelection
         }
-        val query = runCatching {
+        val query = recoverable {
             (store as? PagedPersonalizationStore)?.suggestionPage(input, language, requested, PAGE_SIZE)
                 ?: PersonalSuggestionPage(store.suggestionsFor(input, language, PAGE_SIZE))
         }.getOrDefault(PersonalSuggestionPage())
@@ -134,7 +134,10 @@ internal class PersonalCandidatePaging {
             val ranked = PersonalCandidateRanking.merge(visibleNative, personal, input, promotionThreshold, frequencies)
             ranked + pages.tailMap(0, false).values.flatMap(::rows)
         } else pages.values.flatMap(::rows)
-        val distinctItems = items.distinctBy(Candidate::text)
+        val nativeTexts = visibleNative.mapTo(HashSet(), Candidate::text)
+        val personalTexts = HashSet<String>()
+        val distinctItems = items.filter { !it.id.startsWith("personal:") ||
+            it.text !in nativeTexts && personalTexts.add(it.text) }.distinctBy(Candidate::id)
         val highlightedId = native.candidates.getOrNull(native.highlightedIndex)?.id
         // "Previous" is a personal affordance only while the merged first
         // page has been evicted by deeper browsing (changePage then owns it);
@@ -156,7 +159,7 @@ internal class PersonalCandidatePaging {
         // The engine window contains at most six pages of ten candidates. Only
         // exact lookups of these already-public values touch the prepared mirror.
         return native.take(60).map(Candidate::text).distinct().chunked(PersonalFrequencyStore.MAX_LOOKUP)
-            .flatMap { words -> runCatching { lookup.frequenciesFor(words, language) }.getOrDefault(emptyMap()).entries }
+            .flatMap { words -> recoverable { lookup.frequenciesFor(words, language) }.getOrDefault(emptyMap()).entries }
             .associate { it.toPair() }
     }
 

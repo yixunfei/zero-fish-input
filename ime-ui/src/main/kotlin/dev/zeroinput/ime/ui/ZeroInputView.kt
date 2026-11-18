@@ -59,6 +59,11 @@ class ZeroInputView @JvmOverloads constructor(
     var onPrivateDraftPreview: () -> Unit = {}
     var onPrivateDraftFinished: (PrivateDraftAction) -> Unit = {}
     val isPrivateDraftOpen: Boolean get() = mode == PanelMode.PRIVATE_DRAFT
+    var onTextStegoRequested: () -> Unit = {}
+    var onTextStegoVisibilityChanged: (Boolean) -> Unit = {}
+    val isTextStegoOpen: Boolean get() = mode == PanelMode.TEXT_STEGO
+    val textStegoPanel = StegoPanelView(context)
+    private var stegoSnapshot = EngineSnapshot.Empty
     val isSecureClipboardOpen: Boolean get() = mode == PanelMode.SECURE_CLIPBOARD
     var onCopySelectionRequested: () -> Unit = {}
     var onPasteConfirmed: () -> Unit = {}
@@ -252,6 +257,9 @@ class ZeroInputView @JvmOverloads constructor(
         .apply { layoutParams = LayoutParams(dp(48), dp(48)) }
     private val secondaryTools = mutableListOf<View>()
     private val toolsButton = toolbarButton("☰", context.getString(R.string.keyboard_tools), ::showTools)
+    private val stegoButton = toolbarButton(context.getString(R.string.stego_open), context.getString(R.string.stego_open)) {
+        onTextStegoRequested()
+    }
     private val numbersButton = toolbarButton("123", context.getString(R.string.key_numbers)) {
         if (manualTools) navigateBack()
         keyboard.showNumbers()
@@ -272,7 +280,7 @@ class ZeroInputView @JvmOverloads constructor(
         onCopySelectionRequested()
     }.apply { visibility = GONE; filterTouchesWhenObscured = true }
     private var copySelectionAvailable = false
-    private val primaryTools: List<View> = listOf(shapeButton, toolsButton, privateDraftButton, secureClipboardButton,
+    private val primaryTools: List<View> = listOf(shapeButton, toolsButton, stegoButton, privateDraftButton, secureClipboardButton,
         aiButton, numbersButton, emojiButton)
     private val toolbarRow = createToolbar()
     private val additionalTools = (primaryTools.size until toolbarRow.childCount).map(toolbarRow::getChildAt)
@@ -334,6 +342,7 @@ class ZeroInputView @JvmOverloads constructor(
         content.addView(secureClipboard)
         content.addView(shapeLookup)
         content.addView(privateDraft)
+        content.addView(textStegoPanel)
         content.addView(ai)
         content.addView(keyboardContainer)
         content.addView(expandedCandidates, LayoutParams(LayoutParams.MATCH_PARENT, dp(214)))
@@ -357,7 +366,7 @@ class ZeroInputView @JvmOverloads constructor(
         canReconvert = state.canReconvert
         capabilities = state.engineDescriptor?.capabilities.orEmpty()
         currentSnapshot = state.snapshot
-        if (mode != PanelMode.AI && !isSearchEditing && !isShapeLookupOpen && !isPrivateDraftOpen) {
+        if (mode != PanelMode.AI && !isSearchEditing && !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen) {
             renderEditorLanguage()
             keyboard.setComposing(state.snapshot.isComposing)
             candidateStrip.render(state.snapshot)
@@ -561,11 +570,11 @@ class ZeroInputView @JvmOverloads constructor(
         }
         val nineKey = currentLanguage == InputLanguage.CHINESE && currentPack == null && !sensitive &&
             chineseLayout == ChineseKeyboardLayout.NINE_KEY && EngineCapability.NINE_KEY_PINYIN in capabilities &&
-            mode != PanelMode.EMOJI && mode != PanelMode.AI && !isShapeLookupOpen && !isPrivateDraftOpen &&
+            mode != PanelMode.EMOJI && mode != PanelMode.AI && !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen &&
             editorOptions.layout == EditorLayout.TEXT
         keyboard.setKeyboardLayout(if (nineKey) ChineseKeyboardLayout.NINE_KEY else ChineseKeyboardLayout.FULL)
         keyboard.setDoublePinyinScheme(if (currentLanguage == InputLanguage.CHINESE && currentPack == null &&
-            !sensitive && !nineKey && mode != PanelMode.EMOJI && mode != PanelMode.AI && !isShapeLookupOpen && !isPrivateDraftOpen &&
+            !sensitive && !nineKey && mode != PanelMode.EMOJI && mode != PanelMode.AI && !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen &&
             editorOptions.layout == EditorLayout.TEXT) doublePinyinScheme else DoublePinyinScheme.OFF)
         readings.visibility = if (nineKey) View.VISIBLE else View.GONE
         val label = context.getString(if (nineKey) R.string.layout_full_short else R.string.layout_nine_short)
@@ -577,6 +586,12 @@ class ZeroInputView @JvmOverloads constructor(
 
     /** Retire both public bindings and callbacks before replacing the themed view. */
     fun release() {
+        onTextStegoRequested = {}
+        onTextStegoVisibilityChanged = {}
+        stegoSnapshot = EngineSnapshot.Empty
+        textStegoPanel.clear()
+        textStegoPanel.onAction = {}
+        textStegoPanel.onCaret = {}
         background = null
         emoji.clearSession()
         released = true
@@ -726,6 +741,15 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun openPrivateDraft() = showMode(PanelMode.PRIVATE_DRAFT, userInitiated = false)
+    fun openTextStego() = showMode(PanelMode.TEXT_STEGO, userInitiated = false)
+    fun renderTextStegoInput(state: InputSessionState?) {
+        if (!isTextStegoOpen) return
+        stegoSnapshot = state?.snapshot ?: EngineSnapshot.Empty
+        candidateStrip.render(stegoSnapshot)
+        renderDraftLanguage(state?.language ?: InputLanguage.ENGLISH)
+        keyboard.setComposing(stegoSnapshot.isComposing)
+        refreshHeader()
+    }
 
     private var searchCaret: DraftCaretUi? = null
     fun renderSearchDraftCaret(value: DraftCaretUi) { searchCaret = value }
@@ -860,7 +884,7 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun closeAuxiliaryInput() {
-        if (isPrivateDraftOpen || isShapeLookupOpen) showMode(PanelMode.KEYBOARD, userInitiated = false)
+        if (isPrivateDraftOpen || isShapeLookupOpen || isTextStegoOpen) showMode(PanelMode.KEYBOARD, userInitiated = false)
     }
 
     /** Return one UI level; the service hides the IME only at the keyboard root. */
@@ -903,7 +927,7 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     private fun showTools() {
-        if (isPrivateDraftOpen) return
+        if (isPrivateDraftOpen || isTextStegoOpen) return
         onToolsNavigation()
         if (mode == PanelMode.AI) setAiCandidatesExpanded(false)
         if (isSearchEditing) setSearchCandidatesExpanded(false)
@@ -927,7 +951,7 @@ class ZeroInputView @JvmOverloads constructor(
         candidateStrip.onCandidateSelected = ::selectVisibleCandidate
         candidateStrip.onCompositionSelection = { selection, input -> onCompositionSelection(selection, input) }
         candidateStrip.onExpandRequested = {
-            if (isPrivateDraftOpen) onCandidatePageChanged(PageDirection.NEXT)
+            if (isPrivateDraftOpen || isTextStegoOpen) onCandidatePageChanged(PageDirection.NEXT)
             else if (isSearchEditing) setSearchCandidatesExpanded(!searchCandidatesExpanded)
             else if (mode == PanelMode.AI) setAiCandidatesExpanded(!aiCandidatesExpanded)
             else if (mode == PanelMode.CANDIDATES) showMode(PanelMode.KEYBOARD)
@@ -1029,7 +1053,7 @@ class ZeroInputView @JvmOverloads constructor(
         if (manualTools) { manualTools = false; refreshHeader() }
         if (isShapeLookupOpen) {
             onShapeAction(action)
-        } else if (isPrivateDraftOpen) {
+        } else if (isPrivateDraftOpen || isTextStegoOpen) {
             onKeyboardAction(action)
         } else if (mode == PanelMode.EMOJI && emoji.isSearchActive) {
             onSearchAction(action)
@@ -1071,6 +1095,7 @@ class ZeroInputView @JvmOverloads constructor(
         if (target == PanelMode.AI && !aiAvailable) return
         val shapeChanged = isShapeLookupOpen != (target == PanelMode.SHAPE_LOOKUP)
         val privateChanged = isPrivateDraftOpen != (target == PanelMode.PRIVATE_DRAFT)
+        val stegoChanged = isTextStegoOpen != (target == PanelMode.TEXT_STEGO)
         val aiChanged = (mode == PanelMode.AI) != (target == PanelMode.AI)
         val handwritingChanged = (mode == PanelMode.HANDWRITING) != (target == PanelMode.HANDWRITING)
         val leavingSearch = mode == PanelMode.EMOJI && emoji.isSearchActive && target != PanelMode.EMOJI
@@ -1085,8 +1110,8 @@ class ZeroInputView @JvmOverloads constructor(
         }
         if (leavingSearch) emoji.closeSearch()
         mode = target
-        if (privateChanged) candidateStrip.setPrivateDraftMode(isPrivateDraftOpen)
-        if (isPrivateDraftOpen) {
+        if (privateChanged || stegoChanged) candidateStrip.setPrivateDraftMode(isPrivateDraftOpen || isTextStegoOpen)
+        if (isPrivateDraftOpen || isTextStegoOpen) {
             keyboard.startEditor(EditorInputOptions())
             keyboard.setComposing(false)
             candidateStrip.render(EngineSnapshot.Empty)
@@ -1106,6 +1131,12 @@ class ZeroInputView @JvmOverloads constructor(
         if (privateChanged && !isPrivateDraftOpen) {
             privateSnapshot = EngineSnapshot.Empty
             privateDraft.render("", hasInput = false, busy = false, showFull = false)
+            keyboard.startEditor(editorOptions)
+            candidateStrip.render(currentSnapshot)
+        }
+        if (stegoChanged && !isTextStegoOpen) {
+            stegoSnapshot = EngineSnapshot.Empty
+            textStegoPanel.clear()
             keyboard.startEditor(editorOptions)
             candidateStrip.render(currentSnapshot)
         }
@@ -1140,19 +1171,21 @@ class ZeroInputView @JvmOverloads constructor(
         setPanelVisible(secureClipboard, target == PanelMode.SECURE_CLIPBOARD)
         setPanelVisible(shapeLookup, isShapeLookupOpen)
         setPanelVisible(privateDraft, isPrivateDraftOpen)
+        setPanelVisible(textStegoPanel, isTextStegoOpen)
         setPanelVisible(ai, target == PanelMode.AI && aiAvailable)
         setPanelVisible(emoji, target == PanelMode.EMOJI)
         setPanelVisible(handwriting, target == PanelMode.HANDWRITING)
         setPanelVisible(
             keyboardContainer,
             target == PanelMode.KEYBOARD || emoji.isSearchActive && target == PanelMode.EMOJI ||
-                target == PanelMode.AI && ai.editing || isShapeLookupOpen && shapeEditing || isPrivateDraftOpen,
+                target == PanelMode.AI && ai.editing || isShapeLookupOpen && shapeEditing || isPrivateDraftOpen || isTextStegoOpen,
         )
         if (target == PanelMode.AI && aiChanged) onAiConversationsRequested()
         updatePanelLayout()
         refreshHeader()
         if (shapeChanged) onShapeVisibilityChanged(isShapeLookupOpen)
         if (privateChanged) onPrivateDraftVisibilityChanged(isPrivateDraftOpen)
+        if (stegoChanged) onTextStegoVisibilityChanged(isTextStegoOpen)
     }
 
     private fun setAiCandidatesExpanded(expanded: Boolean) {
@@ -1182,6 +1215,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun visibleSnapshot(): EngineSnapshot = when {
         mode == PanelMode.AI -> aiSnapshot
         isPrivateDraftOpen -> privateSnapshot
+        isTextStegoOpen -> stegoSnapshot
         isSearchEditing -> searchSnapshot
         else -> currentSnapshot
     }
@@ -1235,7 +1269,7 @@ class ZeroInputView @JvmOverloads constructor(
         val hasCandidates = visibleSnapshot.isComposing || visibleSnapshot.candidates.isNotEmpty()
         // Keep the idle entry discoverable without reducing the four-candidate
         // capacity of a compact composing row.
-        candidateStrip.renderAiEntry(aiAvailable, visible = mode != PanelMode.AI && !hasCandidates && !isPrivateDraftOpen)
+        candidateStrip.renderAiEntry(aiAvailable, visible = mode != PanelMode.AI && !hasCandidates && !isPrivateDraftOpen && !isTextStegoOpen)
         val needsStatus = engineStatus == InputEngineStatus.PENDING_CONFIGURATION ||
             engineStatus == InputEngineStatus.FAILED
         fuzzyButton.visibility = if (manualTools && mode == PanelMode.KEYBOARD && currentLanguage == InputLanguage.CHINESE &&
@@ -1246,7 +1280,7 @@ class ZeroInputView @JvmOverloads constructor(
             PanelMode.AI -> false
             PanelMode.KEYBOARD, PanelMode.CANDIDATES -> hasCandidates || needsStatus
             PanelMode.EMOJI -> isSearchEditing && hasCandidates
-            PanelMode.PRIVATE_DRAFT -> hasCandidates
+            PanelMode.PRIVATE_DRAFT, PanelMode.TEXT_STEGO -> hasCandidates
             PanelMode.SECURE_CLIPBOARD, PanelMode.HANDWRITING, PanelMode.SHAPE_LOOKUP -> false
         }
         candidateStrip.visibility = if (showCandidates) VISIBLE else GONE
@@ -1260,8 +1294,9 @@ class ZeroInputView @JvmOverloads constructor(
         if (toolbarParams.marginStart != start) { toolbarParams.marginStart = start; toolbar.layoutParams = toolbarParams }
         toolsButton.isVisible = !manualTools && !isShapeLookupOpen && !isPrivateDraftOpen
         updateCopySelectionButton()
-        aiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen
-        emojiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen
+        aiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen
+        emojiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen
+        stegoButton.isVisible = mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
         shapeButton.isVisible = !manualTools && mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
         privateDraftButton.isVisible = isPrivateDraftOpen ||
             mode == PanelMode.KEYBOARD && !sensitive && editorOptions.layout == EditorLayout.TEXT
@@ -1305,7 +1340,7 @@ class ZeroInputView @JvmOverloads constructor(
         val aiEditing = mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded
         val searchActive = isSearchEditing && !searchCandidatesExpanded
         val shapeTyping = isShapeLookupOpen && shapeEditing
-        val editing = searchActive || aiEditing || shapeTyping || isPrivateDraftOpen
+        val editing = searchActive || aiEditing || shapeTyping || isPrivateDraftOpen || isTextStegoOpen
         val splitSearch = editing && viewportPlan.splitDetailPanel
         // AI keeps three primary commands visible; reserve their width in a short landscape window.
         val detailWeight = if (aiEditing) 5f * resources.configuration.fontScale.coerceIn(1f, 1.5f) else 1f
@@ -1315,6 +1350,7 @@ class ZeroInputView @JvmOverloads constructor(
             editing && !splitSearch -> keyboard.preferredHeight + dp(when {
                 shapeTyping -> 192
                 isPrivateDraftOpen -> 96
+                isTextStegoOpen -> 256
                 searchActive -> 224
                 else -> ai.editingHeightDp
             })
@@ -1335,6 +1371,8 @@ class ZeroInputView @JvmOverloads constructor(
             else LayoutParams(LayoutParams.MATCH_PARENT, if (shapeTyping) detailHeight else body)
         privateDraft.layoutParams = if (splitSearch && isPrivateDraftOpen) LayoutParams(0, body, 2f)
             else LayoutParams(LayoutParams.MATCH_PARENT, if (isPrivateDraftOpen) detailHeight else body)
+        textStegoPanel.layoutParams = if (splitSearch && isTextStegoOpen) LayoutParams(0, body, 2f)
+            else LayoutParams(LayoutParams.MATCH_PARENT, if (isTextStegoOpen) detailHeight else body)
         handwriting.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
         ai.layoutParams = if (splitSearch) LayoutParams(0, body, detailWeight)
             else LayoutParams(LayoutParams.MATCH_PARENT, if (aiEditing) detailHeight else body)
@@ -1344,7 +1382,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun isDetailEditing(): Boolean =
         (isSearchEditing && !searchCandidatesExpanded) || (mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded) ||
             (isShapeLookupOpen && shapeEditing)
-            || isPrivateDraftOpen
+            || isPrivateDraftOpen || isTextStegoOpen
 
     private fun applyViewportPlan(plan: KeyboardViewportPlan) {
         if (viewportPlan == plan) return
@@ -1440,6 +1478,7 @@ class ZeroInputView @JvmOverloads constructor(
         HANDWRITING,
         SHAPE_LOOKUP,
         PRIVATE_DRAFT,
+        TEXT_STEGO,
         CANDIDATES,
     }
 

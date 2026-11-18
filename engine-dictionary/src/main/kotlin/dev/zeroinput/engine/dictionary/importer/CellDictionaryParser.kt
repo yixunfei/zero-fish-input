@@ -70,8 +70,10 @@ class CellDictionaryParser(private val source: Source) : PublicDictionaryParser 
         val output = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(8192)
         while (true) {
+            if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
             val size = read(buffer)
             if (size < 0) break
+            require(size > 0) { "Cell dictionary stream made no progress" }
             require(output.size() + size <= limit) { "Cell dictionary too large" }
             output.write(buffer, 0, size)
         }

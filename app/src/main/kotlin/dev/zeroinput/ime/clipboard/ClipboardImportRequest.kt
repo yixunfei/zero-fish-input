@@ -37,6 +37,12 @@ internal class ClipboardImportRequest(private val text: CharArray, val allowsAiI
 
     fun isSaving(): Boolean = phase == Phase.SAVING
 
+    /** Consumes input for the local-only decrypt branch; it can no longer be forwarded to AI. */
+    @Synchronized fun takeForStego(): CharArray? {
+        if (phase != Phase.REVIEW) return null
+        return text.copyOf().also { close() }
+    }
+
     @Synchronized
     override fun close() {
         phase = Phase.CLOSED

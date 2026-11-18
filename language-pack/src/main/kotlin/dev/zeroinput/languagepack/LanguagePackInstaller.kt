@@ -101,7 +101,7 @@ class LanguagePackInstaller(
     fun setEnabled(pack: InstalledLanguagePack, enabled: Boolean): Boolean =
         setEnabled(pack.manifest.id, pack.manifest.version, enabled)
 
-    fun setEnabled(id: String, version: String, enabled: Boolean): Boolean = runCatching {
+    fun setEnabled(id: String, version: String, enabled: Boolean): Boolean = recoverable {
         synchronized(lock) {
             recoverInterruptedInstallations()
             val directory = directoryFor(id, version)
@@ -125,7 +125,7 @@ class LanguagePackInstaller(
         return remove(packKey.substring(0, separator), packKey.substring(separator + 1))
     }
 
-    fun remove(id: String, version: String): Boolean = runCatching {
+    fun remove(id: String, version: String): Boolean = recoverable {
         synchronized(lock) {
             recoverInterruptedInstallations()
             val directory = directoryFor(id, version)
@@ -259,7 +259,7 @@ class LanguagePackInstaller(
     private fun readInstalled(
         directory: File,
         enabled: Map<String, Boolean>,
-    ): InstalledLanguagePack? = runCatching {
+    ): InstalledLanguagePack? = recoverable {
         val manifestFile = File(directory, MANIFEST_PATH)
         require(manifestFile.isFile) { "Language pack manifest is missing" }
         require(manifestFile.length() in 1..MAX_MANIFEST_BYTES) { "Invalid language pack manifest" }

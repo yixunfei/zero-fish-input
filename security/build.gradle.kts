@@ -28,6 +28,8 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.bcprov)
+    implementation(libs.tink) { isTransitive = false }
     testImplementation(libs.junit)
 }
 

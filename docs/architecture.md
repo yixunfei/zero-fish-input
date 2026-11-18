@@ -1241,7 +1241,68 @@ The previous and next buttons and horizontal swipes share continuous paging.
 The editor adapter places the caret inside a pair using its tracked insertion
 range and checks that the range and bound connection still match after commit.
 
+## Offline text steganography (2026-11-18)
+
+`security/message` owns the portable authenticated envelope and pinned lightweight
+Bouncy Castle/Tink primitives, separate from Keystore storage. `ime-core/stego`
+owns exact-text transport and expiring operation phases, with no provider/Android
+dependency. `ime-ui/StegoPanelView` contains focus-free presentation only.
+`app/textstego/StegoWorkspace` binds isolated drafts to a live editor; the service
+only supplies lifecycle, selection and commit adapters. Secret editing uses
+NoPersonalization. No new user-data format, key alias or module dependency is added.
+
+The private source Activity consumes one-use opaque handoffs from the existing
+share/PROCESS_TEXT gateway or the keyboard. It reads only an explicitly selected
+temporary SAF file or an authenticated vault entry, and saves only after separate
+authentication/confirmation. Crypto and source workers each keep one process-wide
+slot until completion, even after UI cancellation. Weak owner references and
+operation leases prevent late publication and retain no destroyed UI/connection.
+System-clipboard body import was declined; no adapter or privacy exception exists.
+Natural wording is gated unavailable. See [ADR 0039](adr/0039-text-steganography.md).
+
 ## Audit hardening (2026-11-18)
+
+The follow-up audit keeps engine recovery scoped to exceptions raised by engine
+operations. Cancellation, interruption and fatal errors propagate without
+committing preedit or replaying a key; ordinary rendering/storage failures do not
+retire the engine. An ordinary engine-operation failure retains the controlled
+literal fallback: preserve the last preedit without learning, retire the failed
+engine and process the explicit key. Sensitive sessions take the independent
+editor path before engine dispatch. Language changes share the explicit switch's accepted-commit
+guard. Pending dictionary edits retain composition on Space; fully filtered
+candidates use raw text plus a literal space. Browsing and personalization retain
+distinct native candidate routes even when their displayed text is identical.
+
+The existing AI transport now uses the already bundled OkHttp implementation
+with connect/read/write/call deadlines, platform TLS, no proxy, cookies, cache,
+redirect or retry. A network interceptor rejects response-driven follow-ups too.
+Only the existing adapter may send model data; request buffers remain owned by
+the worker and are cleared after the bounded call returns. Cancellation-executor
+rejection performs direct cancellation instead of abandoning the connection.
+
+An asynchronous personalization clear rejected by its bounded worker throws a
+content-free rejection and keeps old reads blocked until explicit retry. It does
+not perform storage work on the caller; the existing settings-worker durable
+clear retains its synchronous final attempt. Uncertain ContentObserver
+registration is owned before the platform call and released on failure/close.
+
+Language-pack text dictionaries are decoded and hashed from the same bounded
+stream, with a 4096-character line buffer and validation after the entry budget.
+JSON dictionaries now fold strict parser events into bounded rows instead of
+building a whole document String and org.json tree. Manifests reuse the same
+syntax reader before their small document parse. Depth is capped at 16, tokens
+at 4096 characters, keys per object at 50,000 and simultaneously retained keys
+at 100,000. Parsing and hashing continue beyond the 50,000 output-row budget;
+invalid trailing data or a checksum failure rejects the entire dictionary.
+Registry refresh callers remain the existing initialization/settings workers.
+
+Build privacy scans also classify owned CMake, Python, PowerShell, shell and
+version-catalog files. CMake cannot add network fetch/link/shell operations;
+host fetches remain restricted to the existing reviewed build/release scripts.
+The approved OkHttp catalog declaration is exact. Vendored dependencies retain
+their pinned source/hash and selected-target boundary; scanning unused upstream
+network examples as application transports would not describe the built app.
+These source checks remain static heuristics.
 
 Application AI configuration snapshots contain provider metadata and key-presence
 flags only. The encrypted repository has no plaintext configuration cache. Each

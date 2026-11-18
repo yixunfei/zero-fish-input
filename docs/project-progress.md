@@ -2,6 +2,135 @@
 
 Updated 2026-11-18.
 
+## Text steganography implementation (2026-11-18; local validation complete)
+
+Implemented the six-cipher portable envelope, ordered authenticated cascades,
+valid selectable widths, one master credential, five factor modes and bounded key
+files; isolated compose/credential/preview/commit and masked local decryption;
+selection/share/PROCESS_TEXT and authenticated vault coordination. The user
+explicitly declined system-clipboard body reads. No permission/export/network/AI
+exception or existing storage-format migration was added.
+
+Pinned Bouncy Castle 1.87/Tink Android 1.21.0 and license/hash review are recorded
+in [ADR 0039](adr/0039-text-steganography.md). Independent RustCrypto vectors cover
+12 cipher-width modes, all three Argon2 profiles, all five factor combinations and
+complete one/six-layer envelopes. Published vectors, all 720 algorithm orders,
+mixed widths and damaged inner tags pass. Final JVM results contain 2,166 passes,
+four opt-in live-AI credential skips and no failures. privacyCheck and
+Debug/Release Lint pass with no issues. Real-Rime x86_64 Debug/AndroidTest and
+unsigned R8 Release builds pass; the merged manifests preserve permission,
+backup, export and Release-debugging boundaries.
+
+All 17 API 37 steganography device tests pass without skips, including actual
+system-PIN authentication for private-vault read and save, fresh confirmations,
+cancellation, settings/deletion revocation and late-worker results. Selection
+preservation and private-candidate clearing were reproduced before repair and
+verified afterward. Small/normal portrait/landscape and light/dark layout checks
+pass, including 48-dp touch targets and scrolling. The standard 64-MiB Argon2id
+six-layer/self-check probe took 1,014 ms, with a maximum 7-ms main-looper probe
+delay; this is not a full input-latency benchmark. Device overrides and the public
+test PIN were cleared, and the task-started emulator was stopped.
+
+The normal checked ARM64 package, without `-SkipChecks`, is
+[zero-fish-input-0.7.6-debug-arm64-v8a.apk](../app/build/outputs/test-apk/20261118-174651/zero-fish-input-0.7.6-debug-arm64-v8a.apk).
+It is 96,317,775 bytes: below the 180 MB budget and above the separate 80 MB target.
+SHA-256: `50f11f0937687e3786c27e996b946a9f938f6f931f61243d7ed3f077029ed25c`.
+Notices, corresponding sources, provenance, size and checksum records are alongside
+it. This Debug package supersedes earlier test-package paths below.
+
+Natural wording remains unavailable under the design's resource, capacity,
+semantic and detector gates; no enhanced profile is claimed. API 26/29/33,
+OEM/ARM64 runtime and actual external-channel round trips remain unverified.
+No release signing, Git commit or publication was performed. Existing audit
+changes below remain preserved. Details and manual destination acceptance:
+[validation record](text-steganography-validation.md).
+
+## Final audit re-verification (2026-11-18)
+
+Rechecked the updated November 17 audit against current code and corrected its
+remaining classifications. Fixed two confirmed residual issues: owned CMake,
+host-script and catalog privacy-gate coverage, and JSON dictionary full-tree
+allocation. A 14,000,001-byte repeated-record file failed with OOM before the
+streaming repair and loaded successfully afterward under the same 128 MiB JVM
+heap. Added explicit token/key budgets, real-hash negative tests, and the public
+asynchronous-clear contract. Original audit now records 17 confirmed findings
+fixed and three withdrawn; M-7/L-2 each include one withdrawn subfinding.
+
+Independent full verification passed: 2,122 JVM variant executions, four
+credential-dependent skips, privacyCheck and Debug/Release Lint with no issues.
+Real Rime Debug/unsigned Release builds cover all three ABIs. All six APKs passed
+resource/native contents checks; Debug splits passed package/ABI/signature
+checks. The exact installed x86_64 APK passed 52 API 37 tests with no skips,
+including nine language-pack platform cases. Installed hashes were verified
+before and after. JNI failure injection passed; the task-started isolated
+emulator was stopped with its data retained.
+
+Current build outputs are in `app/build/outputs/apk/debug/` and `release/`.
+The cleanup/test-package entry below describes its earlier source state: that
+ARM64 delivery package predates this streaming-parser repair. No commit or
+publication was performed. Full evidence and runtime limits are in the
+[updated audit](audits/2026-11-17-code-audit.md#9-最终再核验2026-11-18).
+
+## Build cleanup and fresh test package (2026-11-18)
+
+Removed 23 generated build/distribution directories and 101 expired APKs,
+reclaiming 16.50 GiB before rebuilding. Module outputs, native intermediates and
+old delivery packages were cleared. Pinned dictionaries/models, local Maven
+inputs, third-party sources, emulator data and review evidence were retained;
+historical package provenance and Lint metadata were saved before removal.
+Only the new ARM64 APK and its identical Gradle output remain in the repository.
+Product sources, resources and build configuration match the pre-cleanup hashes;
+a concurrent update to the original audit document was preserved.
+
+Rebuilt with the normal checked packaging command:
+
+```powershell
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
+
+The checks passed: 90 pure JVM tests and 1,012 passes plus two opt-in skips per
+Android variant; privacyCheck; Debug Lint with no issues; fresh three-ABI native
+Debug builds; packaged resources, signature, permissions, ABI, installability,
+ZIP integrity and checksum verification. Gradle reused input-matched caches for
+some unchanged JVM/Lint tasks. This packaging run did not perform device tests.
+
+New full Debug test package, version `0.7.6-debug`:
+`app/build/outputs/test-apk/20261118-123028/zero-fish-input-0.7.6-debug-arm64-v8a.apk`.
+92,460,582 bytes; within the 180 MB packaging budget and above the separate 80 MB
+optimization target. SHA-256:
+`e2be32ed917eb4c881d05f45904c1db2f1ab8e0d02fbb204a51b06ec0401eb6b`.
+Notices, handwriting corresponding sources, size/provenance JSON and
+`SHA256SUMS.txt` are alongside it. Cleanup inventory, package log and verification
+results are in `.tmp-evidence/repackage-20261118/`. Older artifact paths below
+are historical records; the superseded local packages have been removed.
+
+Next: install and verify this ARM64 test package on a suitable physical device.
+No release signing, version bump, commit or publication was performed.
+
+## First audit follow-up (2026-11-18; historical)
+
+Verified all 20 findings in the user-rewritten November 17 audit and repaired the
+confirmed input, deletion, transport, observer, parser and candidate-routing
+issues. Retained the approved legacy AI reset, clipboard grant consumption and
+draft authorization checks; documented partial findings and false positives.
+The original audit content was preserved in that first run and has since been
+updated by the user-authorized final re-verification above. No commit or
+publication was performed in that run.
+
+Validation: 2,114 JVM variant executions passed with four credential-dependent
+skips; privacyCheck and Debug/Release Lint passed with no issues. All three ABIs
+built with real Rime and passed Debug/unsigned Release APK contents checks.
+The exact installed x86_64 APK passed 50 API 37 tests without skips, with hashes
+verified before and after execution. JNI fault injection and public-fixture
+small-screen/theme/landscape checks passed. The isolated emulator was stopped.
+
+Details, commands, test groups and limits:
+[follow-up verification](audits/2026-11-18-followup-verification.md).
+
+Next: physical ARM/OEM and Android 8 timing checks, live provider transport
+validation and device heap profiling when suitable environments are available.
+These remain unverified; no production signing key was used.
+
 ## Re-review and v0.7.6 publication (2026-11-18)
 
 Reviewed the pending audit repairs and fixed two additional AI configuration

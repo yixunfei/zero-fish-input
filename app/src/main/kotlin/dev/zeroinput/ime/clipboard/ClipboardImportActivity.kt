@@ -54,6 +54,7 @@ class ClipboardImportActivity : AppCompatActivity() {
             it.onCancel = ::discardAndFinish
             it.onAction = ::performAction
             it.onAiAction = ::importAiContext
+            it.onStegoAction = ::importStegoText
             it.showReview(requireNotNull(request).length, graph.settings.secureClipboardEnabled,
                 allowsAiImport = requireNotNull(request).allowsAiImport &&
                     graph.settings.learningEnabled && !graph.settings.incognitoMode)
@@ -119,6 +120,16 @@ class ClipboardImportActivity : AppCompatActivity() {
             dev.zeroinput.ime.ai.AiImportedContent(text.toCharArray(), emptyList())
         )
         Toast.makeText(this, R.string.ai_import_ready, Toast.LENGTH_LONG).show()
+        discardAndFinish()
+    }
+
+    private fun importStegoText() {
+        if (!resumed || !hasWindowFocus() || isFinishing || !dev.zeroinput.ime.input.isPrivateDraftDeviceAvailable(this)) return
+        val chars = request?.takeForStego() ?: return
+        val token = graph.stegoHandoff.put(dev.zeroinput.ime.textstego.StegoHandoff.Request(
+            dev.zeroinput.ime.textstego.StegoHandoff.Kind.CARRIER, chars))
+        startActivity(Intent(this, dev.zeroinput.ime.textstego.StegoSourceActivity::class.java)
+            .putExtra(dev.zeroinput.ime.textstego.StegoSourceActivity.EXTRA_TOKEN, token))
         discardAndFinish()
     }
 
@@ -200,6 +211,7 @@ class ClipboardImportActivity : AppCompatActivity() {
         screen?.clearText()
         screen?.onAction = {}
         screen?.onAiAction = {}
+        screen?.onStegoAction = {}
         screen?.onCancel = {}
         authentication?.close()
         authentication = null

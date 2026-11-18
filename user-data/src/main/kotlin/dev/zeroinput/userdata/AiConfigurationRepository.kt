@@ -114,6 +114,11 @@ class AiConfigurationRepository(
                 }
             }
             withJsonReader(bytes, ::readConfiguration).also(::validate)
+        } catch (cancelled: java.util.concurrent.CancellationException) {
+            throw cancelled
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw interrupted
         } catch (_: Exception) {
             throw IllegalStateException("AI configuration is invalid")
         } finally { bytes.fill(0) }
@@ -259,7 +264,7 @@ class AiConfigurationRepository(
 
     private fun validate(value: AiConfiguration) {
         require(value.providers.size <= 16 && value.providers.map { it.id }.distinct().size == value.providers.size)
-        require(value.providers.isEmpty() && value.selectedProviderId == null ||
+        require(value.selectedProviderId == null ||
             value.providers.any { it.id == value.selectedProviderId })
         value.providers.forEach { profile ->
             require(profile.id.length in 1..64 && profile.name.isNotBlank() && profile.name.length <= 64)

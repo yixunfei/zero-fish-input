@@ -86,7 +86,7 @@ class LanguagePackJsonBoundaryTest {
                 val dictionary = File(directory, "dictionary.json").apply { writeText(json) }
                 val pack = InstalledLanguagePack(
                     LanguagePackManifest(1, "fixture", "Fixture", "zh", "1", "fixture",
-                        listOf(LanguagePackFile(dictionary.name, "0".repeat(64), dictionary.length()))),
+                        listOf(LanguagePackFile(dictionary.name, hash(dictionary), dictionary.length()))),
                     directory,
                 )
                 assertFalse(LanguagePackEngineFactory(pack).isAvailable())
@@ -101,7 +101,7 @@ class LanguagePackJsonBoundaryTest {
             val json = File(directory, "dictionary.json").apply { writeText("{\"hao\":\"好\"} {}") }
             val pack = InstalledLanguagePack(
                 LanguagePackManifest(1, "fixture", "Fixture", "zh", "1", "fixture",
-                    listOf(text, json).map { LanguagePackFile(it.name, "0".repeat(64), it.length()) }),
+                    listOf(text, json).map { LanguagePackFile(it.name, hash(it), it.length()) }),
                 directory,
             )
             assertFalse(LanguagePackEngineFactory(pack).isAvailable())
@@ -146,9 +146,18 @@ class LanguagePackJsonBoundaryTest {
     private fun factory(directory: File, files: List<File>, sizes: Map<String, Long> = emptyMap()) =
         LanguagePackEngineFactory(InstalledLanguagePack(
             LanguagePackManifest(1, "fixture", "Fixture", "zh", "1", "fixture", files.map {
-                LanguagePackFile(it.name, "0".repeat(64), sizes[it.name] ?: it.length())
+                LanguagePackFile(it.name, hash(it), sizes[it.name] ?: it.length())
             }), directory,
         ))
+
+    private fun hash(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
 
     private fun manifest(): String = """
         {

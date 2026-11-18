@@ -30,11 +30,11 @@ internal object DeviceStage6SensorCapture {
         val rate = 16_000
         val minimum = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         if (minimum <= 0) return unavailable("Microphone service is unavailable")
-        val pcm = ByteArray(MAX_AUDIO_BYTES)
         val recorder = runCatching {
             AudioRecord(MediaRecorder.AudioSource.MIC, rate, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT, maxOf(minimum, 4_096))
         }.getOrNull() ?: return unavailable("Microphone service is unavailable")
+        val pcm = ByteArray(MAX_AUDIO_BYTES)
         var size = 0
         var wav: ByteArray? = null
         val started = SystemClock.elapsedRealtime()
@@ -52,12 +52,13 @@ internal object DeviceStage6SensorCapture {
             }
             if (!stillValid()) return expired()
             if (size == 0) return failed("Microphone returned no audio")
-            wav = wav(pcm, size, rate)
-            if (wav!!.size > maxAttachmentBytes) {
+            val encoded = wav(pcm, size, rate)
+            wav = encoded
+            if (encoded.size > maxAttachmentBytes) {
                 return failed("Microphone sample is too large")
             }
             DeviceStage6Result(DeviceStage6ResultStatus.SUCCESS, "One-second microphone sample captured",
-                AiAttachment("audio/wav", wav!!.copyOf(), "device-audio.wav"))
+                AiAttachment("audio/wav", encoded.copyOf(), "device-audio.wav"))
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             expired()

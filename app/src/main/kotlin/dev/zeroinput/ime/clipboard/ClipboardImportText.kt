@@ -14,6 +14,8 @@ internal object ClipboardImportText {
                 if (index == value.length || !value[index++].isLowSurrogate()) return null
             } else if (character.isLowSurrogate()) return null
         }
-        return ClipboardImportRequest(CharArray(value.length) { value[it] }, allowsAiImport)
+        val carrier = value.contains(dev.zeroinput.ime.core.stego.StegoCarrierCodec.DENSE_START) ||
+            value.contains(dev.zeroinput.ime.core.stego.StegoCarrierCodec.VISIBLE_START)
+        return ClipboardImportRequest(CharArray(value.length) { value[it] }, allowsAiImport && !carrier)
     }
 }

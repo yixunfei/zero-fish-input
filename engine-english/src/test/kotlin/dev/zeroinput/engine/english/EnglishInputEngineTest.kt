@@ -10,6 +10,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EnglishInputEngineTest {
+    @Test fun `non ASCII letters never enter English composition or gain a completion space`() {
+        for (value in listOf("中", "é", "я")) {
+            EnglishInputEngine().use { engine ->
+                engine.start(context)
+                val update = engine.handle(EngineKey.Character(value))
+                assertFalse(update.snapshot.isComposing)
+                assertTrue(update.snapshot.candidates.isEmpty())
+                assertEquals(value, update.committedText)
+            }
+        }
+    }
+
     @Test fun `character at the buffer limit remains available for editor fallback`() {
         val engine = EnglishInputEngine()
         engine.start(context)
