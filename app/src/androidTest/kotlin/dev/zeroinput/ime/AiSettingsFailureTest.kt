@@ -30,11 +30,63 @@ class AiSettingsFailureTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val graph get() = (instrumentation.targetContext.applicationContext as ZeroInputApplication).graph
 
-    @Test fun providerDraftSurvivesAppSwitchWithoutSavingUntilExplicitSave() = withSettings { screen ->
+    @Test fun rejectedSaveCanReloadPersistedProvidersWithoutReenablingNetwork() {
+        val original = graph.aiConfiguration.read()
+        val profile = AiProviderProfile("fixture", "Fixture", "https://provider.example/fixture",
+            "public-fixture-key", listOf("fixture-model"), "fixture-model")
+        val fixture = AiConfiguration(enabled = true, networkAllowed = true,
+            providers = listOf(profile), selectedProviderId = profile.id)
+        val release = CountDownLatch(1)
+        val entered = CountDownLatch(1)
+        val drained = CountDownLatch(1)
+        var activity: MainActivity? = null
+        try {
+            saveConfiguration(fixture)
+            activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+            val screen = activity
+            openSettings(screen)
+            graph.aiPersistenceExecutor.execute { entered.countDown(); release.await() }
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            graph.aiPersistenceExecutor.execute {}
+            graph.aiPersistenceExecutor.execute { drained.countDown() }
+            onMain {
+                field(R.string.ai_endpoint_hint).setText("https://provider.example/unsaved")
+                dialogSave().performClick()
+            }
+            assertNull(graph.aiConfigurationSnapshot())
+            assertEquals(fixture, graph.aiConfiguration.read())
+            release.countDown()
+            assertTrue(drained.await(5, TimeUnit.SECONDS))
+            onMain { screen.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
+            await { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(screen) == Stage.STOPPED }
+            instrumentation.targetContext.startActivity(Intent(instrumentation.targetContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            await { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(screen) == Stage.RESUMED }
+            openSettings(screen)
+            assertNull(graph.aiConfigurationSnapshot())
+            onMain {
+                assertEquals(profile.endpoint, field(R.string.ai_endpoint_hint).text.toString())
+                assertEquals(profile.selectedModel, field(R.string.ai_models_hint).text.toString())
+                dialogSave().performClick()
+            }
+            await { graph.aiConfigurationSnapshot() != null }
+            assertFalse(checkNotNull(graph.aiConfigurationSnapshot()).enabled)
+            assertFalse(checkNotNull(graph.aiConfigurationSnapshot()).networkAllowed)
+            assertEquals(profile.apiKey, graph.aiConfiguration.read().activeKey())
+        } finally {
+            release.countDown()
+            activity?.let { onMain { it.finish() }; await { it.isDestroyed } }
+            saveConfiguration(original)
+        }
+    }
+
+    @Test fun providerDraftIsClearedOnAppSwitchWithoutSaving() = withSettings { screen ->
         val original = graph.aiConfiguration.read()
         val endpoint = "https://provider.example/unsaved"
         val model = "public-draft-model"
         val key = "public-draft-key"
+        val drafts = onMain { listOf(field(R.string.ai_endpoint_hint), field(R.string.ai_models_hint), field(R.string.ai_key_hint)) }
         onMain {
             field(R.string.ai_endpoint_hint).setText(endpoint)
             field(R.string.ai_models_hint).setText(model)
@@ -42,20 +94,19 @@ class AiSettingsFailureTest {
             screen.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
         }
         await { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(screen) == Stage.STOPPED }
+        onMain { assertTrue(drafts.all { it.text.isNullOrEmpty() }) }
         assertEquals(original, graph.aiConfiguration.read())
         instrumentation.targetContext.startActivity(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         await { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(screen) == Stage.RESUMED }
+        onMain { assertNull(fieldOrNull(R.string.ai_endpoint_hint)) }
+        openSettings(screen)
         onMain {
-            assertEquals(endpoint, field(R.string.ai_endpoint_hint).text.toString())
-            assertEquals(model, field(R.string.ai_models_hint).text.toString())
-            assertEquals(key, field(R.string.ai_key_hint).text.toString())
-            dialogSave().performClick()
+            assertTrue(field(R.string.ai_endpoint_hint).text.isNullOrEmpty())
+            assertTrue(field(R.string.ai_models_hint).text.isNullOrEmpty())
+            assertTrue(field(R.string.ai_key_hint).text.isNullOrEmpty())
         }
-        await { graph.aiConfigurationSnapshot()?.activeModel() == model }
-        val saved = graph.aiConfiguration.read()
-        assertEquals(endpoint, saved.activeEndpoint())
-        assertEquals(key, saved.activeKey())
+        assertEquals(original, graph.aiConfiguration.read())
     }
 
     @Test fun cancellingProviderDraftClearsFieldsAndDoesNotPersistIt() = withSettings { screen ->
@@ -134,7 +185,7 @@ class AiSettingsFailureTest {
                 generateSequence(input.parent) { it.parent }
                     .filterIsInstance<com.google.android.material.textfield.TextInputLayout>().firstOrNull()?.error
             } != null }
-            assertEquals(fixture, graph.aiConfigurationSnapshot())
+            assertEquals(fixture.withoutCredentials(), graph.aiConfigurationSnapshot())
             onMain {
                 field(R.string.ai_endpoint_hint).setText(profile.endpoint)
                 assertEquals(profile.selectedModel, field(R.string.ai_models_hint).text.toString())
@@ -146,7 +197,9 @@ class AiSettingsFailureTest {
             assertTrue(saved.networkAllowed)
             assertEquals(profile.endpoint, saved.activeEndpoint())
             assertEquals(profile.selectedModel, saved.activeModel())
-            assertEquals(profile.apiKey, saved.activeKey())
+            assertTrue(saved.activeKey().isEmpty())
+            assertTrue(saved.hasActiveKey())
+            assertEquals(profile.apiKey, graph.aiConfiguration.read().activeKey())
         } finally {
             activity?.let { onMain { it.finish() } }
             saveConfiguration(original)

@@ -29,7 +29,7 @@ class AiRemoteToolsPlatformTest {
     @Test fun actualAndroidClientRejectsMixedDnsBeforeDispatch() {
         var calls = 0
         val adapter = AiRemoteHttpsTransport {
-            calls++; listOf(InetAddress.getByName("8.8.8.8"), InetAddress.getByName("127.0.0.1"))
+            calls++; listOf(InetAddress.getByAddress(byteArrayOf(8, 8, 8, 8)), InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)))
         }
         val cancel = AiRemoteCancellation { true }
         assertTrue(runCatching { adapter.mcp(AiConnection("public", "Public", AiConnectionKind.MCP, "https://example.com/mcp", "public-token"), "{}", null, cancel) }.isFailure)

@@ -1,5 +1,6 @@
 package dev.zeroinput.engine.api
 
+/** Session ownership ends at close; callers must not invoke further engine operations afterwards. */
 interface InputEngine : AutoCloseable {
     val descriptor: EngineDescriptor
 

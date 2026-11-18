@@ -518,3 +518,20 @@ or expression-search buffer. They do not read or move an external editor cursor.
 Masked private prefixes require the existing explicit reveal before positioning;
 busy views and obsolete gestures cannot move the caret. Session revocation and
 buffer clearing remain unchanged. See [ADR 0037](docs/adr/0037-isolated-draft-caret.md).
+
+### Audit hardening, 2026-11-18
+
+AI application snapshots retain no provider keys and the encrypted configuration
+repository has no plaintext cache. Explicit requests load selected credentials
+on the worker with snapshot revocation checks. Protected settings drop loaded
+credentials and drafts on stop. Immutable JVM strings cannot be reliably erased.
+After a failed save, settings must reload durable providers before another edit;
+both activation switches remain off and transport stays revoked until a successful
+explicit save. Equal metadata reloads preserve queued-request snapshot identity,
+while explicit saves, changed settings and revocation invalidate old requests.
+Language-pack text parsing bounds raw lines and fields before splitting. JNI
+exports preserve pending Java exceptions and contain native exceptions with
+content-free errors and resource leases. Distribution checks require all native
+libraries in every requested ABI. Android 8 empty-item suppression is limited to
+the clear interval and at most one second; same-interval replacements and the
+platform's non-atomic compare-and-clear remain limitations without payload reads.

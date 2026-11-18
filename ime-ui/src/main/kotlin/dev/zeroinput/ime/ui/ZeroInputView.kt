@@ -180,7 +180,10 @@ class ZeroInputView @JvmOverloads constructor(
     private var engineStatus = InputEngineStatus.HIDDEN
     /** Rendered session status. */
     val renderedEngineStatus: InputEngineStatus get() = engineStatus
-    private val languageButton = toolbarButton("中", "切换中英文") {
+    private val languageButton = toolbarButton(
+        context.getString(KeyboardLanguage(InputLanguage.CHINESE).labelResource),
+        context.getString(R.string.language_switch),
+    ) {
         dispatchKeyboardAction(KeyboardAction.SwitchLanguage)
     }
     private val candidateStrip = CandidateStripView(context)
@@ -1390,7 +1393,7 @@ class ZeroInputView @JvmOverloads constructor(
         layoutParams = LayoutParams(dp(48), dp(48))
         setOnClickListener { action() }
         setOnLongClickListener {
-            Toast.makeText(context, description, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, contentDescription, Toast.LENGTH_SHORT).show()
             true
         }
     }

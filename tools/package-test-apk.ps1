@@ -235,7 +235,7 @@ $sourceApk = $artifact.Path
 
 $metadata = Assert-TestApk $sourceApk $androidTools $expectedAbis
 $sizeReport = Join-Path $repositoryRoot "build/reports/apk-size/$Abi.json"
-Invoke-CheckedCommand "python" @((Join-Path $PSScriptRoot 'resources/verify-apk.py'), "full", $sourceApk)
+Invoke-CheckedCommand "python" (@((Join-Path $PSScriptRoot 'resources/verify-apk.py'), "full", $sourceApk, "--abis") + $expectedAbis)
 Invoke-CheckedCommand "python" @((Join-Path $PSScriptRoot 'resources/apk_size.py'), $sourceApk,
     "--max-bytes", $MaxApkBytes.ToString(), "--report", $sizeReport)
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"

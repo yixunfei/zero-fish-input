@@ -226,6 +226,7 @@ dependencies {
     api(project(":engine-api"))
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":engine-api")))
     testImplementation(project(":engine-dictionary"))
     testImplementation(project(":engine-english"))
 }

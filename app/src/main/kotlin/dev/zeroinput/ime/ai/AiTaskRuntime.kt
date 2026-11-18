@@ -81,7 +81,7 @@ internal class AiTaskRuntime(private val context: Context, private val configura
         if (uiOwner != owner || !foreground || running || !baseAllowed() || background && !notifications ||
             notifications && !this.notifications.available() || background && request.tools.any { it.origin == AiToolOrigin.FILE && it.effect != AiToolEffect.READ }) return false
         val currentConfig = configuration() ?: return false
-        if (!currentConfig.enabled || !currentConfig.networkAllowed || currentConfig.activeKey().isBlank()) return false
+        if (!currentConfig.enabled || !currentConfig.networkAllowed || !currentConfig.hasActiveKey()) return false
         clearState()
         config = currentConfig; dataToken = data.current(); connectionToken = connections.current()
         this.remote = remote; this.notify = notifications; this.background = background

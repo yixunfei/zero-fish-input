@@ -9,18 +9,13 @@ import android.os.Build
 /** The only production system-clipboard adapter. It never requests the payload. */
 internal class AndroidSystemClipboard(private val context: Context) : SystemClipboardPort {
     private val manager = context.applicationContext.getSystemService(ClipboardManager::class.java)
-    private var ownEmptyTimestamp: Long? = null
-    private var captureOwnEmptyTimestamp = false
+    private val ownEmpty = OwnEmptyClipboardStamp()
 
     override fun timestamp(): Long? {
         checkUnlocked()
         return try {
             val timestamp = manager.primaryClipDescription?.timestamp
-            if (captureOwnEmptyTimestamp) {
-                ownEmptyTimestamp = timestamp
-                captureOwnEmptyTimestamp = false
-                null
-            } else timestamp?.takeUnless { it == ownEmptyTimestamp }
+            timestamp?.takeUnless { ownEmpty.hides(it, android.os.SystemClock.elapsedRealtime()) }
         } catch (_: SecurityException) { throw ClipboardAccessException(ClipboardAccessIssue.READ_DENIED) }
     }
 
@@ -30,9 +25,12 @@ internal class AndroidSystemClipboard(private val context: Context) : SystemClip
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 manager.clearPrimaryClip()
             } else {
+                val started = System.currentTimeMillis()
                 manager.setPrimaryClip(ClipData.newPlainText("", ""))
-                ownEmptyTimestamp = null
-                captureOwnEmptyTimestamp = true
+                val ended = System.currentTimeMillis()
+                // Never learn a later replacement from the next callback/read.
+                ownEmpty.record(manager.primaryClipDescription?.timestamp, started, ended,
+                    android.os.SystemClock.elapsedRealtime())
             }
         } catch (_: SecurityException) { throw ClipboardAccessException(ClipboardAccessIssue.WRITE_DENIED) }
     }

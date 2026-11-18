@@ -139,6 +139,8 @@ private data class PackDictionaryEntry(
 
 private object LanguagePackDictionaryLoader {
     private const val MAX_ENTRIES = 50_000
+    private const val MAX_LINE_CHARS = 4096
+    private const val MAX_LINE_FIELDS = 16
     private const val MAX_TEXT_FILE_BYTES = 16L * 1024 * 1024
     private const val MAX_TOTAL_TEXT_BYTES = 32L * 1024 * 1024
 
@@ -154,6 +156,7 @@ private object LanguagePackDictionaryLoader {
             when (file.extension.lowercase()) {
                 "json" -> if (!parseJson(text, result)) return emptyList()
                 "txt", "yaml" -> text.lineSequence().forEach { line ->
+                    if (!isBoundedLine(line)) return emptyList()
                     if (result.size < MAX_ENTRIES) parseLine(line, result)
                 }
                 else -> return emptyList()
@@ -220,7 +223,22 @@ private object LanguagePackDictionaryLoader {
         }
     }
 
+    private fun isBoundedLine(raw: String): Boolean {
+        if (raw.length > MAX_LINE_CHARS) return false
+        var fields = 0
+        var inField = false
+        for (character in raw) {
+            if (character.isWhitespace()) inField = false
+            else if (!inField) {
+                if (++fields > MAX_LINE_FIELDS) return false
+                inField = true
+            }
+        }
+        return raw.count { it == '\t' } < MAX_LINE_FIELDS
+    }
+
     private fun parseLine(raw: String, output: MutableSet<PackDictionaryEntry>) {
+        if (!isBoundedLine(raw)) return
         val line = raw.trim().removePrefix("\uFEFF")
         if (line.isEmpty() || line.startsWith("#") || line == "---" || line == "...") return
         val fields = line.split('\t').map(String::trim).filter(String::isNotEmpty)

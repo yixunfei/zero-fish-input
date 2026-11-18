@@ -128,13 +128,16 @@ class AppGraph(context: Context) : AutoCloseable {
     internal val aiConnectionGeneration = AiDataGeneration()
     private val aiConfigurationStorage = dev.zeroinput.ime.ai.AiConfigurationStorage(aiConfiguration, aiConversations, aiContextLibrary, aiSkills, aiConnections)
     private val aiConfigurationState = dev.zeroinput.ime.ai.AiConfigurationState()
-    val aiCoordinator = AiCoordinator(OpenAiCompatibleProvider({ aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor))
+    val aiCoordinator = AiCoordinator(OpenAiCompatibleProvider({ aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor,
+        credentialReader = ::resolveAiCredentials))
     internal val standaloneAiCoordinator = AiCoordinator(OpenAiCompatibleProvider(
         { aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor,
+        credentialReader = ::resolveAiCredentials,
     ))
     val aiDataGeneration = AiDataGeneration()
     internal val toolProvider: dev.zeroinput.ai.api.AiToolProvider = OpenAiCompatibleProvider(
         { aiConfigurationSnapshot() ?: AiConfiguration() }, aiExecutor, aiCancellationExecutor,
+        credentialReader = ::resolveAiCredentials,
     )
     private val taskRuntimeDelegate = lazy { dev.zeroinput.ime.ai.AiTaskRuntime(applicationContext, ::aiConfigurationSnapshot,
         { settings.learningEnabled && !settings.incognitoMode }, aiDataGeneration, aiConnectionGeneration, toolProvider) }
@@ -166,6 +169,7 @@ class AppGraph(context: Context) : AutoCloseable {
             { aiConfigurationSnapshot() ?: AiConfiguration() },
             deviceAgentExecutor,
             aiCancellationExecutor,
+            credentialReader = ::resolveAiCredentials,
         ),
         broker = deviceAgentBroker,
         executor = deviceAgentExecutor,
@@ -207,6 +211,17 @@ class AppGraph(context: Context) : AutoCloseable {
 
     fun aiConfigurationSnapshot(): AiConfiguration? = aiConfigurationState.snapshot()
 
+    /** Invoked only by a transport worker for an explicitly submitted operation. */
+    internal fun resolveAiCredentials(expected: AiConfiguration): AiConfiguration {
+        check(expected.enabled && expected.networkAllowed && aiConfigurationSnapshot() === expected)
+        val loaded = aiConfiguration.read()
+        check(aiConfigurationSnapshot() === expected && loaded.withoutCredentials() == expected)
+        val selected = checkNotNull(loaded.activeProvider())
+        return expected.copy(providers = expected.providers.map {
+            if (it.id == selected.id) selected else it
+        })
+    }
+
     internal val settingsDeletions = dev.zeroinput.ime.settings.SettingsDeletionCoordinator(
         post = { android.os.Handler(android.os.Looper.getMainLooper()).post(it) },
         delete = { kind, completed ->
@@ -232,12 +247,15 @@ class AppGraph(context: Context) : AutoCloseable {
         return AutoCloseable { aiConfigurationListeners -= listener }
     }
 
-    fun readAiConfiguration(completed: (Result<AiConfiguration>) -> Unit) {
+    fun readAiConfiguration(forEditing: Boolean = false, completed: (Result<AiConfiguration>) -> Unit) {
         val token = aiConfigurationState.current()
         try {
             aiPersistenceExecutor.execute {
                 val result = runCatching { aiConfigurationStorage.read() }
                 if (aiConfigurationState.publish(token, result.getOrNull())) completed(result)
+                else if (forEditing) completed(result.mapCatching {
+                    checkNotNull(aiConfigurationState.forEditing(token, it)) { "AI configuration revoked" }
+                })
                 else completed(Result.failure(IllegalStateException("AI configuration revoked")))
             }
         } catch (_: java.util.concurrent.RejectedExecutionException) {

@@ -35,6 +35,8 @@ app -> ime-core --------> engine-api
  +-> ai-api (independent contracts)
  +-> language-pack -----> engine-api
 
+app -> security
+ime-ui -> ime-core
 user-data -> security
 user-data -> ai-api
 ime-ui -> ai-api
@@ -1238,3 +1240,26 @@ The UI owns a curated offline catalog of 13 named groups, starting with a
 The previous and next buttons and horizontal swipes share continuous paging.
 The editor adapter places the caret inside a pair using its tracked insertion
 range and checks that the range and bound connection still match after commit.
+
+## Audit hardening (2026-11-18)
+
+Application AI configuration snapshots contain provider metadata and key-presence
+flags only. The encrypted repository has no plaintext configuration cache. Each
+explicit request resolves its selected credential on the transport worker and
+checks the exact submitted snapshot before and after loading. Settings retain
+editable credentials only while their protected foreground window is active;
+stopping it dismisses drafts and drops the loaded configuration. The encrypted
+format and key aliases are unchanged. JVM strings cannot be reliably erased.
+
+Reloading equal redacted configuration preserves the submitted snapshot identity;
+explicit saves and revocation still replace it. After a failed save, only the
+protected settings editor may reload durable providers with both activation
+switches forced off. That recovery does not publish usable transport state, and
+stale revisions are rejected. Further edits wait for a successful reload so an
+empty error placeholder cannot overwrite saved providers.
+
+Every native Rime JNI export translates C++ failures to fixed Java exceptions,
+preserves pending Java exceptions and stops JNI allocation sequences immediately
+on failure. String, context, commit, candidate iterator and unselected-session
+leases release resources during unwinding. The APK verifier requires Rime,
+C++ shared runtime and both ONNX libraries in every requested ABI.

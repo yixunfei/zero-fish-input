@@ -149,7 +149,7 @@ internal class AiWorkbenchController(
         val input = compactionInput() ?: return false
         val config = configuration() ?: return false
         if (!allowed() || !contextCurrent() || inputRevision != context.state.revision ||
-            !config.enabled || !config.networkAllowed || config.activeKey().isBlank()) return false
+            !config.enabled || !config.networkAllowed || !config.hasActiveKey()) return false
         stop()
         val token = generation.get()
         val data = dataGeneration.current()
@@ -278,7 +278,7 @@ internal class AiWorkbenchController(
             fail(AiProviderError.Policy("AI network is disabled"))
             return
         }
-        if (config.activeKey().isBlank()) {
+        if (!config.hasActiveKey()) {
             fail(AiProviderError.Configuration("AI provider is not configured"))
             return
         }

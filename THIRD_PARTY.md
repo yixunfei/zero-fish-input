@@ -21,6 +21,7 @@ ZeroInput 自有源码使用 Apache-2.0。下列运行时组件和数据保持�
 | AndroidX Test runner / JUnit extension | 1.6.2 / 1.2.1 | Apache-2.0 | `Apache-2.0.txt` | 仅模拟器/设备测试 APK；使用已有缓存，不进入应用运行时，无联网或采集路径 |
 | Robolectric | 4.16.1 | MIT | `robolectric-MIT.txt` | Host JVM tests using Android JSON parsing; not included in application or device-test APKs. |
 | Material Components | 1.12.0 | Apache-2.0 | `Apache-2.0.txt` | Android UI |
+| kotlinx-coroutines core / core-jvm / android | 1.6.4 | Apache-2.0 | `kotlinx-coroutines-Apache-2.0.txt` | Transitive AndroidX coroutine runtime; offline, no implicit networking |
 | Kotlin runtime | 2.1.21 | Apache-2.0 | `Apache-2.0.txt` | Kotlin 运行时 |
 | PaddlePaddle PP-OCRv5 mobile recognition model | `ed152b8b495f84de93cda5709d768548a9127622` | Apache-2.0 (model card) | `Apache-2.0.txt` | 离线中文单字手写识别模型与派生字符表 |
 | CMUdict spellings | `74790861f652b15e4ac49015a90074ad62a27690` | BSD-style | `cmudict-LICENSE.txt` | Offline English glide dictionary |

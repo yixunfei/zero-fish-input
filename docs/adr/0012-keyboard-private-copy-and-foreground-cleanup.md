@@ -60,7 +60,7 @@ Removing the old connection checks without this new action was rejected.
 An application-owned coordinator retains one item ID, source editor metadata
 (package, field ID and input type), vault deletion generation and an unused
 one-use grant. It holds no IME, InputConnection or decrypted text. Authentication
-times out after 60 seconds; successful authentication starts a 30-second grant
+times out after 30 seconds; successful authentication starts a 30-second grant
 deadline. Nothing is persisted or restored after process death. The initial
 authentication navigation may end the original session. Temporary credential
 editors receive neither the grant nor a paste control.

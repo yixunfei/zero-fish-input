@@ -130,3 +130,11 @@ sizes and hashes. `tools/resources/publish.py` uploads public resource archives
 and companion license/source archives. Tegaki redistribution includes the original
 0.3 source archives and conversion scripts alongside the runtime data. See
 `tools/resources/README.md` and ADR 0021 for publication and replacement details.
+
+## Transitive coroutine runtime
+
+kotlinx-coroutines-core/core-jvm and kotlinx-coroutines-android 1.6.4:
+https://github.com/Kotlin/kotlinx.coroutines/tree/1.6.4
+Apache-2.0, Copyright 2000-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+The runtime is resolved transitively through AndroidX; the bundled Apache-2.0
+license and NOTICE apply. It introduces no implicit network component.

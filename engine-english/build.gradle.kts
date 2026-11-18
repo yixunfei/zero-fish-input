@@ -9,6 +9,7 @@ kotlin {
 dependencies {
     implementation(project(":engine-api"))
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":engine-api")))
 }
 
 tasks.test {

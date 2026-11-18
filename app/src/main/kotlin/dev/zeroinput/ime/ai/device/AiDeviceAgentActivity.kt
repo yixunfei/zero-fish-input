@@ -248,7 +248,7 @@ class AiDeviceAgentActivity : AppCompatActivity() {
         })
         content.addView(button(R.string.ai_readiness_fix) {
             val config = graph.aiConfigurationSnapshot()
-            if (config == null || !config.enabled || !config.networkAllowed || config.activeKey().isBlank()) {
+            if (config == null || !config.enabled || !config.networkAllowed || !config.hasActiveKey()) {
                 startActivity(Intent(this, dev.zeroinput.ime.settings.MainActivity::class.java)
                     .putExtra(dev.zeroinput.ime.settings.MainActivity.EXTRA_AI_SETTINGS, true))
             } else startActivity(Intent(this, DeviceAgentSettingsActivity::class.java))
@@ -271,7 +271,7 @@ class AiDeviceAgentActivity : AppCompatActivity() {
     private fun startTask() {
         if (!hasWindowFocus() || pendingStart != null || graph.deviceAgentCoordinator.hasActiveTask) return
         val config = graph.aiConfigurationSnapshot()
-        if (config == null || !config.enabled || !config.networkAllowed || config.activeKey().isBlank()) {
+        if (config == null || !config.enabled || !config.networkAllowed || !config.hasActiveKey()) {
             status.setText(R.string.ai_assistant_configuration_required)
             return
         }
@@ -429,7 +429,7 @@ class AiDeviceAgentActivity : AppCompatActivity() {
             !graph.settings.learningEnabled || graph.settings.incognitoMode -> R.string.ai_assistant_privacy_blocked
             config == null -> R.string.ai_assistant_configuration_loading
             !config.enabled || !config.networkAllowed -> R.string.ai_assistant_network_disabled
-            config.activeKey().isBlank() -> R.string.ai_assistant_configuration_required
+            !config.hasActiveKey() -> R.string.ai_assistant_configuration_required
             !policy.enabled || !policy.disclosureAccepted -> R.string.ai_device_agent_activity_disclosure_required
             !graph.deviceAgentBroker.connected -> R.string.ai_device_agent_not_authorized
             !graph.deviceAgentBroker.unlocked() -> R.string.ai_assistant_privacy_blocked

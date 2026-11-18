@@ -24,6 +24,8 @@ class OpenAiCompatibleProvider internal constructor(
     private val exchangeFactory: (URI) -> AiTransportExchange = { PlatformExchange(it) },
     private val nanoTime: () -> Long = System::nanoTime,
     private val scheduleTimeout: (Long, () -> Unit) -> AutoCloseable = AiRequestTimeouts::schedule,
+    /** Resolves request-scoped secrets on the worker, checking the submitted snapshot again. */
+    private val credentialReader: (AiConfiguration) -> AiConfiguration = { it },
 ) : AiProvider, AiModelCatalog, DeviceAgentProvider, AiToolProvider {
     override fun request(request: AiToolRequest, completed: (Result<AiToolResponse>) -> Unit): AiRequestHandle =
         launch(null, {}, { completed(Result.failure(it)) },
@@ -160,9 +162,12 @@ class OpenAiCompatibleProvider internal constructor(
                     operation.check()
                     // A changed snapshot revokes queued work; it cannot retarget old content.
                     if (configurationReader() != config) throw InterruptedException()
-                    validateConfiguration(config, request)
+                    val resolved = credentialReader(config)
+                    operation.check()
+                    if (configurationReader() != config) throw InterruptedException()
+                    validateConfiguration(resolved, request)
                     operation.deliver(started)
-                    work(config, operation)
+                    work(resolved, operation)
                 } catch (error: Throwable) {
                     if (error is InterruptedException || Thread.currentThread().isInterrupted) operation.cancel()
                     else operation.fail(error.asProviderError())

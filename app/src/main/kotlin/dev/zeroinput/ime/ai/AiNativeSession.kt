@@ -32,7 +32,7 @@ internal class AiNativeSession(private val appContext: Context) : VoiceInteracti
     private val coordinator by lazy {
         val composition = graph
         AiCoordinator(OpenAiCompatibleProvider({ composition.aiConfigurationSnapshot() ?: dev.zeroinput.userdata.AiConfiguration() },
-            composition.aiExecutor, composition.aiCancellationExecutor))
+            composition.aiExecutor, composition.aiCancellationExecutor, credentialReader = composition::resolveAiCredentials))
     }
     private val lockReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) { if (intent?.action == Intent.ACTION_SCREEN_OFF) { clear(); finish() } }
@@ -69,7 +69,7 @@ internal class AiNativeSession(private val appContext: Context) : VoiceInteracti
             !appContext.getSystemService(KeyguardManager::class.java).isKeyguardLocked)
     private fun ready() {
         val config = graph.aiConfigurationSnapshot()
-        panel?.ready(!pending && allowed() && config?.enabled == true && config.networkAllowed && config.activeKey().isNotBlank())
+        panel?.ready(!pending && allowed() && config?.enabled == true && config.networkAllowed && config.hasActiveKey())
     }
     private fun send(text: String) {
         val config = graph.aiConfigurationSnapshot() ?: return

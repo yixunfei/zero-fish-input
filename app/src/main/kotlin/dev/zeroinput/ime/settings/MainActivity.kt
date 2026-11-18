@@ -140,7 +140,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun reloadAiConfiguration() {
         val token = ++aiReadGeneration
-        graph.readAiConfiguration { result -> runOnUiThread {
+        graph.readAiConfiguration(forEditing = true) { result -> runOnUiThread {
             if (!isFinishing && !isDestroyed && token == aiReadGeneration) {
                 aiConfig = result.getOrDefault(AiConfiguration())
                 aiConfigReady = result.isSuccess
@@ -171,6 +171,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        aiReadGeneration++
+        aiConfig = AiConfiguration()
+        aiConfigReady = false
         personalRankingDialog?.dismiss()
         personalRankingDialog = null
         deletionObserver?.close()
@@ -371,19 +374,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateAiConfig(completed: (Boolean) -> Unit = {}, change: AiConfiguration.() -> AiConfiguration) {
         if (!aiConfigReady) { completed(false); return }
-        aiReadGeneration++
         val next = aiConfig.change()
+        val token = ++aiReadGeneration
+        aiConfig = aiConfig.withoutCredentials()
         aiConfigReady = false
         screen.setAiControlsEnabled(false)
         graph.updateAiConfiguration(next) { success -> runOnUiThread {
-            if (isFinishing || isDestroyed) { completed(false); return@runOnUiThread }
-            // A rejected endpoint or failed write leaves the saved settings
-            // intact. Preserve them for the next edit while reflecting the
-            // graph's immediate network revocation in both switches.
-            aiConfig = if (success) next else aiConfig.copy(enabled = false, networkAllowed = false)
-            aiConfigReady = true
+            if (isFinishing || isDestroyed || token != aiReadGeneration) { completed(false); return@runOnUiThread }
+            // Failure leaves durable settings intact but drops editable secrets.
+            // The graph stays revoked until an explicit control operation succeeds.
+            aiConfig = if (success) next else AiConfiguration()
+            aiConfigReady = success
             render()
             completed(success)
+            if (!success) {
+                aiDialog?.dismiss()
+                aiDialog = null
+                reloadAiConfiguration()
+            }
             Toast.makeText(this, if (success) R.string.ai_settings_saved else R.string.operation_failed, Toast.LENGTH_SHORT).show()
         } }
     }
@@ -442,10 +450,11 @@ class MainActivity : AppCompatActivity() {
         incognitoDialog = null
         deletionObserver?.close()
         deletionObserver = null
-        aiDialog?.cancelTests()
-        // Keep the bounded draft in this protected window while the user visits
-        // another app. Explicit dismissal or destruction clears its fields.
-        if (isFinishing) aiDialog?.dismiss()
+        aiReadGeneration++
+        aiConfig = AiConfiguration()
+        aiConfigReady = false
+        aiDialog?.dismiss()
+        aiDialog = null
         super.onStop()
     }
 
@@ -540,7 +549,7 @@ class MainActivity : AppCompatActivity() {
                 aiEndpoint = aiConfig.activeEndpoint(),
                 aiModel = aiConfig.activeModel(),
                 aiProviderName = aiConfig.activeProvider()?.name.orEmpty(),
-                aiKeyConfigured = aiConfig.activeKey().isNotBlank(),
+                aiKeyConfigured = aiConfig.hasActiveKey(),
                 aiSaveConversations = aiConfig.saveConversations,
                 aiThinkingVisible = graph.settings.aiThinkingVisible,
                 interfaceLanguageTag = AppCompatDelegate.getApplicationLocales().toLanguageTags(),

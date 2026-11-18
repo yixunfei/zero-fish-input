@@ -1,6 +1,52 @@
 # Project status
 
-Updated 2026-11-13.
+Updated 2026-11-18.
+
+## Re-review and v0.7.6 preparation (2026-11-18)
+
+Reviewed the pending audit repairs and fixed two additional AI configuration
+defects: equal reloads replacing request snapshot identity, and failed settings
+saves permitting empty provider replacement or preventing editing recovery.
+Recovery retains durable providers with activation off and never republishes
+transport authorization. Negative and actual queue-rejection regressions pass.
+
+Validation is complete: 2,087 JVM passes and four opt-in skips across variants,
+privacyCheck, Debug/Release Lint, three-ABI native/Release builds, 34 Python tests,
+JNI failure injection and packaging/script checks. The final universal APK
+passed 60 API 37 x86_64 device tests with no skips and verified installed hashes,
+after upgrading from the actual published v0.7.5 APK with the same certificate.
+
+Details, commands, hashes and limits: [v0.7.6 validation](releases/v0.7.6-validation.md).
+Ready to commit, tag and publish the Debug-signed testing prerelease with its
+notices, handwriting sources and checksum manifest. No production key is used.
+Physical ARM/OEM and Android 8 execution remain unverified.
+
+## Audit repair and packaging (2026-11-18)
+
+Completed the 13 retained findings from the reviewed November 17 audit and
+re-reviewed the affected paths. Details, evidence, commands and residual limits:
+[repair verification](audits/2026-11-18-fix-verification.md).
+
+- Full JVM tests: 87 pure JVM cases; Android Debug/Release each 997 passed,
+  2 opt-in skips, no failures/errors. Privacy and Lint passed, no Lint issues.
+- 16 Python resource tests and packaging locator/reset tests passed. Original
+  8 MB line probe is bounded under 128 MB heap. JNI failure injection passed.
+- Final universal package: 22 API 37 x86_64 device tests passed, no skips, with
+  installed APK hashes checked. Native shared contract and small/rotated/themed
+  layouts included. Physical ARM and Android 8 execution remain unverified.
+- Rebuilt all three Debug/Release native ABIs; full APK content checks passed.
+  Release splits are unsigned. No commit, push or publication was performed.
+
+Installable Debug test artifact:
+`app/build/outputs/test-apk/20261118-090141/zero-fish-input-0.7.5-debug-universal.apk`.
+104,087,362 bytes; within 180 MB budget and above the 80 MB target. SHA-256:
+`6f870e7b4d4bf3afd4aeda0e3e27933e42596aa220aab2add833a14e38de0d7c`.
+Notices, sources, checksums and verification JSON are alongside it.
+
+Next: physical ARM/OEM and Android 8 timing acceptance when devices are available.
+No unresolved confirmed defect remains in the affected-path review; documented
+platform races, JVM String erasure limits and unverified scenarios remain.
+
 
 ## Public catalog and remote branches (2026-11-13)
 

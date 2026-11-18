@@ -34,7 +34,27 @@ def verify_prebuilt(archive, names):
                 'Damaged prebuilt startup asset')
 
 
-def verify(path, bundle):
+REQUIRED_LIBRARIES = {'libzeroinput_rime.so', 'libc++_shared.so',
+                      'libonnxruntime.so', 'libonnxruntime4j_jni.so'}
+SUPPORTED_ABIS = {'arm64-v8a', 'armeabi-v7a', 'x86_64'}
+
+
+def verify_native_libraries(names, expected_abis=None):
+    libraries = {}
+    for name in names:
+        parts = name.split('/')
+        if len(parts) == 3 and parts[0] == 'lib' and parts[2].endswith('.so'):
+            libraries.setdefault(parts[1], set()).add(parts[2])
+    expected = set(expected_abis) if expected_abis is not None else set(libraries)
+    require(expected and expected <= SUPPORTED_ABIS and set(libraries) == expected,
+            'Missing or unsupported native ABI')
+    for abi in sorted(expected):
+        require(REQUIRED_LIBRARIES <= libraries[abi],
+                f'Missing required native libraries for {abi}: ' +
+                ', '.join(sorted(REQUIRED_LIBRARIES - libraries[abi])))
+
+
+def verify(path, bundle, expected_abis=None):
     lock = json.loads((ROOT / 'tools/dictionaries/sources.lock.json').read_text(encoding='utf-8'))
     catalog = json.loads((ROOT / 'tools/resources/catalog.json').read_text(encoding='utf-8'))
     runtime = json.loads((ROOT / 'tools/onnxruntime/runtime.lock.json').read_text())
@@ -42,6 +62,7 @@ def verify(path, bundle):
         entries = archive.infolist()
         names = {entry.filename for entry in entries}
         require(len(names) == len(entries), 'Duplicate APK entries')
+        verify_native_libraries(names, expected_abis)
         runtime_abis = {name.split('/')[1] for name in names if name.startswith('lib/') and name.endswith('/libonnxruntime.so')}
         jni_abis = {name.split('/')[1] for name in names if name.startswith('lib/') and name.endswith('/libonnxruntime4j_jni.so')}
         require(runtime_abis and runtime_abis == jni_abis and runtime_abis <= runtime['libraries'].keys(),
@@ -86,5 +107,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('bundle', choices=['full', 'lite'])
     parser.add_argument('apk', type=Path)
+    parser.add_argument('--abis', nargs='+', choices=sorted(SUPPORTED_ABIS))
     args = parser.parse_args()
-    verify(args.apk, args.bundle)
+    verify(args.apk, args.bundle, args.abis)

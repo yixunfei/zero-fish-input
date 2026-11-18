@@ -42,5 +42,6 @@ dependencies {
     implementation(project(":security"))
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":engine-api")))
     testImplementation(libs.json)
 }

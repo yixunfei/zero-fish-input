@@ -17,6 +17,59 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class OpenAiCompatibleProviderTest {
+    @Test fun credentialsAreResolvedOnlyOnWorkerAndNeverForRevokedOrRejectedQueue() {
+        val executor = Executors.newSingleThreadExecutor()
+        val gate = CountDownLatch(1)
+        val resolved = java.util.concurrent.atomic.AtomicInteger()
+        val original = configuration().withoutCredentials()
+        val current = AtomicReference(original)
+        val ended = CountDownLatch(1)
+        executor.submit { gate.await() }
+        try {
+            val provider = OpenAiCompatibleProvider({ current.get() }, executor,
+                credentialReader = { resolved.incrementAndGet(); configuration() })
+            provider.stream(AiRequest(null, AiAction.ASK, "fixture")) {
+                if (it is AiStreamEvent.Cancelled || it is AiStreamEvent.Failed) ended.countDown()
+            }
+            assertEquals(0, resolved.get())
+            current.set(AiConfiguration())
+            gate.countDown()
+            assertTrue(ended.await(5, TimeUnit.SECONDS))
+            assertEquals(0, resolved.get())
+        } finally { gate.countDown(); executor.shutdownNow() }
+        val stopped = Executors.newSingleThreadExecutor().apply { shutdownNow() }
+        OpenAiCompatibleProvider({ original }, stopped,
+            credentialReader = { resolved.incrementAndGet(); configuration() })
+            .stream(AiRequest(null, AiAction.ASK, "fixture")) {}
+        assertEquals(0, resolved.get())
+    }
+
+    @Test fun requestResolvesCredentialOffCallerThreadAndRechecksRevocationAfterLoad() {
+        val executor = Executors.newSingleThreadExecutor()
+        val original = configuration().withoutCredentials()
+        val current = AtomicReference(original)
+        val ended = CountDownLatch(1)
+        val caller = Thread.currentThread()
+        val resolved = java.util.concurrent.atomic.AtomicInteger()
+        val exchanges = java.util.concurrent.atomic.AtomicInteger()
+        try {
+            val provider = OpenAiCompatibleProvider({ current.get() }, executor,
+                exchangeFactory = { exchanges.incrementAndGet(); error("fixture must not connect") },
+                credentialReader = {
+                    assertTrue(Thread.currentThread() !== caller)
+                    resolved.incrementAndGet()
+                    current.set(AiConfiguration())
+                    configuration()
+                })
+            provider.stream(AiRequest(null, AiAction.ASK, "fixture")) {
+                if (it is AiStreamEvent.Cancelled || it is AiStreamEvent.Failed) ended.countDown()
+            }
+            assertTrue(ended.await(5, TimeUnit.SECONDS))
+            assertEquals(1, resolved.get())
+            assertEquals(0, exchanges.get())
+        } finally { executor.shutdownNow() }
+    }
+
     @Test fun referencesAreQuotedDataAndCannotChangeMessageRoles() {
         val executor = Executors.newSingleThreadExecutor()
         try {

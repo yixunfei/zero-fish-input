@@ -21,6 +21,22 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiRepositoryTest {
+    @Test fun sameRepositoryNeverReturnsOldCredentialsAfterStorageChangesOrFailures() {
+        val store = MemoryStore()
+        val repository = AiConfigurationRepository(store)
+        val first = AiConfiguration(providers = listOf(providerProfile()), selectedProviderId = "fixture")
+        repository.write(first)
+        assertEquals(first, repository.read())
+        AiConfigurationRepository(store).write(first.copy(providers = listOf(providerProfile(apiKey = "replacement"))))
+        assertEquals("replacement", repository.read().activeKey())
+        store.failWrite = true
+        assertThrows(IOException::class.java) { repository.write(first) }
+        store.bytes = "invalid".toByteArray()
+        assertThrows(IllegalStateException::class.java) { repository.read() }
+        store.bytes = null
+        assertEquals(AiConfiguration(), repository.read())
+    }
+
     @Test fun protocolAndStreamingRoundTripAndUnknownProtocolFailsClosed() {
         for (protocol in dev.zeroinput.ai.api.AiProtocol.entries) {
             val store = MemoryStore()

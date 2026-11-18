@@ -29,7 +29,7 @@ fun systemClipboardViolation(path: String, text: String): String? {
 
 fun networkViolation(path: String, text: String): String? {
     // These TLS exception values contain no I/O capability; transports remain restricted in every source set.
-    val network = Regex("""(?:java\.net\.(?:URL\b|Socket\b|Datagram|Http|http\b)|java\.nio\.channels\.SocketChannel|javax\.net\.(?!ssl\.SSL(?:Exception|HandshakeException)\b)|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|Class\.forName\s*\(\s*[\"']java\.net\.)""")
+    val network = Regex("""(?:java\.net\.(?:URL\b|URLConnection\b|(?:Server)?Socket\b|MulticastSocket\b|Datagram|Http|http\b)|java\.nio\.channels\.(?:(?:Asynchronous)?(?:Server)?SocketChannel|DatagramChannel)\b|javax\.net\.(?!ssl\.SSL(?:Exception|HandshakeException)\b)|HttpURLConnection|HttpsURLConnection|openConnection\s*\(|android\.webkit|WebView|DownloadManager|okhttp|retrofit|ktor\.client|Cronet|\b(?:getByName|getAllByName|getLocalHost|getHostName|getCanonicalHostName)\b|\.\s*(?:hostName|canonicalHostName)\b|Class\.forName\s*\(\s*[\"']java\.net\.)""")
     val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
     val dictionaries = "app/src/main/kotlin/dev/zeroinput/ime/dictionaries/DictionaryDownloadTransport.kt"
     val remote = "app/src/main/kotlin/dev/zeroinput/ime/ai/AiRemoteHttpsTransport.kt"
@@ -407,7 +407,12 @@ tasks.register("testPrivacyBoundary") {
         check(systemClipboardViolation(adapter, "$empty\nmanager.setPrimaryClip(value)") != null)
         val provider = "app/src/main/kotlin/dev/zeroinput/ime/ai/OpenAiCompatibleProvider.kt"
         for (source in listOf("java.net.URL", "javax.net.ssl.HttpsURLConnection", "url.openConnection()",
-            "java.net.Socket", "okhttp3.OkHttpClient", "android.webkit.WebView")) {
+            "java.net.Socket", "java.net.ServerSocket(0)", "java.net.InetAddress.getByName(value)",
+            "java.net.InetAddress.getAllByName(value)", "InetAddress::getByName",
+            "import java.net.InetAddress.getByName as resolve", "InetAddress.getLocalHost()", "address.hostName",
+            "java.nio.channels.ServerSocketChannel.open()", "java.nio.channels.AsynchronousSocketChannel.open()",
+            "java.nio.channels.AsynchronousServerSocketChannel.open()", "java.nio.channels.DatagramChannel.open()",
+            "java.net.MulticastSocket(0)", "java.net.URLConnection", "okhttp3.OkHttpClient", "android.webkit.WebView")) {
             check(networkViolation(business, source) != null)
             check(networkViolation("other/$provider", source) != null)
             check(networkViolation(provider, source) == null)
@@ -419,7 +424,8 @@ tasks.register("testPrivacyBoundary") {
             check(networkViolation("other/$remote", source) != null)
             check(networkViolation("app/src/main/kotlin/dev/zeroinput/ime/ai/AiMcpClient.kt", source) != null)
         }
-        check(networkViolation(business, "java.net.URI") == null)
+        for (source in listOf("java.net.URI", "java.nio.channels.FileChannel", "java.nio.channels.SeekableByteChannel", "java.net.InetAddress", "InetAddress.getByAddress(bytes)"))
+            check(networkViolation(business, source) == null)
         for (path in listOf(business, "app/src/test/kotlin/TransportTest.kt")) {
             check(networkViolation(path, "javax.net.ssl.SSLHandshakeException") == null)
             check(networkViolation(path, "javax.net.ssl.SSLException") == null)

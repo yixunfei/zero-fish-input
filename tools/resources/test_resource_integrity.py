@@ -14,6 +14,25 @@ VERIFIER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFIER)
 
 
+class NativeLibrarySetTest(unittest.TestCase):
+    def names(self, abis):
+        return {f'lib/{abi}/{library}' for abi in abis for library in VERIFIER.REQUIRED_LIBRARIES}
+
+    def test_three_complete_abis_pass(self):
+        VERIFIER.verify_native_libraries(self.names(VERIFIER.SUPPORTED_ABIS), VERIFIER.SUPPORTED_ABIS)
+
+    def test_every_required_library_is_checked_in_every_abi(self):
+        complete = self.names(VERIFIER.SUPPORTED_ABIS)
+        for abi in VERIFIER.SUPPORTED_ABIS:
+            for library in VERIFIER.REQUIRED_LIBRARIES:
+                with self.subTest(abi=abi, library=library), self.assertRaisesRegex(ValueError, 'Missing required'):
+                    VERIFIER.verify_native_libraries(complete - {f'lib/{abi}/{library}'}, VERIFIER.SUPPORTED_ABIS)
+
+    def test_entire_missing_abi_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'native ABI'):
+            VERIFIER.verify_native_libraries(self.names({'x86_64'}), VERIFIER.SUPPORTED_ABIS)
+
+
 class RuntimeIntegrityTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -59,6 +78,8 @@ class RuntimeIntegrityTest(unittest.TestCase):
             archive.writestr('assets/glide-zh.tsv', b'public fixture')
             for index in range(3972):
                 archive.writestr(f'assets/emoji/18.0/images/{index}.webp', b'public artwork fixture')
+            archive.writestr(f'lib/{abi}/libzeroinput_rime.so', b'public Rime fixture')
+            archive.writestr(f'lib/{abi}/libc++_shared.so', b'public C++ fixture')
             if runtime is not None:
                 archive.writestr(f'lib/{abi}/libonnxruntime.so', runtime)
             if jni is not None:

@@ -105,10 +105,13 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   The update job verifies matching prebuilt artifacts, checks bot ownership and an
   exact Git lease, and has no approval/merge or resource-publication step.
 
-- Manifest 为用户主动开启的 AI 网络工作台及显式公开词库下载声明 `INTERNET`；CI 扫描项目源码中的联网权限和
-  系统剪贴板 API，并解析 Debug/Release 合并清单执行权限白名单校验，防止依赖间接引入网络、
-  存储或其他敏感权限。AI 网络传输仅允许 `OpenAiCompatibleProvider`，只接受 HTTPS、禁止明文、
-  查询参数、片段、用户信息和重定向，并限制请求、超时、SSE 单行及整体响应大小。系统剪贴板
+- Manifest 为用户主动开启的 AI 网络工作台、ADR 0033 远程工具及显式公开词库下载声明 `INTERNET`。
+  本地 Gradle `privacyCheck` 与测试包脚本扫描源码中的联网权限、连接/DNS 和系统剪贴板 API，
+  并解析 Debug/Release 合并清单执行权限白名单校验；现有公开词库/资源 CI 工作流并未调用该任务。
+  模型网络仅由 `OpenAiCompatibleProvider` 执行，只接受 HTTPS、禁止明文、查询参数、片段、
+  用户信息和重定向，并限制请求、超时、SSE 单行及整体响应大小。远程工具仅由
+  `AiRemoteHttpsTransport` 按 ADR 0033 校验实际连接 DNS、禁代理/重定向/重试；公开词库仅由
+  `DictionaryDownloadTransport` 按来源白名单和固定资源校验执行，二者的获批查询参数不扩大模型端点规则。系统剪贴板
   正文读取始终禁止；仅专用防护适配器可在用户开启后监听、检查时间戳和清理。AndroidX 文本控件
   只可能在用户明确执行标准粘贴操作时进入系统编辑路径。
 - 除启动页、输入法服务和只接收待确认文本的剪贴板导入页外，Android 组件均不导出；输入法服务只使用系统要求的绑定权限。导入页不能查询或返回私有库内容。
@@ -1496,3 +1499,35 @@ the existing learning flag and queued-write generations. Tests cover persistence
 unchanged public weights, disabled learning and stale selection IDs. Existing
 queue/privacy/clear regressions continue to apply; no format, permission or
 authentication change is introduced.
+
+## Audit controls and residual limits (2026-11-18)
+
+- AI repository reads are uncached. Published application snapshots strip every
+  provider key; only key-presence metadata remains. Request workers resolve the
+  selected key after submission and reject a revoked/replaced snapshot both
+  before and after decryption. Failed/rejected saves leave application state
+  revoked; settings drop credentials on stop and failed saves. No storage format
+  or key alias changes. Active request/edit strings remain immutable JVM strings
+  and cannot be guaranteed erased from heap memory.
+- Equal metadata reloads preserve request snapshot identity. Revocation and
+  explicit saves still invalidate older submissions. Failed settings saves
+  disable editing until durable configuration is reloaded; recovery is limited
+  to the protected editor, forces AI/network switches off and cannot publish
+  transport authorization. Stale recovery revisions are rejected. This prevents
+  saving an empty error placeholder over existing providers.
+- Text language-pack dictionaries reject lines over 4096 characters or 16 fields
+  before splitting, including records beyond the output-entry budget. Invalid
+  files reject the entire loaded dictionary. Existing file/hash limits remain.
+- JNI entry points contain C++ failures, retain pending Java exceptions, and
+  stop allocation/lookup chains on failure. RAII releases acquired resources;
+  error messages contain no native diagnostic, path or input text.
+- Android 8 empty-write deduplication captures metadata immediately after the
+  write, only accepts a timestamp within the write interval, and expires after
+  1000 monotonic milliseconds or any observed timestamp change. Android has no
+  atomic clear-and-identify operation: an external replacement within the same
+  write interval can still be indistinguishable briefly. No payload or length
+  is read; suppression is never retained for the adapter lifetime. An old empty
+  item may subsequently be reported as present. Compare-and-clear races also
+  remain platform limitations.
+- Packaging checks the complete required library set for each explicitly
+  requested ABI. ABI presence alone does not establish native Rime availability.

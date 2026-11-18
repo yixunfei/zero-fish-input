@@ -18,6 +18,19 @@ class AiRemoteToolsTest {
     private val connection = AiConnection("fixture", "Public MCP", AiConnectionKind.MCP, "https://example.com/mcp", "mcp-fixture-token")
     private fun live() = AiRemoteCancellation { true }
 
+    /** Fixed numeric fixtures only; constructing bytes never invokes the DNS resolver. */
+    private fun literalAddress(value: String): InetAddress {
+        if (':' !in value) return InetAddress.getByAddress(value.split('.').map { it.toInt().toByte() }.toByteArray())
+        val halves = value.split("::")
+        val left = halves[0].split(':').filter { it.isNotEmpty() }
+        val right = halves.getOrElse(1) { "" }.split(':').filter { it.isNotEmpty() }
+        val words = left + List(8 - left.size - right.size) { "0" } + right
+        return InetAddress.getByAddress(words.flatMap {
+            val word = it.toInt(16)
+            listOf((word shr 8).toByte(), word.toByte())
+        }.toByteArray())
+    }
+
     @Test fun publicPolicyRejectsPrivateMixedAndRebindingAddressesAtActualLookup() {
         for (url in listOf("http://example.com", "https://user:token@example.com", "https://127.0.0.1", "https://[::1]",
             "https://localhost", "https://host.local", "https://host.home.arpa", "https://example.com:8443", "https://example.com/#fragment"))
@@ -26,12 +39,12 @@ class AiRemoteToolsTest {
         for (address in listOf("0.1.2.3", "10.1.1.1", "100.64.0.1", "127.0.0.1", "169.254.169.254", "172.16.1.1",
             "192.168.1.1", "192.0.2.1", "198.18.0.1", "198.51.100.1", "203.0.113.1", "224.1.1.1", "255.255.255.255",
             "::1", "fc00::1", "fe80::1", "64:ff9b::7f00:1", "2001:db8::1", "2002:7f00:1::", "3fff::1"))
-            assertFalse(address, AiRemotePolicy.publicAddress(InetAddress.getByName(address)))
-        val public = InetAddress.getByName("8.8.8.8"); val private = InetAddress.getByName("127.0.0.1")
+            assertFalse(address, AiRemotePolicy.publicAddress(literalAddress(address)))
+        val public = literalAddress("8.8.8.8"); val private = literalAddress("127.0.0.1")
         assertTrue(AiRemotePolicy.publicAnswers(listOf(public)))
         assertFalse(AiRemotePolicy.publicAnswers(listOf(public, private)))
         assertFalse(AiRemotePolicy.publicAnswers(emptyList()))
-        assertTrue(AiRemotePolicy.publicAddress(InetAddress.getByName("2001:4860:4860::8888")))
+        assertTrue(AiRemotePolicy.publicAddress(literalAddress("2001:4860:4860::8888")))
         var lookups = 0
         val adapter = AiRemoteHttpsTransport { host -> assertEquals("example.com", host); lookups++; listOf(public, private) }
         assertTrue(runCatching { adapter.mcp(connection, "{}", null, live()) }.isFailure)

@@ -145,7 +145,7 @@ class AiToolTaskActivity : AppCompatActivity() {
 
     private fun start(text: String) {
         val config = graph.aiConfigurationSnapshot()
-        if (!visible() || run.running || text.isBlank() || config?.enabled != true || !config.networkAllowed || config.activeKey().isBlank()) {
+        if (!visible() || run.running || text.isBlank() || config?.enabled != true || !config.networkAllowed || !config.hasActiveKey()) {
             panel.error(); return
         }
         val tools = chosen()
@@ -241,7 +241,7 @@ class AiToolTaskActivity : AppCompatActivity() {
         val snapshot = run.snapshot
         panel.configure(snapshot?.request?.tools ?: definitions(), snapshot?.request?.tools?.map { it.id }?.toSet() ?: selected,
             snapshot?.labels ?: labels.values.toList(), snapshot?.request?.workspace ?: workspace, run.running,
-            visible() && config?.enabled == true && config.networkAllowed && config.activeKey().isNotBlank(),
+            visible() && config?.enabled == true && config.networkAllowed && config.hasActiveKey(),
             config?.activeProvider()?.let { getString(R.string.ai_tool_provider_model, it.name, config.activeModel()) }
                 ?: getString(R.string.ai_tool_model_missing))
         val canBackground = chosen().none { it.origin == AiToolOrigin.FILE && it.effect != AiToolEffect.READ }

@@ -22,6 +22,11 @@ data class AiConfiguration(
     fun activeEndpoint(): String = activeProvider()?.endpoint.orEmpty()
     fun activeModel(): String = activeProvider()?.selectedModel.orEmpty()
     fun activeKey(): String = activeProvider()?.apiKey.orEmpty()
+    fun hasActiveKey(): Boolean = activeProvider()?.let { it.apiKey.isNotBlank() || it.keyConfigured } == true
+
+    /** Suitable for application state and UI guards; never retains a credential. */
+    fun withoutCredentials(): AiConfiguration = if (providers.none { it.apiKey.isNotEmpty() }) this else
+        copy(providers = providers.map { it.copy(apiKey = "", keyConfigured = it.apiKey.isNotBlank() || it.keyConfigured) })
     override fun toString(): String = "AiConfiguration(redacted)"
 }
 
@@ -36,6 +41,7 @@ data class AiProviderProfile(
     val audioModels: Set<String> = emptySet(),
     val protocol: AiProtocol = AiProtocol.CHAT_COMPLETIONS,
     val streaming: Boolean = true,
+    val keyConfigured: Boolean = false,
 ) {
     val supportsImages: Boolean get() = selectedModel in imageModels
     val supportsAudio: Boolean get() = selectedModel in audioModels
@@ -50,12 +56,11 @@ class AiConfigurationRepository(
     )
 
     private val lock = Any()
-    private var cached: AiConfiguration? = null
     private var deletionFailed = false
 
     fun read(): AiConfiguration = synchronized(lock) {
         check(!deletionFailed) { "AI configuration unavailable" }
-        cached ?: load().also { cached = it }
+        load()
     }
 
     fun write(value: AiConfiguration) = synchronized(lock) {
@@ -82,15 +87,12 @@ class AiConfigurationRepository(
         }
         val bytes = root.toString().toByteArray(StandardCharsets.UTF_8)
         try { require(bytes.size <= MAX_CONFIG_BYTES); store.write(bytes) } finally { bytes.fill(0) }
-        cached = value
     }
 
     fun clear() = synchronized(lock) {
-        cached = null
         deletionFailed = true
         store.delete(deleteKey = true)
         deletionFailed = false
-        cached = AiConfiguration()
     }
 
     private fun load(): AiConfiguration {

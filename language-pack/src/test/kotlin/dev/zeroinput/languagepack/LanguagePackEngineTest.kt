@@ -195,6 +195,19 @@ class LanguagePackEngineTest {
         }
     }
 
+    @Test fun oversizedOrOverfieldedTextRejectsTheWholeDictionaryBeforeSplitting() {
+        for (payload in listOf("a\t".repeat(4_000_000), "a ".repeat(2_000_000),
+            "a\t".repeat(17), "a ".repeat(17))) {
+            val directory = Files.createTempDirectory("pack-line-boundary").toFile()
+            try {
+                val dictionary = File(directory, "dictionary.txt").apply { writeText("ni\t你\n" + payload) }
+                val manifest = LanguagePackManifest(1, "bounded-pack", "Bounded pack", "zh-CN", "1",
+                    "bounded.dictionary", listOf(LanguagePackFile(dictionary.name, sha256(dictionary), dictionary.length())))
+                assertFalse(LanguagePackEngineFactory(InstalledLanguagePack(manifest, directory)).isAvailable())
+            } finally { directory.deleteRecursively() }
+        }
+    }
+
     private fun sha256(file: File): String = MessageDigest.getInstance("SHA-256")
         .digest(file.readBytes())
         .joinToString("") { "%02x".format(it) }

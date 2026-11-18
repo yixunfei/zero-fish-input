@@ -158,7 +158,7 @@ class AiAssistantActivity : AppCompatActivity() {
 
     private fun send(message: AiChatQueue.Message, interrupt: Boolean) {
         val config = graph.aiConfigurationSnapshot()
-        if (!hasWindowFocus() || !allowed() || config?.enabled != true || !config.networkAllowed || config.activeKey().isBlank() ||
+        if (!hasWindowFocus() || !allowed() || config?.enabled != true || !config.networkAllowed || !config.hasActiveKey() ||
             queue.busy && (config != queueConfiguration || !graph.aiDataGeneration.isCurrent(queueGeneration))) {
             queue.reset()
             refresh()
@@ -254,13 +254,13 @@ class AiAssistantActivity : AppCompatActivity() {
     private fun refresh() {
         if (!started) return
         val config = graph.aiConfigurationSnapshot()
-        val ready = allowed() && config?.enabled == true && config.networkAllowed && config.activeKey().isNotBlank()
+        val ready = allowed() && config?.enabled == true && config.networkAllowed && config.hasActiveKey()
         val message = when {
             !allowed() -> R.string.ai_assistant_privacy_blocked
             config == null && configurationReadFailed -> R.string.ai_assistant_configuration_failed
             config == null -> R.string.ai_assistant_configuration_loading
             !config.enabled || !config.networkAllowed -> R.string.ai_assistant_network_disabled
-            config.activeKey().isBlank() -> R.string.ai_assistant_configuration_required
+            !config.hasActiveKey() -> R.string.ai_assistant_configuration_required
             else -> R.string.ai_assistant_ready
         }
         panel.ready(getString(message), ready, graph.settings.aiThinkingVisible)

@@ -21,6 +21,26 @@ import dev.zeroinput.ime.ui.R as UiR
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class KeyboardReportedBugsTest {
+    @Test fun languageLongPressUsesTheLocalizedCurrentPrivacyDescription() = withActivity { activity ->
+        for (locale in listOf(java.util.Locale.ENGLISH, java.util.Locale.SIMPLIFIED_CHINESE)) {
+            val config = android.content.res.Configuration(activity.resources.configuration).apply { setLocale(locale) }
+            val context = android.view.ContextThemeWrapper(activity.createConfigurationContext(config), R.style.Theme_ZeroInput)
+            val panel = ZeroInputView(context)
+            try {
+                val language = key(panel, UiR.string.language_switch)
+                language.performLongClick()
+                assertEquals(context.getString(UiR.string.language_switch),
+                    org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+                panel.renderSession(dev.zeroinput.ime.core.InputSessionState(privacy =
+                    dev.zeroinput.ime.core.privacy.SessionPrivacy(true, false, false,
+                        dev.zeroinput.ime.core.privacy.PrivacyReason.PASSWORD_FIELD)))
+                language.performLongClick()
+                assertEquals(context.getString(UiR.string.language_sensitive_protection),
+                    org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+            } finally { panel.release() }
+        }
+    }
+
     @Test fun visibleGroupSelectorJumpsToMathematics() = withActivity { activity ->
         val panel = KeyboardPanel(activity)
         activity.setContentView(panel)
