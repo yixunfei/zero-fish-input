@@ -2,7 +2,7 @@
 
 Updated 2026-11-18.
 
-## Re-review and v0.7.6 preparation (2026-11-18)
+## Re-review and v0.7.6 publication (2026-11-18)
 
 Reviewed the pending audit repairs and fixed two additional AI configuration
 defects: equal reloads replacing request snapshot identity, and failed settings
@@ -17,9 +17,14 @@ passed 60 API 37 x86_64 device tests with no skips and verified installed hashes
 after upgrading from the actual published v0.7.5 APK with the same certificate.
 
 Details, commands, hashes and limits: [v0.7.6 validation](releases/v0.7.6-validation.md).
-Ready to commit, tag and publish the Debug-signed testing prerelease with its
-notices, handwriting sources and checksum manifest. No production key is used.
-Physical ARM/OEM and Android 8 execution remain unverified.
+Published [v0.7.6](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.6)
+from source commit `35ea1ae` and its annotated tag. All four public assets (Debug
+APK, notices, handwriting sources and checksum manifest) have verified sizes and
+server SHA-256 digests matching local files. No production key was used. The
+isolated emulator started for this review was stopped.
+
+Next: physical ARM/OEM and Android 8 execution when devices are available; these
+remain unverified. The 80 MB ARM64 optimization target is still exceeded.
 
 ## Audit repair and packaging (2026-11-18)
 
