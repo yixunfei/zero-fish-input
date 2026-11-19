@@ -61,6 +61,7 @@ class InputSessionController(
     private var routes: List<CandidateRoute?> = emptyList()
     /** Engine-owned state without personal candidates for controlled republishing. */
     private var rawEngineSnapshot = EngineSnapshot.Empty
+    private var pendingCommit: PendingEngineCommit? = null
     private val recentComposition = RecentComposition()
     private val candidateWindow = CandidateWindow()
     private val personalPaging = PersonalCandidatePaging()
@@ -139,6 +140,7 @@ class InputSessionController(
                 !command.selection.isValidFor(command.expectedInput))) return
         if (command is InputCommand.SelectCandidate && command.candidateId != null &&
             state.snapshot.candidates.getOrNull(command.visibleIndex)?.id != command.candidateId) return
+        if (handlePendingCommit(command)) return
         if (!associationsAllowed()) invalidateWordAssociations()
         when (command) {
             is InputCommand.Text -> associations.hide()
@@ -228,6 +230,7 @@ class InputSessionController(
 
     fun setLanguage(target: InputLanguage, packKey: String? = null) {
         if (language == target && languagePackKey == packKey) return
+        if (pendingCommit != null) return
         if (state.snapshot.isComposing) {
             // Explicit switching preserves the user's unfinished input without learning.
             // commitText replaces the composing span; a rejected commit keeps this session.
@@ -241,17 +244,20 @@ class InputSessionController(
     }
 
     fun reset() {
+        val uncertain = pendingCommit?.result == CommitTextResult.UNKNOWN
+        pendingCommit = null
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
         recoverableEngine { engine?.reset() }
             .onFailure { closeEngine() }
-        connection.clearComposingText()
+        if (uncertain) connection.finishComposingText() else connection.clearComposingText()
         publish(EngineSnapshot.Empty)
     }
 
     /** Transfers only this IME's unfinished preedit to a bounded local draft. */
     fun handoffComposition(maxChars: Int, receive: (String) -> Boolean): Boolean {
+        if (pendingCommit != null) return false
         if (privacy.isSensitive || !privacy.independentAiAllowed || maxChars < 1) return false
         val snapshot = state.snapshot
         if (!snapshot.isComposing) return true
@@ -269,6 +275,7 @@ class InputSessionController(
     /** An external cursor move hands the visible preedit back to the editor, without learning. */
     fun finishCompositionForCursorMove() {
         if (!state.snapshot.isComposing) return
+        pendingCommit = null
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
@@ -286,6 +293,7 @@ class InputSessionController(
 
     /** Republishes the active composition after an asynchronous personal query completes. */
     fun refreshPersonalization() {
+        if (pendingCommit != null) return
         if (engine == null || !canPersonalizeCandidates()) return
         if (associationsAllowed()) associations.refresh(language) { value ->
             (engine as? CandidateTextNormalizer)?.normalizeCandidateText(value) ?: value
@@ -318,6 +326,7 @@ class InputSessionController(
 
     /** Main-thread-only handoff. A revision is consumed once and routes remain engine-owned. */
     fun applyModelWinner(revision: Long, candidateIndex: Int): Boolean {
+        if (pendingCommit != null) return false
         if (revision != state.candidateRevision || candidateWindow.isBrowsing || personalPaging.isBrowsing || personalPaging.editsApplied) return false
         val candidate = modelCandidates().getOrNull(candidateIndex) ?: return false
         val promoted = ModelRankingPolicy.promote(state.snapshot, candidate.id) ?: return false
@@ -327,7 +336,7 @@ class InputSessionController(
         return true
     }
 
-    fun modelCandidates(): List<Candidate> = if (candidateWindow.isBrowsing || personalPaging.isBrowsing ||
+    fun modelCandidates(): List<Candidate> = if (pendingCommit != null || candidateWindow.isBrowsing || personalPaging.isBrowsing ||
         personalPaging.editsApplied || personalPaging.hasPersonalPriority) emptyList()
         else ModelRankingPolicy.eligible(state)
 
@@ -393,7 +402,7 @@ class InputSessionController(
      * The caller retains no ownership after this method returns.
      */
     fun adoptPreparedEngine(prepared: PreparedInputEngine): Boolean {
-        if (!matches(prepared)) {
+        if (pendingCommit != null || !matches(prepared)) {
             prepared.close()
             return false
         }
@@ -572,6 +581,7 @@ class InputSessionController(
             } else if (state.snapshot.isComposing) {
                 handleEnter(activeEngine, allowLearning = allowLearning)
             }
+            if (pendingCommit != null) return
         }
         // The published state is authoritative for the key's starting
         // point. Adapter properties may lag behind the EngineUpdate that was
@@ -623,12 +633,22 @@ class InputSessionController(
             // commitText replaces the active composing span.  Finishing first
             // would make the pre-edit (for example, "ni") permanent and then
             // append the selected candidate (for example, "你").
-            val committed = commitPredictableText(update.committedText)
-            if (committed && language == InputLanguage.CHINESE && engine is CompositionEditingEngine &&
+            val result = connection.commitTextResult(update.committedText)
+            if (result != CommitTextResult.ACCEPTED) {
+                associations.clear()
+                pendingCommit = PendingEngineCommit(update, state.snapshot, learningShortcut, allowLearning, result,
+                    "commit:retry:${state.candidateRevision + 1}")
+                publishPendingCommit()
+                return
+            }
+            if (associationsAllowed()) associations.committed(update.committedText, language) { value ->
+                (engine as? CandidateTextNormalizer)?.normalizeCandidateText(value) ?: value
+            } else associations.clear()
+            if (language == InputLanguage.CHINESE && engine is CompositionEditingEngine &&
                 connection is ReconversionEditorConnection && !update.snapshot.isComposing) {
                 recentComposition.remember(reading, update.committedText)
             }
-            if (committed && allowLearning && canPersonalizeCandidates() && update.learnable) {
+            if (allowLearning && canPersonalizeCandidates() && update.learnable) {
                 recoverable {
                     val learnedValue = update.committedText.trimEnd(' ')
                     if (learnedValue.isEmpty()) return@recoverable
@@ -684,11 +704,13 @@ class InputSessionController(
     private fun commitLiteral(activeEngine: InputEngine, text: String) {
         if (text.isEmpty()) return
         if (state.modelRanked) selectCandidate(activeEngine, state.snapshot.highlightedIndex, learn = implicitLearningAllowed())
+        if (pendingCommit != null) return
         if (state.snapshot.isComposing) {
             val before = state.snapshot
             if (before.candidates.isNotEmpty()) {
                 selectCandidate(activeEngine, before.highlightedIndex, learn = implicitLearningAllowed())
             }
+            if (pendingCommit != null) return
             if (!flushUnconsumedComposition(activeEngine, state.snapshot)) return
         }
         connection.commitText(text)
@@ -699,9 +721,11 @@ class InputSessionController(
     private fun commitPaired(activeEngine: InputEngine, opening: String, closing: String) {
         if (opening.isEmpty() || closing.isEmpty()) return
         if (state.modelRanked) selectCandidate(activeEngine, state.snapshot.highlightedIndex, learn = implicitLearningAllowed())
+        if (pendingCommit != null) return
         if (state.snapshot.isComposing) {
             val before = state.snapshot
             if (before.candidates.isNotEmpty()) selectCandidate(activeEngine, before.highlightedIndex, learn = implicitLearningAllowed())
+            if (pendingCommit != null) return
             if (!flushUnconsumedComposition(activeEngine, state.snapshot)) return
         }
         connection.commitPairedText(opening + closing, opening.length)
@@ -808,6 +832,7 @@ class InputSessionController(
     }
 
     private fun publish(engineSnapshot: EngineSnapshot, preserveModelRanking: Boolean = false) {
+        if (pendingCommit != null) { publishPendingCommit(); return }
         rawEngineSnapshot = engineSnapshot
         val browsed = candidateWindow.snapshot(engineSnapshot)
         val composed = personalPaging.publish(
@@ -951,6 +976,7 @@ class InputSessionController(
     }
 
     private fun closeEngine() {
+        pendingCommit = null
         associations.clear()
         candidateWindow.clear()
         personalPaging.clear()
@@ -962,6 +988,32 @@ class InputSessionController(
 
     private fun closeSafely(candidate: InputEngine) {
         recoverableEngine { candidate.close() }
+    }
+
+    private fun handlePendingCommit(command: InputCommand): Boolean {
+        val pending = pendingCommit ?: return false
+        when (command) {
+            InputCommand.Backspace -> reset()
+            InputCommand.Space, InputCommand.Enter, is InputCommand.SelectCandidate -> {
+                val valid = command !is InputCommand.SelectCandidate || command.visibleIndex == 0
+                if (valid && pending.result == CommitTextResult.REJECTED) {
+                    pendingCommit = null
+                    apply(pending.update, pending.learningShortcut, pending.allowLearning)
+                } else publishPendingCommit()
+            }
+            // Never drive the advanced engine, overwrite the old editor span or
+            // automatically retry a commit because another character arrived.
+            else -> publishPendingCommit()
+        }
+        return true
+    }
+
+    private fun publishPendingCommit() {
+        val pending = pendingCommit ?: return
+        routes = emptyList()
+        state = state.copy(snapshot = pending.visible, commitFailure = pending.result,
+            canReconvert = false, modelRanked = false, candidateRevision = state.candidateRevision + 1)
+        recoverable { onStateChanged(state) }
     }
 
     private fun recoverFromEngineFailure(failedEngine: InputEngine) {
@@ -1000,4 +1052,5 @@ data class InputSessionState(
     val canReconvert: Boolean = false,
     val candidateRevision: Long = 0,
     val modelRanked: Boolean = false,
+    val commitFailure: CommitTextResult? = null,
 )

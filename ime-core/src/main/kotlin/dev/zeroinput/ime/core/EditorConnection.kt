@@ -19,6 +19,10 @@ interface EditorConnection {
     /** True only when the currently bound editor accepts this commit. */
     fun commitText(text: String): Boolean
 
+    /** An uncertain platform edit must not be replayed, even when it returned no acknowledgement. */
+    fun commitTextResult(text: String): CommitTextResult =
+        if (commitText(text)) CommitTextResult.ACCEPTED else CommitTextResult.REJECTED
+
     /**
      * Commits a pair and positions the cursor after [cursorOffset] code units.
      * Simple editor adapters can fall back to a contiguous commit; Android's
@@ -32,3 +36,5 @@ interface EditorConnection {
 
     fun sendEnterKey()
 }
+
+enum class CommitTextResult { ACCEPTED, REJECTED, UNKNOWN }

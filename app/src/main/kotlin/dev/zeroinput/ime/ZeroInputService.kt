@@ -582,6 +582,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        textStego?.close()
         graph.stegoHandoff.leavePasteEditor()
         cancelDeviceAgentTask()
         appearanceBinding.close()
@@ -751,6 +752,7 @@ class ZeroInputService : InputMethodService() {
             if (inputView?.isAiOpen == true) invalidateAiRequest()
             if (inputView?.isPrivateDraftOpen == true) registerInteraction()
             if (inputView?.isTextStegoOpen == true) {
+                Toast.makeText(this, R.string.stego_selection_cleared, Toast.LENGTH_LONG).show()
                 textStego?.close()
                 inputView?.closeAuxiliaryInput()
                 updateScreenCapturePolicy()
@@ -1207,8 +1209,11 @@ class ZeroInputService : InputMethodService() {
                     val kind = if (action == dev.zeroinput.ime.ui.StegoAction.KEY_FILE)
                         dev.zeroinput.ime.textstego.StegoHandoff.Kind.FILE else dev.zeroinput.ime.textstego.StegoHandoff.Kind.VAULT
                     launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(kind, editor = pasteEditorIdentity(),
-                        target = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER)
-                            dev.zeroinput.ime.ui.StegoField.COVER else dev.zeroinput.ime.ui.StegoField.CARRIER,
+                        target = when (action) {
+                            dev.zeroinput.ime.ui.StegoAction.VAULT_COVER -> dev.zeroinput.ime.ui.StegoField.COVER
+                            dev.zeroinput.ime.ui.StegoAction.VAULT_SECRET -> dev.zeroinput.ime.ui.StegoField.SECRET
+                            else -> dev.zeroinput.ime.ui.StegoField.CARRIER
+                        },
                         carrier = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER) workspaceDetachedCarrier() else null))
                 }
             }, onSave = { value -> launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(
@@ -1230,8 +1235,8 @@ class ZeroInputService : InputMethodService() {
                 try {
                     val carrier = paste?.let { if (it.target == dev.zeroinput.ime.ui.StegoField.CARRIER) it.text else it.carrier }?.let(::String)
                     workspace.open(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions, carrier, file)
-                    if (paste?.target == dev.zeroinput.ime.ui.StegoField.COVER)
-                        paste.text?.let { workspace.pasteText(dev.zeroinput.ime.ui.StegoField.COVER, String(it)) }
+                    if (paste != null && paste.target != dev.zeroinput.ime.ui.StegoField.CARRIER)
+                        paste.text?.let { workspace.pasteText(paste.target, String(it)) }
                 } finally { file?.fill(0); paste?.close() }
             } else workspace.close()
         }
@@ -2060,6 +2065,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun endInputSession(reset: Boolean) {
+        textStego?.close()
         graph.stegoHandoff.leavePasteEditor()
         inputView?.closeAuxiliaryInput()
         cancelDeviceAgentTask()

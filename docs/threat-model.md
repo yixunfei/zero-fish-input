@@ -29,6 +29,23 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
 
 ## Enforced controls
 
+- Engine selection can advance before an editor rejects its commit. One session-local
+  pending update freezes engine operations and candidate routing until explicit
+  retry or cancellation. No learning or prediction consumes a rejected edit; privacy
+  tightening and session disposal revoke it. A throwing/missing Android acknowledgement
+  is UNKNOWN and cannot authorize replay. Backspace ends that pending state without
+  deleting potentially accepted text. Bounded local drafts reject partial exports
+  while a composition or capacity failure remains. Regression cases cover candidate
+  and Space rejection, partial engine updates, explicit retry/cancel, uncertain writes,
+  stale candidate identifiers and privacy revocation. Pending text is never persisted
+  or included in generic failure feedback.
+
+- Stego composition projection uses the committed caret and displayed (including
+  formatting spaces) preedit length for both rendering and touch mapping. Hidden
+  fields keep masking and publish no caret/preedit metadata. Public-fixture tests
+  cover middle insertion, emoji boundaries, formatted preedit, reveal/mask and busy
+  touch rejection; this grants no new editor, clipboard or AI access.
+
 - APK delivery checks preserve the full/lite contract, all core tables and the
   exact reviewed prebuilt startup manifest/archives. Bundled optional-model
   hashes and reduced native runtime hashes are verified in the final ZIP.
@@ -112,7 +129,7 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   用户信息和重定向，并限制请求、超时、SSE 单行及整体响应大小。远程工具仅由
   `AiRemoteHttpsTransport` 按 ADR 0033 校验实际连接 DNS、禁代理/重定向/重试；公开词库仅由
   `DictionaryDownloadTransport` 按来源白名单和固定资源校验执行，二者的获批查询参数不扩大模型端点规则。系统剪贴板
-  正文读取仅新增 ADR 0039 的隐写两字段显式粘贴例外；专用防护适配器可在用户开启后监听、检查时间戳和清理。AndroidX 文本控件
+  正文读取仅新增 ADR 0039 的隐写三字段显式粘贴例外，系统来源默认关闭；专用防护适配器可在用户开启后监听、检查时间戳和清理。AndroidX 文本控件
   只可能在用户明确执行标准粘贴操作时进入系统编辑路径。
 - 除启动页、输入法服务和只接收待确认文本的剪贴板导入页外，Android 组件均不导出；输入法服务只使用系统要求的绑定权限。导入页不能查询或返回私有库内容。
 - `allowBackup=false` 且不启用数据提取规则。
@@ -1581,12 +1598,28 @@ Carriers are untrusted public text. The cover, lengths, credential/KDF IDs and
 encrypted-metadata length are public; ciphertext does not hide the existence of
 the Unicode/Base64 carrier. No body/credential/algorithm failure detail is logged.
 
+The 2026-11-19 follow-up enforces identical UTF-8 input/paste budgets without
+allocating plaintext copies for byte counting. Hidden projection uses length only.
+Expired editing cannot start work; a fresh working window cannot extend a result
+beyond 30 seconds. Authentication callbacks immediately clear the detour exemption;
+leaving before confirmation clears the owned request even if focus has not returned.
+IME teardown revokes workspace validity before UI reconciliation, and source-worker
+checks include the captured deletion generation. Full eligibility remains a
+main-thread delivery check: no Android View/InputConnection is read on the worker.
+Vault paste handoffs require the read's captured deletion generation, including
+at offer time; an old result cannot be relabelled with a newer generation. Offer,
+take and availability checks also require the global vault feature to remain on.
+Rejected mutable text and accompanying detached ciphertext are cleared.
+File navigation, external selection change and recreation still clear drafts.
+Explicit warnings explain this; no new retention/export/credential-paste path exists.
+
 | Attack or failure | Control and observable result |
 | --- | --- |
 | Changed cover, payload/tag, stage order/width, metadata or inner layer | Domain-separated keys/AAD, authenticated metadata and all layer tags; no partial secret or trial fallback |
 | Hostile bootstrap/KDF/UTF-8/size | Public budgets and enum pairs checked before derivation; fixed profiles, resource acknowledgement and worker headroom check; refuse without lowering cost |
 | KDF allocation failure after the headroom check | Clear partial output and publish a memory failure so the foreground operation leaves WORKING immediately; never reduce the requested profile |
 | Preflight checks omit pending carrier composition or decrypt options are edited | Finish composition before inspection, derive credential/KDF requirements from the carrier, and revalidate the exact owned worker buffer before dispatch |
+| Rejected input silently disappears when submitting an otherwise valid prefix | Keep submission blocked until explicit cancellation. Candidate and direct-input budget rejection both consume the first backspace without deleting accepted text; subsequent backspaces delete normally. Distinguish unfinished conversion from a budget rejection without exposing content |
 | Rapid cancellation/reopen or blocked file provider | One process-wide slot per crypto/source worker until work exits; revocable operation lease, cancellation signal/descriptor close, late owned buffers cleared |
 | Stale preview, cursor/session/connection change or duplicate tap | Exact live binding and interaction checks; consume before one external commit; no Send, retry, reread, learning or plaintext fallback |
 | External input-engine warmup finishes during isolated editing | Dispose and defer that adoption until ordinary input resumes; the separate draft engine is unaffected and a valid prepared commit keeps its interaction binding |
@@ -1594,7 +1627,7 @@ the Unicode/Base64 carrier. No body/credential/algorithm failure detail is logge
 | Private candidates reappear after closing the mode | Replace the shared strip with the external editor snapshot before status rendering; clear the stego snapshot on close/release and retain no extra panel text-state object |
 | Malicious external Intent or AI crossover | Existing bounded plain-text-only gateway, explicit local branch and denied AI permission for carrier markers; private nonexported host returns no plaintext |
 | Key file changed, truncated, misreported or slow | Actual streamed 32-byte..1-MiB budget, length-delimited digest, exact factors, bounded deadline and temporary single-URI grant; no persisted path/permission |
-| Slow authentication exhausts a save buffer before confirmation | Private-host draft has a 120-second pre-authentication budget; existing broker timeout stays 30 seconds; successful authentication starts a new at-most-30-second confirmation window. The one-use write buffer is created only on the foreground confirmation click. Cancellation permits retry within the old draft budget; expiry clears with a notice |
+| Slow authentication exhausts a save buffer before confirmation | Private-host draft has a 120-second pre-authentication budget; starting authentication renews an independent 30-second budget matching the broker; successful authentication starts a new at-most-30-second confirmation window. The one-use write buffer is created only on the foreground confirmation click. Cancellation returns to a fresh 120-second foreground draft budget; expiry clears with a phase-specific notice |
 | Internal source Activity cannot launch | Discard the matching opaque handoff immediately and wipe its owned text; a failed old launch cannot clear a newer handoff |
 | Delayed source launch replays an older or missing token | Reject without touching the current handoff; only its matching token can consume it. Expiry, screen-off, settings and deletion-generation revocation still clear the owned draft |
 | Vault deletion/auth replay/background result | New one-use grant per read/save, another foreground click, captured generation and active/deadline checks before and after I/O; auth callback stages only a grant |
@@ -1622,6 +1655,11 @@ object keys retain strict token limits, and structural errors still reject the p
 
 ## Steganography automatic encoded insertion (2026-11-19)
 
+The panel's field/cipher/action expansion is presentation state only: folding
+does not read sources, expose private plaintext, change draft ownership or extend
+authorization. Private fields still require explicit Reveal; the focus-free
+views remain excluded from text capture/state saving and clear on close.
+
 The user explicitly requests Encrypt and insert. That click authorizes one encoded
 carrier insertion after successful self-check into the captured original session,
 actual connection and interaction; it does not authorize Send or plaintext output.
@@ -1635,9 +1673,20 @@ IDs accept only the fixed cipher registry; empty selection is rejected before KD
 
 ## Explicit two-field paste and variable master material (2026-11-19)
 
+The user's subsequent three-field approval adds SECRET without granting access
+to CREDENTIAL/KEY_BITS. System paste is now independently default-off and checked
+before acquisition and publication; vault paste is independently configurable.
+Both sources reject invalid UTF-8/NUL and field-specific character/byte overflow
+without truncation. Secret paste is bounded to 2048 UTF-8 bytes, stays masked and
+does not write the external editor. Vault navigation continues to wipe old drafts
+and requires fresh authentication plus another foreground click. Source setting
+changes revoke handoffs and reject queued vault reads/results. Saved defaults
+contain only public length/cipher descriptors and source permissions, never text
+or key material; invalid stored descriptors cannot authorize unsupported ciphers.
+
 | Attack or failure | Control |
 | --- | --- |
-| Hidden system collection or paste into credential/secret | Exact adapter allowlist; only COVER/CARRIER long-press menu click begins one read; no listener, write, coercion or AI access |
+| Hidden system collection or paste into a credential | Exact adapter allowlist; default-off setting and only COVER/SECRET/CARRIER explicit source-menu selection can begin one read; no listener, write, coercion or AI access |
 | URI/Intent/multiple/oversized/NUL/malformed system text | Reject without provider access or truncation; preserve exact characters for accepted plain text |
 | Session/lock/settings change during source read | Revocable one-use worker lease, device check before/after read, main-thread workspace/editor/deletion-generation checks before use |
 | Vault authentication loses original workspace | Wipe all secret drafts/credentials; retain only target/editor and validated detached ciphertext; fresh auth plus foreground confirmation reads one entry |

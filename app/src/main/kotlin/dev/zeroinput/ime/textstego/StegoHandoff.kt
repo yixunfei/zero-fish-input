@@ -15,7 +15,7 @@ import dev.zeroinput.ime.ui.StegoField
 import java.util.UUID
 
 /** One-use internal transfer. Only an opaque ID crosses an Intent. No editor/Activity/callback. */
-internal class StegoHandoff(private val context: Context, settings: SettingsRepository,
+internal class StegoHandoff(private val context: Context, private val settings: SettingsRepository,
                             private val generation: () -> Long) : AutoCloseable {
     enum class Kind { CARRIER, VAULT, FILE, SAVE }
     class Request(val kind: Kind, var text: CharArray? = null, val editor: PasteEditorIdentity? = null,
@@ -80,18 +80,24 @@ internal class StegoHandoff(private val context: Context, settings: SettingsRepo
     }
 
     /** A foreground authenticated read may populate a new isolated workspace, never an editor. */
-    @Synchronized fun offerPaste(value: CharArray, editor: PasteEditorIdentity, target: StegoField, carrier: CharArray? = null) {
+    @Synchronized fun offerPaste(value: CharArray, editor: PasteEditorIdentity, target: StegoField,
+                                expectedGeneration: Long, carrier: CharArray? = null): Boolean {
         close()
-        if (target != StegoField.COVER && target != StegoField.CARRIER) { value.fill('\u0000'); carrier?.fill('\u0000'); return }
+        if (!settings.secureClipboardEnabled || !settings.stegoDefaults.vaultPaste || expectedGeneration != generation() ||
+            !StegoPastePolicy.accepts(target, java.nio.CharBuffer.wrap(value))) {
+            value.fill('\u0000'); carrier?.fill('\u0000'); return false
+        }
         observeScreen()
-        paste = Request(Kind.CARRIER, value, editor, target, carrier).also { it.generation = generation() }
+        paste = Request(Kind.CARRIER, value, editor, target, carrier).also { it.generation = expectedGeneration }
         deadline = SystemClock.elapsedRealtime() + 30_000
         main.postDelayed(expire, 30_000)
+        return true
     }
 
     @Synchronized fun takePaste(editor: PasteEditorIdentity?): Request? {
         val value = paste ?: return null
-        if (editor == null || editor != value.editor || SystemClock.elapsedRealtime() >= deadline || value.generation != generation()) {
+        if (!settings.secureClipboardEnabled || !settings.stegoDefaults.vaultPaste || editor == null || editor != value.editor ||
+            SystemClock.elapsedRealtime() >= deadline || value.generation != generation()) {
             close(); return null
         }
         return value.also { paste = null; pasteBound = false; main.removeCallbacks(expire); stopObservingScreen() }
@@ -105,7 +111,8 @@ internal class StegoHandoff(private val context: Context, settings: SettingsRepo
     @Synchronized fun cancelPaste() { if (paste != null) close() }
     @Synchronized fun leavePasteEditor() { if (pasteBound) close() }
     @Synchronized fun hasPaste(): Boolean {
-        if (paste != null && (SystemClock.elapsedRealtime() >= deadline || paste?.generation != generation())) close()
+        if (paste != null && (!settings.secureClipboardEnabled || !settings.stegoDefaults.vaultPaste || SystemClock.elapsedRealtime() >= deadline ||
+            paste?.generation != generation())) close()
         return paste != null
     }
 

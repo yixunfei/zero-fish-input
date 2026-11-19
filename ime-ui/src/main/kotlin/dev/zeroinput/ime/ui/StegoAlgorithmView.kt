@@ -9,7 +9,7 @@ import com.google.android.material.button.MaterialButton
 data class StegoAlgorithmUi(val id: Int, val name: String, val bits: Int, val order: Int, val adjustable: Boolean)
 
 /** Public algorithm descriptors only. Selection order is supplied by the workspace. */
-internal class StegoAlgorithmView(context: Context) : LinearLayout(context) {
+class StegoAlgorithmView(context: Context) : LinearLayout(context) {
     var onSelect: (Int, Boolean) -> Unit = { _, _ -> }
     var onWidth: (Int) -> Unit = {}
     var onEarlier: (Int) -> Unit = {}
@@ -34,8 +34,8 @@ internal class StegoAlgorithmView(context: Context) : LinearLayout(context) {
                 addView(LinearLayout(context).apply {
                     isBaselineAligned = false
                     addView(check, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-                    addView(width, LayoutParams(dp(64), dp(48)))
-                    addView(earlier, LayoutParams(dp(56), dp(48)))
+                    addView(width, LayoutParams(dp(64), LayoutParams.WRAP_CONTENT))
+                    addView(earlier, LayoutParams(dp(72), LayoutParams.WRAP_CONTENT))
                 })
                 rows[value.id] = Row(check, width, earlier)
             }
@@ -45,7 +45,7 @@ internal class StegoAlgorithmView(context: Context) : LinearLayout(context) {
             row.check.text = if (value.order >= 0) "${value.order + 1}. ${value.name}" else value.name
             row.check.isChecked = value.order >= 0
             row.check.isEnabled = editable
-            row.width.text = value.bits.toString()
+            row.width.text = context.getString(R.string.stego_bits_value, value.bits)
             row.width.contentDescription = context.getString(R.string.stego_width_for, value.name, value.bits)
             row.width.isEnabled = editable && value.order >= 0 && value.adjustable
             row.earlier.contentDescription = context.getString(R.string.stego_earlier_for, value.name)
@@ -57,6 +57,7 @@ internal class StegoAlgorithmView(context: Context) : LinearLayout(context) {
         com.google.android.material.R.attr.borderlessButtonStyle).apply {
         isAllCaps = false; minWidth = 0; minimumWidth = 0
         textSize = 13f; letterSpacing = 0f; insetTop = 0; insetBottom = 0
+        minHeight = dp(48)
         setPadding(0, 0, 0, 0); maxLines = 2
         filterTouchesWhenObscured = true
         setOnClickListener { action() }

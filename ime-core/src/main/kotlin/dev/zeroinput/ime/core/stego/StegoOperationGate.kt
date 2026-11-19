@@ -11,6 +11,7 @@ class StegoOperationGate(private val now: () -> Long) {
     fun open() { revision++; phase = Phase.EDITING; touch() }
     fun close() { revision++; phase = Phase.CLOSED; deadline = 0 }
     fun touch() { if (phase == Phase.EDITING) deadline = now() + 120_000 }
+    fun remainingMillis(): Long = if (current()) (deadline - now()).coerceAtLeast(0) else 0
     fun current(): Boolean {
         if (phase != Phase.CLOSED && now() >= deadline) close()
         return phase != Phase.CLOSED
@@ -18,6 +19,7 @@ class StegoOperationGate(private val now: () -> Long) {
     fun begin(): Long? {
         if (!current() || phase != Phase.EDITING) return null
         phase = Phase.WORKING
+        deadline = now() + 120_000
         return ++revision
     }
     fun accepts(token: Long): Boolean = current() && token == revision && phase == Phase.WORKING

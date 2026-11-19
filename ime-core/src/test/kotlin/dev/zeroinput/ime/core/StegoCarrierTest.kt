@@ -5,6 +5,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StegoCarrierTest {
+    @Test fun `operation near editing expiry has a fresh bounded working window`() {
+        var time = 0L
+        val gate = StegoOperationGate { time }
+        gate.open()
+        time = 119_000
+        assertEquals(1000L, gate.remainingMillis())
+        val token = requireNotNull(gate.begin())
+        assertEquals(120_000L, gate.remainingMillis())
+        time = 121_000
+        assertTrue(gate.accepts(token))
+        assertTrue(gate.complete(token, false))
+        time += 30_000
+        assertFalse(gate.consume(StegoOperationGate.Phase.PREVIEW))
+        gate.open()
+        val slow = requireNotNull(gate.begin())
+        time += 119_999
+        assertTrue(gate.accepts(slow))
+        assertEquals(1L, gate.remainingMillis())
+        time++
+        assertFalse(gate.complete(slow, true))
+        gate.open()
+        time += 120_000
+        assertNull(gate.begin())
+    }
+
     @Test fun `detached ciphertext requires exact explicit cover and retains strict framing budgets`() {
         val bytes = ByteArray(2372) { it.toByte() }
         val detached = StegoCarrierCodec.ciphertext(bytes)

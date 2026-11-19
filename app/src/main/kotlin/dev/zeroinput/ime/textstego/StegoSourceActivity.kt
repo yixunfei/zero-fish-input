@@ -140,8 +140,12 @@ class StegoSourceActivity : AppCompatActivity() {
             onSource = { action ->
                 when (action) {
                     StegoAction.KEY_FILE -> pickFile()
-                    StegoAction.VAULT, StegoAction.VAULT_COVER -> {
-                        vaultTarget = if (action == StegoAction.VAULT_COVER) StegoField.COVER else StegoField.CARRIER
+                    StegoAction.VAULT, StegoAction.VAULT_COVER, StegoAction.VAULT_SECRET -> {
+                        vaultTarget = when (action) {
+                            StegoAction.VAULT_COVER -> StegoField.COVER
+                            StegoAction.VAULT_SECRET -> StegoField.SECRET
+                            else -> StegoField.CARRIER
+                        }
                         request?.carrier?.fill('\u0000')
                         request?.carrier = if (vaultTarget == StegoField.COVER) workspace?.detachedCarrierForPaste() else null
                         workspace?.close(); listVault()
@@ -152,7 +156,7 @@ class StegoSourceActivity : AppCompatActivity() {
                 request?.close(); request = StegoHandoff.Request(StegoHandoff.Kind.SAVE, value)
                 resetDeadline(120_000)
                 showAction(R.string.stego_save_start, dev.zeroinput.ime.ui.R.string.stego_save) { authenticate(save = true) }
-            }, isKeyboard = false)
+            }, isKeyboard = false, onDraftActivity = { resetDeadline(120_000) })
         workspace = controller
         view.onKeyboardAction = controller::type
         view.onCandidateSelected = { index, id -> controller.command(dev.zeroinput.ime.core.InputCommand.SelectCandidate(index, id)) }
@@ -170,14 +174,17 @@ class StegoSourceActivity : AppCompatActivity() {
             protectInsets(this)
         })
         controller.open(InputLanguage.CHINESE, ChineseInputOptions(), carrier, file)
-        if (request?.target == StegoField.COVER) request?.text?.let { controller.pasteText(StegoField.COVER, String(it)) }
+        request?.let { source -> if (source.target != StegoField.CARRIER)
+            source.text?.let { controller.pasteText(source.target, String(it)) } }
         request?.text?.fill('\u0000'); request?.text = null
         request?.carrier?.fill('\u0000'); request?.carrier = null
         resetDeadline(120_000)
     }
 
     private fun listVault() {
-        if (!current() || !graph.settings.secureClipboardEnabled) { message(R.string.stego_no_entries); return }
+        if (!current() || !graph.settings.secureClipboardEnabled || !graph.settings.stegoDefaults.vaultPaste) {
+            message(R.string.stego_no_entries); return
+        }
         workspace?.close()
         val expected = ++operation
         showBusy()
@@ -185,33 +192,38 @@ class StegoSourceActivity : AppCompatActivity() {
         val owner = WeakReference(this)
         val handler = main
         enqueue {
-            val ids = try { vault.summaries().map { it.id } } catch (_: Exception) { emptyList() }
-            handler.post { owner.get()?.showVaultEntries(expected, ids) }
+            val entries = try { vault.summaries() } catch (_: Exception) { emptyList() }
+            handler.post { owner.get()?.showVaultEntries(expected, entries) }
         }
     }
 
-    private fun showVaultEntries(expected: Long, ids: List<String>) {
+    private fun showVaultEntries(expected: Long, entries: List<dev.zeroinput.userdata.SecureClipboardSummary>) {
         if (expected != operation || !current()) return
-        if (ids.isEmpty()) { message(R.string.stego_no_entries); discard(); return }
+        if (entries.isEmpty()) { message(R.string.stego_no_entries); discard(); return }
         val host = TextView(this)
         setContentView(host)
         val chooser = StegoOptionsDialog(host, ::current).apply { attachToIme = false }
         dialog = chooser
-        chooser.choose(dev.zeroinput.ime.ui.R.string.stego_vault, ids.indices.map { getString(R.string.stego_entry, it + 1) }) {
-            selectedId = ids[it]; authenticate(save = false)
+        val date = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+        chooser.choose(dev.zeroinput.ime.ui.R.string.stego_vault, entries.mapIndexed { index, entry ->
+            getString(R.string.stego_entry_time, index + 1, date.format(java.util.Date(entry.updatedAtEpochMillis)))
+        }) {
+            selectedId = entries[it].id; authenticate(save = false)
         }
     }
 
     private fun authenticate(save: Boolean) {
         if (!current()) { return }
+        resetDeadline(30_000, R.string.stego_authentication_expired)
         detour = true
         workspace?.close(); keyboard?.closeAuxiliaryInput()
         showBusy()
         authentication = AuthenticationBroker.requestCancellable(this) { result ->
             authentication = null
+            detour = false
             if (!deviceReady()) { discard(); return@requestCancellable }
             if (result == null) {
-                detour = false
+                resetDeadline(120_000)
                 showAction(R.string.stego_auth_retry, R.string.stego_retry_authentication) { authenticate(save) }
                 return@requestCancellable
             }
@@ -256,7 +268,8 @@ class StegoSourceActivity : AppCompatActivity() {
         if (!enqueue {
             var value: CharArray? = null
             val valid = { alive.get() && SystemClock.elapsedRealtime() < expectedDeadline &&
-                expectedGeneration == vault.captureGeneration() && settings.secureClipboardEnabled && isPrivateDraftDeviceAvailable(context) }
+                expectedGeneration == vault.captureGeneration() && settings.secureClipboardEnabled &&
+                (save || settings.stegoDefaults.vaultPaste) && isPrivateDraftDeviceAvailable(context) }
             val success = try {
                 if (!valid()) false
                 else if (save) {
@@ -278,14 +291,14 @@ class StegoSourceActivity : AppCompatActivity() {
     private fun completeGrant(expected: Long, success: Boolean, save: Boolean, value: CharArray?) {
         if (!current() || expected != operation) { value?.fill('\u0000'); return }
         if (success && !save && value != null) {
-            val max = if (vaultTarget == StegoField.COVER) 512 else 8192
-            if (value.isEmpty() || value.size > max || value.any { it == '\u0000' }) {
+            if (!graph.settings.secureClipboardEnabled || !graph.settings.stegoDefaults.vaultPaste ||
+                !StegoPastePolicy.accepts(vaultTarget, java.nio.CharBuffer.wrap(value))) {
                 value.fill('\u0000'); message(R.string.stego_paste_failed); discard(); return
             }
             val editor = request?.takeIf { it.kind == StegoHandoff.Kind.VAULT }?.editor
             if (editor != null) {
-                graph.stegoHandoff.offerPaste(value, editor, vaultTarget, request?.carrier?.copyOf())
-                message(R.string.stego_paste_return); discard(); return
+                val accepted = graph.stegoHandoff.offerPaste(value, editor, vaultTarget, generation, request?.carrier?.copyOf())
+                message(if (accepted) R.string.stego_paste_return else R.string.stego_paste_failed); discard(); return
             }
             val carrier = request?.carrier?.copyOf()
             request?.close(); request = StegoHandoff.Request(StegoHandoff.Kind.CARRIER, value, target = vaultTarget, carrier = carrier)

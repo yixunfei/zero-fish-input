@@ -52,7 +52,8 @@ class WordAssociationControllerTest {
         f.editor.accept = false
         f.commit("hello")
         assertEquals(0, f.queries)
-        assertTrue(f.controller.state.snapshot.candidates.isEmpty())
+        assertTrue(f.controller.state.snapshot.candidates.none { it.kind == CandidateKind.NEXT_WORD })
+        assertEquals(CommitTextResult.REJECTED, f.controller.state.commitFailure)
     }
 
     @Test fun `failed next word commit clears candidates without querying or learning`() {

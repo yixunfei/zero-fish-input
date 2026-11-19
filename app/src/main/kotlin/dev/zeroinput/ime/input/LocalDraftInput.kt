@@ -26,6 +26,9 @@ internal class LocalDraftInput(
     private val maskCommitted: Boolean = false,
     private val onLengthLimit: () -> Unit = {},
     private val renderCaret: (dev.zeroinput.ime.ui.DraftCaretUi) -> Unit = {},
+    private val maxUtf8Bytes: Int? = null,
+    private val emitCommittedText: Boolean = true,
+    private val preserveTextOnRejectedBackspace: Boolean = false,
 ) : AutoCloseable {
     private val text = StringBuilder(if (maskCommitted) maxChars else 16)
     private var caret = 0
@@ -76,6 +79,8 @@ internal class LocalDraftInput(
 
     fun handle(action: KeyboardAction) {
         val input = controller ?: return
+        if (cancelRejectedDirectInput(action == KeyboardAction.Backspace)) return
+        val recovering = input.state.commitFailure != null
         when (action) {
             is KeyboardAction.MoveDraftCaret -> moveCaret(action.offset, action.revision)
             is KeyboardAction.Text -> input.handle(InputCommand.Text(action.value))
@@ -88,6 +93,7 @@ internal class LocalDraftInput(
             KeyboardAction.SwitchLanguage -> { input.switchLanguage(); prepare() }
             else -> Unit
         }
+        if (recovering && !input.state.snapshot.isComposing) lengthLimitReached = false
         // Editor fallbacks (notably deleting committed text) run after the
         // controller publishes its engine snapshot. Publish the final draft too.
         emit(input.state)
@@ -95,14 +101,31 @@ internal class LocalDraftInput(
     }
 
     fun command(command: InputCommand) {
+        if (cancelRejectedDirectInput(command == InputCommand.Backspace)) return
+        val recovering = controller?.state?.commitFailure != null
         controller?.handle(command)
+        if (recovering && controller?.state?.snapshot?.isComposing == false) lengthLimitReached = false
         controller?.state?.let(::emit)
         resumePreparation()
+    }
+
+    private fun cancelRejectedDirectInput(backspace: Boolean): Boolean {
+        val state = controller?.state ?: return false
+        if (!preserveTextOnRejectedBackspace || !backspace || !lengthLimitReached ||
+            state.commitFailure != null || state.snapshot.isComposing) return false
+        // Literal, paired and idle Enter commits have no pending engine update.
+        // Match candidate-rejection recovery: the first backspace acknowledges
+        // the rejected input without deleting any already accepted characters.
+        lengthLimitReached = false
+        emit(state)
+        resumePreparation()
+        return true
     }
 
     private fun moveCaret(displayOffset: Int, revision: Long) {
         val input = controller ?: return
         if (revision != caretRevision || displayOffset < displayedPrefix) return
+        if (input.state.commitFailure != null) return
         var offset = displayOffset - displayedPrefix + hiddenPrefix
         if (offset !in 0..text.length) return
         val previousCaret = caret
@@ -120,6 +143,7 @@ internal class LocalDraftInput(
         val input = controller ?: return false
         val composing = input.state.snapshot.isComposing
         if (composing) input.reset()
+        if (composing) lengthLimitReached = false
         resumePreparation()
         return composing
     }
@@ -133,14 +157,25 @@ internal class LocalDraftInput(
 
     fun submittedText(): String {
         finishComposition()
+        if (submissionBlockReason != null) return ""
         return text.toString()
     }
 
     fun submittedChars(): CharArray? {
         finishComposition()
-        if (lengthLimitReached) return null
+        if (submissionBlockReason != null) return null
         return CharArray(text.length).also { text.getChars(0, text.length, it, 0) }
     }
+
+    enum class SubmissionBlockReason { LENGTH_LIMIT, UNFINISHED_COMPOSITION }
+
+    /** Inspect after submission: finishing composition can itself hit the budget. */
+    val submissionBlockReason: SubmissionBlockReason?
+        get() = when {
+            lengthLimitReached -> SubmissionBlockReason.LENGTH_LIMIT
+            controller?.state?.snapshot?.isComposing == true -> SubmissionBlockReason.UNFINISHED_COMPOSITION
+            else -> null
+        }
 
     fun togglePrivateDraftVisibility() {
         showFullPrivateDraft = !showFullPrivateDraft
@@ -152,7 +187,6 @@ internal class LocalDraftInput(
     }
 
     private fun finishComposition() {
-        lengthLimitReached = false
         val input = controller ?: return
         // Some engines select one syllable at a time. Bound conversion by the
         // draft budget and stop if an engine fails to advance its preedit.
@@ -172,10 +206,11 @@ internal class LocalDraftInput(
     }
 
     fun committedText(): String = text.toString()
+    val length: Int get() = text.length
 
     fun replaceCommittedText(value: String): Boolean {
         val input = controller ?: return false
-        if (value.length > maxChars) return false
+        if (value.length > maxChars || !withinByteBudget(value)) return false
         input.reset()
         wipeText()
         text.append(value)
@@ -186,7 +221,7 @@ internal class LocalDraftInput(
     }
 
     fun appendImported(value: String): Boolean {
-        if (value.length + text.length > maxChars || controller == null) return false
+        if (value.length + text.length > maxChars || controller == null || !withinByteBudget(value, text)) return false
         controller?.reset()
         text.insert(caret, value)
         caret += value.length
@@ -220,7 +255,7 @@ internal class LocalDraftInput(
     /** Committed text only; the unfinished code is a separate pre-edit. */
     private fun emit(state: InputSessionState) {
         val preedit = preeditOf(state)
-        val committed = if (maskCommitted && !showFullPrivateDraft) maskedPrivateDraft(text) else text.toString()
+        val committed = if (!emitCommittedText) "" else if (maskCommitted && !showFullPrivateDraft) maskedPrivateDraft(text) else text.toString()
         hiddenPrefix = if (maskCommitted && !showFullPrivateDraft) text.length else 0
         displayedPrefix = hiddenPrefix.coerceAtMost(32)
         caretRevision++
@@ -295,13 +330,14 @@ internal class LocalDraftInput(
         override fun setComposingText(text: String) = Unit
         override fun finishComposingText() = Unit
         override fun commitText(text: String): Boolean {
-            if (text.length > maxChars - this@LocalDraftInput.text.length) {
+            if (text.length > maxChars - this@LocalDraftInput.text.length || !withinByteBudget(text, this@LocalDraftInput.text)) {
                 lengthLimitReached = true
                 onLengthLimit()
                 return false
             }
             this@LocalDraftInput.text.insert(caret, text)
             caret += text.length
+            lengthLimitReached = false
             return true
         }
         override fun commitPairedText(text: String, cursorOffset: Int): Boolean {
@@ -322,6 +358,7 @@ internal class LocalDraftInput(
                 for (index in newLength until text.length) text.setCharAt(index, '\u0000')
                 text.setLength(newLength)
                 caret = end
+                lengthLimitReached = false
             }
         }
         override fun performEditorAction(actionId: Int): Boolean = false
@@ -332,7 +369,15 @@ internal class LocalDraftInput(
         for (index in 0 until text.length) text.setCharAt(index, '\u0000')
         text.setLength(0)
         caret = 0
+        lengthLimitReached = false
         caretRevision++
+    }
+
+    private fun withinByteBudget(value: CharSequence, existing: CharSequence = ""): Boolean {
+        val maximum = maxUtf8Bytes ?: return true
+        val added = exactUtf8ByteLength(value) ?: return false
+        val previous = exactUtf8ByteLength(existing) ?: return false
+        return added <= maximum - previous
     }
 
     private companion object {

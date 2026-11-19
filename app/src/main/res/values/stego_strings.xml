@@ -1,6 +1,20 @@
 <resources>
+    <string name="stego_settings_title">隐写</string>
+    <string name="stego_settings_summary">默认密钥长度、算法组合与粘贴来源</string>
+    <string name="stego_settings_help">默认配置用于新建隐写操作；当前操作中可临时调整。不会保存密钥、口令或正文。</string>
+    <string name="stego_settings_bits">默认随机主密钥长度</string>
+    <string name="stego_settings_bits_value">默认随机主密钥：%1$d 位</string>
+    <string name="stego_settings_bit_choice">%1$d 位</string>
+    <string name="stego_settings_custom_bits">自定义长度</string>
+    <string name="stego_settings_bits_help">仅用于生成随机共享密钥。算法子密钥仍采用各算法支持的位数，较长主密钥不代表同等安全强度。</string>
+    <string name="stego_settings_algorithms">默认加密算法组合</string>
+    <string name="stego_settings_algorithms_help">至少选择一种，按勾选顺序组合。右侧可调整位数或将算法提前。隐写面板默认折叠此组设置；解密使用收到文本中的参数。</string>
+    <string name="stego_settings_paste">长按粘贴来源</string>
+    <string name="stego_settings_vault">允许从安全剪贴板粘贴</string>
+    <string name="stego_settings_system">允许从系统剪贴板粘贴</string>
+    <string name="stego_settings_paste_help">适用于公开文本、秘密正文和待解密文本，替换该字段内容；密钥／口令不支持粘贴。安全剪贴板每次读取仍需认证并确认，跳转会清除原草稿。系统来源默认关闭，开启后也仅在主动选择时读取一个纯文本条目，不自动采集或保存。</string>
     <string name="stego_unavailable">此输入框或当前设备状态不能使用隐写模式</string>
-    <string name="stego_intro">填写文本和凭据，勾选算法后加密。长按公开文本或待解密文本可粘贴。隐写字符可能被检测或移除。</string>
+    <string name="stego_intro">填写文本和凭据后加密；使用密钥文件时请先选文件。离开、移动外部光标或空闲 2 分钟会清除草稿。长按文本框可选择粘贴来源。隐写字符可能被检测或移除。</string>
     <string name="stego_options_summary">%1$s\n%2$s · %3$s · %4$s</string>
     <string name="stego_passphrase">口令</string>
     <string name="stego_random_key">随机共享密钥</string>
@@ -27,7 +41,7 @@
     <string name="stego_commit_failed">编辑器未确认接收，草稿已清除；请重新开始，应用可能已处理此次提交</string>
     <string name="stego_insert_warning">插入后，外部应用可以读取和保存明文正文。确认插入到当前输入框？</string>
     <string name="stego_cost_warning">此消息将执行较高内存成本的口令派生，可能需要较长时间。确认仅为本次操作使用？</string>
-    <string name="stego_file_warning">选择文件会清除当前秘密正文、凭据和解密结果。请选择 32 字节至 1 MiB 的单个秘密文件；接收方需要完全相同的文件内容。公开或可预测文件不能增加秘密强度。继续？</string>
+    <string name="stego_file_warning">选择文件会清除全部草稿，包括公开文本、秘密正文、待解密文本、凭据和结果。请先选择文件，返回后重新导入载文；独立密文还需重填原公开文本。请选择 32 字节至 1 MiB 的单个秘密文件；接收方需要完全相同的文件内容。公开或可预测文件不能增加秘密强度。继续？</string>
     <string name="stego_select_file">选择密钥文件</string>
     <string name="stego_import_decrypt">本地解密隐写文本</string>
     <string name="stego_read_confirm">认证已完成。点击确认后读取所选的一个安全剪贴板条目；随后仍需输入消息主凭据并主动解密。</string>
@@ -38,11 +52,10 @@
     <string name="stego_confirm_save">确认存入私密空间</string>
     <string name="stego_confirm_file">文件已选择。确认仅为当前操作读取？</string>
     <string name="stego_no_entries">安全剪贴板未启用或没有可用条目</string>
-    <string name="stego_entry">条目 %1$d</string>
     <string name="stego_shared_ready">已接收待解密文本。请输入主凭据，主动点击解密；不会向来源应用返回正文。</string>
     <string name="stego_file_imported">密钥文件就绪。请重新选择所需凭据方式并输入正文。</string>
     <string name="stego_import_selection_failed">没有可用的有界选区；请先选中完整的隐写文本</string>
-    <string name="stego_file_missing">当前凭据方式需要选择密钥文件</string>
+    <string name="stego_file_missing">请先选择密钥文件；此步骤会清除全部草稿，返回后需重新导入待解密文本</string>
     <string name="stego_credentials_changed">主凭据方式已更改，请重新输入主凭据</string>
     <string name="stego_decrypt_options_fixed">解密参数由收到的完整文本决定。请输入对应的主凭据，并按需选择相同的密钥文件。</string>
     <string name="stego_auth_retry">身份认证未完成。草稿暂未保存，可在本次操作到期前重试。</string>
@@ -61,4 +74,18 @@
     <string name="stego_paste_failed">无法粘贴：请选择一个完整的纯文本条目，并检查长度与格式</string>
     <string name="stego_invalid_bits">主密钥长度须为 256–4096 位，且为 8 的倍数；算法子密钥位数不变</string>
     <string name="stego_paste_return">已读取。返回原输入框后点击“隐”继续；原草稿已清除。</string>
+    <string name="stego_length_limit">刚才的输入超出上限，尚未加入正文。按一次退格撤销此次输入，再提交已有正文，或缩短后重输。秘密正文最多 2048 个 UTF-8 字节（约 682 个汉字），公开文本最多 512 个 UTF-16 单位，待解密文本最多 8192 个单位 / 16384 字节。</string>
+    <string name="stego_composition_unfinished">当前组合输入尚未完成，请先选词完成输入，或按退格撤销后再试。</string>
+    <plurals name="stego_expiry_warning">
+        <item quantity="other">空闲草稿将在 %1$d 秒后清除；输入或点击字段可继续编辑</item>
+    </plurals>
+    <string name="stego_credential_input_help">英文直接输入，不转换拼音或中文；可主动显示核对，继续输入后自动隐藏。不支持粘贴或光标移动，可清空重输。</string>
+    <string name="stego_random_key_help">随机密钥目前只能手动转录，不支持复制、粘贴或导出。长密钥难以转录，跨设备优先使用口令或密钥文件。可主动显示核对。</string>
+    <string name="stego_edit_warning">重新编辑会清除当前结果。秘密正文、凭据和密钥文件已清除，需要重新输入或选择。继续？</string>
+    <string name="stego_clear_field_warning">清空当前字段？此操作无法撤销。</string>
+    <string name="stego_cleared">隐写草稿和结果已清除</string>
+    <string name="stego_selection_cleared">外部光标或选区已变化，隐写草稿和结果已清除</string>
+    <string name="stego_authentication_expired">身份认证已超时，草稿已清除</string>
+    <string name="stego_entry_time">条目 %1$d · %2$s</string>
+    <string name="stego_bits_range">可输入 256–4096 位，须为 8 的倍数</string>
 </resources>

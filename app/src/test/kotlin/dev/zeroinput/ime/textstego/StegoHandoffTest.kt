@@ -13,6 +13,36 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class StegoHandoffTest {
+    @Test fun secretPasteIsOneUseAndRejectsDisabledPasteOversizeAndCredentialTargets() {
+        val context: Context = RuntimeEnvironment.getApplication()
+        val settings = SettingsRepository(context)
+        val original = settings.stegoDefaults
+        val handoff = StegoHandoff(context, settings) { 1L }
+        val editor = dev.zeroinput.ime.clipboard.PasteEditorIdentity("public.fixture", 1, 1)
+        try {
+            settings.stegoDefaults = original.copy(vaultPaste = true)
+            val text = "public secret fixture".toCharArray()
+            assertTrue(handoff.offerPaste(text, editor, dev.zeroinput.ime.ui.StegoField.SECRET, expectedGeneration = 1L))
+            val accepted = requireNotNull(handoff.takePaste(editor))
+            assertEquals(dev.zeroinput.ime.ui.StegoField.SECRET, accepted.target)
+            accepted.close(); assertTrue(text.all { it == '\u0000' })
+            for (field in listOf(dev.zeroinput.ime.ui.StegoField.CREDENTIAL, dev.zeroinput.ime.ui.StegoField.KEY_BITS)) {
+                val rejected = "public denied".toCharArray()
+                assertFalse(handoff.offerPaste(rejected, editor, field, expectedGeneration = 1L))
+                assertNull(handoff.takePaste(editor)); assertTrue(rejected.all { it == '\u0000' })
+            }
+            val oversized = CharArray(2049) { 'x' }
+            handoff.offerPaste(oversized, editor, dev.zeroinput.ime.ui.StegoField.SECRET, expectedGeneration = 1L)
+            assertNull(handoff.takePaste(editor)); assertTrue(oversized.all { it == '\u0000' })
+            val revoked = "public revoked".toCharArray()
+            handoff.offerPaste(revoked, editor, dev.zeroinput.ime.ui.StegoField.SECRET, expectedGeneration = 1L)
+            settings.stegoDefaults = original.copy(vaultPaste = false)
+            assertNull(handoff.takePaste(editor)); assertTrue(revoked.all { it == '\u0000' })
+            val denied = "public denied".toCharArray()
+            assertFalse(handoff.offerPaste(denied, editor, dev.zeroinput.ime.ui.StegoField.SECRET, expectedGeneration = 1L))
+            assertNull(handoff.takePaste(editor)); assertTrue(denied.all { it == '\u0000' })
+        } finally { handoff.destroy(); settings.stegoDefaults = original }
+    }
     @Test fun pastedTextIsOneUseBoundToOriginalEditorAndClearedOnRevocation() {
         val context: Context = RuntimeEnvironment.getApplication()
         val settings = SettingsRepository(context)
@@ -21,7 +51,7 @@ class StegoHandoffTest {
         val editor = dev.zeroinput.ime.clipboard.PasteEditorIdentity("public.fixture", 1, 1)
         try {
             val chars = "public cover".toCharArray()
-            handoff.offerPaste(chars, editor, dev.zeroinput.ime.ui.StegoField.COVER)
+            handoff.offerPaste(chars, editor, dev.zeroinput.ime.ui.StegoField.COVER, expectedGeneration = generation)
             handoff.leavePasteEditor()
             handoff.observePasteEditor(editor)
             assertNull(handoff.takeFile(editor))
@@ -34,7 +64,7 @@ class StegoHandoffTest {
                     { handoff.takePaste(editor.copy(fieldId = 2)); Unit },
                     { handoff.observePasteEditor(editor); handoff.leavePasteEditor() }, { handoff.close() })) {
                 val stale = "public stale".toCharArray()
-                handoff.offerPaste(stale, editor, dev.zeroinput.ime.ui.StegoField.COVER)
+                handoff.offerPaste(stale, editor, dev.zeroinput.ime.ui.StegoField.COVER, expectedGeneration = generation)
                 revoke()
                 assertNull(handoff.takePaste(editor))
                 assertTrue(stale.all { it == '\u0000' })
@@ -45,6 +75,29 @@ class StegoHandoffTest {
         val application = RuntimeEnvironment.getApplication()
         org.robolectric.Shadows.shadowOf(application)
             .grantPermissions("${application.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+        SettingsRepository(application).secureClipboardEnabled = true
+    }
+
+    @Test fun lateReadCannotRequeueAfterVaultDisableOrBecomePartOfANewerDeletionGeneration() {
+        val context: Context = RuntimeEnvironment.getApplication()
+        val settings = SettingsRepository(context)
+        var generation = 1L
+        val handoff = StegoHandoff(context, settings) { generation }
+        val editor = dev.zeroinput.ime.clipboard.PasteEditorIdentity("public.fixture", 1, 1)
+        try {
+            settings.secureClipboardEnabled = false
+            val disabled = "public revoked".toCharArray()
+            assertFalse(handoff.offerPaste(disabled, editor, dev.zeroinput.ime.ui.StegoField.SECRET, 1L))
+            assertTrue(disabled.all { it == '\u0000' })
+            settings.secureClipboardEnabled = true
+            generation++
+            val stale = "public old generation".toCharArray()
+            val carrier = "public old carrier".toCharArray()
+            assertFalse(handoff.offerPaste(stale, editor, dev.zeroinput.ime.ui.StegoField.COVER, 1L, carrier))
+            assertTrue(stale.all { it == '\u0000' } && carrier.all { it == '\u0000' })
+            assertFalse(handoff.hasPaste())
+            assertNull(handoff.takePaste(editor))
+        } finally { handoff.destroy() }
     }
 
     @Test fun replayedOrMissingTokenCannotDiscardANewerSaveDraft() {

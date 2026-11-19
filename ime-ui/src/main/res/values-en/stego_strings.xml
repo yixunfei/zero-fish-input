@@ -34,8 +34,24 @@
     <string name="stego_earlier">Earlier</string>
     <string name="stego_width_for">%1$s, %2$d bits, tap to change</string>
     <string name="stego_earlier_for">Move %1$s one layer earlier</string>
-    <string name="stego_advanced">More options</string>
+    <string name="stego_advanced">More actions and settings</string>
+    <string name="stego_editing">Editing</string>
+    <string name="stego_working">Working…</string>
+    <string name="stego_expand_text">More</string>
+    <string name="stego_collapse_text">Less</string>
+    <string name="stego_credential_choice">Key: %1$s</string>
+    <string name="stego_cover_hint">Public cover text; hold to paste</string>
+    <string name="stego_secret_hint">Text to hide; hold to paste</string>
+    <string name="stego_carrier_hint">Full hidden text or ciphertext; hold to paste</string>
+    <string name="stego_credential_hint">Direct English input; reveal to check</string>
+    <string name="stego_bits_hint">256–4096, in multiples of 8</string>
+    <string name="stego_no_algorithm">No cipher selected</string>
+    <string name="stego_expand_section">Expand %1$s</string>
+    <string name="stego_collapse_section">Collapse %1$s</string>
     <string name="stego_master_bits">Master bits</string>
     <string name="stego_master_bits_value">Random master key, %1$d bits</string>
     <string name="stego_generate_key">Generate key</string>
+    <string name="stego_paste_field">Paste field</string>
+    <string name="stego_clear_field">Clear field</string>
+    <string name="stego_bits_value">%1$d bits</string>
 </resources>

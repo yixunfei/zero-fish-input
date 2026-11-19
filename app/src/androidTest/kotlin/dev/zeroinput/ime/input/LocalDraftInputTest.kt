@@ -18,6 +18,74 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalDraftInputTest {
+    @Test fun typedUnicodeCannotExceedByteBudgetAndMaskedCallbacksNeverCopyCommittedText() = onMain {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        var limits = 0
+        val draft = LocalDraftInput({ graph }, { false }, {}, { text, _, _ -> assertEquals("", text) },
+            maxChars = 2048, maxUtf8Bytes = 2048, emitCommittedText = false, onLengthLimit = { limits++ },
+            preserveTextOnRejectedBackspace = true)
+        try {
+            draft.start(InputLanguage.ENGLISH)
+            draft.handle(KeyboardAction.LiteralText("汉".repeat(682) + "ab"))
+            assertEquals(684, draft.length)
+            draft.handle(KeyboardAction.LiteralText("汉"))
+            assertTrue(limits > 0)
+            assertEquals(684, draft.length)
+            assertNull(draft.submittedChars())
+            draft.handle(KeyboardAction.Backspace)
+            val recovered = requireNotNull(draft.submittedChars())
+            try { assertEquals("汉".repeat(682) + "ab", String(recovered)) }
+            finally { recovered.fill('\u0000') }
+            draft.handle(KeyboardAction.Backspace)
+            assertEquals(683, draft.length)
+            draft.clear()
+            draft.handle(KeyboardAction.LiteralText("😀".repeat(512)))
+            val accepted = requireNotNull(draft.submittedChars())
+            try { assertEquals(2048, String(accepted).toByteArray(Charsets.UTF_8).size) }
+            finally { accepted.fill('\u0000') }
+            assertFalse(draft.replaceCommittedText("汉".repeat(683)))
+            assertFalse(draft.appendImported("x"))
+        } finally { draft.close() }
+    }
+    @Test fun rejectedEnglishAndRealRimeCandidatesCannotSubmitAnIncompleteDraft() {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val handler = Handler(Looper.getMainLooper())
+        for (language in listOf(InputLanguage.ENGLISH, InputLanguage.CHINESE)) {
+            val state = java.util.concurrent.atomic.AtomicReference(InputSessionState())
+            val draft = LocalDraftInput({ graph }, handler::post, handler::removeCallbacks,
+                { _, _, next -> state.set(next) }, maxChars = 3)
+            try {
+                onMain { draft.start(language) }
+                if (language == InputLanguage.CHINESE) {
+                    val deadline = SystemClock.uptimeMillis() + 60_000
+                    while (state.get().engineDescriptor?.isFallback != false && SystemClock.uptimeMillis() < deadline) {
+                        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                        SystemClock.sleep(50)
+                    }
+                    assertEquals("Real Rime must be adopted", false, state.get().engineDescriptor?.isFallback)
+                }
+                onMain {
+                    draft.replaceCommittedText("ABC")
+                    val code = if (language == InputLanguage.CHINESE) "ni" else "x"
+                    code.forEach { draft.handle(KeyboardAction.Text(it.toString())) }
+                    draft.command(dev.zeroinput.ime.core.InputCommand.SelectCandidate(0))
+                    assertEquals(dev.zeroinput.ime.core.CommitTextResult.REJECTED, state.get().commitFailure)
+                    repeat(2) { assertNull(draft.submittedChars()) }
+                    assertTrue(state.get().snapshot.isComposing)
+                    draft.handle(KeyboardAction.Backspace)
+                    assertNull(state.get().commitFailure)
+                    draft.handle(KeyboardAction.Backspace)
+                    draft.handle(KeyboardAction.Backspace)
+                    code.forEach { draft.handle(KeyboardAction.Text(it.toString())) }
+                    draft.command(dev.zeroinput.ime.core.InputCommand.SelectCandidate(0))
+                    val result = requireNotNull(draft.submittedChars())
+                    try { assertEquals(if (language == InputLanguage.CHINESE) "A你" else "Ax ", String(result)) }
+                    finally { result.fill('\u0000') }
+                }
+            } finally { onMain { draft.close() } }
+        }
+    }
+
     @Test fun backspaceRemovesWholeCommittedGraphemesInBothDraftModes() = onMain {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         for (masked in listOf(false, true)) {

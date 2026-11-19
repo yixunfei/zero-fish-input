@@ -66,11 +66,12 @@ reads are the supported import sources. Existing uncommitted audit work is retai
   grant followed by another foreground click and deletion-generation check.
 - Cross-screen handoffs contain an opaque one-use ID only. A pending save owns one
   mutable result under the private host's 120-second pre-authentication draft budget.
-  Authentication keeps the broker's existing 30-second request limit; success starts
+  Starting authentication renews a separate 30-second authentication budget,
+  matching the broker's existing request limit; success starts
   a fresh confirmation window of at most 30 seconds, without extending the grant.
   Only the subsequent foreground click transfers the draft to a one-use
   PendingClipboardAddition for the write. Authentication cancellation offers a
-  retry within the existing draft budget; timeout clears it with an explicit notice.
+  retry with a fresh 120-second foreground draft budget; timeout clears it with an explicit notice.
   No Activity, InputConnection or secret is put in an Intent/saved state. A temporary
   file factor may return only to a matching public editor identity, followed by an
   explicit new operation. Settings, lock, timeout and vault generation revoke it.
@@ -116,6 +117,8 @@ one-shot insertion into the bound editor with no Send or plaintext fallback.
 All integers use unsigned big-endian encoding. `F(a,b,...)` is a concatenation of
 `u32be(length) || bytes` for every field. `D(s)` is the ASCII bytes
 `ZeroInput/message/v1/` followed by `s`. Hash/HMAC are SHA-256/HMAC-SHA-256.
+The bootstrap has no separate version byte; v1 is bound by these domain strings
+and the authenticated metadata version. This clarification changes no wire bytes.
 
 Public bootstrap: random 16-byte salt, credential ID, KDF ID, u16 encrypted-metadata
 length, fresh 24-byte metadata nonce (44 bytes). Credential IDs 1..5 follow the order
@@ -124,7 +127,7 @@ allow nonzero KDF. Encrypted metadata length is 38..120 including its 16-byte ta
 
 File factor is `Hash(F(D("key-file"), u64be(actualLength), Hash(fileBytes)))`.
 Password+file factor is `HMAC(fileFactor,F(D("passphrase-file"),passwordUtf8))`;
-random+file uses `F(D("random-key-file"),random32)`. Single modes use their exact
+random+file uses `HMAC(fileFactor,F(D("random-key-file"),random32))`. Single modes use their exact
 password/random/file factor. Password modes run Argon2id(factor,salt,profile).
 HKDF extract is `prk=HMAC(salt,derivedOrDirectFactor)`.
 
@@ -190,6 +193,34 @@ under More options. No additional persistence or input connection is introduced.
 
 ## Approved two-field paste and variable master material (2026-11-19)
 
+### Later approved defaults and three-field paste (2026-11-19)
+
+The user subsequently approved COVER, SECRET and CARRIER long-press private-vault
+paste, with independently configurable sources. Vault paste defaults on, while
+the existing global secure-vault feature still defaults off and every read keeps
+its fresh authentication and foreground confirmation. System paste now defaults
+off and requires explicit Settings > Steganography opt-in, even for the original
+two public fields. The same exact adapter may then serve only these three text
+fields; credentials and key-length fields are excluded. Source menus, worker
+acquisition and publication recheck the source setting; settings changes revoke
+pending handoffs. No listener, write, automatic import or AI path is added.
+
+Secret paste accepts at most 2048 UTF-8 bytes without truncation. Navigation still
+clears every old draft/credential, and authenticated results return only through
+the existing 30-second, editor-bound one-use handoff into a new isolated workspace.
+The pasted secret remains masked. Standalone reads remain local. No plaintext
+is inserted into the external editor or preserved as an earlier draft.
+
+Public settings persist a default random master length (256 initially, valid
+256..4096 multiples of 8), ordered cipher/width descriptors (AES-256 initially),
+and the two paste switches. Each new workspace copies these defaults; temporary
+workspace adjustments never overwrite them. Cipher controls start collapsed with
+their summary. Decryption continues to derive its parameters from the received
+carrier. No message text, credentials, encrypted format or vault migration is added.
+
+The following two-field record describes the earlier approval and is superseded
+only by this later source/default decision.
+
 The latest explicit request authorizes system Paste from the COVER/CARRIER
 long-press source menu. This supersedes only the earlier refusal for these fields.
 StegoSystemPaste reads one bounded plain-text item on the source worker, with no
@@ -219,3 +250,28 @@ The page follows text, credential, cipher selection, action, result/save order;
 mode and reveal controls are inline, optional carrier/KDF settings secondary.
 All touch controls remain at least 48 dp; no platform editable/clipboard menu,
 autofill, capture, saved state or extra input connection is introduced.
+
+## Security and usability audit follow-up (2026-11-19)
+
+The user approved fixing verified defects and explaining intentional clearing.
+Beginning an operation renews a bounded 120-second working window; expired
+editing cannot be revived, and preview/result consumption still expires at 30 s.
+The private host renews its editing timer on explicit draft interactions and
+starts a separate 30-second budget before requesting authentication. Authentication
+completion ends the detour exemption immediately, even before focus returns.
+
+Typing and paste enforce the same exact UTF-8 budgets without truncation.
+Credential input already uses the English layout without composition; the UI
+now explains direct entry and manual random-key distribution limits. Display is
+explicit and typing remasks; clear requires confirmation for secrets/credentials.
+No key export, credential paste, Chinese credential composition or key persistence
+is introduced. The portable format still accepts exact Unicode credentials.
+
+File navigation deliberately clears all fields, including carrier and cover.
+The warning requires selecting the file first and reimporting received text.
+Re-editing a prepared result deliberately clears it and requires entering secrets,
+credentials and file factors again; a confirmation explains this. Cursor/selection
+changes, navigation and recreation still revoke every draft. No carrier-preserving
+file handoff or saved secret state is added. Pre-authentication vault choices show
+only ordinal and the timestamp already available in the independent index;
+encrypted labels and bodies are not read for the chooser.

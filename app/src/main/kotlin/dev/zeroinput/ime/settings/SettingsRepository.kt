@@ -20,6 +20,11 @@ import dev.zeroinput.ai.api.DeviceStage6Capability
 class SettingsRepository(context: Context) {
     private val preferences = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
     private val aiDisplayPreferences = context.getSharedPreferences(AI_DISPLAY_FILE_NAME, Context.MODE_PRIVATE)
+    private val stego = dev.zeroinput.ime.textstego.StegoPreferences(preferences)
+
+    var stegoDefaults: dev.zeroinput.ime.textstego.StegoDefaults
+        get() = stego.read()
+        set(value) = stego.write(value)
 
     /**
      * Observes settings changes without exposing the underlying

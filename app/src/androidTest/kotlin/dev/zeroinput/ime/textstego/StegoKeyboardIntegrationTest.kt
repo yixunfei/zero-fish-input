@@ -25,7 +25,10 @@ import org.junit.runner.RunWith
 class StegoKeyboardIntegrationTest {
     private val graph get() = (Device.context.applicationContext as ZeroInputApplication).graph
 
-    @Test fun authenticatedCoverPasteSurvivesRealEditorReturnAndWaitsForAnExplicitStegoTap() {
+    @Test fun authenticatedCoverPasteSurvivesRealEditorReturnAndWaitsForAnExplicitStegoTap() = authenticatedPaste(StegoField.COVER)
+    @Test fun authenticatedSecretPasteReturnsMaskedOnlyAfterExplicitStegoTapWithoutWritingEditor() = authenticatedPaste(StegoField.SECRET)
+
+    private fun authenticatedPaste(target: StegoField) {
         org.junit.Assume.assumeTrue(androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("stegoTestPin") == "2468")
         assertEquals(0, graph.secureClipboard.count())
         val enabled = graph.settings.secureClipboardEnabled
@@ -37,7 +40,7 @@ class StegoKeyboardIntegrationTest {
                 var source: StegoSourceActivity? = null
                 Device.onMain {
                     keyboard().onTextStegoRequested()
-                    keyboard().textStegoPanel.onPasteRequested(StegoField.COVER)
+                    keyboard().textStegoPanel.onPasteRequested(target)
                 }
                 Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_paste_vault))
                 await { onMain { androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
@@ -46,7 +49,7 @@ class StegoKeyboardIntegrationTest {
                     source = androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
                         .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).filterIsInstance<StegoSourceActivity>().single()
                 }
-                Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_entry, 1))
+                clickStegoVaultEntry(1)
                 StegoVaultPlatformTest().authenticate()
                 await { onMain {
                     val host = requireNotNull(source)
@@ -63,6 +66,10 @@ class StegoKeyboardIntegrationTest {
                     assertFalse(keyboard().isTextStegoOpen)
                     assertTrue(graph.stegoHandoff.hasPaste())
                     keyboard().onTextStegoRequested()
+                    if (target == StegoField.SECRET) {
+                        assertFalse(labels(keyboard().textStegoPanel).contains(cover))
+                        keyboard().textStegoPanel.onAction(StegoAction.REVEAL)
+                    }
                     assertTrue(labels(keyboard().textStegoPanel).contains(cover))
                     assertFalse(graph.stegoHandoff.hasPaste())
                     assertEquals("", activity.editor.text.toString())
@@ -146,14 +153,27 @@ class StegoKeyboardIntegrationTest {
             button.requestRectangleOnScreen(android.graphics.Rect(0, 0, button.width, button.height), true)
         }
         Device.instrumentation.waitForIdleSync()
+        // Field changes can start a posted smooth scroll after the main queue is idle.
+        Device.instrumentation.uiAutomation.waitForIdle(300, 3000)
         val point = IntArray(2)
-        Device.onMain { button.getLocationOnScreen(point); point[0] += button.width / 2; point[1] += button.height / 2 }
+        Device.onMain {
+            val visible = android.graphics.Rect()
+            assertTrue("Public fixture control must be visible", button.getGlobalVisibleRect(visible))
+            // Global-visible rectangles are relative to the root, while injected
+            // events use screen coordinates. An IME window need not start at y=0.
+            val origin = IntArray(2)
+            button.rootView.getLocationOnScreen(origin)
+            point[0] = visible.centerX() + origin[0]; point[1] = visible.centerY() + origin[1]
+        }
         val down = SystemClock.uptimeMillis()
         for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
             val event = android.view.MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0].toFloat(), point[1].toFloat(), 0)
             try { assertTrue(Device.instrumentation.uiAutomation.injectInputEvent(event, true)) } finally { event.recycle() }
         }
         Device.instrumentation.waitForIdleSync()
+        Device.instrumentation.uiAutomation.waitForIdle(300, 3000)
+        if (label == dev.zeroinput.ime.ui.R.string.stego_secret || label == dev.zeroinput.ime.ui.R.string.stego_credential)
+            Device.onMain { assertTrue("Touched draft field ${button.resources.getResourceEntryName(label)} must become selected", button.isSelected) }
     }
 
     @Test fun isolatedDraftPreviewsThenCommitsOnlyAuthenticatedCarrierOnce() = withEditor { activity ->

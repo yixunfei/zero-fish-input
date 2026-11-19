@@ -476,3 +476,12 @@ Not verified in this iteration: OEM/ARM64 or older-API runtime, real third-party
 message transport, or a signed Release build. ARM64 packaging is not runtime
 proof. No Git commit, publication or external message was made. Existing unrelated
 uncommitted changes are preserved.
+
+
+## Security/UX audit follow-up (2026-11-19)
+
+See the [item-by-item audit resolution](audits/2026-11-19-stego-security-ux-resolution.md)
+for the classified findings, corrected behavior, current build/device evidence and
+remaining platform gaps. Earlier package paths/hashes above do not identify the
+audit-fixed build. No new ARM64 distribution or Release publication is made by
+this follow-up. Navigation/selection/recreation still revoke private drafts.

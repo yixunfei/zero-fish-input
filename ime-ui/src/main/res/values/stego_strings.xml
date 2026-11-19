@@ -1,8 +1,8 @@
 <resources>
     <string name="stego_open">隐写模式</string>
     <string name="stego_short">隐</string>
-    <string name="stego_encrypt">加密隐写</string>
-    <string name="stego_decrypt">本地解密</string>
+    <string name="stego_encrypt">加密</string>
+    <string name="stego_decrypt">解密</string>
     <string name="stego_close">关闭清除</string>
     <string name="stego_cover">公开文本</string>
     <string name="stego_secret">秘密正文</string>
@@ -34,8 +34,24 @@
     <string name="stego_earlier">提前</string>
     <string name="stego_width_for">%1$s，%2$d 位，点击切换</string>
     <string name="stego_earlier_for">将 %1$s 提前一层</string>
-    <string name="stego_advanced">更多选项</string>
+    <string name="stego_advanced">更多操作与设置</string>
+    <string name="stego_editing">正在编辑</string>
+    <string name="stego_working">处理中…</string>
+    <string name="stego_expand_text">展开</string>
+    <string name="stego_collapse_text">收起</string>
+    <string name="stego_credential_choice">凭据：%1$s</string>
+    <string name="stego_cover_hint">输入公开可见的掩护文本；长按可粘贴</string>
+    <string name="stego_secret_hint">输入要隐藏的正文；长按可粘贴</string>
+    <string name="stego_carrier_hint">输入完整隐写文本或独立密文；长按可粘贴</string>
+    <string name="stego_credential_hint">英文直接输入密钥或口令；可显示核对</string>
+    <string name="stego_bits_hint">256–4096，须为 8 的倍数</string>
+    <string name="stego_no_algorithm">尚未选择算法</string>
+    <string name="stego_expand_section">展开%1$s</string>
+    <string name="stego_collapse_section">收起%1$s</string>
     <string name="stego_master_bits">主密钥位数</string>
     <string name="stego_master_bits_value">随机主密钥 %1$d 位</string>
     <string name="stego_generate_key">生成随机密钥</string>
+    <string name="stego_paste_field">粘贴此项</string>
+    <string name="stego_clear_field">清空此项</string>
+    <string name="stego_bits_value">%1$d 位</string>
 </resources>

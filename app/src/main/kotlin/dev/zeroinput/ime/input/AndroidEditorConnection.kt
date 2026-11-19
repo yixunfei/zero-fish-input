@@ -3,6 +3,7 @@ package dev.zeroinput.ime.input
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
 import dev.zeroinput.ime.core.EditorConnection
+import dev.zeroinput.ime.core.CommitTextResult
 import dev.zeroinput.ime.core.ReconversionEditorConnection
 
 class AndroidEditorConnection(
@@ -58,18 +59,24 @@ class AndroidEditorConnection(
         return false
     }
 
-    override fun commitText(text: String): Boolean {
+    override fun commitText(text: String): Boolean = commitTextResult(text) == CommitTextResult.ACCEPTED
+
+    override fun commitTextResult(text: String): CommitTextResult {
         val connection = current()
         committedConnection = null
         // As with pre-edit updates, reserve the resulting cursor before the
         // platform callback can arrive.  A rejected commit invalidates the
         // prediction and forces the next interaction to re-anchor.
         selection.replaced(text.length, composing = false)
-        if (platformCall { connection?.commitText(text, 1) } == true) {
+        val result = platformCall { connection?.commitText(text, 1) }
+        if (result == true) {
             committedConnection = connection
             onCommitted(text)
-            return true
-        } else { invalidateContext(); onCommitted(null); return false }
+            return CommitTextResult.ACCEPTED
+        }
+        invalidateContext()
+        onCommitted(null)
+        return if (result == false) CommitTextResult.REJECTED else CommitTextResult.UNKNOWN
     }
 
     override fun commitPairedText(text: String, cursorOffset: Int): Boolean {

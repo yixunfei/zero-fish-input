@@ -26,15 +26,29 @@ import org.junit.runner.RunWith
 /** P1 only: never packaged in the IME; no vault, authentication, cleanup or listener wiring. */
 @RunWith(AndroidJUnit4::class)
 class SystemClipboardImportPrototypeTest {
+    @Test fun disabledStegoSystemPasteRejectsEveryTargetBeforeAuthorization() {
+        val settings = (context.applicationContext as ZeroInputApplication).graph.settings
+        val defaults = settings.stegoDefaults
+        try {
+            instrumentation.runOnMainSync { settings.stegoDefaults = defaults.copy(systemPaste = false) }
+            val adapter = dev.zeroinput.ime.textstego.StegoSystemPaste(context)
+            for (field in dev.zeroinput.ime.ui.StegoField.entries) {
+                assertNull(adapter.read(field) { fail("Disabled paste must not reach authorization"); true })
+            }
+        } finally { instrumentation.runOnMainSync { settings.stegoDefaults = defaults } }
+    }
+
     @Test fun longPressSystemPastePopulatesOnlyTheIsolatedCoverThroughTheSourceWorker() = withCleanDevice { activity, manager, ownership ->
         val sample = Sample.GUARD
         manager.setPrimaryClip(publicFixture(sample))
         ownership.record(manager.primaryClipDescription?.timestamp)
         val graph = (context.applicationContext as ZeroInputApplication).graph
+        val defaults = graph.settings.stegoDefaults
         lateinit var view: dev.zeroinput.ime.ui.ZeroInputView
         lateinit var workspace: dev.zeroinput.ime.textstego.StegoWorkspace
         try {
             instrumentation.runOnMainSync {
+                graph.settings.stegoDefaults = defaults.copy(systemPaste = true)
                 val themed = dev.zeroinput.ime.settings.KeyboardThemeContext.create(activity, dev.zeroinput.ime.ui.KeyboardTheme.CLASSIC)
                 view = dev.zeroinput.ime.ui.ZeroInputView(themed)
                 activity.setContentView(view)
@@ -59,17 +73,21 @@ class SystemClipboardImportPrototypeTest {
                 found
             }
         } finally {
-            instrumentation.runOnMainSync { workspace.close(); view.release() }
+            instrumentation.runOnMainSync { workspace.close(); view.release(); graph.settings.stegoDefaults = defaults }
             await { activity.hasWindowFocus() && !locked() }
         }
     }
     @Test fun stegoPasteReadsOnlyExplicitTextAndRejectsWrongTargetsBoundsAndRevocation() = withCleanDevice { _, manager, ownership ->
         val adapter = dev.zeroinput.ime.textstego.StegoSystemPaste(context)
+        val settings = (context.applicationContext as ZeroInputApplication).graph.settings
+        val defaults = settings.stegoDefaults
+        try {
+        instrumentation.runOnMainSync { settings.stegoDefaults = defaults.copy(systemPaste = true) }
         for (sample in Sample.entries) {
             assumeTrue(ownership.mayReplace(manager.primaryClipDescription?.timestamp))
             manager.setPrimaryClip(publicFixture(sample))
             ownership.record(manager.primaryClipDescription?.timestamp)
-            val allowed = sample in listOf(Sample.UNICODE, Sample.LIMIT, Sample.GUARD, Sample.HTML, Sample.BLANK)
+            val allowed = sample in listOf(Sample.UNICODE, Sample.GUARD, Sample.HTML, Sample.BLANK)
             val carrier = adapter.read(dev.zeroinput.ime.ui.StegoField.CARRIER) { true }
             assertTrue("Public fixture classification differs: ${sample.name}", allowed == (carrier != null))
             if (carrier != null && sample.expected != null) assertTrue(carrier == sample.expected)
@@ -78,9 +96,16 @@ class SystemClipboardImportPrototypeTest {
             var checks = 0
             assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.CARRIER) { ++checks == 1 })
             assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.COVER) { false })
-            assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.SECRET) { fail("Wrong target must not reach authorization"); true })
+            val secret = adapter.read(dev.zeroinput.ime.ui.StegoField.SECRET) { true }
+            assertEquals(allowed && sample != Sample.LIMIT, secret != null)
             assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.CREDENTIAL) { fail("Wrong target must not reach authorization"); true })
         }
+        instrumentation.runOnMainSync { settings.stegoDefaults = defaults.copy(systemPaste = false) }
+        for (field in listOf(dev.zeroinput.ime.ui.StegoField.COVER, dev.zeroinput.ime.ui.StegoField.SECRET,
+                dev.zeroinput.ime.ui.StegoField.CARRIER)) {
+            assertNull(adapter.read(field) { fail("Disabled system paste must not acquire an item"); true })
+        }
+        } finally { instrumentation.runOnMainSync { settings.stegoDefaults = defaults } }
     }
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext

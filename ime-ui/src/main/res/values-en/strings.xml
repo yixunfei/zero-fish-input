@@ -236,4 +236,6 @@
     <string name="secure_clipboard_copy_save">Save selected text</string>
     <string name="secure_clipboard_copy_saving">Saving</string>
     <string name="secure_clipboard_copy_cancel">Cancel copying</string>
+    <string name="commit_rejected">Not submitted. Tap the candidate, Space or Enter to retry, or Backspace to cancel before typing.</string>
+    <string name="commit_uncertain">Submission could not be confirmed. Check the editor, then press Backspace to end the pending edit.</string>
 </resources>

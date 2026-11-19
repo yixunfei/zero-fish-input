@@ -46,6 +46,7 @@ data class SettingsScreenState(
     val personalPromotionThreshold: Int = 1,
     val privateDraftEnabled: Boolean = false,
     val savePrivateDraftOnSubmit: Boolean = true,
+    val stegoDefaults: dev.zeroinput.ime.textstego.StegoDefaults = dev.zeroinput.ime.textstego.StegoDefaults(),
 )
 
 data class LanguagePackScreenState(
@@ -96,6 +97,7 @@ class SettingsScreenView(context: Context) : LinearLayout(context) {
     var onAiPageSettingsRequested: () -> Unit = {}
     var onAiDeviceAgentSettingsRequested: () -> Unit = {}
     var onInterfaceLanguageChanged: (String) -> Unit = {}
+    var onStegoDefaultsChanged: (dev.zeroinput.ime.textstego.StegoDefaults) -> Unit = {}
 
     private var suppressSwitchCallbacks = false
     private var aiControlsEnabled = true
@@ -162,6 +164,9 @@ class SettingsScreenView(context: Context) : LinearLayout(context) {
     private val chineseSettings = ChineseSettingsView(context).apply {
         onOptionsChanged = { onChineseOptionsChanged(it) }
     }
+    private val stegoSettings = dev.zeroinput.ime.textstego.StegoSettingsView(context).apply {
+        onChanged = { onStegoDefaultsChanged(it) }
+    }
 
     fun showFuzzySettings() { navigateTo(SettingsCategory.INPUT); chineseSettings.showFuzzySettings() }
 
@@ -225,6 +230,7 @@ class SettingsScreenView(context: Context) : LinearLayout(context) {
     }
 
     fun render(state: SettingsScreenState) {
+        stegoSettings.render(state.stegoDefaults)
         enabledStatus.setText(if (state.isEnabled) R.string.setting_enabled else R.string.setting_disabled)
         currentStatus.setText(if (state.isCurrent) R.string.setting_current else R.string.setting_not_selected)
         homeStatus.setText(if (state.isCurrent) R.string.setting_current else if (state.isEnabled)
@@ -299,6 +305,9 @@ class SettingsScreenView(context: Context) : LinearLayout(context) {
         command(context.getString(R.string.secure_clipboard)) { onSecureClipboardRequested() }
         command(context.getString(R.string.clear_personal_data)) { onPersonalDataClearRequested() }
         command(context.getString(R.string.clear_secure_clipboard)) { onSecureClipboardClearRequested() }
+
+        page(SettingsCategory.STEGO)
+        content.addView(stegoSettings)
 
         page(SettingsCategory.AI)
         section(context.getString(R.string.ai_title))

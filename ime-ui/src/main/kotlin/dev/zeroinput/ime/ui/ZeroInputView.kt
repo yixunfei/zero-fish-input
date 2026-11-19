@@ -243,6 +243,7 @@ class ZeroInputView @JvmOverloads constructor(
     private val shapeLookup = ShapeLookupPanelView(context)
     private var shapeEditing = true
     private val privateDraft = PrivateDraftPanelView(context)
+    private val commitFailureNotice = CommitFailureNotice(context)
     private var privateSnapshot = EngineSnapshot.Empty
     private val ai = AiWorkbenchPanelView(context)
     private val content = LinearLayout(context).apply {
@@ -316,6 +317,7 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
+        commitFailureNotice.clear()
         backNavigation.clear()
         super.onDetachedFromWindow()
     }
@@ -352,6 +354,7 @@ class ZeroInputView @JvmOverloads constructor(
     }
 
     fun renderSession(state: InputSessionState) {
+        commitFailureNotice.render(state)
         if (currentLanguage != state.language || currentPack != state.languagePackKey || sensitive != state.privacy.isSensitive) {
             cancelPendingGestures()
             if (mode == PanelMode.CANDIDATES) showMode(PanelMode.KEYBOARD)
@@ -704,6 +707,7 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun renderSearchDraft(text: String, state: InputSessionState) {
         if (!isSearchEditing) return
+        commitFailureNotice.render(state)
         searchSnapshot = state.snapshot
         val composition = state.snapshot.composition
         val committed = text.dropLast(composition.length)
@@ -744,6 +748,7 @@ class ZeroInputView @JvmOverloads constructor(
     fun openTextStego() = showMode(PanelMode.TEXT_STEGO, userInitiated = false)
     fun renderTextStegoInput(state: InputSessionState?) {
         if (!isTextStegoOpen) return
+        commitFailureNotice.render(state)
         stegoSnapshot = state?.snapshot ?: EngineSnapshot.Empty
         candidateStrip.render(stegoSnapshot)
         renderDraftLanguage(state?.language ?: InputLanguage.ENGLISH)
@@ -758,6 +763,7 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun renderPrivateDraft(text: String, hasInput: Boolean, state: InputSessionState, busy: Boolean, showFull: Boolean) {
         if (!isPrivateDraftOpen) return
+        commitFailureNotice.render(state)
         privateSnapshot = if (busy) EngineSnapshot.Empty else state.snapshot
         privateDraft.render(text, hasInput, busy, showFull)
         candidateStrip.render(privateSnapshot)
@@ -806,6 +812,7 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun renderAiDraft(text: String, state: InputSessionState, preedit: String = "",
         options: ChineseInputOptions = ChineseInputOptions()) {
+        commitFailureNotice.render(state)
         aiChineseOptions = options
         aiLanguage = state.language
         aiCapabilities = state.engineDescriptor?.capabilities.orEmpty()
@@ -832,6 +839,7 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun renderAiDeviceAgentDraft(text: String, state: InputSessionState, preedit: String = "",
         options: ChineseInputOptions = ChineseInputOptions()) {
+        commitFailureNotice.render(state)
         aiChineseOptions = options
         aiLanguage = state.language
         aiCapabilities = state.engineDescriptor?.capabilities.orEmpty()
@@ -1349,7 +1357,7 @@ class ZeroInputView @JvmOverloads constructor(
             editing && !splitSearch -> keyboard.preferredHeight + dp(when {
                 shapeTyping -> 192
                 isPrivateDraftOpen -> 96
-                isTextStegoOpen -> 256
+                isTextStegoOpen -> 320
                 searchActive -> 224
                 else -> ai.editingHeightDp
             })

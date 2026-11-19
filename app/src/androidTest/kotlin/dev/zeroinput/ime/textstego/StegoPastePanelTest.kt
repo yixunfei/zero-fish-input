@@ -17,10 +17,20 @@ import dev.zeroinput.ime.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.Before
+import org.junit.After
 import dev.zeroinput.ime.R
 
 @RunWith(AndroidJUnit4::class)
 class StegoPastePanelTest {
+    private var enabled = false
+    @Before fun enableVaultMenuFixture() = Device.onMain {
+        val settings = (Device.context.applicationContext as ZeroInputApplication).graph.settings
+        enabled = settings.secureClipboardEnabled; settings.secureClipboardEnabled = true
+    }
+    @After fun restoreVaultMenuFixture() = Device.onMain {
+        (Device.context.applicationContext as ZeroInputApplication).graph.settings.secureClipboardEnabled = enabled
+    }
     @Test fun presetAndCustomMasterLengthsGenerateMaskedCanonicalCredentials() {
         ActivityScenario.launch<KeyboardPreviewFixtureActivity>(Intent(Device.context, KeyboardPreviewFixtureActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)).use { scenario ->
@@ -89,7 +99,8 @@ class StegoPastePanelTest {
                     { sources = sources + it }, {})
                 view.openTextStego(); workspace?.open(InputLanguage.ENGLISH, ChineseInputOptions())
                 assertTrue(workspace?.pasteText(StegoField.COVER, "public replacement") == true)
-                assertFalse(workspace?.pasteText(StegoField.SECRET, "denied") == true)
+                assertTrue(workspace?.pasteText(StegoField.SECRET, "public secret") == true)
+                assertFalse(nodes(panel).filterIsInstance<TextView>().any { it.isShown && it.text.toString() == "public secret" })
                 val body = nodes(panel).filterIsInstance<TextView>().single { it.isShown && it.text.toString() == "public replacement" }
                 assertTrue(body.performLongClick())
                 stale = panel.onPasteRequested

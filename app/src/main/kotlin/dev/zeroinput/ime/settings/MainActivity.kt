@@ -212,6 +212,7 @@ class MainActivity : AppCompatActivity() {
         screen.onPrivateDraftChanged = ::setPrivateDraftEnabled
         screen.onPrivateDraftCopyChanged = { graph.settings.savePrivateDraftOnSubmit = it }
         screen.onClipboardGuardRequested = { startActivity(Intent(this, ClipboardGuardSettingsActivity::class.java)) }
+        screen.onStegoDefaultsChanged = { graph.settings.stegoDefaults = it; render() }
         screen.onHapticsChanged = { graph.settings.hapticFeedbackEnabled = it; render() }
         screen.onSoundEffectsChanged = { graph.settings.soundEffectsEnabled = it; render() }
         screen.onWordAssociationsChanged = { graph.settings.wordAssociationsEnabled = it; render() }
@@ -525,6 +526,7 @@ class MainActivity : AppCompatActivity() {
                 secureClipboardEnabled = graph.settings.secureClipboardEnabled,
                 privateDraftEnabled = graph.settings.privateDraftEnabled,
                 savePrivateDraftOnSubmit = graph.settings.savePrivateDraftOnSubmit,
+                stegoDefaults = graph.settings.stegoDefaults,
                 hapticsEnabled = graph.settings.hapticFeedbackEnabled,
                 soundEffectsEnabled = graph.settings.soundEffectsEnabled,
                 wordAssociationsEnabled = graph.settings.wordAssociationsEnabled,

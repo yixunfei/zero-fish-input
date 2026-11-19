@@ -2,6 +2,123 @@
 
 Updated 2026-11-19.
 
+## Stego audit verification follow-up (2026-11-19)
+
+The [second source verification](audits/2026-11-19-stego-security-ux-verification.md#6-二次回源复核与修正)
+corrects the missed existing working-deadline test and treats the proposed IPC
+selection race as unproven. Pending candidate rejection still blocks incomplete
+submission until explicit cancellation. Stego now opts into first-backspace
+cancellation of rejected direct input without deleting accepted text; other draft
+consumers retain their previous behavior. Submission feedback distinguishes
+budget rejection from unfinished conversion. No new credential paste, retention,
+key export, permission or format path is added.
+
+Final app/core reports: 774 passes, two opt-in provider skips, zero failures/errors.
+Real-Rime x86_64 Debug/test APKs, privacyCheck and zero-issue Lint pass. API 37
+passes 24 targeted platform regressions, plus nine repeated checks at 320x480 dp,
+dark theme/font 1.3. Emulator settings restored and task-owned emulator closed.
+The verification records final logs/APK provenance and the initial failures that
+led to limiting the behavior to Stego. Next: the full system-clipboard rejection
+matrix and physical ARM/OEM/older-Android acceptance. No ARM redistribution,
+Release or publication occurred.
+
+## Stego security/UX audit resolution (2026-11-19)
+
+The user approved verifying and fixing the feedback while preserving draft
+revocation on navigation, external selection changes and recreation. The
+[item-by-item resolution](audits/2026-11-19-stego-security-ux-resolution.md)
+distinguishes bugs, missing guidance, deliberate boundaries and inaccurate claims.
+Fixes cover independent working/authentication deadlines, exact UTF-8 input
+budgets, early source revocation, handoff acceptance/global-vault/deletion-generation
+checks and reduced hidden-text copies. UI adds expiry guidance, confirmed field
+clearing, visible paste/next/selection actions, vault timestamps, explicit credential
+and clearing limits, public-cover accessibility and status announcements.
+No format, permission, export, credential paste or key-export change is introduced.
+
+Validation and final artifact provenance are recorded in the resolution document.
+Reports total 1,151 unit passes plus two opt-in provider skips, zero failures/errors;
+the final real-Rime Debug/test build, privacyCheck and zero-issue Lint pass. API 37
+passes all 52 stego tests after the final handoff change, plus 12 draft tests.
+Five UI checks repeat at 320x480 dp dark/font 1.3 and actual 640x320 dp landscape.
+Next: physical ARM/OEM, older Android and the complete explicit system-clipboard
+rejection matrix; retain existing conservative fixture ownership checks. Existing
+ARM64 distribution packages predate this change. No release or publication occurred.
+
+## Stego defaults and three-field explicit paste (2026-11-19)
+
+Settings > Steganography now persists the default random master length (initially
+256 bits), ordered cipher/width cascade (initially AES-256), and independent
+private-vault/system paste switches. New workspaces copy these settings and keep
+the cipher group folded. Temporary workspace edits do not overwrite defaults.
+
+Public cover, secret text and encoded-message fields support long-press source
+selection. Private-vault paste retains authentication, foreground confirmation,
+draft clearing and one-use return into a new matching editor-bound workspace;
+secret text returns masked. System paste defaults off and requires explicit
+opt-in. Keys/passphrases cannot be pasted; source changes revoke pending work.
+
+Real-Rime x86_64 Debug/test builds, 613 scoped app/UI unit passes (two opt-in
+provider skips), privacy checks and zero-issue Debug Lint pass. Final API 37
+regression and isolated source/default-off checks pass 29 distinct platform
+cases plus five landscape/dark/large-font repeats. The full system rejection
+matrix conservatively skips on fixture-ownership metadata and is not a pass.
+Main merged-manifest boundaries and installed APK hashes match. See the
+[validation record](audits/2026-11-19-stego-defaults-paste.md).
+Next: physical ARM/OEM and older-Android acceptance. No Release/publication was
+performed; the 15:05 ARM package below predates this change.
+
+Repackaged the defaults/paste changes at 2026-11-19 16:04 China time using
+`./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000`, without
+SkipChecks. The [current ARM64 Debug test APK](../app/build/outputs/test-apk/20261119-160438/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+is 96,406,675 bytes, SHA-256
+`9a8b776091bcf91635cb67bee6149ea033285eb1aa9383de97c61570202ba188`.
+Full Debug/Release unit reports contain 2,278 passes and four opt-in provider
+skips, no failures/errors (including cached/up-to-date suites). Privacy checks,
+zero-issue Debug Lint, real-Rime ARM64 build, resource/signature/ABI/permission
+checks and all three distribution checksums pass. The 180 MB budget passes;
+the separate 80 MB target remains exceeded. The new Debug-signed package has not
+been installed on a physical device. Evidence: `.tmp-evidence/stego-defaults-repackage.log`
+and `.tmp-evidence/stego-defaults-repackage-verification.json`.
+
+## Stego panel presentation and interaction (2026-11-19)
+
+The panel now uses full-width labelled draft fields, a current-field outline and
+editing marker, field-specific hints and long-text expansion. Cipher selection
+starts folded with an ordered summary; secondary actions/settings fold separately.
+Mode/clear and execution rows remain fixed; the viewport-constrained portrait
+detail request is 320 dp. Field switching scrolls to the active field. Existing
+masking, focus-free input and all source/crypto/lifecycle boundaries are preserved.
+
+Real-Rime x86_64 Debug/test builds, 606 scoped app/UI unit passes (two opt-in
+provider skips), privacy checks and zero-issue Debug Lint pass. API 37 passes 14
+distinct platform tests, plus eight repeated layout/caret executions across small
+dark/large-font and landscape/light configurations. See the
+[change and validation record](audits/2026-11-19-stego-panel-ui.md).
+Next: physical ARM/OEM and older-API acceptance. No Release or publication was
+performed for this UI change; the audit work below remains preserved.
+
+Repackaged after the UI change at 2026-11-19 15:05 China time with
+`./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000` (no SkipChecks).
+The current [ARM64 Debug test APK](../app/build/outputs/test-apk/20261119-150532/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+is 96,383,639 bytes, SHA-256
+`865c993b334fa791f9d243c02bab23f6c11892da7bfd56f14f68969739de2d1a`.
+Full Debug/Release unit reports contain 2,264 passes and four opt-in provider
+skips, zero failures/errors (including up-to-date/cached suites). Privacy, zero-issue
+Debug Lint, real-Rime ARM64 build, full resource/signature/ABI/permission checks
+and all three distribution checksums pass. The 180 MB budget passes; the separate
+80 MB target remains exceeded. This is Debug-signed, not a production Release;
+the new ARM64 artifact was not installed on a physical device.
+
+The user requested historical package cleanup. After validating the new delivery,
+ten old distribution directories and 66 old package/archive/metadata files were
+removed (1,868,635,775 bytes); Debug packaging reset separately replaced five
+historical main APKs. Only the latest ARM64 source APK and distribution copy remain.
+Old provenance/checksum text and the path/hash cleanup manifest are preserved in
+`.tmp-evidence/stego-panel-package-cleanup.json`; build evidence is
+`.tmp-evidence/stego-panel-repackage.log`. Source changes, native caches, validation
+records and remote release assets were retained. Historical local APK links below
+may now be unavailable; their recorded hashes remain historical evidence.
+
 ## v0.7.7 published (2026-11-19)
 
 README and release notes describe the current stego workspace, full private-draft

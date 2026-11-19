@@ -48,6 +48,22 @@ language-pack -> engine-dictionary
 
 ## Runtime boundaries
 
+Rejected engine commits are owned by one bounded, session-local PendingEngineCommit.
+It retains the immutable EngineUpdate and the prior visible composition while the
+already-advanced engine is frozen. Candidate/Space/Enter explicitly retry the same
+result without re-running selection; Backspace cancels the entire pending composition.
+Other editing, ranking, paging and warm-up adoption cannot drive that engine until
+resolution. Accepted commits alone publish the post-commit snapshot and learn.
+AndroidEditorConnection distinguishes rejection from an uncertain platform call;
+uncertain commits cannot be retried. Session/privacy/reset/close boundaries revoke
+pending state. LocalDraftInput refuses partial submission and caret moves while a
+failed commit is unresolved; explicit submission may retry a definite rejection.
+
+StegoFieldUi carries the displayed composition length alongside the committed-text
+caret. StegoWorkspace inserts formatted preedit at that caret, and DraftTextView
+uses that same length for drawing and touch projection. Hidden secret fields expose
+neither a caret nor preedit metadata.
+
 The November 18 review separates personal answer readiness from unproven dictionary
 edits. DictionaryPersonalizationStore prepares immutable suppression sets on its
 worker; an uncached query can filter native rows without storage or a dictionary
@@ -1281,6 +1297,24 @@ dependency. `ime-ui/StegoPanelView` contains focus-free presentation only.
 only supplies lifecycle, selection and commit adapters. Secret editing uses
 NoPersonalization. No new user-data format, key alias or module dependency is added.
 
+Audit follow-up (2026-11-19): LocalDraftInput optionally enforces an exact UTF-8
+budget and omits committed-text rendering copies when the workspace projects its
+own fields. Hidden fields use lengths without allocating complete secret strings.
+Submission diagnostics distinguish a rejected budget from unfinished composition
+without copying draft text. Stego opts into first-backspace cancellation of
+budget-rejected direct input without deleting accepted characters, matching
+pending-candidate cancellation; later backspaces delete normally. Other draft
+consumers retain their existing deletion behavior. Submission remains blocked
+until cancellation.
+The operation gate renews its working deadline on begin, retaining strict editing
+and result expiry. Private-host explicit draft interactions renew its own editing
+deadline; authentication/confirmation each have independent 30-second windows.
+IME finish/session teardown revoke the atomic workspace validity before other
+reconciliation; source reads check it, operation lifetime, vault generation and
+device readiness off-thread, then recheck full main-thread eligibility on delivery.
+Vault paste publication passes the captured read generation into the handoff;
+the handoff rejects mismatches and globally disabled vault access before staging.
+
 The private source Activity consumes one-use opaque handoffs from the existing
 share/PROCESS_TEXT gateway or the keyboard. It reads only an explicitly selected
 temporary SAF file or an authenticated vault entry, and saves only after separate
@@ -1373,6 +1407,13 @@ C++ shared runtime and both ONNX libraries in every requested ABI.
 
 ## Steganography single-page workflow (2026-11-19)
 
+`ime-ui/StegoFieldView` owns labelled full-width draft presentation and local
+text expansion only. It retains no draft model, creates no input connection and
+clears display/expansion state with the workspace. `StegoPanelView` separately
+folds cipher controls and secondary actions; collapsed cipher summaries contain
+only public algorithm descriptors. Field switching scrolls the active surface
+into view; generation/result transitions return the scroll area to its start.
+
 The focus-free panel now presents all applicable draft fields together in one
 bounded scrollable page. Six inline algorithm checkboxes emit typed selection
 intents; the workspace appends newly checked ciphers in selection order, supports
@@ -1385,13 +1426,29 @@ plaintext insertion, and authenticated private-save coordination is unchanged.
 
 ## Explicit stego paste and master material lengths (2026-11-19)
 
-Long press on COVER/CARRIER emits a source intention, without an Android editor
+The later Settings > Steganography defaults persist only public cipher/width
+descriptors, random master length and independent vault/system paste switches in
+the existing settings repository. `StegoPreferences` validates the complete
+ordered cascade and length before saving and restores safe defaults for malformed
+configuration; system paste never defaults on. `StegoSettingsView` emits complete
+configuration updates; a new workspace copies defaults without persisting its
+temporary edits. Decrypt parameters remain carrier-owned.
+
+The approved paste targets now include SECRET as well as COVER/CARRIER.
+`StegoPastePolicy` shares exact UTF-8 budgets across system acquisition, vault
+publication, handoff and isolated field replacement. The source host's existing
+authentication/foreground-confirmation workflow returns only a one-use result to
+the requested field of a new editor-bound workspace; secret display stays masked.
+System acquisition also rechecks its default-off setting before and after reads.
+
+Long press on COVER/SECRET/CARRIER emits a source intention, without an Android editor
 or native selection menu. StegoSystemPaste is the sole payload adapter: one explicit
 menu click, one plain-text item, no URI/Intent coercion, no listener/write/cache.
 Reads run on the bounded source worker. Workspace lease/current editor, lock,
 settings, deletion generation and completion checks reject revoked delivery.
-COVER is limited to 512 UTF-16 units and CARRIER to 8192; malformed Unicode/NUL
-fails. Vault navigation clears drafts and retains only the public target/editor
+COVER is limited to 512 UTF-16 units / 1536 UTF-8 bytes, SECRET to 2048 units /
+2048 bytes, and CARRIER to 8192 units / 16384 bytes; malformed Unicode/NUL fails.
+Vault navigation clears drafts and retains only the public target/editor
 identity (and a validated detached ciphertext if its exact cover is requested).
 Fresh system authentication and a separate foreground read confirmation remain.
 A one-use at-most-30-second return buffer populates only a newly opened isolated

@@ -46,7 +46,7 @@ class StegoVaultPlatformTest {
             activity = Device.instrumentation.startActivitySync(Intent(Device.context, StegoSourceActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(StegoSourceActivity.EXTRA_TOKEN, token)) as StegoSourceActivity
             val source = activity
-            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_entry, 1))
+            clickStegoVaultEntry(1)
             authenticate()
             Device.await { Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_read)) != null }
             Device.onMain { assertNull(graph.stegoHandoff.takePaste(editor)) }
@@ -89,7 +89,7 @@ class StegoVaultPlatformTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(StegoSourceActivity.EXTRA_TOKEN, token)) as StegoSourceActivity
             val source = activity
             Device.click(Device.context.getString(dev.zeroinput.ime.ui.R.string.stego_vault))
-            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_entry, 1))
+            clickStegoVaultEntry(1)
             authenticate()
             Device.await { onMain { source.isFinishing } || Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_read)) != null }
             Device.onMain { assertFalse("Authentication must return to the protected source", source.isFinishing) }
@@ -152,7 +152,11 @@ class StegoVaultPlatformTest {
         val enabled = graph.settings.secureClipboardEnabled
         val activity = startSave()
         try {
-            SystemClock.sleep(16_000)
+            // Reach the old draft boundary without a two-minute test sleep.
+            Device.onMain {
+                activity.javaClass.getDeclaredField("deadline").apply { isAccessible = true }
+                    .setLong(activity, SystemClock.elapsedRealtime() + 5000)
+            }
             Device.click(Device.context.getString(dev.zeroinput.ime.ui.R.string.stego_save))
             authenticate()
             Device.await { Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_save)) != null }

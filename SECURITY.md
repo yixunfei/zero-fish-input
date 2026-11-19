@@ -1,5 +1,13 @@
 # Security policy
 
+Stego paste sources are independently configurable. System paste is default-off;
+explicit opt-in permits one bounded pure-text item only for public cover, secret
+text or encoded-message fields. Credentials cannot be pasted. Private-vault paste
+keeps fresh system authentication, foreground confirmation and an expiring one-use
+return to the matching isolated workspace. Neither source automatically collects,
+saves, sends or inserts plaintext into an external editor. Defaults store only
+public cipher/length choices and source switches, never message text or keys.
+
 APK delivery also verifies reviewed full/lite resources, prebuilt startup data
 and native runtime hashes, and rejects retained native debug sections or excessive
 incremental ZIP space. Checks cannot be disabled with Python optimization.
@@ -539,7 +547,8 @@ complete erasure, constant-time behavior or protection against a compromised OS.
 
 Only bounded editor selection, plain-text share/PROCESS_TEXT and newly authenticated
 private-vault reads supply carriers. On 2026-11-19 the user explicitly authorized
-one-shot system Paste only through the COVER/CARRIER long-press menu. The isolated
+one-shot system Paste through COVER/SECRET/CARRIER long-press source menus only
+after enabling the default-off stego system-paste setting. The isolated
 adapter rejects non-text, multiple, invalid and oversized items; it never observes,
 coerces URIs, writes back, collects automatically or shares with AI. Vault source
 reads retain fresh authentication and foreground confirmation, clear old drafts,

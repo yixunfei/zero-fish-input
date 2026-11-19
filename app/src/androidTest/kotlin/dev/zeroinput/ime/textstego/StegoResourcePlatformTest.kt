@@ -58,6 +58,14 @@ class StegoResourcePlatformTest {
                 }
                 var controls = emptyList<View>()
                 Device.onMain {
+                    val ciphers = nodes(view.textStegoPanel).filterIsInstance<android.widget.CheckBox>()
+                    assertTrue("Ciphers start collapsed", ciphers.none { it.isShown })
+                    nodes(view.textStegoPanel).filterIsInstance<MaterialButton>().single {
+                        it.text == it.context.getString(dev.zeroinput.ime.ui.R.string.stego_layers_short)
+                    }.performClick()
+                }
+                Device.instrumentation.waitForIdleSync()
+                Device.onMain {
                     controls = nodes(view.textStegoPanel).filter {
                         it.isShown && (it is MaterialButton || it is android.widget.CheckBox)
                     }
@@ -77,6 +85,14 @@ class StegoResourcePlatformTest {
                         assertTrue(control.width >= (48 * control.resources.displayMetrics.density).toInt())
                         assertTrue("Public inline control is clipped", visible.height() >= control.height - 2 && visible.width() >= control.width - 2)
                     }
+                }
+                if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("stegoLayoutEvidence") == "true") {
+                    val bitmap = Device.instrumentation.uiAutomation.takeScreenshot()
+                    try {
+                        java.io.File(Device.context.cacheDir, "stego-public-options.png").outputStream().use {
+                            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+                        }
+                    } finally { bitmap.recycle() }
                 }
                 Device.onMain {
                     val configuration = view.resources.configuration

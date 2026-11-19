@@ -7,10 +7,11 @@ import dev.zeroinput.ime.ui.StegoField
 /** User-triggered plain-text read only. Never observes, coerces URI/Intent data, or writes. */
 internal class StegoSystemPaste(context: Context) {
     private val manager = context.getSystemService(ClipboardManager::class.java)
+    private val settings = dev.zeroinput.ime.settings.SettingsRepository(context)
 
     fun read(field: StegoField, isCurrent: () -> Boolean): String? {
-        val max = when (field) { StegoField.COVER -> 512; StegoField.CARRIER -> 8192; else -> return null }
-        if (!isCurrent()) return null
+        val max = StegoPastePolicy.maxChars(field)
+        if (max == 0 || !settings.stegoDefaults.systemPaste || !isCurrent()) return null
         return try {
             val clip = manager?.primaryClip ?: return null
             if (clip.itemCount != 1) return null
@@ -20,7 +21,7 @@ internal class StegoSystemPaste(context: Context) {
             val text = item.text ?: return null
             if (text.length !in 1..max) return null
             val value = text.toString()
-            if (!isCurrent() || value.any { it == '\u0000' } || !Charsets.UTF_8.newEncoder().canEncode(value)) null else value
+            if (!isCurrent() || !settings.stegoDefaults.systemPaste || !StegoPastePolicy.accepts(field, value)) null else value
         } catch (_: RuntimeException) { null }
     }
 }
