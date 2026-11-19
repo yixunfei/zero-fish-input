@@ -68,6 +68,7 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         minHeight = dp(48)
         filterTouchesWhenObscured = true
         setOnClickListener { onStegoAction() }
+        visibility = GONE
     }
 
     init {
@@ -110,12 +111,16 @@ internal class ClipboardImportView(context: Context) : LinearLayout(context) {
         }
     }
 
-    fun showReview(length: Int, enabled: Boolean, allowsAiImport: Boolean) {
+    fun showReview(length: Int, enabled: Boolean, allowsAiImport: Boolean, allowsStegoImport: Boolean = false) {
+        clearText()
         status.text = resources.getQuantityString(R.plurals.clipboard_import_received, length, length)
         action.setText(if (enabled) R.string.clipboard_import_authenticate else R.string.enable_secure_clipboard)
+        action.isEnabled = true
         aiAction.setText(R.string.clipboard_import_ai)
         aiAction.visibility = if (allowsAiImport) VISIBLE else GONE
         aiAction.isEnabled = allowsAiImport
+        stegoAction.visibility = if (allowsStegoImport) VISIBLE else GONE
+        stegoAction.isEnabled = allowsStegoImport
     }
 
     fun showAuthorized(value: String) {

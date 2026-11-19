@@ -1,6 +1,176 @@
 # Project status
 
-Updated 2026-11-18.
+Updated 2026-11-19.
+
+## Stego paste, custom master material and compact layout (2026-11-19)
+
+The latest request adds a COVER/CARRIER long-press source menu. System Paste reads
+one bounded plain-text item only on explicit selection; vault Paste keeps system
+authentication and foreground confirmation, wipes original drafts and returns to
+the matching editor's newly opened isolated workspace. A lifecycle self-review
+fixed premature cancellation during the first IME return; continued input or
+subsequent leave still revokes the buffer. Default private input cannot preempt it.
+
+Random master material supports 256/512/1024/4096 presets and byte-aligned custom
+256..4096-bit lengths. Cipher subkeys remain at their supported widths; longer
+material is not a higher cipher-strength claim. Text, credential and cipher
+controls share one page; primary actions stay fixed under the scroll area. Full
+reveal expands long credentials within that area. Compact 13 sp, zero-tracking
+buttons retain 48 dp targets. See the [self-review](audits/2026-11-19-stego-paste-keys-layout.md).
+
+Final acceptance passes 36 stego platform tests, three system-paste/masking tests,
+and both two-test small-dark/large-font and landscape-light layout probes, with no
+failures or skips. Full packaging reports 2,218 unit passes, four opt-in AI skips,
+zero failures/errors; privacyCheck/testPrivacyBoundary, Lint (zero issues), real
+Rime builds, Debug/Release manifest checks and artifact validations pass.
+
+The current [ARM64 Debug test package](../app/build/outputs/test-apk/20261119-112304/zero-fish-input-0.7.6-debug-arm64-v8a.apk)
+is 96,363,403 bytes, SHA-256
+`f4b1899792921c1c1ee587826f78c9c417be547731966932b22d7f1fc80176a3`.
+It meets the 180 MB budget, exceeds the 80 MB target, and is not a signed Release.
+Temporary PIN/display/font/rotation/night/IME changes were restored. OEM/ARM64
+and older-API runtime acceptance remain. See the
+[validation record](text-steganography-validation.md#paste-custom-master-material-and-compact-layout-2026-11-19).
+Earlier entries are historical.
+
+## Steganography usability repair (2026-11-19)
+
+The reported unusable flow is repaired: Encrypt and insert automatically fills the
+original bound editor after self-check; Generate only retains preview and the four
+authenticated private saves. All relevant fields share a bounded scrollable page.
+Six inline cipher checkboxes use selection order, valid widths and direct earlier
+moves; optional modes/KDF/transport settings are secondary. Private temporary
+input now masks every committed character until explicit reveal.
+
+The [self-audit](audits/2026-11-19-stego-usability.md) preceded platform acceptance;
+it added workspace-generation guards to reject callbacks from a closed/reopened
+workspace. The final API 37 x86_64 suite passes all 55 tests with no failures/skips,
+including real touch insertion, selection revocation, authenticated saves, short
+masking and existing native/caret regression. Both 240x480 dark/1.3-font and
+640x320 light/landscape attached layout probes pass. Full packaging checks report
+2,212 unit-test passes, four opt-in AI skips, no failures/errors; privacyCheck,
+Debug Lint, real-Rime builds and APK artifact checks pass.
+
+The repaired [ARM64 Debug test package](../app/build/outputs/test-apk/20261119-101438/zero-fish-input-0.7.6-debug-arm64-v8a.apk)
+is 96,348,751 bytes, SHA-256
+`8258e194e8a9dee91fe242625767749834b48719078b029c7da53340863c6132`.
+It meets the 180 MB budget and still exceeds the 80 MB target. Test PIN and display,
+font, rotation, night and IME settings were restored; the task-owned emulator was
+stopped. Next: OEM/ARM64 and older-API runtime acceptance. See the
+[validation record](text-steganography-validation.md#single-page-repair-and-automatic-encoded-insertion-2026-11-19).
+Earlier records below are historical.
+
+## Text steganography usability completion (2026-11-18)
+
+The user approved the proposed four-content definition and authentication flow.
+The toolbar now places `隐` immediately after shape lookup, with More after all
+common tools (including selection copy). Next-field navigation and direct ordered
+cipher editing simplify the path to generation and one-tap carrier insertion.
+One to six distinct ciphers can be added, removed, reordered or assigned valid
+key widths continuously, with one/two/six-layer presets.
+
+Encryption and authenticated decryption expose separate private-save entries for
+secret plaintext, exact public cover, detached ciphertext and the full carrier.
+Noncredential drafts can also be saved. Every save consumes the workspace and
+uses the existing system authentication plus foreground confirmation. Detached
+`[ZIS1:...]` ciphertext requires the exact original cover for decryption. No vault
+format, encrypted envelope, key alias, permission, clipboard or network boundary
+changed. External-engine warmup adoption is deferred while stego is open so it
+cannot revoke an otherwise valid prepared commit.
+
+The new ARM64 Debug test package is
+[zero-fish-input-0.7.6-debug-arm64-v8a.apk](../app/build/outputs/test-apk/20261118-224348/zero-fish-input-0.7.6-debug-arm64-v8a.apk),
+96,338,823 bytes, SHA-256
+`ac86cc4747ac07a875e0619435d38354451fd9bcae13b3b839a6e80229c7f6fb`.
+The standard packaging script ran without SkipChecks: 2,208 unit-test passes,
+four opt-in AI skips, no failures/errors; privacyCheck, Debug Lint, real-Rime build,
+signature/ABI/permission/resource checks passed. The 180 MB budget is met and the
+80 MB target remains exceeded. It has not been installed on an ARM64 device.
+The [validation record](text-steganography-validation.md#usability-completion-2026-11-18)
+records current device evidence and remaining platform limits.
+
+The final API 37 x86_64 platform suite passes all 28 tests with no failures or
+skips, including system-authenticated save and lifetime checks. The PIN harness
+uses the system confirmation control and waits for window dismissal; production
+authentication and timeout boundaries are unchanged.
+
+Next: perform OEM/ARM64 and older-API runtime acceptance. Current commands and raw
+local evidence are in the validation record; earlier delivery records below are
+historical.
+
+## Previous ARM64 test delivery (2026-11-18)
+
+The checked Debug test package includes both refactor repair passes:
+[zero-fish-input-0.7.6-debug-arm64-v8a.apk](../app/build/outputs/test-apk/20261118-205059/zero-fish-input-0.7.6-debug-arm64-v8a.apk).
+Application ID: `dev.zeroinput.ime.debug`; size: 96,327,119 bytes (96.327 MB).
+SHA-256: `a61b6292ce5902ab2e81d0c1d710e945216c327b816372febe0571bee8b2495f`.
+The standard ARM64 script passed without `-SkipChecks`: full unit tests (2,200
+passes, four credential-dependent skips, no failures/errors), privacyCheck and
+Debug Lint (zero issues), real-Rime build, signature/ABI/permission/installability,
+resource and size checks. All three distribution checksums match; the APK also
+matches the current Gradle output and provenance. The 180 MB budget is met;
+the separate 80 MB target is exceeded. Notices, corresponding sources, size,
+provenance and checksum records accompany the APK. This package was not installed;
+the device rerun limitation below remains.
+
+Two attempts were interrupted by a Gradle daemon stop command. The successful
+run used an isolated local Gradle user home with shared dependency caches and
+the existing JDK paths; project build configuration was unchanged. Evidence:
+`.tmp-evidence/refactor-arm64-package-final.log`.
+Requested removal of three superseded test deliveries and four stale APK copies
+was rejected by automatic approval (`blocked by policy`); no old package was
+deleted. Next: complete that cleanup when deletion is permitted, and perform
+ARM64/OEM runtime acceptance.
+
+## Second refactor self-check (2026-11-18)
+
+The second pass reproduced and repaired two residual gaps: native LinkageError
+handling was missing from engine reset/startup/prepared disposal, and replayed
+handoff tokens could discard a newer save draft. Engine-specific recovery now
+preserves accepted commits without command replay; cancellation/interruption and
+other fatal errors still propagate. Token mismatch only rejects the old caller;
+matching-token expiry/deletion-generation failure still clears the owned draft.
+Six engine lifecycle and two handoff regressions cover the changes. Details and
+verification are in the [self-check disposition](audits/2026-11-18-refactor-fixes.md#second-self-check-2026-11-18).
+Selected suites now report 1,145 passes, two opt-in live-AI skips and no failures.
+privacyCheck/testPrivacyBoundary, real-Rime x86_64 Debug/AndroidTest/unsigned
+Release builds and Debug/Release Lint (zero issues) pass. Updated artifact
+identities are in the disposition; first-pass hashes below are historical.
+
+This pass's device rerun is blocked: two starts of the same task-owned AVD fail
+with WHPX partition setup error 0x80070005, even though accel-check reports the
+installed hypervisor usable. Both emulator processes exited, no device became
+available and no PIN or device setting was changed. The 35 platform passes below
+belong to the preceding source state, not these additional fixes. Recheck on
+API 37/OEM hardware when the local virtualization environment is available.
+
+## Refactor review follow-up (2026-11-18)
+
+Goal: verify and address the November 18 refactor review after a local baseline
+backup. Backup commit: `2c86668`. The approved choices are implemented: distinguish
+pending answers from unproven dictionary edits, preserve Space as raw input plus
+a space when edits are unproven, separate the 120-second draft and 30-second
+authenticated confirmation budgets, and limit fatal engine fallback to LinkageError.
+Sixteen findings are addressed; D-5 is withdrawn because the rejected-clear
+synchronous completion path really returns null. No persisted format or approved
+privacy boundary changed. The baseline commit remains separate from these fixes.
+
+Current Debug and pure JVM suites report 1,137 passes, two opt-in live-AI skips
+and no failures. privacyCheck, its negative self-tests, Debug/Release Lint (zero
+issues), real-Rime x86_64 Debug/AndroidTest and unsigned Release builds pass.
+API 37 device validation passes 22 steganography and 13 import/language-pack
+tests, plus 240x480-dp dark and 640x320-dp light layout probes. Test-only selection
+acknowledgement and oversized-value expectations were corrected after actual
+device failures; no production invalidation or parser safety checks were weakened.
+The installed Debug hash was checked before/after; the public PIN and display/IME
+settings were restored and the task-started emulator stopped.
+
+Next: review the local changes and perform OEM/ARM64 and older-API acceptance.
+The current ARM64 package is recorded above; native-symbol fault injection
+remains unverified. The prior ARM64 delivery below predates these fixes.
+Commands, per-finding evidence and current artifact hashes:
+[refactor disposition](audits/2026-11-18-refactor-fixes.md) and
+[device addendum](text-steganography-validation.md#refactor-review-follow-up-2026-11-18).
 
 ## Text steganography implementation (2026-11-18; local validation complete)
 
@@ -31,12 +201,12 @@ six-layer/self-check probe took 1,014 ms, with a maximum 7-ms main-looper probe
 delay; this is not a full input-latency benchmark. Device overrides and the public
 test PIN were cleared, and the task-started emulator was stopped.
 
-The normal checked ARM64 package, without `-SkipChecks`, is
+The historical checked ARM64 package, without `-SkipChecks`, was
 [zero-fish-input-0.7.6-debug-arm64-v8a.apk](../app/build/outputs/test-apk/20261118-174651/zero-fish-input-0.7.6-debug-arm64-v8a.apk).
 It is 96,317,775 bytes: below the 180 MB budget and above the separate 80 MB target.
 SHA-256: `50f11f0937687e3786c27e996b946a9f938f6f931f61243d7ed3f077029ed25c`.
 Notices, corresponding sources, provenance, size and checksum records are alongside
-it. This Debug package supersedes earlier test-package paths below.
+it. This package is superseded by the current ARM64 test delivery above.
 
 Natural wording remains unavailable under the design's resource, capacity,
 semantic and detector gates; no enhanced profile is claimed. API 26/29/33,

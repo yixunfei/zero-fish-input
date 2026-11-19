@@ -544,6 +544,7 @@ class ZeroInputService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        graph.stegoHandoff.observePasteEditor(pasteEditorIdentity(info))
         inputViewActive = true
         inputView?.closeHandwriting()
         refreshKeyboardAppearance()
@@ -581,6 +582,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        graph.stegoHandoff.leavePasteEditor()
         cancelDeviceAgentTask()
         appearanceBinding.close()
         glideInput?.invalidate()
@@ -619,6 +621,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        graph.stegoHandoff.cancelPaste()
         clipboardCopy.cancel()
         inputView?.closeAuxiliaryInput()
         shapeLookup.close()
@@ -755,6 +758,7 @@ class ZeroInputService : InputMethodService() {
             cancelSecureClipboardRequest()
             clipboardCopy.selectionChanged()
             graph.securePaste.editorChanged(pasteEditorIdentity())
+            graph.stegoHandoff.cancelPaste()
             controller?.clearModelRanking()
             controller?.finishCompositionForCursorMove()
             controller?.invalidateReconversion()
@@ -1202,14 +1206,17 @@ class ZeroInputService : InputMethodService() {
                 else {
                     val kind = if (action == dev.zeroinput.ime.ui.StegoAction.KEY_FILE)
                         dev.zeroinput.ime.textstego.StegoHandoff.Kind.FILE else dev.zeroinput.ime.textstego.StegoHandoff.Kind.VAULT
-                    launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(kind, editor = pasteEditorIdentity()))
+                    launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(kind, editor = pasteEditorIdentity(),
+                        target = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER)
+                            dev.zeroinput.ime.ui.StegoField.COVER else dev.zeroinput.ime.ui.StegoField.CARRIER,
+                        carrier = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER) workspaceDetachedCarrier() else null))
                 }
             }, onSave = { value -> launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(
                 dev.zeroinput.ime.textstego.StegoHandoff.Kind.SAVE, value)) })
         textStego = workspace
         view.onTextStegoRequested = {
             syncSessionPrivacy()
-            if (eligibleForPrivateDraft(view) && isDeviceUnlocked()) { registerInteraction(); view.openTextStego() }
+            if (eligibleForPrivateDraft(view) && isDeviceUnlocked()) { registerInteraction(preserveStegoPaste = true); view.openTextStego() }
             else Toast.makeText(this, R.string.stego_unavailable, Toast.LENGTH_SHORT).show()
         }
         view.onTextStegoVisibilityChanged = { visible ->
@@ -1219,11 +1226,18 @@ class ZeroInputService : InputMethodService() {
                 // reset() clears an editor composing span through setComposingText.
                 if (controller?.state?.snapshot?.isComposing == true) controller?.reset()
                 val file = graph.stegoHandoff.takeFile(pasteEditorIdentity())
-                try { workspace.open(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions, file = file) }
-                finally { file?.fill(0) }
+                val paste = graph.stegoHandoff.takePaste(pasteEditorIdentity())
+                try {
+                    val carrier = paste?.let { if (it.target == dev.zeroinput.ime.ui.StegoField.CARRIER) it.text else it.carrier }?.let(::String)
+                    workspace.open(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions, carrier, file)
+                    if (paste?.target == dev.zeroinput.ime.ui.StegoField.COVER)
+                        paste.text?.let { workspace.pasteText(dev.zeroinput.ime.ui.StegoField.COVER, String(it)) }
+                } finally { file?.fill(0); paste?.close() }
             } else workspace.close()
         }
     }
+
+    private fun workspaceDetachedCarrier(): CharArray? = textStego?.detachedCarrierForPaste()
 
     private fun textStegoCommitTarget(view: ZeroInputView): ((String) -> Boolean)? {
         if (!view.isTextStegoOpen || !eligibleForPrivateDraft(view) || !isDeviceUnlocked()) return null
@@ -1255,8 +1269,13 @@ class ZeroInputService : InputMethodService() {
     private fun launchStegoSource(request: dev.zeroinput.ime.textstego.StegoHandoff.Request) {
         val token = graph.stegoHandoff.put(request)
         inputView?.closeAuxiliaryInput()
-        startActivity(Intent(this, dev.zeroinput.ime.textstego.StegoSourceActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(dev.zeroinput.ime.textstego.StegoSourceActivity.EXTRA_TOKEN, token))
+        try {
+            startActivity(Intent(this, dev.zeroinput.ime.textstego.StegoSourceActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(dev.zeroinput.ime.textstego.StegoSourceActivity.EXTRA_TOKEN, token))
+        } catch (_: RuntimeException) {
+            graph.stegoHandoff.discard(token)
+            Toast.makeText(this, R.string.stego_failed, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun isDeviceUnlocked(): Boolean =
@@ -1267,7 +1286,7 @@ class ZeroInputService : InputMethodService() {
 
     private fun openDefaultPrivateDraft() {
         val view = inputView ?: return
-        if (graph.settings.privateDraftEnabled && !graph.securePaste.inProgress &&
+        if (graph.settings.privateDraftEnabled && !graph.securePaste.inProgress && !graph.stegoHandoff.hasPaste() &&
             !view.isPrivateDraftOpen && !view.isSecureClipboardOpen &&
             eligibleForPrivateDraft(view) && isDeviceUnlocked()) {
             updateScreenCapturePolicy()
@@ -1965,7 +1984,9 @@ class ZeroInputService : InputMethodService() {
 
             is EngineWarmupResult.Prepared -> {
                 val session = activeSession
-                if (session == null || !isWarmupSessionCurrent(session, result.request)) {
+                // The isolated stego editor owns a separate engine. Defer external-engine
+                // adoption so its unrelated warmup cannot revoke a prepared one-shot commit.
+                if (session == null || !isWarmupSessionCurrent(session, result.request) || inputView?.isTextStegoOpen == true) {
                     result.engine.close()
                     engineWarmupRetry = true
                     return
@@ -1975,7 +1996,7 @@ class ZeroInputService : InputMethodService() {
                     // Engine replacement revokes editor writes. An unused paste consent
                     // contains no engine state and still requires a new foreground tap.
                     modelRanking.invalidate()
-                    registerInteraction(preservePasteConsent = true, preserveCopyConfirmation = true)
+                    registerInteraction(preservePasteConsent = true, preserveCopyConfirmation = true, preserveStegoPaste = true)
                     transferred = session.controller.adoptPreparedEngine(result.engine)
                     if (transferred) {
                         installedEngineWarmupContext = result.request
@@ -2039,6 +2060,7 @@ class ZeroInputService : InputMethodService() {
     }
 
     private fun endInputSession(reset: Boolean) {
+        graph.stegoHandoff.leavePasteEditor()
         inputView?.closeAuxiliaryInput()
         cancelDeviceAgentTask()
         searchDraft.close()
@@ -2050,7 +2072,7 @@ class ZeroInputService : InputMethodService() {
         inputView?.cancelPendingGestures()
         clipboardCopy.leaveEditor()
         inputView?.renderCopyConfirmation(null)
-        registerInteraction(preservePasteConsent = true, preserveCopyConfirmation = true)
+        registerInteraction(preservePasteConsent = true, preserveCopyConfirmation = true, preserveStegoPaste = true)
         graph.securePaste.leaveEditor()
         nativeRetryRequested = false
         invalidatePendingPersonalization()
@@ -2205,7 +2227,8 @@ class ZeroInputService : InputMethodService() {
 
     /** Revokes work authorized in an older UI state. Called only on the IME main thread. */
     private fun registerInteraction(preserveReconversion: Boolean = false, preservePasteConsent: Boolean = false,
-        preserveWordAssociations: Boolean = false, preserveCopyConfirmation: Boolean = false) {
+        preserveWordAssociations: Boolean = false, preserveCopyConfirmation: Boolean = false, preserveStegoPaste: Boolean = false) {
+        if (!preserveStegoPaste) graph.stegoHandoff.cancelPaste()
         glideInput?.invalidate()
         if (!preserveWordAssociations) controller?.invalidateWordAssociations()
         modelRanking.interaction()

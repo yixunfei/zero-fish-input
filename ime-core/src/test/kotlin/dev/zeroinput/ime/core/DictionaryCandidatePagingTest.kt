@@ -5,6 +5,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DictionaryCandidatePagingTest {
+    @Test fun pendingAnswersKeepFilteredNativeRowsAndTheLastResolvedPersonalPage() {
+        val paging = PersonalCandidatePaging()
+        val store = Store(PersonalSuggestionPage(listOf(PersonalSuggestion("replacement", "您好", 100)),
+            hasMore = true, dictionaryEditsApplied = true, suppressedDictionaryTexts = setOf("你好")))
+        val first = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        assertTrue(paging.changePage(PageDirection.NEXT, native))
+        store.page = PersonalSuggestionPage(ready = false, dictionaryEditsApplied = true,
+            suppressedDictionaryTexts = setOf("你好"))
+        val pending = paging.publish(native, store, InputLanguage.CHINESE, true) { it }
+        assertEquals(first, pending)
+        assertFalse(paging.editsPending)
+        assertEquals(listOf("personal:replacement", "other"), pending.candidates.map { it.id })
+    }
+
     @Test fun wholeInputSuggestionsCannotReplaceAFixedSegment() {
         val native = EngineSnapshot("nihao", "你 hao", listOf(Candidate("keep", "好", input = "hao"),
             Candidate("hide", "号", input = "hao")), canUndoSelection = true)
@@ -47,7 +61,7 @@ class DictionaryCandidatePagingTest {
     }
     @Test fun privateEditorsNeverQueryTheEditStoreAndPendingEditsCannotExposeOriginals() {
         val paging = PersonalCandidatePaging()
-        val store = Store(PersonalSuggestionPage(ready = false, dictionaryEditsApplied = true))
+        val store = Store(PersonalSuggestionPage(ready = false, dictionaryEditsApplied = true, editsUnproven = true))
         assertTrue(paging.publish(native, store, InputLanguage.CHINESE, true) { it }.candidates.isEmpty())
         assertTrue(paging.editsPending)
         val calls = store.calls
@@ -55,7 +69,7 @@ class DictionaryCandidatePagingTest {
         assertEquals(calls, store.calls)
         assertFalse(paging.editsApplied)
     }
-    private class Store(private val page: PersonalSuggestionPage) : PagedPersonalizationStore {
+    private class Store(var page: PersonalSuggestionPage) : PagedPersonalizationStore {
         var calls = 0
         override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int): PersonalSuggestionPage { calls++; return page }
         override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = page.items

@@ -25,6 +25,137 @@ import org.junit.runner.RunWith
 class StegoKeyboardIntegrationTest {
     private val graph get() = (Device.context.applicationContext as ZeroInputApplication).graph
 
+    @Test fun authenticatedCoverPasteSurvivesRealEditorReturnAndWaitsForAnExplicitStegoTap() {
+        org.junit.Assume.assumeTrue(androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("stegoTestPin") == "2468")
+        assertEquals(0, graph.secureClipboard.count())
+        val enabled = graph.settings.secureClipboardEnabled
+        val cover = "public authenticated cover"
+        val id = graph.secureClipboard.add("", cover, dev.zeroinput.security.AuthenticationGrant.afterSuccessfulSystemAuthentication()).id
+        try {
+            Device.onMain { graph.settings.secureClipboardEnabled = true }
+            withEditor { activity ->
+                var source: StegoSourceActivity? = null
+                Device.onMain {
+                    keyboard().onTextStegoRequested()
+                    keyboard().textStegoPanel.onPasteRequested(StegoField.COVER)
+                }
+                Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_paste_vault))
+                await { onMain { androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).any { it is StegoSourceActivity } } }
+                Device.onMain {
+                    source = androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).filterIsInstance<StegoSourceActivity>().single()
+                }
+                Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_entry, 1))
+                StegoVaultPlatformTest().authenticate()
+                await { onMain {
+                    val host = requireNotNull(source)
+                    !host.isFinishing && views(host.window.decorView).filterIsInstance<TextView>().any {
+                        it.isShown && it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_read)
+                    }
+                } }
+                Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_read))
+                await { onMain { activity.hasWindowFocus() } }
+                await { onMain { runCatching { keyboard().isShown }.getOrDefault(false) } }
+                Device.instrumentation.waitForIdleSync()
+                Device.onMain {
+                    assertEquals("", activity.editor.text.toString())
+                    assertFalse(keyboard().isTextStegoOpen)
+                    assertTrue(graph.stegoHandoff.hasPaste())
+                    keyboard().onTextStegoRequested()
+                    assertTrue(labels(keyboard().textStegoPanel).contains(cover))
+                    assertFalse(graph.stegoHandoff.hasPaste())
+                    assertEquals("", activity.editor.text.toString())
+                }
+            }
+        } finally {
+            graph.secureClipboard.remove(id, dev.zeroinput.security.AuthenticationGrant.afterSuccessfulSystemAuthentication())
+            Device.onMain { graph.stegoHandoff.close(); graph.settings.secureClipboardEnabled = enabled }
+        }
+    }
+
+    @Test fun primaryButtonAutomaticallyInsertsOnceUsingInlineCheckboxesAndFields() = withEditor { activity ->
+        val cover = "公开掩护文本 🌏"
+        val secret = "公开测试秘密 中文"
+        val passphrase = "public fixture passphrase"
+        Device.onMain {
+            val view = keyboard()
+            view.onTextStegoRequested()
+            view.dispatchKeyboardAction(KeyboardAction.LiteralText(cover))
+        }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_secret)
+        Device.onMain { keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText(secret)) }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_credential)
+        Device.onMain {
+            val view = keyboard()
+            view.dispatchKeyboardAction(KeyboardAction.LiteralText(passphrase))
+            val checks = views(view.textStegoPanel).filterIsInstance<android.widget.CheckBox>()
+            assertEquals(6, checks.size)
+            checks.single { "SM4" in it.text }.performClick()
+            checks.single { "XChaCha20" in it.text }.performClick()
+            assertFalse(labels(view).any { secret in it || passphrase in it })
+        }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_encrypt_insert)
+        await(30_000) { onMain { activity.editor.text.isNotEmpty() } }
+        val encoded = onMain { activity.editor.text.toString() }
+        val carrier = StegoCarrierCodec.decode(encoded)
+        MessageCredential(MessageCredentialMode.PASSPHRASE, passphrase.toCharArray()).use { key ->
+            val opened = MessageEnvelope().open(carrier.cover.toCharArray(), carrier.envelope, key)
+            assertArrayEquals(secret.toCharArray(), opened); opened.fill('\u0000')
+        }
+        carrier.envelope.fill(0)
+        Device.onMain {
+            assertEquals(cover, carrier.cover)
+            assertFalse(keyboard().isTextStegoOpen)
+            assertTrue(activity.editorActions.isEmpty())
+            assertEquals(encoded, activity.editor.text.toString())
+        }
+    }
+
+    @Test fun changingEditorSelectionDuringAutomaticEncryptionCannotInsertIntoTheNewSelection() = withEditor { activity ->
+        Device.onMain { activity.editor.setText("public untouched editor"); activity.editor.selectAll() }
+        Device.instrumentation.waitForIdleSync()
+        await { onMain { service().let { service ->
+            val editor = service.javaClass.getDeclaredField("editorConnection").apply { isAccessible = true }.get(service)
+                as dev.zeroinput.ime.input.AndroidEditorConnection
+            editor.selectedLength() == "public untouched editor".length
+        } } }
+        Device.onMain {
+            val view = keyboard()
+            view.onTextStegoRequested()
+            view.dispatchKeyboardAction(KeyboardAction.LiteralText("public cover"))
+            view.textStegoPanel.onAction(StegoAction.SECRET)
+            view.dispatchKeyboardAction(KeyboardAction.LiteralText("public secret"))
+            view.textStegoPanel.onAction(StegoAction.CREDENTIAL)
+            view.dispatchKeyboardAction(KeyboardAction.LiteralText("public fixture passphrase"))
+            view.textStegoPanel.onAction(StegoAction.CONFIRM)
+            activity.editor.setSelection(0)
+        }
+        await { onMain { !keyboard().isTextStegoOpen } }
+        // Allow a late worker result to return; it must not write into the changed editor.
+        SystemClock.sleep(2500)
+        Device.onMain { assertEquals("public untouched editor", activity.editor.text.toString()) }
+    }
+
+    private fun tapLabel(label: Int) {
+        lateinit var button: TextView
+        Device.onMain {
+            button = views(keyboard().textStegoPanel).filterIsInstance<TextView>().single {
+                it.isShown && it.text.toString() == it.context.getString(label)
+            }
+            button.requestRectangleOnScreen(android.graphics.Rect(0, 0, button.width, button.height), true)
+        }
+        Device.instrumentation.waitForIdleSync()
+        val point = IntArray(2)
+        Device.onMain { button.getLocationOnScreen(point); point[0] += button.width / 2; point[1] += button.height / 2 }
+        val down = SystemClock.uptimeMillis()
+        for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+            val event = android.view.MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0].toFloat(), point[1].toFloat(), 0)
+            try { assertTrue(Device.instrumentation.uiAutomation.injectInputEvent(event, true)) } finally { event.recycle() }
+        }
+        Device.instrumentation.waitForIdleSync()
+    }
+
     @Test fun isolatedDraftPreviewsThenCommitsOnlyAuthenticatedCarrierOnce() = withEditor { activity ->
         val cover = "public cover 🌏"
         val secret = "public secret fixture"
@@ -81,6 +212,12 @@ class StegoKeyboardIntegrationTest {
         val encoded = StegoCarrierCodec.encode("public cover", envelope, dev.zeroinput.ime.core.stego.StegoTransport.DENSE_UNICODE)
         Device.onMain { activity.editor.setText(encoded); activity.editor.selectAll() }
         Device.instrumentation.waitForIdleSync()
+        // waitForIdleSync does not drain the editor-to-IME Binder selection update.
+        await { onMain { service().let { service ->
+            val editor = service.javaClass.getDeclaredField("editorConnection").apply { isAccessible = true }
+                .get(service) as? dev.zeroinput.ime.input.AndroidEditorConnection
+            editor?.selectedLength() == encoded.length
+        } } }
         Device.onMain {
             keyboard().onTextStegoRequested()
             assertEquals("Opening the mode must preserve the selected carrier", encoded, activity.editor.text.toString())
@@ -89,7 +226,7 @@ class StegoKeyboardIntegrationTest {
         }
         // Selection extraction is asynchronous; wait for the credential field to become selected.
         await { onMain { views(keyboard().textStegoPanel).filterIsInstance<TextView>().any {
-            it.isSelected && it.text == it.context.getString(dev.zeroinput.ime.ui.R.string.stego_credential)
+            it.isSelected && it.text.toString() == it.context.getString(dev.zeroinput.ime.ui.R.string.stego_credential)
         } } }
         Device.onMain {
             keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText(passphrase))
@@ -149,6 +286,11 @@ class StegoKeyboardIntegrationTest {
 
     private fun keyboard() = requireNotNull(WindowInspector.getGlobalWindowViews().flatMap(::views)
         .filterIsInstance<ZeroInputView>().firstOrNull { it.isShown })
+    private fun service(): dev.zeroinput.ime.ZeroInputService {
+        var context = keyboard().context
+        while (context is android.content.ContextWrapper && context !is dev.zeroinput.ime.ZeroInputService) context = context.baseContext
+        return context as dev.zeroinput.ime.ZeroInputService
+    }
     private fun interactionRevision(view: ZeroInputView): Long {
         var context = view.context
         while (context is android.content.ContextWrapper && context !is dev.zeroinput.ime.ZeroInputService) context = context.baseContext

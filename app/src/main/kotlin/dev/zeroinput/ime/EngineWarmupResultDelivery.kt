@@ -1,5 +1,7 @@
 package dev.zeroinput.ime
 
+import dev.zeroinput.ime.concurrency.recoverable
+
 /**
  * Owns a prepared warm-up result while it is waiting for the IME owner thread.
  *
@@ -46,10 +48,7 @@ internal class EngineWarmupResultDelivery(
             return
         }
         val runnable = runnableToPost ?: return
-        val posted = runCatching {
-            post(runnable)
-        }.getOrDefault(false)
-        if (!posted) cancelPostedDelivery()
+        postDelivery(runnable)
     }
 
     /** Closes any result that has not reached the owner thread yet. */
@@ -63,8 +62,8 @@ internal class EngineWarmupResultDelivery(
                 pending.also { pending = null } to deliveryRunnable.also { deliveryRunnable = null }
             }
         }
-        runnable?.let { runCatching { removePosted?.invoke(it) } }
-        closePrepared(orphan)
+        try { runnable?.let { recoverable { removePosted?.invoke(it) } } }
+        finally { closePrepared(orphan) }
     }
 
     /** Owner thread resumes a deferred handoff after its composition ends. */
@@ -76,11 +75,10 @@ internal class EngineWarmupResultDelivery(
                 Runnable { deliverPending() }.also { deliveryRunnable = it }
             }
         }
-        if (runnable != null && !runCatching { post(runnable) }.getOrDefault(false)) cancelPostedDelivery()
+        if (runnable != null) postDelivery(runnable)
     }
 
     private fun deliverPending() {
-        val canDeliver = runCatching(ready).getOrDefault(false)
         var wasClosed = false
         val result = synchronized(lock) {
             deliveryPosted = false
@@ -88,20 +86,22 @@ internal class EngineWarmupResultDelivery(
             wasClosed = closed
             pending.also { pending = null }
         }
-        if (wasClosed || !canDeliver) {
-            closePrepared(result)
-            return
-        }
         if (result == null) return
 
         // The controller may transfer the wrapped engine, in which case the
         // wrapper's close is a no-op.  Keeping this finally block means a
         // callback failure cannot leak a native session.
         try {
-            deliver(result)
+            if (!wasClosed && recoverable(ready).getOrDefault(false)) deliver(result)
         } finally {
             closePrepared(result)
         }
+    }
+
+    private fun postDelivery(runnable: Runnable) {
+        var posted = false
+        try { posted = recoverable { post(runnable) }.getOrDefault(false) }
+        finally { if (!posted) cancelPostedDelivery() }
     }
 
     private fun cancelPostedDelivery() {
@@ -113,8 +113,8 @@ internal class EngineWarmupResultDelivery(
                 pending.also { pending = null } to deliveryRunnable.also { deliveryRunnable = null }
             }
         }
-        runnable?.let { runCatching { removePosted?.invoke(it) } }
-        closePrepared(orphan)
+        try { runnable?.let { recoverable { removePosted?.invoke(it) } } }
+        finally { closePrepared(orphan) }
     }
 
     private fun closePrepared(result: EngineWarmupResult?) {

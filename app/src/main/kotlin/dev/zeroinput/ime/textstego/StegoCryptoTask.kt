@@ -25,8 +25,16 @@ internal class StegoCryptoOperation(val token: Long, private val deadline: Long)
 internal class StegoDelivery : AutoCloseable {
     var encoded: String? = null
     var result: CharArray? = null
+    var outputs: StegoOutputs? = null
     var memoryUnavailable = false
-    override fun close() { encoded = null; result?.fill('\u0000'); result = null }
+    fun compute(action: () -> Unit) {
+        try { action() }
+        catch (_: OutOfMemoryError) { close(); memoryUnavailable = true }
+        catch (cancelled: java.util.concurrent.CancellationException) { close(); throw cancelled }
+        catch (interrupted: InterruptedException) { close(); Thread.currentThread().interrupt(); throw interrupted }
+        catch (_: Exception) { close() }
+    }
+    override fun close() { encoded = null; result?.fill('\u0000'); result = null; outputs?.close(); outputs = null }
 }
 
 /** Worker owns only immutable configuration, transient buffers and a weak foreground owner. */
@@ -47,16 +55,22 @@ internal class StegoCryptoTask(
         val delivery = StegoDelivery()
         try {
             if (!operation.current()) return
-            if (kdf != MessageKdf.NONE && !reserveHeadroom()) {
-                delivery.memoryUnavailable = true
-            } else process(delivery)
-        } catch (_: Exception) { delivery.close() }
-        finally { close() }
-        operation.offer(delivery)
-        if (!operation.current() || !main.post {
-            val workspace = owner.get()
-            if (workspace == null) operation.close() else workspace.publish(operation)
-        }) operation.close()
+            delivery.compute {
+                if (kdf != MessageKdf.NONE && !reserveHeadroom()) delivery.memoryUnavailable = true
+                else process(delivery)
+            }
+        } catch (failure: Error) {
+            // Publish failure before propagating a fatal worker error; never leave WORKING stuck.
+            delivery.close()
+            throw failure
+        } finally {
+            close()
+            operation.offer(delivery)
+            if (!operation.current() || !main.post {
+                val workspace = owner.get()
+                if (workspace == null) operation.close() else workspace.publish(operation)
+            }) operation.close()
+        }
     }
 
     override fun close() {
@@ -66,10 +80,14 @@ internal class StegoCryptoTask(
     private fun process(delivery: StegoDelivery) {
         val crypto = MessageEnvelope()
         if (decrypt) {
-            val parsed = StegoCarrierCodec.decode(String(carrier))
+            val parsed = StegoCarrierCodec.decode(String(carrier), String(cover))
             val coverChars = parsed.cover.toCharArray()
-            delivery.result = try { crypto.open(coverChars, parsed.envelope, master) { it == kdf } }
-                finally { parsed.envelope.fill(0); coverChars.fill('\u0000') }
+            try {
+                val opened = crypto.open(coverChars, parsed.envelope, master) { it == kdf }
+                delivery.result = opened
+                val complete = StegoCarrierCodec.encode(parsed.cover, parsed.envelope, parsed.transport)
+                delivery.outputs = StegoOutputs(coverChars, opened, parsed.envelope, complete)
+            } finally { parsed.envelope.fill(0); coverChars.fill('\u0000') }
         } else {
             val envelope = crypto.seal(cover, secret, master, stages, kdf)
             delivery.encoded = try { StegoCarrierCodec.encode(String(cover), envelope, transport).also {
@@ -77,6 +95,7 @@ internal class StegoCryptoTask(
                 try {
                     if (!envelope.contentEquals(extracted.envelope) || extracted.cover != String(cover)) throw MessageFailure()
                 } finally { extracted.envelope.fill(0) }
+                delivery.outputs = StegoOutputs(cover, secret, envelope, it)
             } } finally { envelope.fill(0) }
         }
     }

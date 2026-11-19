@@ -30,7 +30,7 @@ class LocalDraftInputTest {
                     assertTrue(draft.replaceCommittedText("前文" + suffix))
                     draft.handle(KeyboardAction.Backspace)
                     assertEquals("前文", draft.committedText())
-                    assertEquals("前文", rendered)
+                    assertEquals(if (masked) "••" else "前文", rendered)
                 }
                 assertTrue(draft.replaceCommittedText("x".repeat(2048) + "👍🏽"))
                 draft.handle(KeyboardAction.Backspace)

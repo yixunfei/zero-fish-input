@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.settings
 
 import android.content.Context
+import dev.zeroinput.ime.concurrency.recoverable
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseScript
@@ -27,7 +28,7 @@ class SettingsRepository(context: Context) {
      */
     fun addChangeListener(listener: () -> Unit): AutoCloseable {
         val observer = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            runCatching(listener)
+            recoverable(listener)
         }
         preferences.registerOnSharedPreferenceChangeListener(observer)
         return object : AutoCloseable {

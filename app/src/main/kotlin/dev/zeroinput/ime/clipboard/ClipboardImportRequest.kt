@@ -1,7 +1,8 @@
 package dev.zeroinput.ime.clipboard
 
 /** Owns one transient draft. No callback or Android component is retained here. */
-internal class ClipboardImportRequest(private val text: CharArray, val allowsAiImport: Boolean = false) : AutoCloseable {
+internal class ClipboardImportRequest(private val text: CharArray, val allowsAiImport: Boolean = false,
+                                    val allowsStegoImport: Boolean = false) : AutoCloseable {
     enum class Phase { REVIEW, AUTHENTICATING, AUTHORIZED, SAVING, CLOSED }
 
     val length = text.size
@@ -39,7 +40,7 @@ internal class ClipboardImportRequest(private val text: CharArray, val allowsAiI
 
     /** Consumes input for the local-only decrypt branch; it can no longer be forwarded to AI. */
     @Synchronized fun takeForStego(): CharArray? {
-        if (phase != Phase.REVIEW) return null
+        if (!allowsStegoImport || phase != Phase.REVIEW) return null
         return text.copyOf().also { close() }
     }
 

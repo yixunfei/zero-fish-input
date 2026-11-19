@@ -51,8 +51,18 @@ class LanguagePackDictionaryJsonTest {
         }
     }
 
-    @Test fun tokenLengthAndObjectKeyBudgetsFailBeforeLargeTreesCanBeAllocated() {
-        assertThrows(IllegalArgumentException::class.java) { read("{\"x\":\"" + "a".repeat(4097) + "\"}") }
+    @Test fun oversizedDictionaryValuesAreSkippedWithoutDroppingValidRows() {
+        val large = "a".repeat(100_000)
+        val json = """[{"shortcut":"bad","value":"$large"},{"ni":"你"},["$large","bad"],{"hao":"好"}]"""
+        assertEquals(setOf("ni" to "你", "hao" to "好"), read(json).map { it.shortcut to it.value }.toSet())
+        assertThrows(IllegalArgumentException::class.java) { read("""[{"bad":"$large\q"},{"ni":"你"}]""") }
+        assertThrows(IllegalArgumentException::class.java) { read("""[{"bad":"$large"}, [1,]]""") }
+        assertThrows(IllegalArgumentException::class.java) { read("{\"$large\":0}") }
+        assertEquals(setOf(PackDictionaryEntry("ni", "你")), read("""[{"bad":1${"0".repeat(5000)}},{"ni":"你"}]"""))
+        assertThrows(IllegalArgumentException::class.java) { read("""[{"bad":1${"0".repeat(5000)}e},{"ni":"你"}]""") }
+    }
+
+    @Test fun objectKeyBudgetsFailBeforeLargeTreesCanBeAllocated() {
         val keys = (0..50_000).joinToString(",") { "\"key$it\":0" }
         assertThrows(IllegalArgumentException::class.java) { read("{$keys}") }
     }

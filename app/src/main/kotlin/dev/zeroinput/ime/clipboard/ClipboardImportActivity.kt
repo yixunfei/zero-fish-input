@@ -57,7 +57,8 @@ class ClipboardImportActivity : AppCompatActivity() {
             it.onStegoAction = ::importStegoText
             it.showReview(requireNotNull(request).length, graph.settings.secureClipboardEnabled,
                 allowsAiImport = requireNotNull(request).allowsAiImport &&
-                    graph.settings.learningEnabled && !graph.settings.incognitoMode)
+                    graph.settings.learningEnabled && !graph.settings.incognitoMode,
+                allowsStegoImport = requireNotNull(request).allowsStegoImport)
             setContentView(it)
         }
         settingsListener = graph.settings.addChangeListener {
@@ -128,8 +129,13 @@ class ClipboardImportActivity : AppCompatActivity() {
         val chars = request?.takeForStego() ?: return
         val token = graph.stegoHandoff.put(dev.zeroinput.ime.textstego.StegoHandoff.Request(
             dev.zeroinput.ime.textstego.StegoHandoff.Kind.CARRIER, chars))
-        startActivity(Intent(this, dev.zeroinput.ime.textstego.StegoSourceActivity::class.java)
-            .putExtra(dev.zeroinput.ime.textstego.StegoSourceActivity.EXTRA_TOKEN, token))
+        try {
+            startActivity(Intent(this, dev.zeroinput.ime.textstego.StegoSourceActivity::class.java)
+                .putExtra(dev.zeroinput.ime.textstego.StegoSourceActivity.EXTRA_TOKEN, token))
+        } catch (_: RuntimeException) {
+            graph.stegoHandoff.discard(token)
+            showMessage(R.string.stego_failed)
+        }
         discardAndFinish()
     }
 

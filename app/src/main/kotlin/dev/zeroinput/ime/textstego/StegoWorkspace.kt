@@ -38,14 +38,19 @@ internal class StegoWorkspace(
     private var notice: Int? = null
     private val credential = StringBuilder(1024)
     private var credentialLimit = false
+    private var keyBits = "256"
+    private var replaceBits = true
     private var factor: ByteArray? = null
     private var prepared: String? = null
     private var boundCommit: ((String) -> Boolean)? = null
+    private var insertOnReady = false
     private var result: CharArray? = null
+    private var outputs: StegoOutputs? = null
     private val options = StegoOptions()
     private val dialogs = StegoOptionsDialog(view, ::current).apply { attachToIme = isKeyboard }
     @Volatile private var pending: StegoCryptoOperation? = null
     private var vaultGeneration = 0L
+    private var workspaceGeneration = 0L
     private val valid = AtomicBoolean(false)
     private val expire = object : Runnable {
         override fun run() {
@@ -60,12 +65,31 @@ internal class StegoWorkspace(
         valid.set(true)
         vaultGeneration = graph().secureClipboard.captureGeneration()
         decrypt = carrier != null
+        reveal = false
         notice = null
         field = if (decrypt) StegoField.CREDENTIAL else StegoField.COVER
         factor = file?.copyOf()
         if (file != null) options.mode = MessageCredentialMode.KEY_FILE
-        view.textStegoPanel.onAction = ::act
-        view.textStegoPanel.onCaret = ::type
+        val generation = workspaceGeneration
+        view.textStegoPanel.onAction = { if (generation == workspaceGeneration) act(it) }
+        view.textStegoPanel.onCaret = { if (generation == workspaceGeneration) type(it) }
+        view.textStegoPanel.onSelectAlgorithm = { id, selected ->
+            if (generation == workspaceGeneration) updateAlgorithm(id) { options.select(it, selected) }
+        }
+        view.textStegoPanel.onAlgorithmWidth = { id ->
+            if (generation == workspaceGeneration) updateAlgorithm(id, options::cycleWidth)
+        }
+        view.textStegoPanel.onAlgorithmEarlier = { id ->
+            if (generation == workspaceGeneration) updateAlgorithm(id, options::moveEarlier)
+        }
+        view.textStegoPanel.onPasteRequested = { target ->
+            if (generation == workspaceGeneration) pasteMenu(target)
+        }
+        view.textStegoPanel.onKeyBits = { bits ->
+            if (generation == workspaceGeneration && editable() && !decrypt && isRandomMode()) {
+                gate.touch(); keyBits = bits.toString(); replaceBits = true; render()
+            }
+        }
         for (target in listOf(StegoField.COVER, StegoField.SECRET, StegoField.CARRIER)) {
             val max = when (target) { StegoField.COVER -> 512; StegoField.SECRET -> 2048; else -> 8192 }
             val draft = LocalDraftInput(graph, { main.post(it) }, main::removeCallbacks,
@@ -78,10 +102,11 @@ internal class StegoWorkspace(
         if (carrier != null) {
             drafts[StegoField.CARRIER]?.replaceCommittedText(carrier)
             try {
-                val parsed = StegoCarrierCodec.decode(carrier)
-                val requirements = MessageEnvelope().inspect(parsed.envelope)
+                val chars = carrier.toCharArray()
+                val requirements = try { inspectCarrier(chars) } finally { chars.fill('\u0000') }
                 options.mode = requirements.mode; options.kdf = requirements.kdf
-                parsed.envelope.fill(0)
+                field = if (StegoCarrierCodec.isDetached(carrier)) StegoField.COVER
+                    else if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.CARRIER else StegoField.CREDENTIAL
             } catch (_: Exception) { notify(R.string.stego_failed) }
         }
         main.postDelayed(expire, 1000)
@@ -95,6 +120,15 @@ internal class StegoWorkspace(
 
     fun type(action: KeyboardAction) {
         if (!editable()) return
+        if (field == StegoField.KEY_BITS) {
+            when (action) {
+                is KeyboardAction.Text -> typeBits(action.value)
+                is KeyboardAction.LiteralText -> typeBits(action.value)
+                KeyboardAction.Backspace -> { keyBits = if (replaceBits) "" else keyBits.dropLast(1); replaceBits = false }
+                else -> Unit
+            }
+            gate.touch(); render(); return
+        }
         reveal = if (field == StegoField.CREDENTIAL) false else reveal
         gate.touch()
         if (field == StegoField.CREDENTIAL) {
@@ -124,32 +158,136 @@ internal class StegoWorkspace(
         else { credentialLimit = true; notify(R.string.stego_failed) }
     }
 
+    private fun typeBits(value: String) {
+        if (value.isEmpty() || value.any { it !in '0'..'9' }) return
+        val next = if (replaceBits) value else keyBits + value
+        if (next.length <= 4) { keyBits = next; replaceBits = false }
+    }
+
+    private fun isRandomMode(): Boolean = options.mode == MessageCredentialMode.RANDOM_KEY ||
+        options.mode == MessageCredentialMode.RANDOM_KEY_FILE
+
+    private fun pasteMenu(target: StegoField) {
+        if (!editable() || !pasteTargetAllowed(target)) return
+        gate.touch()
+        dialogs.choose(R.string.stego_paste_title, listOf(R.string.stego_paste_system, R.string.stego_paste_vault)
+            .map(view.context::getString)) { source ->
+            if (!editable() || !pasteTargetAllowed(target)) return@choose
+            if (source == 0) pasteSystem(target)
+            else onSource(if (target == StegoField.COVER) StegoAction.VAULT_COVER else StegoAction.VAULT)
+        }
+    }
+
+    private fun pasteSystem(target: StegoField) {
+        val token = gate.begin() ?: return
+        val lease = StegoCryptoOperation(token, SystemClock.elapsedRealtime() + 30_000)
+        pending = lease
+        val owner = WeakReference(this)
+        val handler = main
+        val context = view.context.applicationContext
+        val alive = valid
+        render()
+        try {
+            StegoSourceWorker.executor.execute {
+                val value = StegoSystemPaste(context).read(target) {
+                    lease.current() && alive.get() && dev.zeroinput.ime.input.isPrivateDraftDeviceAvailable(context)
+                }
+                if (!handler.post { owner.get()?.acceptSystemPaste(lease, target, value) ?: lease.close() }) lease.close()
+            }
+        } catch (_: RejectedExecutionException) {
+            lease.close(); pending = null; gate.fail(token); notify(R.string.stego_worker_busy); render()
+        }
+    }
+
+    private fun acceptSystemPaste(lease: StegoCryptoOperation, target: StegoField, value: String?) {
+        if (pending !== lease) { lease.close(); return }
+        if (!current() || !gate.accepts(lease.token)) { lease.close(); return }
+        val timely = lease.current()
+        pending = null; gate.fail(lease.token); lease.close()
+        if (!timely || value == null || !pasteText(target, value)) notify(R.string.stego_paste_failed)
+        render()
+    }
+
+    private fun pasteTargetAllowed(target: StegoField): Boolean = when (target) {
+        StegoField.COVER -> !decrypt || StegoCarrierCodec.isDetached(drafts[StegoField.CARRIER]?.committedText().orEmpty())
+        StegoField.CARRIER -> decrypt
+        else -> false
+    }
+
+    fun pasteText(target: StegoField, value: String): Boolean {
+        if (!editable() || !pasteTargetAllowed(target)) return false
+        if (target == StegoField.CARRIER) return importCarrier(value)
+        if (value.isEmpty() || value.length > 512 || value.any { it == '\u0000' } || !Charsets.UTF_8.newEncoder().canEncode(value)) return false
+        gate.touch()
+        val accepted = drafts[target]?.replaceCommittedText(value) == true
+        if (accepted) field = target
+        render(); return accepted
+    }
+
+    private fun generateKey() {
+        if (!editable() || decrypt || !isRandomMode()) return
+        val bits = keyBits.toIntOrNull() ?: 0
+        if (!MessageRandomKey.validBits(bits)) { notify(R.string.stego_invalid_bits); return }
+        val token = gate.begin() ?: return
+        val generation = workspaceGeneration
+        val owner = WeakReference(this)
+        val handler = main
+        render()
+        try {
+            StegoCryptoWorker.executor.execute {
+                val chars = try { MessageRandomKey.generate(bits) } catch (_: Exception) { null }
+                if (!handler.post {
+                    try { owner.get()?.acceptGeneratedKey(generation, token, chars) }
+                    finally { chars?.fill('\u0000') }
+                }) chars?.fill('\u0000')
+            }
+        } catch (_: RejectedExecutionException) { gate.fail(token); notify(R.string.stego_worker_busy); render() }
+    }
+
+    private fun acceptGeneratedKey(generation: Long, token: Long, chars: CharArray?) {
+        if (generation != workspaceGeneration || !current() || !gate.accepts(token)) return
+        gate.fail(token)
+        if (chars == null) notify(R.string.stego_failed)
+        else { clearCredential(); chars.forEach(credential::append); field = StegoField.CREDENTIAL; reveal = false }
+        render()
+    }
+
     fun importCarrier(value: String): Boolean {
         if (!editable()) return false
         return try {
-            val carrier = StegoCarrierCodec.decode(value)
-            val requirement = MessageEnvelope().inspect(carrier.envelope)
-            carrier.envelope.fill(0)
+            val carrier = StegoCarrierCodec.inspectable(value)
+            val requirement = try { MessageEnvelope().inspect(carrier.envelope) } finally { carrier.envelope.fill(0) }
             clearSensitive()
             options.mode = requirement.mode
             options.kdf = requirement.kdf
             decrypt = true
-            field = StegoField.CREDENTIAL
+            field = if (StegoCarrierCodec.isDetached(value)) StegoField.COVER
+                else if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.CARRIER else StegoField.CREDENTIAL
             drafts[StegoField.CARRIER]?.replaceCommittedText(value) == true
         } catch (_: Exception) { notify(R.string.stego_failed); false }.also { render() }
+    }
+
+    /** Only a validated detached encrypted block may accompany a cover-source detour. */
+    fun detachedCarrierForPaste(): CharArray? {
+        if (!editable() || !decrypt) return null
+        val value = drafts[StegoField.CARRIER]?.committedText() ?: return null
+        if (!StegoCarrierCodec.isDetached(value)) return null
+        val chars = value.toCharArray()
+        return try { inspectCarrier(chars); chars } catch (_: Exception) { chars.fill('\u0000'); null }
     }
 
     private fun act(action: StegoAction) {
         if (action == StegoAction.CLOSE) { close(); view.returnToKeyboard(); return }
         if (!current()) { close(); view.closeAuxiliaryInput(); return }
         when (action) {
-            StegoAction.CONFIRM -> submit(false)
+            StegoAction.CONFIRM -> if (gate.phase == Phase.EDITING) prepare(true) else submit(false)
             StegoAction.INSERT -> if (gate.phase == Phase.RESULT)
                 dialogs.confirm(R.string.stego_insert_warning) { submit(true) }
-            StegoAction.SAVE -> if (gate.phase == Phase.RESULT) {
-                val chars = result?.copyOf() ?: return
-                if (gate.consume(Phase.RESULT)) { close(); onSave(chars) } else chars.fill('\u0000')
-            }
+            StegoAction.SAVE -> save(StegoOutput.PLAINTEXT)
+            StegoAction.SAVE_COVER -> save(StegoOutput.COVER)
+            StegoAction.SAVE_CIPHERTEXT -> save(StegoOutput.CIPHERTEXT)
+            StegoAction.SAVE_CARRIER -> save(StegoOutput.CARRIER)
+            StegoAction.SAVE_FIELD -> saveField()
             StegoAction.EDIT -> { clearPrepared(); gate.edit(); render() }
             StegoAction.REVEAL -> { reveal = !reveal; render() }
             else -> if (editable()) editAction(action)
@@ -160,6 +298,7 @@ internal class StegoWorkspace(
         gate.touch()
         when (action) {
             StegoAction.ENCRYPT, StegoAction.DECRYPT -> {
+                if (decrypt == (action == StegoAction.DECRYPT)) return
                 decrypt = action == StegoAction.DECRYPT
                 field = if (decrypt) StegoField.CARRIER else StegoField.COVER
                 clearSensitive()
@@ -167,10 +306,22 @@ internal class StegoWorkspace(
             StegoAction.COVER -> field = StegoField.COVER
             StegoAction.SECRET -> field = StegoField.SECRET
             StegoAction.CREDENTIAL -> field = StegoField.CREDENTIAL
+            StegoAction.KEY_BITS -> { field = StegoField.KEY_BITS; replaceBits = true }
+            StegoAction.GENERATE_KEY -> generateKey()
+            StegoAction.CREDENTIAL_MODE -> if (!decrypt) dialogs.mode(options) {
+                clearCredential(); field = if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.COVER else StegoField.CREDENTIAL
+                render()
+            }
             StegoAction.CARRIER -> field = StegoField.CARRIER
-            StegoAction.OPTIONS -> dialogs.show(options, decrypt, ::render) { clearCredential(); notify(R.string.stego_credentials_changed) }
+            StegoAction.OPTIONS -> dialogs.show(options, decrypt, ::render) {
+                clearCredential()
+                if (options.mode == MessageCredentialMode.KEY_FILE && field == StegoField.CREDENTIAL)
+                    field = if (decrypt) StegoField.CARRIER else StegoField.COVER
+                notify(R.string.stego_credentials_changed)
+            }
+            StegoAction.NEXT -> nextField()
             StegoAction.PREPARE -> prepare()
-            StegoAction.SELECTION, StegoAction.VAULT -> onSource(action)
+            StegoAction.SELECTION, StegoAction.VAULT, StegoAction.VAULT_COVER -> onSource(action)
             StegoAction.KEY_FILE -> dialogs.confirm(R.string.stego_file_warning) {
                 close(); onSource(StegoAction.KEY_FILE)
             }
@@ -180,30 +331,99 @@ internal class StegoWorkspace(
         render()
     }
 
-    private fun prepare() {
+    private fun updateAlgorithm(id: Int, update: (MessageCipher) -> Unit) {
+        if (!editable() || decrypt) return
+        val cipher = MessageCipher.entries.firstOrNull { it.id == id } ?: return
+        gate.touch(); update(cipher); render()
+    }
+
+    private fun nextField() {
+        if (decrypt && field == StegoField.CARRIER) {
+            val chars = drafts[field]?.submittedChars() ?: return
+            try {
+                val requirements = inspectCarrier(chars)
+                options.mode = requirements.mode; options.kdf = requirements.kdf
+            } catch (_: Exception) { notify(R.string.stego_failed); return }
+            finally { chars.fill('\u0000') }
+        }
+        field = if (decrypt) {
+            when {
+                field == StegoField.CARRIER && StegoCarrierCodec.isDetached(drafts[field]?.committedText().orEmpty()) -> StegoField.COVER
+                field != StegoField.CREDENTIAL && options.mode != MessageCredentialMode.KEY_FILE -> StegoField.CREDENTIAL
+                else -> StegoField.CARRIER
+            }
+        } else when (field) {
+            StegoField.COVER -> StegoField.SECRET
+            StegoField.SECRET -> if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.COVER else StegoField.CREDENTIAL
+            else -> StegoField.COVER
+        }
+    }
+
+    private fun save(kind: StegoOutput) {
+        if (gate.phase != Phase.PREVIEW && gate.phase != Phase.RESULT) return
+        val chars = outputs?.copy(kind) ?: return
+        transferSave(chars, gate.phase)
+    }
+
+    private fun saveField() {
+        if (!editable() || field == StegoField.CREDENTIAL || field == StegoField.KEY_BITS) return
+        val chars = drafts[field]?.submittedChars() ?: return
+        if (chars.isEmpty()) return
+        transferSave(chars, Phase.EDITING)
+    }
+
+    private fun transferSave(chars: CharArray, phase: Phase) {
+        if (current() && gate.consume(phase)) { close(); onSave(chars) }
+        else chars.fill('\u0000')
+    }
+
+    private fun prepare(insert: Boolean = false) {
         if (!editable()) return
+        if (!decrypt && options.stages.isEmpty()) { notify(R.string.stego_choose_algorithm); render(); return }
+        if (insert && (decrypt || !isKeyboard || commitTarget() == null)) {
+            notify(R.string.stego_commit_unavailable); render(); return
+        }
         if (credentialLimit) { notify(R.string.stego_failed); return }
         val kdf = try {
             if (decrypt) {
-                val decoded = StegoCarrierCodec.decode(drafts[StegoField.CARRIER]?.committedText().orEmpty())
-                val requirements = MessageEnvelope().inspect(decoded.envelope)
-                decoded.envelope.fill(0)
-                if (options.mode != requirements.mode) throw MessageFailure()
+                val carrier = drafts[StegoField.CARRIER]?.submittedChars() ?: throw MessageFailure()
+                val requirements = try { inspectCarrier(carrier) } finally { carrier.fill('\u0000') }
+                options.mode = requirements.mode
+                options.kdf = requirements.kdf
+                render()
                 requirements.kdf
             } else if (options.mode.password) options.kdf else MessageKdf.NONE
         } catch (_: Exception) { notify(R.string.stego_failed); return }
         if (options.mode.file && factor == null) { notify(R.string.stego_file_missing); return }
         if (kdf != MessageKdf.NONE && !StegoOptions.available(kdf)) { notify(R.string.stego_memory_unavailable); return }
         if (kdf == MessageKdf.INCREASED || kdf == MessageKdf.HIGH_MEMORY)
-            dialogs.confirm(R.string.stego_cost_warning) { enqueue(kdf) }
-        else enqueue(kdf)
+            dialogs.confirm(R.string.stego_cost_warning) { enqueue(kdf, insert) }
+        else enqueue(kdf, insert)
     }
 
-    private fun enqueue(kdf: MessageKdf) {
+    private fun enqueue(kdf: MessageKdf, insert: Boolean) {
         if (!editable()) return
         val cover = drafts[StegoField.COVER]?.submittedChars() ?: return
         val secret = drafts[StegoField.SECRET]?.submittedChars() ?: run { cover.fill('\u0000'); return }
         val carrier = drafts[StegoField.CARRIER]?.submittedChars() ?: run { cover.fill('\u0000'); secret.fill('\u0000'); return }
+        val invalid = when {
+            !decrypt && cover.isEmpty() -> R.string.stego_cover_required
+            !decrypt && secret.isEmpty() -> R.string.stego_secret_required
+            !decrypt && options.mode.password && Character.codePointCount(credential, 0, credential.length) < 12 -> R.string.stego_passphrase_required
+            else -> null
+        }
+        if (invalid != null) {
+            cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000')
+            notify(invalid); render(); return
+        }
+        // Recheck the exact owned buffer handed to the worker, including after a cost dialog.
+        if (decrypt) try {
+            val requirements = inspectCarrier(carrier, String(cover))
+            if (requirements.mode != options.mode || requirements.kdf != kdf) throw MessageFailure()
+        } catch (_: Exception) {
+            cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000')
+            notify(R.string.stego_failed); render(); return
+        }
         val chars = CharArray(credential.length) { credential[it] }
         val master = MessageCredential(options.mode, chars, if (options.mode.file) factor else null)
         chars.fill('\u0000')
@@ -216,6 +436,7 @@ internal class StegoWorkspace(
         val transport = options.transport
         val target = if (!isDecrypt && isKeyboard) commitTarget() else null
         boundCommit = target
+        insertOnReady = insert
         val task = StegoCryptoTask(lease, WeakReference(this), main, isDecrypt, stages, transport, kdf,
             cover, secret, carrier, master)
         render()
@@ -225,6 +446,12 @@ internal class StegoWorkspace(
             task.close(); lease.close(); boundCommit = null
             gate.fail(token); pending = null; notify(R.string.stego_worker_busy); render()
         }
+    }
+
+    private fun inspectCarrier(chars: CharArray, exactCover: String? = null): MessageRequirements {
+        val decoded = if (exactCover == null) StegoCarrierCodec.inspectable(String(chars))
+            else StegoCarrierCodec.decode(String(chars), exactCover)
+        return try { MessageEnvelope().inspect(decoded.envelope) } finally { decoded.envelope.fill(0) }
     }
 
     fun publish(lease: StegoCryptoOperation) {
@@ -237,11 +464,14 @@ internal class StegoWorkspace(
             gate.fail(token); notify(if (delivery.memoryUnavailable) R.string.stego_memory_unavailable else R.string.stego_failed)
         } else if (gate.complete(token, delivery.result != null)) {
             prepared = delivery.encoded; result = delivery.result; delivery.result = null
+            outputs = delivery.outputs; delivery.outputs = null
+            reveal = false
             clearCredential()
             factor?.fill(0); factor = null
             drafts[StegoField.SECRET]?.clear()
         }
         delivery.close()
+        if (insertOnReady && gate.phase == Phase.PREVIEW) { submit(false); return }
         render()
     }
 
@@ -249,7 +479,8 @@ internal class StegoWorkspace(
         if (!current()) return
         val target = if (plaintext) commitTarget() else boundCommit
         val text = if (plaintext) result?.let(::String) else prepared
-        if (target == null || text == null || !gate.consume(if (plaintext) Phase.RESULT else Phase.PREVIEW)) return
+        if (target == null || text == null) { notify(R.string.stego_commit_unavailable); render(); return }
+        if (!gate.consume(if (plaintext) Phase.RESULT else Phase.PREVIEW)) return
         // Consume before calling an external editor: an uncertain commit is never retried.
         val accepted = target(text)
         close()
@@ -277,10 +508,32 @@ internal class StegoWorkspace(
             hasResult -> view.context.getString(R.string.stego_result)
             else -> view.context.getString(notice ?: if (decrypt) R.string.stego_shared_ready else R.string.stego_intro)
         }
+        val detached = decrypt && StegoCarrierCodec.isDetached(drafts[StegoField.CARRIER]?.committedText().orEmpty())
         view.textStegoPanel.render(StegoUiState(decrypt, field, text, busy, preview, reveal, hasResult,
-            isKeyboard, status, options.summary(view, factor != null)),
+            isKeyboard, if (detached && !hasResult && !busy && notice == null) view.context.getString(R.string.stego_detached_hint) else status,
+            if (decrypt) view.context.getString(R.string.stego_decrypt_options_fixed) else options.summary(view, factor != null),
+            options.mode != MessageCredentialMode.KEY_FILE,
+            options.mode.file, detached, field != StegoField.CREDENTIAL &&
+                (drafts[field]?.committedText()?.isNotEmpty() == true || states[field]?.snapshot?.isComposing == true),
+            fields = fieldDisplays(), algorithms = MessageCipher.entries.map { cipher ->
+                val stage = options.stages.firstOrNull { it.cipher == cipher } ?: MessageStage(cipher)
+                StegoAlgorithmUi(cipher.id, if (cipher == MessageCipher.XCHACHA20) "XChaCha20-Poly1305" else "${cipher.name}-GCM",
+                    stage.bits, options.stages.indexOfFirst { it.cipher == cipher }, cipher.keyBits.size > 1)
+            }, randomKey = isRandomMode(), credentialMode = view.context.getString(StegoOptions.MODE_LABELS[options.mode.ordinal])),
             if (hidden && !reveal) null else carets[field])
         view.renderTextStegoInput(if (busy || preview || hasResult || field == StegoField.CREDENTIAL) null else states[field])
+    }
+
+    private fun fieldDisplays(): Map<StegoField, StegoFieldUi> = StegoField.entries.associateWith { target ->
+        val hidden = target == StegoField.SECRET || target == StegoField.CREDENTIAL
+        val committed = when (target) {
+            StegoField.KEY_BITS -> keyBits
+            StegoField.CREDENTIAL -> credential
+            else -> drafts[target]?.committedText().orEmpty()
+        }
+        val text = if (hidden && !reveal) "•".repeat(committed.length.coerceAtMost(32))
+            else committed.toString() + if (target == StegoField.CREDENTIAL) "" else states[target]?.snapshot?.composition.orEmpty()
+        StegoFieldUi(text, if (hidden && !reveal) null else carets[target])
     }
 
     private fun editable(): Boolean = current() && gate.phase == Phase.EDITING
@@ -290,14 +543,21 @@ internal class StegoWorkspace(
         credential.setLength(0); credentialLimit = false
     }
     private fun clearSensitive() { clearCredential(); drafts[StegoField.SECRET]?.clear(); clearPrepared(); reveal = false }
-    private fun clearPrepared() { prepared = null; boundCommit = null; result?.fill('\u0000'); result = null }
+    private fun clearPrepared() {
+        prepared = null; boundCommit = null; insertOnReady = false; result?.fill('\u0000'); result = null
+        outputs?.close(); outputs = null
+    }
 
     override fun close() {
+        workspaceGeneration++
         valid.set(false)
         gate.close(); pending?.close(); pending = null; main.removeCallbacks(expire)
         dialogs.close(); clearCredential(); factor?.fill(0); factor = null; clearPrepared()
         drafts.values.forEach(LocalDraftInput::close); drafts.clear(); states.clear(); carets.clear()
         view.textStegoPanel.clear()
         view.textStegoPanel.onAction = {}; view.textStegoPanel.onCaret = {}
+        view.textStegoPanel.onSelectAlgorithm = { _, _ -> }; view.textStegoPanel.onAlgorithmWidth = {}
+        view.textStegoPanel.onAlgorithmEarlier = {}
+        view.textStegoPanel.onPasteRequested = {}; view.textStegoPanel.onKeyBits = {}
     }
 }

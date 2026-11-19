@@ -126,7 +126,7 @@ class InputSessionController(
         evaluatedFor = configuration
         if (updated == privacy) return false
         privacy = updated
-        recoverable { engine?.reset() }
+        recoverableEngine { engine?.reset() }
             .onFailure { closeEngine() }
         connection.clearComposingText()
         replaceEngine()
@@ -170,8 +170,8 @@ class InputSessionController(
                 InputCommand.Backspace -> handleKey(activeEngine, EngineKey.Backspace, fallbackBackspace = true)
                 InputCommand.Space -> {
                     if (personalPaging.editsPending) {
-                        // Do not select an engine candidate before dictionary edits
-                        // have been checked or turn unfinished pinyin into a commit.
+                        // Preserve the key without selecting an unverified dictionary row.
+                        commitUnconsumedKey(activeEngine, state.snapshot, state.snapshot, " ")
                         return
                     }
                     if (personalPaging.editsApplied && state.snapshot.isComposing && state.snapshot.candidates.isEmpty()) {
@@ -244,7 +244,7 @@ class InputSessionController(
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
-        recoverable { engine?.reset() }
+        recoverableEngine { engine?.reset() }
             .onFailure { closeEngine() }
         connection.clearComposingText()
         publish(EngineSnapshot.Empty)
@@ -261,7 +261,7 @@ class InputSessionController(
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
-        recoverable { engine?.reset() }.onFailure { closeEngine() }
+        recoverableEngine { engine?.reset() }.onFailure { closeEngine() }
         publish(EngineSnapshot.Empty)
         return true
     }
@@ -272,7 +272,7 @@ class InputSessionController(
         associations.clear()
         candidateWindow.clear()
         invalidateReconversion(publishState = false)
-        recoverable { engine?.reset() }.onFailure { closeEngine() }
+        recoverableEngine { engine?.reset() }.onFailure { closeEngine() }
         connection.finishComposingText()
         publish(EngineSnapshot.Empty)
     }
@@ -426,7 +426,7 @@ class InputSessionController(
         }
         val candidate = prepared.takeEngine() ?: return false
         val restored = try {
-            recoverable { (candidate as? CompositionEditingEngine)?.restoreComposition(input) }.getOrNull()
+            recoverableEngine { (candidate as? CompositionEditingEngine)?.restoreComposition(input) }.getOrNull()
         } catch (failure: Throwable) {
             closeSafely(candidate)
             throw failure
@@ -483,9 +483,9 @@ class InputSessionController(
 
         val requestedPackKey = languagePackKey
         val packEngine = requestedPackKey?.let { key ->
-            recoverable { languagePackProvider(key) }.getOrNull()
+            recoverableEngine { languagePackProvider(key) }.getOrNull()
         }?.let { candidate ->
-            val supportsLanguage = recoverable {
+            val supportsLanguage = recoverableEngine {
                 language in candidate.descriptor.languages
             }.getOrDefault(false)
             if (supportsLanguage) {
@@ -515,7 +515,7 @@ class InputSessionController(
             languagePackKey = null
         }
 
-        val baseEngine = recoverable { engineProvider(language) }.getOrNull()
+        val baseEngine = recoverableEngine { engineProvider(language) }.getOrNull()
         val snapshot = baseEngine?.let(::startEngine)
         if (snapshot != null) {
             engine = baseEngine
@@ -529,7 +529,7 @@ class InputSessionController(
     }
 
     private fun installImmediateEngine() {
-        val immediate = recoverable { engineProvider(language) }.getOrNull()
+        val immediate = recoverableEngine { engineProvider(language) }.getOrNull()
         val snapshot = immediate?.let(::startEngine)
         if (snapshot != null) {
             engine = immediate
@@ -547,7 +547,7 @@ class InputSessionController(
             prepared.packageName == editorInfo.packageName &&
             prepared.privacy == privacy &&
             prepared.snapshot.isComposing.not() &&
-            recoverable { language in prepared.descriptor.languages }.getOrDefault(false)
+            recoverableEngine { language in prepared.descriptor.languages }.getOrDefault(false)
 
     private companion object {
         const val MAX_HANDOFF_PINYIN_LENGTH = 128
@@ -670,7 +670,7 @@ class InputSessionController(
         // editor accepts the replacement, so a rejected Enter can be retried.
         val committed = commitRawComposition(rawComposition)
         if (!committed) return
-        recoverable { activeEngine.reset() }
+        recoverableEngine { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         if (allowLearning && privacy.learningAllowed && privacy.personalizationAllowed &&
             (language == InputLanguage.ENGLISH || rawComposition.codePoints().allMatch(Character::isIdeographic))) {
@@ -777,7 +777,7 @@ class InputSessionController(
     private fun commitLocalCandidate(activeEngine: InputEngine, text: String): Boolean {
         if (!commitPredictableText(text)) return false
         candidateWindow.clear()
-        recoverable { activeEngine.reset() }
+        recoverableEngine { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         return true
     }
@@ -817,7 +817,7 @@ class InputSessionController(
             canPersonalizeCandidates(),
             promotionThreshold = personalPromotionThreshold().coerceAtLeast(1),
         ) { text ->
-            recoverable { (engine as? CandidateTextNormalizer)?.normalizeCandidateText(text) ?: text }.getOrNull()
+            recoverableEngine { (engine as? CandidateTextNormalizer)?.normalizeCandidateText(text) ?: text }.getOrNull()
         }
         if (!associationsAllowed()) associations.clear()
         if (composed.isComposing) associations.hide()
@@ -878,7 +878,7 @@ class InputSessionController(
             ?: return true
         val rawComposition = fallbackComposition(effectiveSnapshot)
         if (!commitRawComposition(rawComposition)) return false
-        recoverable { activeEngine.reset() }
+        recoverableEngine { activeEngine.reset() }
             .onFailure { if (engine === activeEngine) closeEngine() }
         publish(EngineSnapshot.Empty)
         return true
@@ -928,7 +928,7 @@ class InputSessionController(
     }
 
     private fun startEngine(candidate: InputEngine): EngineSnapshot? = try {
-        recoverable {
+        recoverableEngine {
             candidate.start(
                 EditorContext(language, privacy.isSensitive, privacy.learningAllowed, editorInfo.packageName,
                     predictionsAllowed = privacy.predictionsAllowed),
@@ -950,7 +950,7 @@ class InputSessionController(
     }
 
     private fun closeSafely(candidate: InputEngine) {
-        recoverable { candidate.close() }
+        recoverableEngine { candidate.close() }
     }
 
     private fun recoverFromEngineFailure(failedEngine: InputEngine) {

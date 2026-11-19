@@ -221,7 +221,7 @@ internal class LocalDraftInput(
     private fun emit(state: InputSessionState) {
         val preedit = preeditOf(state)
         val committed = if (maskCommitted && !showFullPrivateDraft) maskedPrivateDraft(text) else text.toString()
-        hiddenPrefix = if (maskCommitted && !showFullPrivateDraft) privateDraftTailStart(text) else 0
+        hiddenPrefix = if (maskCommitted && !showFullPrivateDraft) text.length else 0
         displayedPrefix = hiddenPrefix.coerceAtMost(32)
         caretRevision++
         renderCaret(dev.zeroinput.ime.ui.DraftCaretUi(
@@ -348,14 +348,5 @@ internal class LocalDraftInput(
 }
 
 internal fun maskedPrivateDraft(text: CharSequence): String {
-    val tail = privateDraftTailStart(text)
-    return "•".repeat(tail.coerceAtMost(32)) + text.subSequence(tail, text.length)
-}
-
-private fun privateDraftTailStart(text: CharSequence): Int {
-    var tail = text.length
-    repeat(3) {
-        if (tail > 0) tail = Character.offsetByCodePoints(text, tail, -1)
-    }
-    return tail
+    return "•".repeat(text.length.coerceAtMost(32))
 }

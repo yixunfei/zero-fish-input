@@ -42,10 +42,12 @@ class StegoSourceActivity : AppCompatActivity() {
     private var grant: AuthenticationGrant? = null
     private var authorizedSave: Boolean? = null
     private var selectedId: String? = null
+    private var vaultTarget = StegoField.CARRIER
     private var selectedUri: Uri? = null
     private var resumed = false
     private var detour = false
     private var enabling = false
+    private var initialVaultList = false
     private val active = AtomicBoolean(true)
     @Volatile private var operation = 0L
     private var generation = 0L
@@ -53,7 +55,8 @@ class StegoSourceActivity : AppCompatActivity() {
     private var settingsObserver: AutoCloseable? = null
     private var dialog: StegoOptionsDialog? = null
     private val fileRead = AtomicReference<StegoKeyFileRead?>()
-    private val expire = Runnable { discard() }
+    private var timeoutMessage = R.string.stego_expired
+    private val expire = Runnable { message(timeoutMessage); discard() }
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) { discard() }
     }
@@ -69,6 +72,8 @@ class StegoSourceActivity : AppCompatActivity() {
         request = if (savedInstanceState == null) graph.stegoHandoff.take(token) else null
         if (request == null || !isPrivateDraftDeviceAvailable(this)) { discard(); return }
         generation = requireNotNull(request).generation
+        vaultTarget = requireNotNull(request).target
+        initialVaultList = request?.kind == StegoHandoff.Kind.VAULT && request?.editor != null
         if (generation != graph.secureClipboard.captureGeneration()) { discard(); return }
         settingsObserver = graph.settings.addChangeListener { if (!enabling) main.post { discard() } }
         ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -84,7 +89,9 @@ class StegoSourceActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume(); resumed = true
-        if (!deviceReady()) discard() else showAuthorizedAction()
+        if (!deviceReady()) discard() else if (initialVaultList) {
+            initialVaultList = false; listVault()
+        } else showAuthorizedAction()
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -119,7 +126,8 @@ class StegoSourceActivity : AppCompatActivity() {
     private fun current(): Boolean = deviceReady() && resumed &&
         generation == graph.secureClipboard.captureGeneration()
 
-    private fun resetDeadline(duration: Long) {
+    private fun resetDeadline(duration: Long, message: Int = R.string.stego_expired) {
+        timeoutMessage = message
         deadline = SystemClock.elapsedRealtime() + duration
         main.removeCallbacks(expire); main.postDelayed(expire, duration)
     }
@@ -132,11 +140,17 @@ class StegoSourceActivity : AppCompatActivity() {
             onSource = { action ->
                 when (action) {
                     StegoAction.KEY_FILE -> pickFile()
-                    StegoAction.VAULT -> { workspace?.close(); listVault() }
+                    StegoAction.VAULT, StegoAction.VAULT_COVER -> {
+                        vaultTarget = if (action == StegoAction.VAULT_COVER) StegoField.COVER else StegoField.CARRIER
+                        request?.carrier?.fill('\u0000')
+                        request?.carrier = if (vaultTarget == StegoField.COVER) workspace?.detachedCarrierForPaste() else null
+                        workspace?.close(); listVault()
+                    }
                     else -> message(R.string.stego_import_selection_failed)
                 }
             }, onSave = { value ->
                 request?.close(); request = StegoHandoff.Request(StegoHandoff.Kind.SAVE, value)
+                resetDeadline(120_000)
                 showAction(R.string.stego_save_start, dev.zeroinput.ime.ui.R.string.stego_save) { authenticate(save = true) }
             }, isKeyboard = false)
         workspace = controller
@@ -147,7 +161,7 @@ class StegoSourceActivity : AppCompatActivity() {
         view.onHideKeyboardRequested = { discard() }
         view.onTextStegoVisibilityChanged = { if (!it && !detour && active.get()) discard() }
         view.openTextStego()
-        val carrier = request?.text?.let(::String)
+        val carrier = request?.let { if (it.target == StegoField.CARRIER) it.text else it.carrier }?.let(::String)
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM
@@ -156,6 +170,9 @@ class StegoSourceActivity : AppCompatActivity() {
             protectInsets(this)
         })
         controller.open(InputLanguage.CHINESE, ChineseInputOptions(), carrier, file)
+        if (request?.target == StegoField.COVER) request?.text?.let { controller.pasteText(StegoField.COVER, String(it)) }
+        request?.text?.fill('\u0000'); request?.text = null
+        request?.carrier?.fill('\u0000'); request?.carrier = null
         resetDeadline(120_000)
     }
 
@@ -186,17 +203,21 @@ class StegoSourceActivity : AppCompatActivity() {
     }
 
     private fun authenticate(save: Boolean) {
-        if (!current()) return
+        if (!current()) { return }
         detour = true
         workspace?.close(); keyboard?.closeAuxiliaryInput()
         showBusy()
-        resetDeadline(30_000)
         authentication = AuthenticationBroker.requestCancellable(this) { result ->
             authentication = null
             if (!deviceReady()) { discard(); return@requestCancellable }
-            if (result == null) { discard(); return@requestCancellable }
+            if (result == null) {
+                detour = false
+                showAction(R.string.stego_auth_retry, R.string.stego_retry_authentication) { authenticate(save) }
+                return@requestCancellable
+            }
             if (generation != graph.secureClipboard.captureGeneration()) { discard(); return@requestCancellable }
             grant = result
+            resetDeadline(30_000, R.string.stego_confirmation_expired)
             // The callback only stages a one-use grant; a foreground click starts the read/write.
             authorizedSave = save
             showAuthorizedAction()
@@ -217,7 +238,7 @@ class StegoSourceActivity : AppCompatActivity() {
         val authorization = grant ?: return
         grant = null
         val id = selectedId
-        val addition = request?.addition
+        val addition = if (save) request?.takeAddition() else null
         if (save && addition == null || !save && id == null) { discard(); return }
         if (save && !graph.settings.secureClipboardEnabled) {
             enabling = true; graph.settings.secureClipboardEnabled = true; enabling = false
@@ -232,7 +253,7 @@ class StegoSourceActivity : AppCompatActivity() {
         val context = applicationContext
         val owner = WeakReference(this)
         val handler = main
-        enqueue {
+        if (!enqueue {
             var value: CharArray? = null
             val valid = { alive.get() && SystemClock.elapsedRealtime() < expectedDeadline &&
                 expectedGeneration == vault.captureGeneration() && settings.secureClipboardEnabled && isPrivateDraftDeviceAvailable(context) }
@@ -245,18 +266,29 @@ class StegoSourceActivity : AppCompatActivity() {
                     value != null
                 }
             } catch (_: Exception) { false }
+            finally { addition?.close() }
             val delivered = value
             if (!valid() || !handler.post {
                 val activity = owner.get()
                 if (activity == null) delivered?.fill('\u0000') else activity.completeGrant(expected, success, save, delivered)
             }) delivered?.fill('\u0000')
-        }
+        }) addition?.close()
     }
 
     private fun completeGrant(expected: Long, success: Boolean, save: Boolean, value: CharArray?) {
         if (!current() || expected != operation) { value?.fill('\u0000'); return }
         if (success && !save && value != null) {
-            request?.close(); request = StegoHandoff.Request(StegoHandoff.Kind.CARRIER, value)
+            val max = if (vaultTarget == StegoField.COVER) 512 else 8192
+            if (value.isEmpty() || value.size > max || value.any { it == '\u0000' }) {
+                value.fill('\u0000'); message(R.string.stego_paste_failed); discard(); return
+            }
+            val editor = request?.takeIf { it.kind == StegoHandoff.Kind.VAULT }?.editor
+            if (editor != null) {
+                graph.stegoHandoff.offerPaste(value, editor, vaultTarget, request?.carrier?.copyOf())
+                message(R.string.stego_paste_return); discard(); return
+            }
+            val carrier = request?.carrier?.copyOf()
+            request?.close(); request = StegoHandoff.Request(StegoHandoff.Kind.CARRIER, value, target = vaultTarget, carrier = carrier)
             launchWorkspace()
         } else { value?.fill('\u0000'); message(if (success) R.string.clipboard_import_saved else R.string.stego_failed); discard() }
     }
@@ -290,7 +322,7 @@ class StegoSourceActivity : AppCompatActivity() {
         val uri = selectedUri ?: return
         selectedUri = null
         val expected = ++operation
-        resetDeadline(5000)
+        resetDeadline(120_000, R.string.stego_file_timeout)
         val importDeadline = deadline
         showBusy()
         val alive = active
@@ -350,10 +382,9 @@ class StegoSourceActivity : AppCompatActivity() {
         }
     }
 
-    private fun enqueue(action: () -> Unit) {
-        try { StegoSourceWorker.executor.execute(action) }
-        catch (_: RejectedExecutionException) { message(R.string.stego_worker_busy); discard() }
-    }
+    private fun enqueue(action: () -> Unit): Boolean = try {
+        StegoSourceWorker.executor.execute(action); true
+    } catch (_: RejectedExecutionException) { message(R.string.stego_worker_busy); discard(); false }
     private fun message(id: Int) { Toast.makeText(this, id, Toast.LENGTH_LONG).show() }
     private fun discard() {
         active.set(false); operation++; grant = null; authorizedSave = null; selectedUri = null

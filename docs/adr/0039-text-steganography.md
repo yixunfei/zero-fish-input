@@ -7,8 +7,8 @@ Status: accepted for implementation, 2026-11-18.
 The user requested implementation of revision 2 of the
 [design](../text-steganography-design.md): an independent portable format, six
 cipher families, ordered cascades, valid key widths, one master credential and
-optional key files. The user explicitly declined the proposed system-clipboard
-body-read exception. Selection, plain-text sharing and authenticated private-vault
+optional key files. The user initially declined the proposed system-clipboard
+body-read exception; the explicit 2026-11-19 two-field request below supersedes that refusal. Selection, plain-text sharing and authenticated private-vault
 reads are the supported import sources. Existing uncommitted audit work is retained.
 
 ## Decision
@@ -64,15 +64,52 @@ reads are the supported import sources. Existing uncommitted audit work is retai
   warning and fresh current-editor check. A private Activity cannot insert or
   return plaintext to a caller. Vault read/save each uses a new system-authentication
   grant followed by another foreground click and deletion-generation check.
-- Cross-screen handoffs contain an opaque one-use ID only. The bounded pending
-  save owns one mutable result under the existing PendingClipboardAddition policy;
-  no Activity, InputConnection or secret is put in an Intent/saved state. A temporary
+- Cross-screen handoffs contain an opaque one-use ID only. A pending save owns one
+  mutable result under the private host's 120-second pre-authentication draft budget.
+  Authentication keeps the broker's existing 30-second request limit; success starts
+  a fresh confirmation window of at most 30 seconds, without extending the grant.
+  Only the subsequent foreground click transfers the draft to a one-use
+  PendingClipboardAddition for the write. Authentication cancellation offers a
+  retry within the existing draft budget; timeout clears it with an explicit notice.
+  No Activity, InputConnection or secret is put in an Intent/saved state. A temporary
   file factor may return only to a matching public editor identity, followed by an
   explicit new operation. Settings, lock, timeout and vault generation revoke it.
 - Crypto and source I/O each have one process-wide nonqueueing slot. Cancellation
   revokes publication and closes file descriptors/signals but does not free a slot
   until running work returns. Workers own buffers and weak foreground references;
   stale/duplicate/late deliveries clear their owned mutable result.
+- Key-file reads have a 120-second bound and an explicit timeout notice; cancellation
+  still closes the temporary descriptor/signal and rejects late completion. Decrypt
+  options come from the carrier, and both preflight and queued processing validate
+  submitted text including any pending composition. A recoverable KDF allocation
+  failure clears partial output and publishes failure immediately. Other fatal
+  worker errors publish failure during cleanup and then propagate.
+
+## Approved usability completion (2026-11-18)
+
+The user approved direct private-save entry points for secret plaintext, exact
+public cover, detached ciphertext and the complete carrier, plus saving the
+current noncredential field. They reuse the private host's existing fresh system
+authentication and foreground save confirmation; source navigation consumes the
+workspace and revokes its editor binding. No system clipboard copy is introduced.
+Successful encryption retains one bounded mutable plaintext result solely for
+these explicit saves within the existing 30-second preview window. Successful
+decryption exposes the same four outputs only after complete authentication.
+Disposal, expired publication and duplicate delivery clear the owned result bundle.
+
+Detached ciphertext is the existing canonical `[ZIS1:base64url]` block without its
+cover. It changes neither the encrypted envelope nor vault storage. Its import
+requires a separately entered exact original cover before KDF/decryption; a public
+inspection placeholder may parse credential/KDF requirements only, and never
+authorizes plaintext. The worker always uses the actual supplied cover. Complete
+carriers retain their embedded exact cover. Existing carrier-marker AI rejection
+also covers complete and damaged detached blocks.
+
+The UI uses a direct ordered-cipher editor, continuous add/remove/reorder/key-width
+changes and one/two/six-layer presets. The one-to-six unique algorithm boundary
+remains unchanged. The toolbar shows `隐` immediately after shape lookup and puts
+More after the common tools. Prepared carrier submission remains one explicit,
+one-shot insertion into the bound editor with no Send or plaintext fallback.
 
 ## Frozen v1 format
 
@@ -132,3 +169,53 @@ Existing encrypted vault formats and Keystore aliases are unchanged. The earlier
 single-suite proposal was never deployed; no compatibility reader/migration is added.
 The rejected clipboard adapter, persistent message keys, external plaintext export,
 automatic decrypt and a resource-free wording substitute remain outside v1.
+
+## Single-page and automatic encoded insertion (2026-11-19)
+
+The user requested an immediately usable flow after reporting the previous
+preview/confirmation workflow ineffective. The primary Encrypt and insert click
+now authorizes one automatic encoded insertion after encryption self-check. The
+original actual connection, session, interaction, privacy and lock checks remain
+mandatory; consume before commit and never retry an uncertain edit. Generate only
+preserves the explicit preview and four authenticated private saves. Decrypted
+plaintext still has its independent insertion warning. No format or vault changes.
+
+All relevant fields share one scrollable, focus-free page. Six visible checkboxes
+replace cascade dialogs: checking appends the algorithm, unchecking removes it,
+rechecking appends it again, and displayed numbering defines the exact cascade.
+Inline controls change valid key widths or move an algorithm earlier. Empty
+selection cannot start crypto. Credential modes, KDF and carrier settings remain
+under More options. No additional persistence or input connection is introduced.
+
+
+## Approved two-field paste and variable master material (2026-11-19)
+
+The latest explicit request authorizes system Paste from the COVER/CARRIER
+long-press source menu. This supersedes only the earlier refusal for these fields.
+StegoSystemPaste reads one bounded plain-text item on the source worker, with no
+URI/Intent coercion, listener, write, automatic import, vault save or AI access.
+The original workspace lease and foreground session must remain current before
+use; lock/settings/session/deletion/timeout revoke the operation. Clipboard guard
+metadata/cleanup behavior is unchanged. No permissions/exports are added.
+
+Vault menu selection targets the requested field. Navigation clears original
+secret drafts and credentials. Authentication stages only a grant; another
+foreground click reads the entry. Only target/editor identity and a validated
+detached encrypted block may survive navigation, never plaintext drafts or old
+connections. A bounded one-use read result may return for 30 seconds to the
+matching eligible editor's newly opened isolated workspace, after an explicit
+Stego tap. It cannot write an external editor, auto-generate or auto-decrypt.
+Lock/settings/deletion/expiry/mismatch clears it. Standalone flows stay local.
+
+The requested 512/1024/4096 lengths refer to random master material, not unsupported
+AES widths. Support 256..4096 bits in multiples of 8, presets plus protected numeric
+entry. Canonical unpadded Base64url decodes to 32..512 bytes. Existing extraction,
+cipher widths and serialized envelope are unchanged, and existing 32-byte keys
+continue to produce the same root. HKDF-SHA256 caps derived security at 256 bits;
+no higher cipher or additive-strength claim. Generation runs off the input thread;
+stale/duplicate results are wiped. No persistent credential/data migration exists.
+
+The page follows text, credential, cipher selection, action, result/save order;
+mode and reveal controls are inline, optional carrier/KDF settings secondary.
+All touch controls remain at least 48 dp; no platform editable/clipboard menu,
+autofill, capture, saved state or extra input connection is introduced.

@@ -23,6 +23,18 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 30)
 class StegoKeyFilePlatformTest {
+    @Test fun aSlowProviderCanCompleteAfterFiveSecondsWithoutPersistingAccess() {
+        val bytes = ByteArray(128) { it.toByte() }
+        val file = File.createTempFile("message-public-slow-", ".bin", Device.context.cacheDir)
+        try {
+            file.writeBytes(bytes)
+            val provider = PublicProvider(file).apply { delayMillis = 5500 }
+            val end = android.os.SystemClock.elapsedRealtime() + 120_000
+            assertArrayEquals(MessageKeyFile.factor(ByteArrayInputStream(bytes)),
+                StegoKeyFileRead().read(ContentResolver.wrap(provider), URI) { android.os.SystemClock.elapsedRealtime() < end })
+        } finally { assertTrue(file.delete()) }
+    }
+
     @Test fun temporaryProviderReadChecksActualBoundsAndNeverPersistsAUriGrant() {
         val bytes = ByteArray(128) { it.toByte() }
         val publicFile = File.createTempFile("message-public-", ".bin", Device.context.cacheDir)
@@ -65,10 +77,12 @@ class StegoKeyFilePlatformTest {
     private class PublicProvider(private val file: File) : ContentProvider() {
         var opens = 0
         var block = false
+        var delayMillis = 0L
         val entered = CountDownLatch(1)
         val cancelled = CountDownLatch(1)
         override fun openFile(uri: Uri, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
             opens++
+            if (delayMillis > 0) android.os.SystemClock.sleep(delayMillis)
             if (block) {
                 signal?.setOnCancelListener { cancelled.countDown() }
                 entered.countDown()

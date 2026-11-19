@@ -28,6 +28,45 @@ class StegoSourcePlatformTest {
     private val graph get() = (Device.context.applicationContext as ZeroInputApplication).graph
     private val randomKey = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() })
 
+    @Test fun rejectedLaunchDiscardsOnlyItsOwnHandoffAndWipesPendingSave() {
+        Device.onMain {
+            val chars = "public aborted save".toCharArray()
+            val token = graph.stegoHandoff.put(StegoHandoff.Request(StegoHandoff.Kind.SAVE, chars))
+            graph.stegoHandoff.discard(token)
+            assertTrue(chars.all { it == '\u0000' })
+            assertNull(graph.stegoHandoff.take(token))
+            val newer = graph.stegoHandoff.put(StegoHandoff.Request(StegoHandoff.Kind.FILE))
+            graph.stegoHandoff.discard(token)
+            val retained = graph.stegoHandoff.take(newer)
+            assertNotNull(retained)
+            retained?.close()
+        }
+    }
+
+    @Test fun pendingCarrierCompositionIsValidatedBeforeStartingCrypto() {
+        val carrier = MessageCredential(MessageCredentialMode.RANDOM_KEY, randomKey.toCharArray()).use {
+            StegoCarrierCodec.encode("public cover", MessageEnvelope().seal("public cover".toCharArray(),
+                "public fixture".toCharArray(), it, kdf = MessageKdf.NONE), StegoTransport.VISIBLE_BASE64)
+        }
+        val token = onMain { graph.stegoHandoff.put(StegoHandoff.Request(StegoHandoff.Kind.CARRIER, carrier.toCharArray())) }
+        val activity = Device.instrumentation.startActivitySync(Intent(Device.context, StegoSourceActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(StegoSourceActivity.EXTRA_TOKEN, token)) as StegoSourceActivity
+        try {
+            Device.onMain {
+                val keyboard = nodes(activity.window.decorView).filterIsInstance<ZeroInputView>().single()
+                keyboard.textStegoPanel.onAction(StegoAction.CARRIER)
+                keyboard.dispatchKeyboardAction(KeyboardAction.Text("x"))
+                keyboard.textStegoPanel.onAction(StegoAction.CREDENTIAL)
+                keyboard.dispatchKeyboardAction(KeyboardAction.LiteralText(randomKey))
+                keyboard.textStegoPanel.onAction(StegoAction.PREPARE)
+                assertTrue(nodes(keyboard).filterIsInstance<TextView>().any { it.isShown &&
+                    it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_failed) })
+                assertFalse(nodes(keyboard).filterIsInstance<TextView>().any { it.isShown &&
+                    it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_busy) })
+            }
+        } finally { Device.onMain { activity.finish(); graph.stegoHandoff.close() } }
+    }
+
     @Test fun shareAndProcessTextRequireChoiceDecryptLocallyAndRecreationDiscardsAllState() {
         for (action in listOf(Intent.ACTION_SEND, Intent.ACTION_PROCESS_TEXT)) {
             val carrier = MessageCredential(MessageCredentialMode.RANDOM_KEY, randomKey.toCharArray()).use {
@@ -55,6 +94,15 @@ class StegoSourcePlatformTest {
                     val keyboard = nodes(activity.window.decorView).filterIsInstance<ZeroInputView>().single()
                     assertTrue(keyboard.isTextStegoOpen)
                     assertFalse(nodes(keyboard).any { it is android.widget.EditText })
+                    keyboard.textStegoPanel.onAction(StegoAction.OPTIONS)
+                    val fixed = android.view.inspector.WindowInspector.getGlobalWindowViews().single { window ->
+                        window.findViewById<View>(android.R.id.button1) != null &&
+                        nodes(window).filterIsInstance<TextView>().any { it.text.toString() ==
+                            Device.context.getString(dev.zeroinput.ime.R.string.stego_decrypt_options_fixed) }
+                    }
+                    assertFalse(nodes(fixed).filterIsInstance<TextView>().any { it.text.toString() ==
+                        Device.context.getString(dev.zeroinput.ime.R.string.stego_credential_mode) })
+                    requireNotNull(fixed.findViewById<View>(android.R.id.button1)).performClick()
                     keyboard.dispatchKeyboardAction(KeyboardAction.LiteralText(randomKey))
                     keyboard.textStegoPanel.onAction(StegoAction.PREPARE)
                 }

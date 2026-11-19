@@ -26,6 +26,62 @@ import org.junit.runner.RunWith
 /** P1 only: never packaged in the IME; no vault, authentication, cleanup or listener wiring. */
 @RunWith(AndroidJUnit4::class)
 class SystemClipboardImportPrototypeTest {
+    @Test fun longPressSystemPastePopulatesOnlyTheIsolatedCoverThroughTheSourceWorker() = withCleanDevice { activity, manager, ownership ->
+        val sample = Sample.GUARD
+        manager.setPrimaryClip(publicFixture(sample))
+        ownership.record(manager.primaryClipDescription?.timestamp)
+        val graph = (context.applicationContext as ZeroInputApplication).graph
+        lateinit var view: dev.zeroinput.ime.ui.ZeroInputView
+        lateinit var workspace: dev.zeroinput.ime.textstego.StegoWorkspace
+        try {
+            instrumentation.runOnMainSync {
+                val themed = dev.zeroinput.ime.settings.KeyboardThemeContext.create(activity, dev.zeroinput.ime.ui.KeyboardTheme.CLASSIC)
+                view = dev.zeroinput.ime.ui.ZeroInputView(themed)
+                activity.setContentView(view)
+                workspace = dev.zeroinput.ime.textstego.StegoWorkspace({ graph }, android.os.Handler(android.os.Looper.getMainLooper()),
+                    view, { !activity.isFinishing && !locked() }, { null }, {}, {}, {}, isKeyboard = false)
+                view.openTextStego()
+                workspace.open(dev.zeroinput.engine.api.InputLanguage.ENGLISH, dev.zeroinput.engine.api.ChineseInputOptions())
+                view.textStegoPanel.onPasteRequested(dev.zeroinput.ime.ui.StegoField.COVER)
+            }
+            val label = context.getString(dev.zeroinput.ime.R.string.stego_paste_system)
+            ClipboardDeviceTestSupport.await { ClipboardDeviceTestSupport.findText(label) != null }
+            val bounds = android.graphics.Rect()
+            requireNotNull(ClipboardDeviceTestSupport.findText(label)).getBoundsInScreen(bounds)
+            ClipboardDeviceTestSupport.shell("input tap ${bounds.centerX()} ${bounds.centerY()}")
+            await {
+                var found = false
+                instrumentation.runOnMainSync {
+                    fun contains(owner: android.view.View): Boolean = owner is android.widget.TextView && owner.text.toString() == Sample.GUARD.expected ||
+                        owner is android.view.ViewGroup && (0 until owner.childCount).any { contains(owner.getChildAt(it)) }
+                    found = contains(view.textStegoPanel)
+                }
+                found
+            }
+        } finally {
+            instrumentation.runOnMainSync { workspace.close(); view.release() }
+            await { activity.hasWindowFocus() && !locked() }
+        }
+    }
+    @Test fun stegoPasteReadsOnlyExplicitTextAndRejectsWrongTargetsBoundsAndRevocation() = withCleanDevice { _, manager, ownership ->
+        val adapter = dev.zeroinput.ime.textstego.StegoSystemPaste(context)
+        for (sample in Sample.entries) {
+            assumeTrue(ownership.mayReplace(manager.primaryClipDescription?.timestamp))
+            manager.setPrimaryClip(publicFixture(sample))
+            ownership.record(manager.primaryClipDescription?.timestamp)
+            val allowed = sample in listOf(Sample.UNICODE, Sample.LIMIT, Sample.GUARD, Sample.HTML, Sample.BLANK)
+            val carrier = adapter.read(dev.zeroinput.ime.ui.StegoField.CARRIER) { true }
+            assertTrue("Public fixture classification differs: ${sample.name}", allowed == (carrier != null))
+            if (carrier != null && sample.expected != null) assertTrue(carrier == sample.expected)
+            val cover = adapter.read(dev.zeroinput.ime.ui.StegoField.COVER) { true }
+            assertTrue("Public cover bound differs: ${sample.name}", (allowed && sample != Sample.LIMIT) == (cover != null))
+            var checks = 0
+            assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.CARRIER) { ++checks == 1 })
+            assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.COVER) { false })
+            assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.SECRET) { fail("Wrong target must not reach authorization"); true })
+            assertNull(adapter.read(dev.zeroinput.ime.ui.StegoField.CREDENTIAL) { fail("Wrong target must not reach authorization"); true })
+        }
+    }
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 

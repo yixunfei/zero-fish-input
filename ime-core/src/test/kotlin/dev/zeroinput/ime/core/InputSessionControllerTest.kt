@@ -25,6 +25,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InputSessionControllerTest {
+    @Test fun `native linkage failure preserves preedit and routes the key to the editor`() {
+        val delegate = TestEngine()
+        var fail = false
+        var closed = false
+        val engine = object : InputEngine by delegate {
+            override fun handle(key: EngineKey): EngineUpdate {
+                if (fail) throw UnsatisfiedLinkError("public fixture")
+                return delegate.handle(key)
+            }
+            override fun close() { closed = true; throw UnsatisfiedLinkError("public cleanup fixture") }
+        }
+        val connection = RecordingConnection()
+        val controller = InputSessionController(connection, { engine }, RecordingPersonalization())
+        controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+        controller.handle(InputCommand.Text("ni"))
+        fail = true
+        controller.handle(InputCommand.Text("x"))
+        assertEquals(listOf("ni", "x"), connection.commits)
+        assertTrue(closed)
+        controller.handle(InputCommand.Text("y"))
+        assertEquals(listOf("ni", "x", "y"), connection.commits)
+        controller.close()
+    }
+
     @Test fun `cancellation and fatal engine failures do not commit preedit or replay the key`() {
         for (failure in listOf(java.util.concurrent.CancellationException(), AssertionError("fixture"))) {
             val delegate = TestEngine()

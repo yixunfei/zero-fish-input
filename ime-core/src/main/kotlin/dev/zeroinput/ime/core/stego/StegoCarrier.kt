@@ -18,11 +18,31 @@ object StegoCarrierCodec {
     const val VISIBLE_START = "[ZIS1:"
     private val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
+    /** A detached envelope uses the existing visible block, with no unauthenticated cover. */
+    fun ciphertext(envelope: ByteArray): String {
+        if (envelope.size !in 1..MAX_ENVELOPE) throw StegoFormatFailure()
+        return VISIBLE_START + Base64.getUrlEncoder().withoutPadding().encodeToString(envelope) + "]"
+    }
+
+    fun isDetached(value: String): Boolean = value.startsWith(VISIBLE_START)
+
+    /** Detached messages require an explicitly supplied exact cover; complete carriers ignore it. */
+    fun decode(value: String, exactCover: String): StegoCarrier {
+        checkText(value)
+        return decode(if (isDetached(value)) {
+            checkCover(exactCover)
+            exactCover + value
+        } else value)
+    }
+
+    /** Inspect public requirements before a detached message's cover has been entered. */
+    fun inspectable(value: String): StegoCarrier = decode(value, "ZeroInput detached inspection")
+
     fun encode(cover: String, envelope: ByteArray, transport: StegoTransport): String {
         checkCover(cover)
         if (envelope.size !in 1..MAX_ENVELOPE) throw StegoFormatFailure()
         val value = when (transport) {
-            StegoTransport.VISIBLE_BASE64 -> cover + VISIBLE_START + Base64.getUrlEncoder().withoutPadding().encodeToString(envelope) + "]"
+            StegoTransport.VISIBLE_BASE64 -> cover + ciphertext(envelope)
             StegoTransport.DENSE_UNICODE -> buildString {
                 append(cover); append(DENSE_START)
                 envelope.forEach { byte ->

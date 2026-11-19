@@ -21,8 +21,8 @@ drafts. Previously these local buffers appended and deleted only at the end.
 - Clicking during conversion finishes the current composition before moving.
   AI and search render composition at the caret and map its display offsets back
   to committed text. Capacity failure does not apply the requested movement.
-- Private masking still exposes only the last three committed code points.
-  The compressed masked prefix cannot be positioned by tapping. The existing
+- Private masking hides all committed code points (2026-11-19 user request).
+  The compressed masked buffer cannot be positioned by tapping except at its end. The existing
   explicit full-display toggle enables editing there; masking again hides a
   caret inside that prefix. Composition and candidates keep their existing
   separate display. Private text remains non-selectable and excluded from

@@ -24,6 +24,50 @@ import org.junit.runner.RunWith
 class StegoVaultPlatformTest {
     private val graph get() = (Device.context.applicationContext as ZeroInputApplication).graph
 
+    @Test fun coverPasteAuthenticatesOnceAndReturnsOnlyToTheOriginalNewWorkspace() {
+        requirePublicPin()
+        assertEquals(0, graph.secureClipboard.count())
+        val enabled = graph.settings.secureClipboardEnabled
+        val cover = "public pasted cover"
+        val id = graph.secureClipboard.add("", cover, grant()).id
+        val editor = dev.zeroinput.ime.clipboard.PasteEditorIdentity("public.fixture", 7, 1)
+        val key = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() })
+        val detached = MessageCredential(MessageCredentialMode.RANDOM_KEY, key.toCharArray()).use {
+            StegoCarrierCodec.ciphertext(MessageEnvelope().seal(cover.toCharArray(), "public secret".toCharArray(), it, kdf = MessageKdf.NONE))
+        }
+        var activity: StegoSourceActivity? = null
+        try {
+            var token = ""
+            Device.onMain {
+                graph.settings.secureClipboardEnabled = true
+                token = graph.stegoHandoff.put(StegoHandoff.Request(StegoHandoff.Kind.VAULT, editor = editor,
+                    target = StegoField.COVER, carrier = detached.toCharArray()))
+            }
+            activity = Device.instrumentation.startActivitySync(Intent(Device.context, StegoSourceActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(StegoSourceActivity.EXTRA_TOKEN, token)) as StegoSourceActivity
+            val source = activity
+            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_entry, 1))
+            authenticate()
+            Device.await { Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_read)) != null }
+            Device.onMain { assertNull(graph.stegoHandoff.takePaste(editor)) }
+            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_read))
+            await { onMain { source.isFinishing } }
+            Device.onMain {
+                val accepted = requireNotNull(graph.stegoHandoff.takePaste(editor))
+                try {
+                    assertEquals(StegoField.COVER, accepted.target)
+                    assertTrue(cover == String(requireNotNull(accepted.text)))
+                    assertTrue(detached == String(requireNotNull(accepted.carrier)))
+                    assertNull(graph.stegoHandoff.takePaste(editor))
+                } finally { accepted.close() }
+            }
+        } finally {
+            Device.onMain { activity?.finish(); graph.stegoHandoff.close() }
+            graph.secureClipboard.remove(id, grant())
+            Device.onMain { graph.settings.secureClipboardEnabled = enabled }
+        }
+    }
+
     @Test fun vaultReadAndSaveEachRequireSystemAuthenticationAndAnotherForegroundConfirmation() {
         requirePublicPin()
         assertEquals("Public fixture requires an empty vault", 0, graph.secureClipboard.count())
@@ -66,7 +110,11 @@ class StegoVaultPlatformTest {
             }
             Device.click(Device.context.getString(dev.zeroinput.ime.ui.R.string.stego_save))
             authenticate()
-            Device.await { Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_save)) != null }
+            await {
+                onMain { nodes(source.window.decorView).filterIsInstance<TextView>().any {
+                    it.isShown && it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_save)
+                } }
+            }
             assertEquals("Authentication alone must not write", 1, graph.secureClipboard.count())
             Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_save))
             await { graph.secureClipboard.count() == 2 }
@@ -79,7 +127,7 @@ class StegoVaultPlatformTest {
         }
     }
 
-    @Test fun canceledAuthenticationDiscardsPendingSaveWithoutWriting() {
+    @Test fun canceledAuthenticationOffersRetryAndLeavingDiscardsPendingSaveWithoutWriting() {
         requirePublicPin()
         val count = graph.secureClipboard.count()
         val activity = startSave()
@@ -87,10 +135,37 @@ class StegoVaultPlatformTest {
             Device.click(Device.context.getString(dev.zeroinput.ime.ui.R.string.stego_save))
             awaitPrompt()
             Device.shell("input keyevent KEYCODE_BACK")
-            Device.await { onMain { activity.isFinishing } }
+            Device.await { Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_retry_authentication)) != null }
             assertEquals(count, graph.secureClipboard.count())
-            Device.onMain { assertFalse(nodes(activity.window.decorView).any { it is ZeroInputView }) }
+            Device.onMain {
+                assertFalse(activity.isFinishing)
+                assertFalse(nodes(activity.window.decorView).any { it is ZeroInputView })
+            }
+            Device.shell("input keyevent KEYCODE_BACK")
+            Device.await { onMain { activity.isFinishing } }
         } finally { Device.onMain { activity.finish(); graph.stegoHandoff.close() } }
+    }
+
+    @Test fun saveDraftLifetimeDoesNotExpireDuringSeparateAuthenticationAndConfirmationWindows() {
+        requirePublicPin()
+        assertEquals("Public fixture requires an empty vault", 0, graph.secureClipboard.count())
+        val enabled = graph.settings.secureClipboardEnabled
+        val activity = startSave()
+        try {
+            SystemClock.sleep(16_000)
+            Device.click(Device.context.getString(dev.zeroinput.ime.ui.R.string.stego_save))
+            authenticate()
+            Device.await { Device.findText(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_save)) != null }
+            SystemClock.sleep(16_000)
+            assertEquals(0, graph.secureClipboard.count())
+            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_confirm_save))
+            await { graph.secureClipboard.count() == 1 }
+            assertEquals("public pending secret", graph.secureClipboard.read(graph.secureClipboard.summaries().single().id, grant()))
+        } finally {
+            Device.onMain { activity.finish(); graph.stegoHandoff.close() }
+            graph.secureClipboard.summaries().forEach { graph.secureClipboard.remove(it.id, grant()) }
+            Device.onMain { graph.settings.secureClipboardEnabled = enabled }
+        }
     }
 
     @Test fun settingsChangeRevokesAuthenticatedSaveBeforeConfirmation() {
@@ -135,10 +210,14 @@ class StegoVaultPlatformTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(StegoSourceActivity.EXTRA_TOKEN, token)) as StegoSourceActivity
     }
 
-    private fun requirePublicPin() = assumeTrue("Requires the disposable public-fixture emulator PIN",
-        InstrumentationRegistry.getArguments().getString("stegoTestPin") == "2468")
+    private fun requirePublicPin() {
+        assumeTrue("Requires the disposable public-fixture emulator PIN",
+            InstrumentationRegistry.getArguments().getString("stegoTestPin") == "2468")
+        // A preceding cancellation can still be dismissing its system window.
+        Device.instrumentation.uiAutomation.waitForIdle(500, 3000)
+    }
 
-    private fun authenticate() {
+    internal fun authenticate() {
         awaitPrompt()
         Device.instrumentation.uiAutomation.waitForIdle(100, 3000)
         for (label in listOf("Use PIN", "USE PIN", "Use screen lock", "使用 PIN 码")) {
@@ -152,7 +231,14 @@ class StegoVaultPlatformTest {
             while (!node.isClickable && node.parent != null) node = node.parent
             assertTrue(node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
         }
-        Device.shell("input keyevent KEYCODE_ENTER")
+        // Confirm on the system keypad itself. A hardware Enter can activate a
+        // separately focused Cancel control after accessibility digit clicks.
+        Device.await("Public system PIN confirmation must be available") { systemConfirmation() != null }
+        var confirmation = requireNotNull(systemConfirmation())
+        while (!confirmation.isClickable && confirmation.parent != null) confirmation = confirmation.parent
+        assertTrue(confirmation.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+        Device.await("Public system PIN prompt must finish dismissing") { systemConfirmation() == null }
+        Device.instrumentation.uiAutomation.waitForIdle(500, 3000)
     }
     private fun awaitPrompt() {
         Device.await("Public system authentication must be focused") {
@@ -164,6 +250,12 @@ class StegoVaultPlatformTest {
     private fun systemDigit(digit: String): android.view.accessibility.AccessibilityNodeInfo? = Device.roots()
         .filter { it.window?.isFocused == true && it.packageName?.toString() in setOf("com.android.systemui", "com.android.settings") }
         .firstNotNullOfOrNull { findNode(it, digit) }
+    private fun systemConfirmation(): android.view.accessibility.AccessibilityNodeInfo? = Device.roots()
+        .filter { it.window?.isFocused == true && it.packageName?.toString() in setOf("com.android.systemui", "com.android.settings") }
+        .firstNotNullOfOrNull(::findConfirmation)
+    private fun findConfirmation(node: android.view.accessibility.AccessibilityNodeInfo): android.view.accessibility.AccessibilityNodeInfo? =
+        if (node.isVisibleToUser && node.viewIdResourceName?.endsWith(":id/key_enter") == true) node else
+            (0 until node.childCount).firstNotNullOfOrNull { node.getChild(it)?.let(::findConfirmation) }
     private fun findNode(node: android.view.accessibility.AccessibilityNodeInfo, digit: String): android.view.accessibility.AccessibilityNodeInfo? =
         if (node.text?.toString() == digit && node.isVisibleToUser) node else
             (0 until node.childCount).firstNotNullOfOrNull { node.getChild(it)?.let { child -> findNode(child, digit) } }

@@ -8,6 +8,12 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class LanguagePackJsonBoundaryTest {
+    @Test fun manifestsStillRejectOversizedScalarTokens() {
+        for (value in listOf("\"" + "a".repeat(4097) + "\"", "1" + "0".repeat(4096))) {
+            assertThrows(IllegalArgumentException::class.java) { LanguagePackJson.parse("{\"extra\":$value}") }
+        }
+    }
+
     @Test fun deeplyNestedManifestIsRejectedBeforeRecursiveParsing() {
         val nested = "[".repeat(10_000) + "0" + "]".repeat(10_000)
         assertThrows(IllegalArgumentException::class.java) {

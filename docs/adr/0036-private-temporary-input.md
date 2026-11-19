@@ -17,8 +17,8 @@ Reading a saved body retains the existing one-use grant and paste confirmation.
   If the user turns off the secure clipboard independently, writes fail closed.
 - A separate local input controller accepts only input to the private keyboard
   draft in supported plain text editors. The IME window is secure, the draft
-  display shows current composition and candidates plus the last three committed
-  characters. An explicit display toggle reveals the full draft until it is
+  display shows current composition and candidates while all committed characters
+  are masked by default (user-requested change, 2026-11-19). An explicit display toggle reveals the full draft until it is
   masked again or the draft closes. Lifecycle changes clear the draft, reset
   the display toggle and revoke queued operations.
 - Save and close appends one encrypted entry. Save and submit also appends by
@@ -43,5 +43,5 @@ atomic files.
 The bounded live draft and active engine preedit need plaintext for editing.
 Encrypting a redundant copy on each keystroke would retain those same plaintext
 values and add work. The draft stays in memory until explicit completion, the UI
-receives a masked prefix by default, and disk writes happen only after encryption on a
+receives a fully masked committed draft by default, and disk writes happen only after encryption on a
 worker. Kotlin/engine/display strings remain subject to garbage collection.

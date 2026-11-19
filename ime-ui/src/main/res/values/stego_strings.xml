@@ -1,11 +1,12 @@
 <resources>
     <string name="stego_open">隐写模式</string>
+    <string name="stego_short">隐</string>
     <string name="stego_encrypt">加密隐写</string>
     <string name="stego_decrypt">本地解密</string>
     <string name="stego_close">关闭清除</string>
     <string name="stego_cover">公开文本</string>
     <string name="stego_secret">秘密正文</string>
-    <string name="stego_credential">主凭据</string>
+    <string name="stego_credential">密钥 / 口令</string>
     <string name="stego_carrier">待解密文本</string>
     <string name="stego_reveal">显示全文</string>
     <string name="stego_mask">隐藏全文</string>
@@ -14,10 +15,27 @@
     <string name="stego_key_file">密钥文件</string>
     <string name="stego_selection">导入选区</string>
     <string name="stego_vault">从安全剪贴板读取</string>
-    <string name="stego_prepare">生成预览／解密</string>
-    <string name="stego_confirm">确认提交隐写文本</string>
+    <string name="stego_prepare">仅生成</string>
+    <string name="stego_confirm">提交到输入框</string>
     <string name="stego_edit">重新编辑</string>
     <string name="stego_save">认证后保存正文</string>
     <string name="stego_insert">确认插入明文</string>
     <string name="stego_draft_hint">点击字段名称，使用下方键盘输入</string>
+    <string name="stego_next">下一项</string>
+    <string name="stego_layers_short">组合算法</string>
+    <string name="stego_save_field">此项存入私密空间</string>
+    <string name="stego_save_plaintext">明文存入私密空间</string>
+    <string name="stego_save_cover">公开文本存入私密空间</string>
+    <string name="stego_save_ciphertext">密文存入私密空间</string>
+    <string name="stego_save_carrier">隐写结果存入私密空间</string>
+    <string name="stego_encrypt_insert">加密并填入</string>
+    <string name="stego_field_hint">点此输入，使用下方键盘</string>
+    <string name="stego_algorithm_hint">组合算法 · 按勾选顺序加密；右侧为算法子密钥位数。</string>
+    <string name="stego_earlier">提前</string>
+    <string name="stego_width_for">%1$s，%2$d 位，点击切换</string>
+    <string name="stego_earlier_for">将 %1$s 提前一层</string>
+    <string name="stego_advanced">更多选项</string>
+    <string name="stego_master_bits">主密钥位数</string>
+    <string name="stego_master_bits_value">随机主密钥 %1$d 位</string>
+    <string name="stego_generate_key">生成随机密钥</string>
 </resources>

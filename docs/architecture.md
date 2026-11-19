@@ -48,6 +48,27 @@ language-pack -> engine-dictionary
 
 ## Runtime boundaries
 
+The November 18 review separates personal answer readiness from unproven dictionary
+edits. DictionaryPersonalizationStore prepares immutable suppression sets on its
+worker; an uncached query can filter native rows without storage or a dictionary
+scan on key dispatch. Only absent/invalidated suppression hides the whole candidate
+page. Space then commits the raw composition and a space without learning, rather
+than dropping the key or selecting an unchecked deleted row. Pending answers retain
+resolved pages only within the same input and revision. Native LinkageError inside
+an engine operation enters controlled editor fallback; cancellation, interruption,
+other fatal errors and failures outside the engine call retain their propagation.
+The engine-specific recovery policy also applies to construction, startup,
+composition restoration, reset and prepared-engine disposal. A reset failure
+after an accepted editor commit closes the engine without replaying the command;
+ordinary cancellation/interruption and other fatal errors still propagate.
+
+Module-local recoverable helpers deliberately avoid new dependencies or a public
+general-purpose utility API. Their policy must stay aligned across app, ime-core,
+engine-rime and language-pack. Warm-up preparation, owner-thread delivery and
+settings change notifications use that policy; finally blocks release native
+ownership even when cancellation propagates. Existing runCatching sites outside
+these reviewed boundaries have not been certified by this change.
+
 Settings navigation uses stable SettingsCategory identifiers, with Activity-owned
 back dispatch and saved category/scroll positions. Category views retain their
 controls and callbacks when detached, so navigation does not write preferences or
@@ -1205,7 +1226,7 @@ selection import, including its existing session, sensitivity and authentication
 checks. Android/host text-menu ordering is outside the IME's control.
 
 The private temporary input panel reuses `LocalDraftInput` with an empty
-personalization port, a masked draft display with visible recent text and
+personalization port, a fully masked committed draft display and visible
 composition candidates, and a separate completion owner. Submit only uses the
 current editor binding directly.
 Settings consumes a fresh one-use system grant on either toggle. Explicit
@@ -1257,8 +1278,22 @@ temporary SAF file or an authenticated vault entry, and saves only after separat
 authentication/confirmation. Crypto and source workers each keep one process-wide
 slot until completion, even after UI cancellation. Weak owner references and
 operation leases prevent late publication and retain no destroyed UI/connection.
-System-clipboard body import was declined; no adapter or privacy exception exists.
+The initially declined system-body import is superseded by the explicit 2026-11-19 two-field paste exception below.
 Natural wording is gated unavailable. See [ADR 0039](adr/0039-text-steganography.md).
+
+The approved usability completion keeps one bounded `StegoOutputs` bundle during
+the existing 30-second preview/result window. The worker creates it only after
+encryption self-check or complete decryption; the workspace owns and clears it.
+Four direct save commands copy only the selected plaintext/cover/ciphertext/carrier
+to the existing authenticated private host, consuming the old workspace first.
+Current noncredential draft fields may use the same save route. `StegoCarrierCodec`
+reuses the canonical visible block for detached ciphertext and requires an explicit
+exact cover for its worker decode; bootstrap inspection cannot bypass cover binding.
+No encrypted envelope, vault format, key alias or dependency changes.
+The external editor's prepared-engine adoption is deferred while this isolated
+workspace is open. Its separate draft engines remain available; the unrelated
+external warmup cannot advance the interaction revision and revoke a prepared
+carrier insertion. Normal warmup retry resumes on subsequent editor input.
 
 ## Audit hardening (2026-11-18)
 
@@ -1290,10 +1325,12 @@ Language-pack text dictionaries are decoded and hashed from the same bounded
 stream, with a 4096-character line buffer and validation after the entry budget.
 JSON dictionaries now fold strict parser events into bounded rows instead of
 building a whole document String and org.json tree. Manifests reuse the same
-syntax reader before their small document parse. Depth is capped at 16, tokens
-at 4096 characters, keys per object at 50,000 and simultaneously retained keys
+syntax reader before their small document parse. Depth is capped at 16, retained
+scalar text at 4096 characters, keys per object at 50,000 and simultaneously retained keys
 at 100,000. Parsing and hashing continue beyond the 50,000 output-row budget;
 invalid trailing data or a checksum failure rejects the entire dictionary.
+Dictionary values beyond the retained-text limit are skipped with full syntax
+validation; object keys and manifest tokens still fail at the limit.
 Registry refresh callers remain the existing initialization/settings workers.
 
 Build privacy scans also classify owned CMake, Python, PowerShell, shell and
@@ -1324,3 +1361,37 @@ preserves pending Java exceptions and stops JNI allocation sequences immediately
 on failure. String, context, commit, candidate iterator and unselected-session
 leases release resources during unwinding. The APK verifier requires Rime,
 C++ shared runtime and both ONNX libraries in every requested ABI.
+
+## Steganography single-page workflow (2026-11-19)
+
+The focus-free panel now presents all applicable draft fields together in one
+bounded scrollable page. Six inline algorithm checkboxes emit typed selection
+intents; the workspace appends newly checked ciphers in selection order, supports
+width changes and moves a checked stage earlier without a cascade dialog.
+The primary Encrypt and insert intent captures the actual editor binding before
+background encryption. After self-check, the workspace consumes the prepared phase
+before one bound commit and clears all local outputs. Generate only retains the
+existing preview/save window. Decryption still requires a separate warning before
+plaintext insertion, and authenticated private-save coordination is unchanged.
+
+## Explicit stego paste and master material lengths (2026-11-19)
+
+Long press on COVER/CARRIER emits a source intention, without an Android editor
+or native selection menu. StegoSystemPaste is the sole payload adapter: one explicit
+menu click, one plain-text item, no URI/Intent coercion, no listener/write/cache.
+Reads run on the bounded source worker. Workspace lease/current editor, lock,
+settings, deletion generation and completion checks reject revoked delivery.
+COVER is limited to 512 UTF-16 units and CARRIER to 8192; malformed Unicode/NUL
+fails. Vault navigation clears drafts and retains only the public target/editor
+identity (and a validated detached ciphertext if its exact cover is requested).
+Fresh system authentication and a separate foreground read confirmation remain.
+A one-use at-most-30-second return buffer populates only a newly opened isolated
+workspace after the user returns to the matching eligible editor and taps Stego.
+It never commits to InputConnection; close/settings/lock/generation/expiry wipes it.
+
+MessageRandomKey creates 256..4096-bit master material, multiples of 8, on the
+crypto worker. Canonical unpadded Base64url accepts 32..512 decoded bytes. The
+existing HKDF extraction and stage keys are unchanged, as are message envelopes,
+vault data and old 32-byte credential behavior. Longer master material does not
+raise cipher widths or the 256-bit derivation ceiling. UI presets and focus-free
+numeric entry share the existing protected page. No new permissions/dependencies.

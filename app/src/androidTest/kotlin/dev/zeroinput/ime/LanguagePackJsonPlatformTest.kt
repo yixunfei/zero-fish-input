@@ -143,7 +143,8 @@ class LanguagePackJsonPlatformTest {
         val original = install(installer, manifest())
         val file = File(original.directory, "stream.json")
         for (document in listOf("""{"hao":"好"} {}""", """{"hao":"好","\u0068ao":"坏"}""",
-            """{"hao":"\u１２３４"}""", "{\"hao\":\"${"a".repeat(4097)}\"}")) {
+            """{"hao":"\u１２３４"}""", "{\"${"a".repeat(4097)}\":\"好\"}",
+            "{\"hao\":\"${"a".repeat(5000)}\\q\"}")) {
             file.writeText(document)
             val sha256 = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
                 .joinToString("") { "%02x".format(it) }
@@ -151,6 +152,25 @@ class LanguagePackJsonPlatformTest {
                 LanguagePackFile(file.name, sha256, file.length())))
             assertFalse(LanguagePackEngineFactory(pack).isAvailable())
         }
+    }
+
+    @Test fun oversizedDictionaryValueIsSkippedAndFollowingValidEntryRemainsUsable() = withInstaller { installer ->
+        val original = install(installer, manifest())
+        val file = File(original.directory, "stream.json").apply {
+            writeText("{\"bad\":\"${"a".repeat(100_000)}\",\"hao\":\"好\"}")
+        }
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        val pack = original.copy(manifest = original.manifest.copy(
+            files = listOf(LanguagePackFile(file.name, sha256, file.length()))))
+        val factory = LanguagePackEngineFactory(pack)
+        assertTrue(factory.isAvailable())
+        val engine = factory.create()
+        try {
+            engine.start(EditorContext(InputLanguage.CHINESE, false, false, null))
+            "hao".forEach { engine.handle(EngineKey.Character(it.toString())) }
+            assertEquals(listOf("好"), engine.snapshot.candidates.map { it.text })
+        } finally { engine.close() }
     }
 
     @Test fun signedStagingNamesAreRecoveredWithoutTouchingUnrelatedDirectories() = withInstaller { installer ->

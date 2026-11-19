@@ -535,13 +535,37 @@ strengths or imply certification. Managed crypto/engine/View copies cannot promi
 complete erasure, constant-time behavior or protection against a compromised OS.
 
 Only bounded editor selection, plain-text share/PROCESS_TEXT and newly authenticated
-private-vault reads supply carriers. The proposed system-clipboard body exception
-was explicitly declined; there is no system Paste/Copy operation in these fields.
+private-vault reads supply carriers. On 2026-11-19 the user explicitly authorized
+one-shot system Paste only through the COVER/CARRIER long-press menu. The isolated
+adapter rejects non-text, multiple, invalid and oversized items; it never observes,
+coerces URIs, writes back, collects automatically or shares with AI. Vault source
+reads retain fresh authentication and foreground confirmation, clear old drafts,
+and return only to a new isolated workspace for the original eligible editor.
 No new permission, exported component, network or AI access is introduced.
 File grants are temporary and never persisted. Lock/settings/session/source changes
 revoke operations, pending results and file factors. See
 [ADR 0039](docs/adr/0039-text-steganography.md) and the
 [validation record](docs/text-steganography-validation.md).
+
+Review follow-up separates the save draft's 120-second pre-authentication budget
+from the at-most-30-second confirmation/grant window. The write buffer is created
+only after the foreground confirmation click; authentication callbacks never write.
+Cancelled authentication can be retried before draft expiry. File reads have a
+120-second limit with cancellation and a distinct timeout notice. Failed internal
+launches wipe their handoffs immediately. Carrier-derived decryption parameters
+cannot be changed, pending composition is included in validation, and allocation
+failure releases partial results and reports failure without weakening the KDF.
+Replayed or missing handoff tokens cannot consume or discard a newer valid draft;
+matching-token expiry and deletion-generation checks still wipe revoked content.
+
+The approved direct private-save commands cover secret plaintext, exact public
+cover, detached ciphertext and the complete carrier. Saving consumes the workspace
+and still requires fresh system authentication plus foreground confirmation. Draft
+save never accepts the credential field. Encryption keeps its bounded plaintext
+output only within the existing 30-second preview window; revocation clears the
+owned result bundle. Detached ciphertext reuses the visible v1 block and requires
+the exact original cover for authentication. It grants no AI or system-clipboard copy path
+and changes no encrypted envelope or private-vault storage format.
 
 ### Audit hardening, 2026-11-18
 
@@ -578,3 +602,15 @@ version catalogs also enter the privacy gate; existing host build/release
 fetches retain separate exact entry points. These checks do not treat unused
 vendored network code as an enabled Android transport or prove all runtime
 behavior. Current status is in the [updated audit](docs/audits/2026-11-17-code-audit.md).
+
+The 2026-11-19 Encrypt and insert action explicitly authorizes automatic encoded
+insertion after self-check into the original bound editor. Generate only still
+requires a later insertion click. No Send or automatic plaintext insertion occurs.
+Private temporary input now masks all committed characters by default, including
+short drafts; explicit reveal and lifecycle clearing retain their existing scope.
+
+
+Stego random master material accepts canonical 32..512-byte Base64url credentials
+and generation at 256..4096 bits in byte increments. Existing 32-byte credentials
+and the envelope/vault formats are unchanged. HKDF and each cipher keep their
+existing widths; longer material is not a claim of 512/1024/4096-bit cipher strength.

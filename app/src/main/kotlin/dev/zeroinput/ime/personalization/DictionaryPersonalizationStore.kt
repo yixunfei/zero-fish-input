@@ -14,19 +14,32 @@ internal class DictionaryPersonalizationStore(
     private val activeIds: () -> Set<String>,
     private val options: () -> ChineseInputOptions,
 ) : PagedPersonalizationStore, PersonalFrequencyStore {
-    @Volatile var requiresFiltering: Boolean = true
-        private set
+    @Volatile private var filtering: PersonalSuggestionPage? = null
+    private val requiresFiltering: Boolean get() = filtering?.dictionaryEditsApplied ?: true
     private val preparationLock = Any()
     private var preparationRevision = 0L
 
     fun prepare() {
         val revision = synchronized(preparationLock) { preparationRevision }
         val active = activeIds()
-        val present = edits.read().entries.any { it.dictionaryId in active }
-        synchronized(preparationLock) { if (revision == preparationRevision) requiresFiltering = present }
+        val selected = edits.read().entries.filter { it.dictionaryId in active }
+        val script = options().script
+        val originals = selected.mapNotNull { it.original }.map {
+            DictionaryEditReading.displayText(it.text, script) to it.reading.replace(" ", "").replace("'", "")
+        }
+        // Prepare exact suppression sets once on the worker. Cache misses only
+        // read these immutable sets, so they need not hide every native row.
+        val snapshot = PersonalSuggestionPage(ready = false, dictionaryEditsApplied = selected.isNotEmpty(),
+            suppressedDictionaryTexts = originals.mapTo(HashSet()) { it.first },
+            suppressedDictionaryEntries = originals.mapTo(HashSet()) { "${it.first}\t${it.second}" })
+        synchronized(preparationLock) { if (revision == preparationRevision) filtering = snapshot }
     }
 
-    fun invalidate() = synchronized(preparationLock) { preparationRevision++; requiresFiltering = true }
+    fun invalidate() = synchronized(preparationLock) { preparationRevision++; filtering = null }
+
+    /** No storage access or scans on the input thread. Unknown edits fail closed. */
+    fun pendingPage(revision: Long): PersonalSuggestionPage = filtering?.copy(revision = revision)
+        ?: PersonalSuggestionPage(ready = false, revision = revision, dictionaryEditsApplied = true, editsUnproven = true)
 
     override fun suggestionPage(prefix: String, language: InputLanguage, offset: Int, limit: Int): PersonalSuggestionPage {
         require(limit in 0..50 && offset in 0..20000)
@@ -90,5 +103,9 @@ internal class DictionaryPersonalizationStore(
     }
     override fun frequenciesFor(words: List<String>, language: InputLanguage) = lexicon.frequenciesFor(words, language)
     override fun frequencyLookupSnapshot() = lexicon.frequencyLookupSnapshot()
-    override fun clear() { try { lexicon.clear() } finally { edits.clear() } }
+    override fun clear() {
+        invalidate()
+        try { lexicon.clear() } finally { edits.clear() }
+        prepare()
+    }
 }

@@ -7,14 +7,17 @@ plugins {
 
 fun systemClipboardViolation(path: String, text: String): String? {
     val prototype = "app/src/androidTest/kotlin/dev/zeroinput/ime/clipboard/SystemClipboardImportPrototypeTest.kt"
-    if (path != prototype && Regex("\\b(?:getPrimaryClip|primaryClip)\\b").containsMatchIn(text)) {
-        return "Reading system clipboard payloads is restricted to the isolated P1 public-fixture test"
+    val stegoPaste = "app/src/main/kotlin/dev/zeroinput/ime/textstego/StegoSystemPaste.kt"
+    if (path != prototype && path != stegoPaste && Regex("\\b(?:getPrimaryClip|primaryClip)\\b").containsMatchIn(text)) {
+        return "System clipboard payload reads are restricted to the approved stego paste adapter and P1 fixture"
     }
+    if (path == stegoPaste && Regex("\\b(?:(?:add|remove)PrimaryClipChangedListener|(?:clear|set)PrimaryClip)\\b").containsMatchIn(text))
+        return "The stego paste adapter must not listen or write"
     val capabilities = Regex("\\bClipboardManager\\b|\\bCLIPBOARD_SERVICE\\b|\\b(?:add|remove)PrimaryClipChangedListener\\b|\\b(?:clear|set|has)PrimaryClip\\b|\\b(?:getPrimaryClipDescription|primaryClipDescription)\\b")
     if (!capabilities.containsMatchIn(text)) return null
     val adapter = "app/src/main/kotlin/dev/zeroinput/ime/clipboardguard/AndroidSystemClipboard.kt"
     val fixture = "app/src/androidTest/kotlin/dev/zeroinput/ime/clipboardguard/SystemClipboardPlatformTest.kt"
-    if (path != adapter && path != fixture && path != prototype) return "System clipboard capabilities are restricted to the approved adapter and fixtures"
+    if (path != adapter && path != fixture && path != prototype && path != stegoPaste) return "System clipboard capabilities are restricted to the approved adapters and fixtures"
     val writes = Regex("\\bsetPrimaryClip\\s*\\(").findAll(text).count()
     val allowedWrite = if (path == adapter) {
         Regex("setPrimaryClip\\(ClipData\\.newPlainText\\(\"\", \"\"\\)\\)")
@@ -459,6 +462,11 @@ tasks.register("testPrivacyBoundary") {
         }
         for (read in reads) {
             check(systemClipboardViolation(prototype, read) == null)
+            val paste = "app/src/main/kotlin/dev/zeroinput/ime/textstego/StegoSystemPaste.kt"
+            check(systemClipboardViolation(paste, read) == null)
+            check(systemClipboardViolation("other/$paste", read) != null)
+            for (forbidden in listOf("addPrimaryClipChangedListener", "setPrimaryClip", "clearPrimaryClip"))
+                check(systemClipboardViolation(paste, forbidden) != null)
             for (path in listOf("other/$prototype", prototype.replace("androidTest", "main"),
                 prototype.replace("PrototypeTest", "OtherTest"),
                 "app/src/main/kotlin/dev/zeroinput/ime/ai/Probe.kt")) {

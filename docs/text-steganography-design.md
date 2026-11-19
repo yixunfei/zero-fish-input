@@ -343,7 +343,7 @@ Support one master configuration per operation:
 | Credential mode | Root derivation |
 | --- | --- |
 | Passphrase | Argon2id(exact UTF-8 passphrase, random message salt, chosen approved cost) |
-| Existing random shared key | Canonical Base64url decoding to exactly 32 bytes, then HKDF |
+| Existing random shared key | Canonical unpadded Base64url decoding to 32..512 bytes, then HKDF (2026-11-19 approved extension) |
 | Key file only | Domain-separated file-content digest, then HKDF; recommend a random secret file |
 | Passphrase plus key file | HMAC-SHA256 keyed by the file factor over domain/length/passphrase, then Argon2id once |
 | Random shared key plus key file | Domain-separated HMAC/HKDF combination of both inputs |

@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StegoCarrierTest {
+    @Test fun `detached ciphertext requires exact explicit cover and retains strict framing budgets`() {
+        val bytes = ByteArray(2372) { it.toByte() }
+        val detached = StegoCarrierCodec.ciphertext(bytes)
+        assertArrayEquals(bytes, StegoCarrierCodec.decode(detached, "汉".repeat(512)).envelope)
+        assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.decode(detached) }
+        for (cover in listOf("", " ", "a".repeat(513), "\ud800", "x${StegoCarrierCodec.VISIBLE_START}"))
+            assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.decode(detached, cover) }
+        for (invalid in listOf(detached + "x", detached + detached, "[ZIS1:ARR]", "[ZIS1:ARQ=]", "[ZIS1:]"))
+            assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.decode(invalid, "cover") }
+        assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.ciphertext(ByteArray(2373)) }
+        assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.ciphertext(byteArrayOf()) }
+        val complete = StegoCarrierCodec.encode("original", bytes, StegoTransport.VISIBLE_BASE64)
+        assertEquals("original", StegoCarrierCodec.decode(complete, "ignored").cover)
+    }
+
     @Test fun `every byte round trips while preserving emoji IVS combining and line endings`() {
         val covers = listOf("公开文本", "👩🏽‍💻❤️ 葛\uDB40\uDD00 e\u0301\r\n", " leading and trailing ")
         val bytes = ByteArray(256) { it.toByte() }

@@ -10,6 +10,8 @@ data class PersonalSuggestionPage(
     val suppressedDictionaryTexts: Set<String> = emptySet(),
     /** Canonical text + tab + reading, prepared on a worker for native candidate readings. */
     val suppressedDictionaryEntries: Set<String> = emptySet(),
+    /** Suppression metadata is not prepared; distinct from a pending suggestion query. */
+    val editsUnproven: Boolean = false,
 )
 
 /** Offset is relative to one stable, deterministically ranked query revision. */

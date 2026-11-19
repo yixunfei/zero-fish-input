@@ -7,7 +7,7 @@ import org.json.JSONObject
 internal object LanguagePackDictionaryJson {
     fun read(reader: Reader, limit: Int): Set<PackDictionaryEntry> {
         val visitor = DictionaryVisitor(limit)
-        LanguagePackJsonReader(reader, visitor).read()
+        LanguagePackJsonReader(reader, visitor, skipOversizedScalars = true).read()
         val root = checkNotNull(visitor.root)
         require(root.kind == Kind.OBJECT || root.kind == Kind.ARRAY) { "Invalid language pack dictionary" }
         return root.entries
@@ -34,6 +34,9 @@ internal object LanguagePackDictionaryJson {
         override fun scalar(value: String, quoted: Boolean) {
             complete(Value(if (quoted) Kind.STRING else Kind.PRIMITIVE, value,
                 (if (quoted) JSONObject.quote(value) else value).takeIf { it.length <= MAX_VALUE_CHARS }))
+        }
+        override fun oversizedScalar(quoted: Boolean) {
+            complete(Value(if (quoted) Kind.STRING else Kind.PRIMITIVE, null, null))
         }
 
         private fun complete(value: Value) {

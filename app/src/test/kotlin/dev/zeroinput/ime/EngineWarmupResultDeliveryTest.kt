@@ -7,6 +7,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class EngineWarmupResultDeliveryTest {
+    @Test fun cancellationDuringPostOrReadinessReleasesPreparedOwnershipAndPropagates() {
+        for (duringPost in listOf(true, false)) {
+            val engine = TrackingEngine()
+            val queued = mutableListOf<Runnable>()
+            val delivery = EngineWarmupResultDelivery({
+                if (duringPost) throw java.util.concurrent.CancellationException()
+                queued += it; true
+            }, { throw java.util.concurrent.CancellationException() }) { error("Cancelled delivery") }
+            try {
+                assertThrows(java.util.concurrent.CancellationException::class.java) {
+                    delivery.offer(prepared(engine))
+                    queued.single().run()
+                }
+                assertEquals(1, engine.closes)
+            } finally { delivery.close() }
+        }
+    }
+
     @Test fun activeCompositionReleasesPreparedEngineUntilNextWarmup() {
         val queued = mutableListOf<Runnable>()
         var ready = false

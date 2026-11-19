@@ -1,6 +1,6 @@
 <resources>
     <string name="stego_unavailable">此输入框或当前设备状态不能使用隐写模式</string>
-    <string name="stego_intro">秘密正文只在本机编辑。请先选择凭据与密钥文件，再输入正文；口令至少 12 个字符，随机共享密钥为 32 字节的 Base64url。公开文本必须填写。隐写字符可被检测或被接收应用移除，不能保证隐蔽或送达。凭据不会保存，丢失后无法恢复。</string>
+    <string name="stego_intro">填写文本和凭据，勾选算法后加密。长按公开文本或待解密文本可粘贴。隐写字符可能被检测或移除。</string>
     <string name="stego_options_summary">%1$s\n%2$s · %3$s · %4$s</string>
     <string name="stego_passphrase">口令</string>
     <string name="stego_random_key">随机共享密钥</string>
@@ -9,7 +9,7 @@
     <string name="stego_random_file">随机共享密钥＋文件</string>
     <string name="stego_file_ready">文件已就绪</string>
     <string name="stego_file_absent">未选择文件</string>
-    <string name="stego_layers">加密层（按显示顺序）</string>
+    <string name="stego_file_not_required">无需密钥文件</string>
     <string name="stego_credential_mode">主凭据方式</string>
     <string name="stego_kdf">口令派生成本</string>
     <string name="stego_transport">文本载体</string>
@@ -18,13 +18,6 @@
     <string name="stego_wording_unavailable">自然措辞载体 · 暂不可用</string>
     <string name="stego_wording_explanation">自然措辞载体尚无满足容量、语义保持和检测评估要求的语言资源。可显式选择 Unicode 或可见载体；它们可被检测。</string>
     <string name="stego_memory_unavailable">当前内存余量不足以运行此成本档位，操作未开始</string>
-    <string name="stego_add_layer">添加一种算法</string>
-    <string name="stego_preset_two">双层：AES → XChaCha20</string>
-    <string name="stego_preset_six">六种算法各一层</string>
-    <string name="stego_key_bits">此层密钥位数</string>
-    <string name="stego_move_up">提前一层</string>
-    <string name="stego_move_down">推后一层</string>
-    <string name="stego_remove_layer">移除此层</string>
     <string name="stego_busy">正在本机处理…</string>
     <string name="stego_failed">无法完成操作。请检查完整文本、主凭据及密钥文件；未输出秘密正文。</string>
     <string name="stego_worker_busy">上一项加密任务尚未结束，请稍后重新操作</string>
@@ -39,10 +32,10 @@
     <string name="stego_import_decrypt">本地解密隐写文本</string>
     <string name="stego_read_confirm">认证已完成。点击确认后读取所选的一个安全剪贴板条目；随后仍需输入消息主凭据并主动解密。</string>
     <string name="stego_read_start">选择一个安全剪贴板条目，再完成系统身份认证并确认读取。不会自动解密。</string>
-    <string name="stego_save_start">保存正文需要系统身份认证和再次确认。如果安全剪贴板未启用，此操作将启用它。</string>
-    <string name="stego_save_confirm">认证已完成。确认把解密正文保存到安全剪贴板？</string>
+    <string name="stego_save_start">将所选内容存入私密空间，需要系统身份认证和保存确认。如果安全剪贴板未启用，此操作将启用它。返回输入框需重新开始隐写。</string>
+    <string name="stego_save_confirm">认证已完成。确认把刚才选择的内容存入私密空间？</string>
     <string name="stego_confirm_read">确认读取条目</string>
-    <string name="stego_confirm_save">确认保存正文</string>
+    <string name="stego_confirm_save">确认存入私密空间</string>
     <string name="stego_confirm_file">文件已选择。确认仅为当前操作读取？</string>
     <string name="stego_no_entries">安全剪贴板未启用或没有可用条目</string>
     <string name="stego_entry">条目 %1$d</string>
@@ -51,4 +44,21 @@
     <string name="stego_import_selection_failed">没有可用的有界选区；请先选中完整的隐写文本</string>
     <string name="stego_file_missing">当前凭据方式需要选择密钥文件</string>
     <string name="stego_credentials_changed">主凭据方式已更改，请重新输入主凭据</string>
+    <string name="stego_decrypt_options_fixed">解密参数由收到的完整文本决定。请输入对应的主凭据，并按需选择相同的密钥文件。</string>
+    <string name="stego_auth_retry">身份认证未完成。草稿暂未保存，可在本次操作到期前重试。</string>
+    <string name="stego_retry_authentication">重新认证</string>
+    <string name="stego_confirmation_expired">确认已超时，草稿已清除。请重新解密后认证保存或重新选择条目。</string>
+    <string name="stego_file_timeout">密钥文件读取超时，操作已取消。请重新选择文件后重试。</string>
+    <string name="stego_detached_hint">这是独立密文。请填写加密时完全相同的公开文本，再输入对应凭据并解密。</string>
+    <string name="stego_choose_algorithm">请至少勾选一种加密算法</string>
+    <string name="stego_commit_unavailable">当前输入框不可提交，请回到原输入框重新开始</string>
+    <string name="stego_cover_required">请填写公开掩护文本</string>
+    <string name="stego_secret_required">请填写要加密的秘密正文</string>
+    <string name="stego_passphrase_required">口令至少需要 12 个字符</string>
+    <string name="stego_paste_title">粘贴到此项（替换现有内容）</string>
+    <string name="stego_paste_system">从系统剪贴板粘贴</string>
+    <string name="stego_paste_vault">从安全剪贴板粘贴</string>
+    <string name="stego_paste_failed">无法粘贴：请选择一个完整的纯文本条目，并检查长度与格式</string>
+    <string name="stego_invalid_bits">主密钥长度须为 256–4096 位，且为 8 的倍数；算法子密钥位数不变</string>
+    <string name="stego_paste_return">已读取。返回原输入框后点击“隐”继续；原草稿已清除。</string>
 </resources>

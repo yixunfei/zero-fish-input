@@ -28,6 +28,69 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class StegoResourcePlatformTest {
+    @Test fun allInlineFieldsAndAlgorithmsRemainReachableInTheBoundedPanel() {
+        ActivityScenario.launch<dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity>(Intent(Device.context,
+            dev.zeroinput.ime.testing.KeyboardPreviewFixtureActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra("night", (Device.context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES)).use { scenario ->
+            var workspace: StegoWorkspace? = null
+            lateinit var view: ZeroInputView
+            scenario.onActivity { activity ->
+                view = activity.keyboard
+                val graph = (Device.context.applicationContext as ZeroInputApplication).graph
+                workspace = StegoWorkspace({ graph }, Handler(Looper.getMainLooper()), view, { true }, { null }, {}, {}, {})
+                view.openTextStego(); workspace?.open(dev.zeroinput.engine.api.InputLanguage.ENGLISH,
+                    dev.zeroinput.engine.api.ChineseInputOptions())
+            }
+            try {
+                Device.instrumentation.waitForIdleSync()
+                if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("stegoLayoutEvidence") == "true") {
+                    val drawn = CountDownLatch(1)
+                    Device.onMain { view.postOnAnimation { view.postOnAnimation { drawn.countDown() } } }
+                    assertTrue(drawn.await(2, TimeUnit.SECONDS))
+                    Device.instrumentation.waitForIdleSync()
+                    val bitmap = Device.instrumentation.uiAutomation.takeScreenshot()
+                    try {
+                        java.io.File(Device.context.cacheDir, "stego-public-layout.png").outputStream().use {
+                            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+                        }
+                    } finally { bitmap.recycle() }
+                }
+                var controls = emptyList<View>()
+                Device.onMain {
+                    controls = nodes(view.textStegoPanel).filter {
+                        it.isShown && (it is MaterialButton || it is android.widget.CheckBox)
+                    }
+                    assertEquals(6, controls.filterIsInstance<android.widget.CheckBox>().size)
+                    val labels = controls.filterIsInstance<MaterialButton>().map { it.text.toString() }
+                    for (id in listOf(dev.zeroinput.ime.ui.R.string.stego_cover, dev.zeroinput.ime.ui.R.string.stego_secret,
+                        dev.zeroinput.ime.ui.R.string.stego_credential, dev.zeroinput.ime.ui.R.string.stego_encrypt_insert))
+                        assertTrue(labels.contains(view.context.getString(id)))
+                }
+                for (control in controls) {
+                    Device.onMain { control.requestRectangleOnScreen(Rect(0, 0, control.width, control.height), true) }
+                    Device.instrumentation.waitForIdleSync()
+                    Device.onMain {
+                        val visible = Rect()
+                        assertTrue(control.getGlobalVisibleRect(visible))
+                        assertTrue(control.height >= (48 * control.resources.displayMetrics.density).toInt())
+                        assertTrue(control.width >= (48 * control.resources.displayMetrics.density).toInt())
+                        assertTrue("Public inline control is clipped", visible.height() >= control.height - 2 && visible.width() >= control.width - 2)
+                    }
+                }
+                Device.onMain {
+                    val configuration = view.resources.configuration
+                    Device.instrumentation.sendStatus(2, Bundle().apply {
+                        putInt("stego_inline_width_dp", configuration.screenWidthDp)
+                        putInt("stego_inline_height_dp", configuration.screenHeightDp)
+                        putInt("stego_inline_orientation", configuration.orientation)
+                        putInt("stego_inline_night", configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                        putFloat("stego_inline_font_scale", configuration.fontScale)
+                    })
+                }
+            } finally { Device.onMain { workspace?.close(); view.release() } }
+        }
+    }
     @Test fun standardPasswordSixLayerWorkLeavesMainLooperResponsive() {
         val runtime = Runtime.getRuntime()
         assertTrue(StegoOptions.available(MessageKdf.STANDARD))
@@ -96,7 +159,10 @@ class StegoResourcePlatformTest {
             Device.onMain {
                 val keyboard = nodes(activity.window.decorView).filterIsInstance<ZeroInputView>().single()
                 assertTrue(keyboard.isShown && keyboard.height > 0)
-                buttons = nodes(keyboard.textStegoPanel).filterIsInstance<MaterialButton>().filter { it.visibility == View.VISIBLE }
+                nodes(keyboard.textStegoPanel).filterIsInstance<MaterialButton>().single {
+                    it.text == it.context.getString(dev.zeroinput.ime.ui.R.string.stego_advanced)
+                }.performClick()
+                buttons = nodes(keyboard.textStegoPanel).filterIsInstance<MaterialButton>().filter { it.isShown }
                 assertTrue(buttons.size >= 8)
             }
             for (button in buttons) {
@@ -111,6 +177,26 @@ class StegoResourcePlatformTest {
                     assertTrue("Public command ${button.text} cannot be fully scrolled into view: ${button.width}x${button.height}, visible=$visible",
                         visible.height() >= button.height - 2)
                     assertTrue(visible.width() >= button.width - 2)
+                }
+            }
+            // Exercise the new result actions in the same attached, constrained viewport.
+            Device.onMain {
+                val keyboard = nodes(activity.window.decorView).filterIsInstance<ZeroInputView>().single()
+                keyboard.textStegoPanel.render(dev.zeroinput.ime.ui.StegoUiState(prepared = true, canInsert = true), null)
+                buttons = nodes(keyboard.textStegoPanel).filterIsInstance<MaterialButton>().filter { it.isShown }
+            }
+            Device.instrumentation.waitForIdleSync()
+            for (button in buttons) {
+                Device.onMain { button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true) }
+                Device.instrumentation.waitForIdleSync()
+                Device.onMain {
+                    val visible = Rect()
+                    assertTrue(button.getGlobalVisibleRect(visible))
+                    assertTrue(button.height >= (48 * button.resources.displayMetrics.density).toInt())
+                    assertTrue(button.width >= (48 * button.resources.displayMetrics.density).toInt())
+                    assertTrue(visible.height() >= button.height - 2 && visible.width() >= button.width - 2)
+                    val layout = requireNotNull(button.layout)
+                    assertTrue("Public result action is clipped", (0 until layout.lineCount).all { layout.getEllipsisCount(it) == 0 })
                 }
             }
             Device.onMain {

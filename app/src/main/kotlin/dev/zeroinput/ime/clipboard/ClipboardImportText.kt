@@ -16,6 +16,6 @@ internal object ClipboardImportText {
         }
         val carrier = value.contains(dev.zeroinput.ime.core.stego.StegoCarrierCodec.DENSE_START) ||
             value.contains(dev.zeroinput.ime.core.stego.StegoCarrierCodec.VISIBLE_START)
-        return ClipboardImportRequest(CharArray(value.length) { value[it] }, allowsAiImport && !carrier)
+        return ClipboardImportRequest(CharArray(value.length) { value[it] }, allowsAiImport && !carrier, carrier)
     }
 }

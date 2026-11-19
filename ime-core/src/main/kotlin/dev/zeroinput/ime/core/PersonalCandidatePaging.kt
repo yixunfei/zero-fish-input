@@ -101,7 +101,7 @@ internal class PersonalCandidatePaging {
         }
         revision = loaded.revision
         editsApplied = loaded.dictionaryEditsApplied
-        editsPending = editsApplied && !loaded.ready
+        editsPending = loaded.editsUnproven
         if (editsPending) return native.copy(candidates = emptyList(), highlightedIndex = 0)
         if (loaded.ready) {
             val goingBack = requested < offset

@@ -32,7 +32,7 @@ class PreparedInputEngine(
 
     override fun close() {
         if (owned.compareAndSet(true, false)) {
-            recoverable { candidate.close() }
+            recoverableEngine { candidate.close() }
         }
     }
 }

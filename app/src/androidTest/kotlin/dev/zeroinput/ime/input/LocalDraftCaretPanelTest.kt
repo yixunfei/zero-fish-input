@@ -95,7 +95,7 @@ class LocalDraftCaretPanelTest {
             draft.start(InputLanguage.ENGLISH)
             draft.appendImported("abcdefg")
             layout(panel)
-            val body = descendants(panel).filterIsInstance<TextView>().single { it.text.toString() == "••••efg" }
+            val body = descendants(panel).filterIsInstance<TextView>().single { it.text.toString() == "•••••••" }
             assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, body.importantForAccessibility)
             assertFalse(body.isTextSelectable)
             tap(body, 0)
@@ -109,7 +109,7 @@ class LocalDraftCaretPanelTest {
             assertEquals("abYcdefgX", draft.committedText())
             full = false
             draft.togglePrivateDraftVisibility()
-            assertEquals("••••••fgX", body.text.toString())
+            assertEquals("•••••••••", body.text.toString())
             busy = true
             draft.refreshDisplay()
             layout(panel)

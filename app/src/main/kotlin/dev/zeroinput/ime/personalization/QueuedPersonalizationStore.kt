@@ -92,11 +92,9 @@ internal class QueuedPersonalizationStore(
         return unavailablePage(revision, language)
     }
 
-    private fun unavailablePage(revision: Long, language: InputLanguage) = PersonalSuggestionPage(
-        ready = false, revision = revision,
-        dictionaryEditsApplied = language == InputLanguage.CHINESE &&
-            (delegate as? DictionaryPersonalizationStore)?.requiresFiltering == true,
-    )
+    private fun unavailablePage(revision: Long, language: InputLanguage): PersonalSuggestionPage =
+        if (language == InputLanguage.CHINESE && delegate is DictionaryPersonalizationStore) delegate.pendingPage(revision)
+        else PersonalSuggestionPage(ready = false, revision = revision)
 
     /**
      * Answers from the prepared frequency snapshot only. A cold snapshot
@@ -224,6 +222,7 @@ internal class QueuedPersonalizationStore(
      * while normal key handling remains fully asynchronous.
      */
     fun clearAndAwait() {
+        // Null means the rejected task already completed synchronously on this settings worker.
         val task = enqueueClear(await = true) ?: return
         try {
             task.get()

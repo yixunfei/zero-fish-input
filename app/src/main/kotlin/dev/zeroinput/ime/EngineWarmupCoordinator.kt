@@ -7,6 +7,7 @@ import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.ime.core.PreparedInputEngine
 import dev.zeroinput.ime.core.privacy.SessionPrivacy
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.concurrency.recoverable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
 import java.util.concurrent.RejectedExecutionException
@@ -75,7 +76,7 @@ internal class EngineWarmupCoordinator(
             // Keep the failure observable without invoking client code while
             // the coordinator lock is held (a dispatcher may synchronously
             // schedule another request in tests or during teardown).
-            runCatching { dispatch(EngineWarmupResult.Unavailable(ticket, request)) }
+            recoverable { dispatch(EngineWarmupResult.Unavailable(ticket, request)) }
         }
         return ticket
     }
@@ -100,10 +101,10 @@ internal class EngineWarmupCoordinator(
     private fun prepareAndDispatch(ticket: Long, request: EngineWarmupRequest) {
         if (!isCurrent(ticket)) return
         var candidate: InputEngine? = null
-        val prepared = runCatching {
-            if (!request.privacy.suggestionsAllowed) return@runCatching null
+        val prepared = try { recoverable {
+            if (!request.privacy.suggestionsAllowed) return@recoverable null
             candidate = prepare(request)
-            val engine = candidate ?: return@runCatching null
+            val engine = candidate ?: return@recoverable null
             val snapshot = engine.start(
                 EditorContext(
                     language = request.language,
@@ -121,11 +122,12 @@ internal class EngineWarmupCoordinator(
                 snapshot = snapshot,
                 engine = engine,
             ).also { candidate = null }
-        }.getOrNull()
-
-        // A failed start or a cancelled/stale request must never retain a
-        // partially initialized native engine.
-        candidate?.let { runCatching { it.close() } }
+        }.getOrNull() } catch (_: LinkageError) {
+            null // An unavailable optional native module is an ordinary engine failure.
+        } finally {
+            // Cancellation and fatal failures propagate only after releasing ownership.
+            try { candidate?.let { recoverable { it.close() } } } catch (_: LinkageError) { }
+        }
         if (!isCurrent(ticket)) {
             prepared?.close()
             return
@@ -135,8 +137,9 @@ internal class EngineWarmupCoordinator(
         } else {
             EngineWarmupResult.Prepared(ticket, request, prepared)
         }
-        runCatching { dispatch(result) }
-            .onFailure { if (result is EngineWarmupResult.Prepared) result.engine.close() }
+        var handedOff = false
+        try { recoverable { dispatch(result); handedOff = true } }
+        finally { if (!handedOff && result is EngineWarmupResult.Prepared) result.engine.close() }
     }
 
     private fun isCurrent(ticket: Long): Boolean = synchronized(lock) {

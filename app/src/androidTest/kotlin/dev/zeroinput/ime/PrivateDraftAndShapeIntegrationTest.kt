@@ -193,7 +193,7 @@ class PrivateDraftAndShapeIntegrationTest {
         val hostText = activity.editor.text.toString()
         view.onKeyboardAction(KeyboardAction.LiteralText(value))
         assertEquals(hostText, activity.editor.text.toString())
-        assertTrue(labels(view).any { it.startsWith("••") && it.endsWith(value.takeLast(3)) })
+        assertTrue(labels(view).contains("•".repeat(value.length.coerceAtMost(32))))
         assertFalse(labels(view).contains(value))
     }
 
@@ -213,7 +213,8 @@ class PrivateDraftAndShapeIntegrationTest {
         clickText("你")
         Device.onMain {
             assertEquals("", activity.editor.text.toString())
-            assertTrue(labels(keyboard()).contains("你"))
+            assertFalse(labels(keyboard()).contains("你"))
+            assertTrue(labels(keyboard()).contains("•"))
             keyboard().onKeyboardAction(KeyboardAction.Backspace)
         }
     }

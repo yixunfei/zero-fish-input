@@ -4,7 +4,8 @@ import java.io.Reader
 import java.util.concurrent.CancellationException
 
 /** Strict JSON events shared by manifest validation and streaming dictionary loading. */
-internal class LanguagePackJsonReader(private val source: Reader, private val visitor: Visitor = Visitor.None) {
+internal class LanguagePackJsonReader(private val source: Reader, private val visitor: Visitor = Visitor.None,
+                                     private val skipOversizedScalars: Boolean = false) {
     interface Visitor {
         fun beginObject() = Unit
         fun name(value: String) = Unit
@@ -12,6 +13,7 @@ internal class LanguagePackJsonReader(private val source: Reader, private val vi
         fun beginArray() = Unit
         fun endArray() = Unit
         fun scalar(value: String, quoted: Boolean) = Unit
+        fun oversizedScalar(quoted: Boolean) = Unit
         object None : Visitor
     }
 
@@ -30,7 +32,10 @@ internal class LanguagePackJsonReader(private val source: Reader, private val vi
         when (next) {
             '{'.code -> objectValue(depth + 1)
             '['.code -> arrayValue(depth + 1)
-            '"'.code -> visitor.scalar(string(), true)
+            '"'.code -> {
+                val text = string(skipOversizedScalars)
+                if (text == null) visitor.oversizedScalar(true) else visitor.scalar(text, true)
+            }
             't'.code, 'f'.code, 'n'.code -> token(literal = true)
             '-'.code, in '0'.code..'9'.code -> token(literal = false)
             else -> throw IllegalArgumentException("Invalid language pack JSON token")
@@ -47,7 +52,7 @@ internal class LanguagePackJsonReader(private val source: Reader, private val vi
             if (!consume('}')) while (true) {
                 whitespace()
                 require(next == '"'.code) { "Object keys must be quoted" }
-                val key = string()
+                val key = requireNotNull(string())
                 require(keys.add(key)) { "Duplicate JSON object key" }
                 activeKeys++
                 require(keys.size <= MAX_OBJECT_KEYS && activeKeys <= MAX_ACTIVE_KEYS) { "Too many JSON object keys" }
@@ -81,19 +86,22 @@ internal class LanguagePackJsonReader(private val source: Reader, private val vi
         visitor.endArray()
     }
 
-    private fun string(): String {
+    private fun string(skipOversized: Boolean = false): String? {
         require(consume('"')) { "JSON string must start with a quote" }
-        val output = StringBuilder()
+        var output: StringBuilder? = StringBuilder()
         while (next >= 0) {
             val character = next.toChar()
             advance()
             when {
-                character == '"' -> return output.toString()
+                character == '"' -> return output?.toString()
                 character < ' ' -> throw IllegalArgumentException("Invalid language pack JSON string")
-                character == '\\' -> output.append(escape())
-                else -> output.append(character)
+                character == '\\' -> { val escaped = escape(); output?.append(escaped) }
+                else -> output?.append(character)
             }
-            require(output.length <= MAX_TOKEN_CHARS) { "Language pack JSON token is too long" }
+            if (output != null && output.length > MAX_TOKEN_CHARS) {
+                require(skipOversized) { "Language pack JSON token is too long" }
+                output = null // Still validate the complete string and escape syntax without retaining it.
+            }
         }
         throw IllegalArgumentException("Incomplete language pack JSON string")
     }
@@ -123,15 +131,37 @@ internal class LanguagePackJsonReader(private val source: Reader, private val vi
     }
 
     private fun token(literal: Boolean) {
-        val output = StringBuilder()
-        while (next >= 0 && next.toChar() !in ",]} \t\r\n") {
-            require(output.length < MAX_TOKEN_CHARS) { "Language pack JSON token is too long" }
-            output.append(next.toChar())
+        var output: StringBuilder? = StringBuilder()
+        fun append() {
+            output?.append(next.toChar())
+            if (output?.length == MAX_TOKEN_CHARS + 1) {
+                require(skipOversizedScalars && !literal) { "Language pack JSON token is too long" }
+                output = null
+            }
             advance()
         }
-        val text = output.toString()
-        require(if (literal) text in LITERALS else NUMBER.matches(text)) { "Invalid language pack JSON token" }
-        visitor.scalar(text, false)
+        if (literal) {
+            while (next >= 0 && next.toChar() !in ",]} \t\r\n") append()
+            require(output.toString() in LITERALS) { "Invalid language pack JSON token" }
+        } else {
+            if (next == '-'.code) append()
+            require(next in '0'.code..'9'.code) { "Invalid JSON number" }
+            if (next == '0'.code) append() else while (next in '0'.code..'9'.code) append()
+            if (next == '.'.code) {
+                append()
+                require(next in '0'.code..'9'.code) { "Invalid JSON fraction" }
+                while (next in '0'.code..'9'.code) append()
+            }
+            if (next == 'e'.code || next == 'E'.code) {
+                append()
+                if (next == '+'.code || next == '-'.code) append()
+                require(next in '0'.code..'9'.code) { "Invalid JSON exponent" }
+                while (next in '0'.code..'9'.code) append()
+            }
+            require(next < 0 || next.toChar() in ",]} \t\r\n") { "Invalid JSON number delimiter" }
+        }
+        val text = output?.toString()
+        if (text == null) visitor.oversizedScalar(false) else visitor.scalar(text, false)
     }
 
     private fun whitespace() {
@@ -155,6 +185,5 @@ internal class LanguagePackJsonReader(private val source: Reader, private val vi
         private const val MAX_OBJECT_KEYS = 50_000
         private const val MAX_ACTIVE_KEYS = 100_000
         private val LITERALS = setOf("true", "false", "null")
-        private val NUMBER = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
     }
 }

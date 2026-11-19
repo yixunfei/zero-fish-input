@@ -7,10 +7,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StegoImportBoundaryTest {
+    @Test fun `plain text cannot consume the import through the decrypt action`() {
+        val request = requireNotNull(ClipboardImportText.parse("public plain text", allowsAiImport = true))
+        try {
+            assertNull(request.takeForStego())
+            assertEquals("public plain text", request.copyForAi())
+            assertTrue(request.beginAuthentication())
+        } finally { request.close() }
+    }
+
     @Test fun `recognized and damaged carriers cannot be forwarded to AI at the input model boundary`() {
         StegoTransport.entries.forEach { mode ->
             val encoded = StegoCarrierCodec.encode("public fixture", ByteArray(162), mode)
-            listOf(encoded, encoded.dropLast(1)).forEach { text ->
+            val detached = StegoCarrierCodec.ciphertext(ByteArray(162))
+            listOf(encoded, encoded.dropLast(1), detached, detached.dropLast(1)).forEach { text ->
                 val request = requireNotNull(ClipboardImportText.parse(text, allowsAiImport = true))
                 assertFalse(request.allowsAiImport)
                 assertNull(request.copyForAi())

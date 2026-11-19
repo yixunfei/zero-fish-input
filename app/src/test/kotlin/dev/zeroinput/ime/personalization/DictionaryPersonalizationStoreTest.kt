@@ -9,6 +9,43 @@ import org.junit.Test
 @org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
 @org.robolectric.annotation.Config(sdk = [28])
 class DictionaryPersonalizationStoreTest {
+    @Test fun cacheMissesReadOnlyPreparedSuppressionAndInvalidationRevokesIt() {
+        val disk = MemoryStore()
+        val edits = DictionaryEditRepository(disk)
+        edits.save(DictionaryEdit("ice_fixture", DictionaryWord("你好", "ni hao", 1), null))
+        val lexicon = UserLexiconRepository(MemoryStore(), object : EncryptedExportCipher {
+            override fun encrypt(plaintext: ByteArray, associatedData: ByteArray): ByteArray = error("No export")
+            override fun decrypt(payload: ByteArray, associatedData: ByteArray): ByteArray = error("No import")
+            override fun hasKey() = false
+        })
+        val delegate = DictionaryPersonalizationStore(lexicon, edits, { setOf("ice_fixture") }, { ChineseInputOptions() })
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val release = java.util.concurrent.CountDownLatch(1)
+        val store = QueuedPersonalizationStore(delegate, { delegate.prepare(); lexicon.warmUp() }, executor)
+        try {
+            assertTrue(store.suggestionPage("ni", InputLanguage.CHINESE, 0, 8).editsUnproven)
+            executor.submit {}.get(3, java.util.concurrent.TimeUnit.SECONDS)
+            executor.execute { release.await(5, java.util.concurrent.TimeUnit.SECONDS) }
+            val reads = disk.reads
+            for (input in listOf("ni", "hao", "shi")) {
+                val pending = store.suggestionPage(input, InputLanguage.CHINESE, 0, 8)
+                assertFalse(pending.ready)
+                assertFalse(pending.editsUnproven)
+                assertTrue(pending.dictionaryEditsApplied)
+                assertEquals(setOf("你好\tnihao"), pending.suppressedDictionaryEntries)
+            }
+            assertEquals(reads, disk.reads)
+            store.invalidatePreparedData()
+            assertTrue(store.suggestionPage("ni", InputLanguage.CHINESE, 0, 8).editsUnproven)
+            release.countDown()
+            store.clearAndAwait()
+            val cleared = store.suggestionPage("ni", InputLanguage.CHINESE, 0, 8)
+            assertFalse(cleared.editsUnproven)
+            assertFalse(cleared.dictionaryEditsApplied)
+            assertTrue(cleared.suppressedDictionaryEntries.isEmpty())
+        } finally { release.countDown(); store.close() }
+    }
+
     @Test fun learnedPrioritySurvivesMoreThanOnePageOfDictionaryReplacements() {
         val lexicon = UserLexiconRepository(MemoryStore())
         val edits = DictionaryEditRepository(MemoryStore())
@@ -124,8 +161,9 @@ class DictionaryPersonalizationStoreTest {
     }
 
     private class MemoryStore : EncryptedStore {
+        var reads = 0
         private var bytes: ByteArray? = null
-        override fun read() = bytes?.copyOf()
+        override fun read(): ByteArray? { reads++; return bytes?.copyOf() }
         override fun write(plaintext: ByteArray) { bytes = plaintext.copyOf(); plaintext.fill(0) }
         override fun delete(deleteKey: Boolean) { bytes = null }
     }

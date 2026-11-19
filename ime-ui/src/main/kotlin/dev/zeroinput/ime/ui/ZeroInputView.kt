@@ -257,7 +257,7 @@ class ZeroInputView @JvmOverloads constructor(
         .apply { layoutParams = LayoutParams(dp(48), dp(48)) }
     private val secondaryTools = mutableListOf<View>()
     private val toolsButton = toolbarButton("☰", context.getString(R.string.keyboard_tools), ::showTools)
-    private val stegoButton = toolbarButton(context.getString(R.string.stego_open), context.getString(R.string.stego_open)) {
+    private val stegoButton = toolbarButton(context.getString(R.string.stego_short), context.getString(R.string.stego_open)) {
         onTextStegoRequested()
     }
     private val numbersButton = toolbarButton("123", context.getString(R.string.key_numbers)) {
@@ -280,8 +280,8 @@ class ZeroInputView @JvmOverloads constructor(
         onCopySelectionRequested()
     }.apply { visibility = GONE; filterTouchesWhenObscured = true }
     private var copySelectionAvailable = false
-    private val primaryTools: List<View> = listOf(shapeButton, toolsButton, stegoButton, privateDraftButton, secureClipboardButton,
-        aiButton, numbersButton, emojiButton)
+    private val primaryTools: List<View> = listOf(shapeButton, stegoButton, privateDraftButton, secureClipboardButton,
+        aiButton, numbersButton, emojiButton, copySelectionButton, toolsButton)
     private val toolbarRow = createToolbar()
     private val additionalTools = (primaryTools.size until toolbarRow.childCount).map(toolbarRow::getChildAt)
     private var additionalToolsFirst = false
@@ -910,7 +910,6 @@ class ZeroInputView @JvmOverloads constructor(
         layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dp(48))
         primaryTools.forEach { addView(it, LayoutParams(dp(48), dp(48))) }
         fun addTool(view: View) { secondaryTools += view; addView(view, LayoutParams(dp(48), dp(48))) }
-        addView(copySelectionButton, LayoutParams(dp(48), dp(48)))
         addTool(panelIconButton(context, android.R.drawable.ic_menu_edit, R.string.handwriting_open) {
             toggleMode(PanelMode.HANDWRITING)
         })
@@ -1292,7 +1291,7 @@ class ZeroInputView @JvmOverloads constructor(
         val toolbarParams = toolbar.layoutParams as FrameLayout.LayoutParams
         val start = if (returnButton.isVisible) dp(48) else 0
         if (toolbarParams.marginStart != start) { toolbarParams.marginStart = start; toolbar.layoutParams = toolbarParams }
-        toolsButton.isVisible = !manualTools && !isShapeLookupOpen && !isPrivateDraftOpen
+        toolsButton.isVisible = !manualTools && !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen
         updateCopySelectionButton()
         aiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen
         emojiButton.isVisible = !isShapeLookupOpen && !isPrivateDraftOpen && !isTextStegoOpen

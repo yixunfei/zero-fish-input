@@ -1,6 +1,6 @@
 <resources>
     <string name="stego_unavailable">Steganography is unavailable for this editor or device state</string>
-    <string name="stego_intro">Edit secrets locally. Choose credentials and any key file before entering text. Passphrases need at least 12 characters; random shared keys are 32 bytes in Base64url. A public cover is required. Hidden characters are detectable and may be removed by the receiving app. Delivery is not guaranteed. Credentials are never saved and cannot be recovered.</string>
+    <string name="stego_intro">Enter text and credentials, check ciphers, then encrypt. Long press cover or encrypted text to paste. Hidden characters can be detected or stripped.</string>
     <string name="stego_options_summary">%1$s\n%2$s · %3$s · %4$s</string>
     <string name="stego_passphrase">Passphrase</string>
     <string name="stego_random_key">Random shared key</string>
@@ -9,7 +9,7 @@
     <string name="stego_random_file">Random key + file</string>
     <string name="stego_file_ready">File ready</string>
     <string name="stego_file_absent">No file selected</string>
-    <string name="stego_layers">Encryption layers in order</string>
+    <string name="stego_file_not_required">No key file needed</string>
     <string name="stego_credential_mode">Master credential mode</string>
     <string name="stego_kdf">Passphrase derivation cost</string>
     <string name="stego_transport">Text carrier</string>
@@ -18,13 +18,6 @@
     <string name="stego_wording_unavailable">Natural wording · unavailable</string>
     <string name="stego_wording_explanation">No wording resource currently meets the capacity, meaning preservation and detection evaluation requirements. Choose Unicode or a visible carrier explicitly; both are detectable.</string>
     <string name="stego_memory_unavailable">Insufficient memory headroom for this cost profile; no operation started</string>
-    <string name="stego_add_layer">Add a different algorithm</string>
-    <string name="stego_preset_two">Two layers: AES → XChaCha20</string>
-    <string name="stego_preset_six">All six algorithms</string>
-    <string name="stego_key_bits">Layer key bits</string>
-    <string name="stego_move_up">Move earlier</string>
-    <string name="stego_move_down">Move later</string>
-    <string name="stego_remove_layer">Remove layer</string>
     <string name="stego_busy">Processing locally…</string>
     <string name="stego_failed">Operation failed. Check the complete message, credential and key file. No secret text was released.</string>
     <string name="stego_worker_busy">The previous crypto task is still running; try again shortly</string>
@@ -39,10 +32,10 @@
     <string name="stego_import_decrypt">Decrypt steganographic text locally</string>
     <string name="stego_read_confirm">Authenticated. Confirm reading the selected private vault entry, then enter its message credential and explicitly decrypt.</string>
     <string name="stego_read_start">Choose one secure clipboard entry, then authenticate and confirm the read. Decryption does not start automatically.</string>
-    <string name="stego_save_start">Saving the message requires system authentication and another confirmation. This action enables the secure clipboard if needed.</string>
-    <string name="stego_save_confirm">Authenticated. Confirm saving the decrypted text to the private vault?</string>
+    <string name="stego_save_start">Saving the selected content privately requires system authentication and save confirmation. This enables the secure clipboard if needed. Start a new steganography operation when returning to the editor.</string>
+    <string name="stego_save_confirm">Authenticated. Save the content you just selected to the private vault?</string>
     <string name="stego_confirm_read">Confirm entry read</string>
-    <string name="stego_confirm_save">Confirm text save</string>
+    <string name="stego_confirm_save">Confirm private save</string>
     <string name="stego_confirm_file">File selected. Read it for this operation only?</string>
     <string name="stego_no_entries">The private vault is disabled or empty</string>
     <string name="stego_entry">Entry %1$d</string>
@@ -51,4 +44,21 @@
     <string name="stego_import_selection_failed">No bounded selection available. Select the entire encoded message first.</string>
     <string name="stego_file_missing">Select a key file for this credential mode</string>
     <string name="stego_credentials_changed">Credential mode changed; enter the master credential again</string>
+    <string name="stego_decrypt_options_fixed">Decryption parameters come from the complete received message. Enter its master credential and select the same key file if required.</string>
+    <string name="stego_auth_retry">Authentication did not complete. Nothing was saved. You can retry before this operation expires.</string>
+    <string name="stego_retry_authentication">Authenticate again</string>
+    <string name="stego_confirmation_expired">Confirmation timed out; drafts cleared. Decrypt again before authenticating a save, or select an entry again.</string>
+    <string name="stego_file_timeout">Key file reading timed out and was cancelled. Select the file again to retry.</string>
+    <string name="stego_detached_hint">Detached ciphertext: enter the exact original public cover, then the matching credentials, and decrypt.</string>
+    <string name="stego_choose_algorithm">Select at least one encryption algorithm</string>
+    <string name="stego_commit_unavailable">This editor is unavailable. Return to the original editor and start again.</string>
+    <string name="stego_cover_required">Enter the public cover text</string>
+    <string name="stego_secret_required">Enter the secret text to encrypt</string>
+    <string name="stego_passphrase_required">Use a passphrase of at least 12 characters</string>
+    <string name="stego_paste_title">Paste here (replace current text)</string>
+    <string name="stego_paste_system">Paste from system clipboard</string>
+    <string name="stego_paste_vault">Paste from secure clipboard</string>
+    <string name="stego_paste_failed">Cannot paste. Select one complete plain-text item and check its length and format.</string>
+    <string name="stego_invalid_bits">Master key length must be 256–4096 bits in multiples of 8. Cipher key widths stay unchanged.</string>
+    <string name="stego_paste_return">Read complete. Return to the original field and tap Stego to continue. Previous drafts were cleared.</string>
 </resources>

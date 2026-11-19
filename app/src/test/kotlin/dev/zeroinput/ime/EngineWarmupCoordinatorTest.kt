@@ -24,6 +24,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EngineWarmupCoordinatorTest {
+    @Test fun `cancelled interrupted and fatal startup releases the engine without publishing unavailable`() {
+        for (failure in listOf(java.util.concurrent.CancellationException(), InterruptedException(), AssertionError("public fixture"))) {
+            val delegate = TrackingEngine()
+            val engine = object : InputEngine by delegate {
+                override fun start(context: EditorContext): EngineSnapshot = throw failure
+            }
+            var queued: Runnable? = null
+            val executor = object : java.util.concurrent.AbstractExecutorService() {
+                override fun execute(command: Runnable) { queued = command }
+                override fun shutdown() = Unit
+                override fun shutdownNow() = mutableListOf<Runnable>()
+                override fun isShutdown() = false
+                override fun isTerminated() = false
+                override fun awaitTermination(timeout: Long, unit: TimeUnit) = true
+            }
+            val coordinator = EngineWarmupCoordinator(executor, { engine }, { error("Must not publish cancellation") })
+            try {
+                coordinator.request(request())
+                val task = requireNotNull(queued)
+                task.run()
+                val thrown = org.junit.Assert.assertThrows(java.util.concurrent.ExecutionException::class.java) {
+                    (task as java.util.concurrent.Future<*>).get()
+                }
+                org.junit.Assert.assertSame(failure, thrown.cause)
+                assertEquals(1, delegate.closeCalls.get())
+                assertEquals(failure is InterruptedException, Thread.currentThread().isInterrupted)
+            } finally { Thread.interrupted(); coordinator.close() }
+        }
+    }
+
     @Test fun `prepared engines receive the editor prediction restriction`() {
         val executor = worker()
         val delivered = CountDownLatch(1)

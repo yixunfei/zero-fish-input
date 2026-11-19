@@ -1,11 +1,12 @@
 <resources>
     <string name="stego_open">Text steganography</string>
+    <string name="stego_short">隐</string>
     <string name="stego_encrypt">Encrypt</string>
-    <string name="stego_decrypt">Decrypt locally</string>
-    <string name="stego_close">Close and clear</string>
+    <string name="stego_decrypt">Decrypt</string>
+    <string name="stego_close">Clear</string>
     <string name="stego_cover">Public cover</string>
     <string name="stego_secret">Secret text</string>
-    <string name="stego_credential">Master credential</string>
+    <string name="stego_credential">Key / passphrase</string>
     <string name="stego_carrier">Encoded message</string>
     <string name="stego_reveal">Reveal text</string>
     <string name="stego_mask">Mask text</string>
@@ -14,10 +15,27 @@
     <string name="stego_key_file">Key file</string>
     <string name="stego_selection">Import selection</string>
     <string name="stego_vault">Read private vault</string>
-    <string name="stego_prepare">Preview / decrypt</string>
-    <string name="stego_confirm">Confirm encoded insertion</string>
+    <string name="stego_prepare">Generate only</string>
+    <string name="stego_confirm">Insert into editor</string>
     <string name="stego_edit">Edit again</string>
     <string name="stego_save">Authenticate and save text</string>
     <string name="stego_insert">Confirm plaintext insertion</string>
     <string name="stego_draft_hint">Choose a field and type with the keyboard below</string>
+    <string name="stego_next">Next field</string>
+    <string name="stego_layers_short">Combine ciphers</string>
+    <string name="stego_save_field">Save field privately</string>
+    <string name="stego_save_plaintext">Save plaintext privately</string>
+    <string name="stego_save_cover">Save cover privately</string>
+    <string name="stego_save_ciphertext">Save ciphertext privately</string>
+    <string name="stego_save_carrier">Save hidden text privately</string>
+    <string name="stego_encrypt_insert">Encrypt and insert</string>
+    <string name="stego_field_hint">Tap here, then use the keyboard below</string>
+    <string name="stego_algorithm_hint">Cipher cascade · check in encryption order. Cipher key bits appear on the right.</string>
+    <string name="stego_earlier">Earlier</string>
+    <string name="stego_width_for">%1$s, %2$d bits, tap to change</string>
+    <string name="stego_earlier_for">Move %1$s one layer earlier</string>
+    <string name="stego_advanced">More options</string>
+    <string name="stego_master_bits">Master bits</string>
+    <string name="stego_master_bits_value">Random master key, %1$d bits</string>
+    <string name="stego_generate_key">Generate key</string>
 </resources>

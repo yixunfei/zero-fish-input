@@ -78,10 +78,10 @@ internal object MessageKeys {
     }
 
     private fun decodeRandom(value: ByteArray): ByteArray {
-        if (value.size != 43 || value.any { it.toInt().toChar() !in
+        if (value.size !in 43..683 || value.any { it.toInt().toChar() !in
                     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" }) throw MessageFailure()
         val result = try { Base64.getUrlDecoder().decode(value) } catch (_: IllegalArgumentException) { throw MessageFailure() }
-        if (result.size != 32 || !Base64.getUrlEncoder().withoutPadding().encode(result).contentEquals(value)) {
+        if (result.size !in 32..512 || !Base64.getUrlEncoder().withoutPadding().encode(result).contentEquals(value)) {
             result.fill(0); throw MessageFailure()
         }
         return result

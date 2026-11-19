@@ -26,6 +26,25 @@ import org.junit.runner.RunWith
 class ClipboardImportPanelTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    @Test fun stegoChoiceAppearsOnlyForCarriersAndReviewRestoresItAfterBusyOrClear() = onMain {
+        val view = ClipboardImportView(ContextThemeWrapper(instrumentation.targetContext, R.style.Theme_ZeroInput))
+        fun visibleStego() = children(view).filterIsInstance<MaterialButton>().any {
+            it.visibility == View.VISIBLE && it.text.toString() == view.context.getString(R.string.stego_import_decrypt)
+        }
+        assertFalse(visibleStego())
+        repeat(2) {
+            view.showReview(120, true, false, allowsStegoImport = true)
+            assertTrue(visibleStego())
+            view.showBusy(true)
+            assertFalse(visibleStego())
+            view.showReview(120, true, false, allowsStegoImport = true)
+            assertTrue(visibleStego())
+            view.clearText()
+        }
+        view.showReview(120, true, true)
+        assertFalse(visibleStego())
+    }
+
     @Test
     fun reviewAndConfirmationFitSmallScreensBothThemesAndLanguages() = onMain {
         for (night in listOf(false, true)) {

@@ -2,7 +2,7 @@ package dev.zeroinput.ime.concurrency
 
 import java.util.concurrent.CancellationException
 
-/** Keep cancellation and fatal failures out of optional-work fallback values. */
+/** Module-local by design; keep the policy aligned with ime-core, engine-rime and language-pack. */
 internal inline fun <T> recoverable(operation: () -> T): Result<T> = try {
     Result.success(operation())
 } catch (cancelled: CancellationException) {

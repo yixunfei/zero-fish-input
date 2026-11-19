@@ -269,12 +269,12 @@ class OpenAiCompatibleProvider internal constructor(
         }
     }
 
-    private class PlatformExchange(uri: URI) : AiTransportExchange {
+    internal class PlatformExchange(uri: URI) : AiTransportExchange {
         private val request = okhttp3.Request.Builder().url(uri.toURL())
-        private var client: okhttp3.OkHttpClient? = null
+        @Volatile private var client: okhttp3.OkHttpClient? = null
         private val call = AtomicReference<okhttp3.Call?>(null)
         private val closed = AtomicBoolean()
-        private var response: okhttp3.Response? = null
+        @Volatile private var response: okhttp3.Response? = null
         private var method = "GET"
         override fun prepare(method: String, key: String, accept: String, timeoutMs: Int, bodySize: Int?, protocol: AiProtocol) {
             this.method = method
@@ -294,6 +294,7 @@ class OpenAiCompatibleProvider internal constructor(
                     chain.proceed(chain.request())
                 }
                 .build()
+            if (closed.get()) { disconnect(); throw java.io.IOException("AI request cancelled") }
             request.header("Accept", accept).header("Cache-Control", "no-store")
             if (protocol == AiProtocol.ANTHROPIC_MESSAGES) {
                 request.header("x-api-key", key).header("anthropic-version", "2023-06-01")
@@ -301,7 +302,7 @@ class OpenAiCompatibleProvider internal constructor(
             if (bodySize != null) request.header("Content-Type", "application/json; charset=utf-8")
         }
         override fun send(body: ByteArray?) {
-            check(!closed.get())
+            if (closed.get()) { disconnect(); throw java.io.IOException("AI request cancelled") }
             val payload = body?.let { bytes -> object : okhttp3.RequestBody() {
                 override fun contentType(): okhttp3.MediaType? = null
                 override fun contentLength(): Long = bytes.size.toLong()
@@ -310,7 +311,9 @@ class OpenAiCompatibleProvider internal constructor(
             val active = checkNotNull(client).newCall(request.method(method, payload).build())
             call.set(active)
             if (closed.get()) active.cancel()
-            response = active.execute()
+            val received = active.execute()
+            response = received
+            if (closed.get()) { disconnect(); throw java.io.IOException("AI request cancelled") }
         }
         override fun status() = checkNotNull(response).code
         override fun contentType(): String? = response?.header("Content-Type")
@@ -322,6 +325,10 @@ class OpenAiCompatibleProvider internal constructor(
             client?.connectionPool?.evictAll()
             client?.dispatcher?.executorService?.shutdown()
         }
+
+        internal fun resourcesReleased(): Boolean = client?.let {
+            it.dispatcher.executorService.isShutdown && it.connectionPool.connectionCount() == 0
+        } ?: closed.get()
     }
 
     private fun validateConfiguration(config: AiConfiguration, request: AiRequest?) {
