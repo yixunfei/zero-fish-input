@@ -2,7 +2,7 @@
 
 Updated 2026-11-19.
 
-## v0.7.7 release preparation (2026-11-19)
+## v0.7.7 published (2026-11-19)
 
 README and release notes describe the current stego workspace, full private-draft
 masking and verified audit fixes. Version is 0.7.7, code 14. The public package
@@ -22,8 +22,12 @@ record; its isolated recheck passed without changing production code/assertions.
 The universal APK is 108,003,899 bytes (below the 180 MB budget); ARM64 Debug
 remains above the separate 80 MB target. Installed APK hashes match the artifacts.
 Temporary PIN and device settings were restored and the task-owned emulator was
-stopped. Next: publish the verified four assets and confirm remote tag/digests;
-physical ARM/OEM, older Android and live-provider acceptance remain unverified.
+stopped. [v0.7.7](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.7)
+was published at 2026-11-19 04:52:01 UTC as a public testing prerelease. Its
+annotated tag resolves to `85b9a348268b8ec7f97fa52bbecb10dca6604de2`.
+All four public assets match local sizes and GitHub SHA-256 digests; the downloaded
+public checksum list also matches. README, source and release tag are pushed.
+Next: physical ARM/OEM, older Android and opt-in live-provider acceptance.
 Earlier entries below are historical.
 
 ## Full code review verification and fixes (2026-11-19)
