@@ -4,15 +4,22 @@
 
 ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、表情和安全剪贴板可离线使用。AI 联网和公开资源下载由用户主动启用。
 
-[下载 v0.7.6 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.6) · [发布说明](docs/releases/v0.7.6.md) · [发布验证](docs/releases/v0.7.6-validation.md)
+[下载 v0.7.7 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.7) · [发布说明](docs/releases/v0.7.7.md) · [发布验证](docs/releases/v0.7.7-validation.md)
 
 ## 安装
 
-1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.6/zero-fish-input-0.7.6-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
-2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.6-debug-universal.apk -Algorithm SHA256`。
+1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.7/zero-fish-input-0.7.7-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
+2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.7-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，点「启用」进入系统输入法设置。启用后返回应用，点「切换」并选择 **zero fish input**。设置页显示「正在使用」后，在普通文本框输入 `nihao`，点选“你好”。
 
-公开包是 Debug 签名测试版，包名为 `dev.zeroinput.ime.debug`。已在模拟器验证从官方 v0.7.1 覆盖安装。遇到签名冲突时请先确认原安装来源，卸载会清除该应用的本地数据。首次启动会在后台准备中文数据，期间可用内置基础词表离线输入。
+公开包是 Debug 签名测试版，包名为 `dev.zeroinput.ime.debug`。升级与设备验证范围见本版[发布验证](docs/releases/v0.7.7-validation.md)。遇到签名冲突时请先确认原安装来源，卸载会清除该应用的本地数据。首次启动会在后台准备中文数据，期间可用内置基础词表离线输入。
+
+## v0.7.7 更新
+
+- 隐写模式提供同页编辑、六种算法按选择顺序组合、加密后自动填入原输入框，以及四类结果的认证私密保存。
+- 公开文本和待解密文本支持主动粘贴；随机主密钥支持预设和自定义长度。私密临时输入默认遮盖全部已确认文字。
+- 修复异步个人化刷新撤销模型重排的问题，保留正确候选提交路径；新获得的个人词频优先级仍然生效。
+- 设备代理未配置动作类别时不授予任何类别；同时加固动作参数、聊天历史、引擎生命周期和语言包导入边界。详见[逐项核查记录](docs/audits/2026-11-19-full-code-review-fixes.md)。
 
 ## 日常输入
 
@@ -33,7 +40,7 @@ ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、�
 
 在普通文本框的键盘工具栏点击象形后面的「隐」，在同一可滚动页面填写公开文本、秘密正文和密钥／口令，点击对应输入区域即可使用下方键盘编辑。
 六种算法直接展开为复选框：AES、XChaCha20、Kuznyechik、Twofish、Camellia、SM4。按勾选先后组合加密，编号显示顺序；可直接调整支持的密钥位数或提前某一层。至少选择一种。
-「更多选项」支持口令、32 字节 Base64url 随机共享密钥、密钥文件及两种组合凭据；选择文件会先清除秘密草稿，请在编辑正文前选择。
+「更多选项」支持口令、Base64url 随机共享密钥、密钥文件及两种组合凭据；选择文件会先清除秘密草稿，请在编辑正文前选择。
 点击「加密并填入」，自检成功后自动将最终隐写文本填入原输入框，不触发发送。需要先保存时点击「仅生成」，结果页仍可手动提交。凭据不保存，丢失后无法恢复。
 结果页可分别一键进入秘密明文、公开掩护文本、独立密文和完整隐写结果的私密保存流程；编辑时也可保存当前非凭据字段。
 「存入私密空间」使用安全剪贴板私有加密库，仍需系统身份认证和保存确认，不写入系统剪贴板。进入保存流程会结束当前隐写操作。
@@ -47,13 +54,13 @@ ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、�
 
 Unicode 隐写与可见 Base64url 均可被检测，也可能被目标应用改写或移除。自然措辞载体因尚无通过容量、语义及检测门槛的资源而不可用，不会自动切换其他载体。
 秘密正文上限 2048 UTF-8 字节，公开文本上限 512 UTF-16 单位／1536 UTF-8 字节，单个密钥文件 32 字节至 1 MiB。
-使用与验证范围见[隐写验收记录](docs/text-steganography-validation.md)。此处描述当前源码功能；上方已发布的 v0.7.6 链接不代表包含这些未发布改动。
+使用与验证范围见[隐写验收记录](docs/text-steganography-validation.md)及本版[发布验证](docs/releases/v0.7.7-validation.md)。
 
 ## 隐私与可选联网
 
 - 密码、PIN 等敏感编辑器按隐私策略限制学习和个性化。用户数据在本机保存，应用关闭系统备份。主动清除或卸载前请确认需要保留的数据。
 - 安全剪贴板是默认关闭的私有加密库。主动添加或导入内容需要确认，每次读取正文需要认证。熄屏会取消正在处理的私密粘贴。独立的系统剪贴板防护默认关闭，只处理元信息，可按设置提醒或清理当前项。
-- **私密临时输入**可在「隐私」或键盘一级工具栏中开启，开关时需认证。开启后，符合条件的普通文本框默认进入私密副框。副框显示当前拼音候选和最近三个字，可用「本次明文」显示整段。「保存并关闭」把草稿加密存入安全剪贴板。「保存并提交」插入当前输入框，默认也保留加密副本，可在设置中关闭。「仅提交」只写入当前输入框。私密粘贴仍需单独认证。
+- **私密临时输入**可在「隐私」或键盘一级工具栏中开启，开关时需认证。开启后，符合条件的普通文本框默认进入私密副框。当前拼音和候选保持可见，已确认文字全部遮盖，可用「本次明文」显示整段。「保存并关闭」把草稿加密存入安全剪贴板。「保存并提交」插入当前输入框，默认也保留加密副本，可在设置中关闭。「仅提交」只写入当前输入框。私密粘贴仍需单独认证。
 - 词库管理中的公开资源下载需要主动操作，已安装的词库和模型可以离线使用。完整包内置万象核心词表和 Mini INT8。轻量包保留核心词表，Mini INT8、LTS 语法和手写资源可按需下载。
 - QQ、搜狗的首页和分类页直接列出可下载词库。点击「分类、排序与来源分页」浏览其他结果，再点选词库确认下载并导入。
 - 在「内置与下载词库」中选择来源和词库，确认「下载并导入」后，应用会校验并安装受支持的 Rime YAML、QQ `.qcel` 或搜狗 `.scel` 文件。「访问来源网页」是单独的浏览器入口。取消任务后会返回已安装列表，已完成的导入仍保留。
@@ -90,7 +97,7 @@ python -B tools/prepare-handwriting-stroke-model.py
   "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
 ```
 
-通用测试包包含许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.6-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
+通用测试包附带许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.7-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
 
 ```powershell
 ./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000
@@ -103,14 +110,3 @@ python -B tools/prepare-handwriting-stroke-model.py
 - [架构与模块职责](docs/architecture.md) · [架构决策](docs/adr/) · [当前进度](docs/project-progress.md)
 - [贡献指南](CONTRIBUTING.md) · [安全问题报告](SECURITY.md) · [历史版本](docs/releases/)
 - 项目代码采用 [Apache-2.0](LICENSE)。第三方数据与模型按各自许可分发，见 [第三方声明](THIRD_PARTY.md)、[来源](SOURCES.md) 和 [NOTICE](NOTICE)。
-
-### Audit fixes (2026-11-18)
-
-AI settings discard unsaved provider drafts when the settings window stops;
-reopen the provider editor to edit them again. Failed saves reload persisted providers with AI and network switches off before allowing another edit; unchanged configuration reloads preserve queued requests. Text language-pack dictionaries
-must keep each line within 4096 characters and 16 fields. JSON dictionaries load
-incrementally, with at most 16 container levels, 4096 characters per token,
-50,000 keys per object and 100,000 simultaneously retained object keys. They keep
-the existing 16 MiB per-file, 32 MiB total and 50,000 output-entry limits; data
-after the output limit is still validated. Test APK packaging now
-checks Rime, the C++ runtime and both ONNX libraries for every requested ABI.

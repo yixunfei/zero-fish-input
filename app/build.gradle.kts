@@ -73,8 +73,8 @@ android {
         applicationId = "dev.zeroinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.7.6"
+        versionCode = 14
+        versionName = "0.7.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

@@ -2,6 +2,30 @@
 
 Updated 2026-11-19.
 
+## v0.7.7 release preparation (2026-11-19)
+
+README and release notes describe the current stego workspace, full private-draft
+masking and verified audit fixes. Version is 0.7.7, code 14. The public package
+remains a Debug-signed testing prerelease; no production signing key was created.
+See the [release notes](releases/v0.7.7.md) and
+[validation record](releases/v0.7.7-validation.md).
+
+Full Debug/Release tests pass: 1,163 distinct unit cases, two opt-in live-provider
+skips, no failures. Privacy gates, both Lint variants (zero issues), three real-Rime
+ABIs, unsigned Release artifacts and all 32 bundled notices pass verification.
+The exact universal distribution APK upgraded official v0.7.6 in place and passed
+103 distinct API 37 x86_64 platform cases, plus four repeated layout executions
+across small/dark/large-font and landscape/light configurations. An intermittent
+system-menu touch timeout in a combined sequence is retained in the validation
+record; its isolated recheck passed without changing production code/assertions.
+
+The universal APK is 108,003,899 bytes (below the 180 MB budget); ARM64 Debug
+remains above the separate 80 MB target. Installed APK hashes match the artifacts.
+Temporary PIN and device settings were restored and the task-owned emulator was
+stopped. Next: publish the verified four assets and confirm remote tag/digests;
+physical ARM/OEM, older Android and live-provider acceptance remain unverified.
+Earlier entries below are historical.
+
 ## Full code review verification and fixes (2026-11-19)
 
 The pre-fix workspace is committed as `0c1c433` and retained by the local
