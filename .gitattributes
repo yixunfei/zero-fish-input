@@ -19,6 +19,7 @@ app/src/main/assets/shape/han-shapes.tsv text eol=lf
 
 # Preserve exact upstream bytes used by the bootstrap SHA-256 checks.
 LICENSES/** -text
+engine-rime/src/main/assets/rime/default.yaml -text
 engine-rime/src/main/assets/rime/luna_pinyin.dict.yaml -text
 engine-rime/src/main/assets/rime/essay.txt -text
 ime-ui/src/main/assets/expressions/rime-kaomoji-source.txt -text
