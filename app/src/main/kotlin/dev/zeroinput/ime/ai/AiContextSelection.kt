@@ -80,10 +80,11 @@ internal class AiContextSelection {
 
     /** Preserve explicitly selected history when the bounded stored transcript drops its oldest turns. */
     fun append(messages: List<AiMessage>, dropped: Int) {
-        val previous = state.selectedHistory.mapNotNull { (it - dropped).takeIf { index -> index >= 0 } }.toSet()
+        val previous = state.selectedHistory.mapNotNull { (it - dropped).takeIf { index -> index in messages.indices } }.toSet()
         state = AiContextState(state.revision + 1, messages.toList(), previous, state.references, state.workspace)
         // Continuing this active chat includes its new turn only when the complete pair fits.
-        replace(previous + listOf(messages.lastIndex - 1, messages.lastIndex), state.references)
+        val pair = if (messages.size >= 2) setOf(messages.lastIndex - 1, messages.lastIndex) else emptySet()
+        replace(previous + pair, state.references)
     }
 
     private fun replace(selected: Set<Int>, references: List<AiReference>): Boolean {

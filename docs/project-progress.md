@@ -2,6 +2,30 @@
 
 Updated 2026-11-19.
 
+## Full code review verification and fixes (2026-11-19)
+
+The pre-fix workspace is committed as `0c1c433` and retained by the local
+`zn/backup-full-review-20261119` branch. The user's ten-item review was verified
+against the existing contracts and regression cases; see the
+[item-by-item result](audits/2026-11-19-full-code-review-fixes.md).
+
+Missing device-agent categories now grant none, while explicit selections are
+preserved, as confirmed by the user. Personal-data refresh preserves a valid
+model winner and its native route until personal priority or another existing
+revocation boundary supersedes it. Swipe parsing and incomplete history appends
+were hardened. Six other reported failures have no supported reproduction under
+the current ownership and data contracts; no speculative behavior changes were
+made for them.
+
+Full Debug/native x86_64 build, instrumentation build, 1,163 unit passes (two
+opt-in live-provider skips), privacyCheck/testPrivacyBoundary, both merged
+manifests and Debug lint pass. API 37 x86_64 platform validation passes all 25
+selected cases, including the audit examples and actual category-settings page.
+No new ARM or Release APK was produced. Next: physical ARM/OEM and older-API
+acceptance, plus opt-in live-provider checks when test credentials are available.
+Commands and validation scope are in the linked record; earlier entries below
+are historical.
+
 ## Stego paste, custom master material and compact layout (2026-11-19)
 
 The latest request adds a COVER/CARRIER long-press source menu. System Paste reads

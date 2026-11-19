@@ -302,6 +302,9 @@ disabled by default and requires an in-app disclosure, an exact target package,
 an approval policy and Android accessibility authorization. The service is
 protected by `BIND_ACCESSIBILITY_SERVICE`; authorization alone does not start a
 task. The feature is separate from the read-only page-reference service.
+Action categories default to none until explicitly selected, including screen
+observation. Opening settings or enabling the agent does not grant categories;
+existing explicit selections are preserved.
 
 The accessibility action catalog remains fixed to `wait`, `back`, `home`,
 `scroll`, `click`, `long_click`, `swipe`, `input_text`, `ime_action` and

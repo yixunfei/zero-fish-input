@@ -66,6 +66,11 @@ approved separately by [ADR 0026](0026-ai-device-agent-stage6-minimal-capabiliti
 
 ## Consequences
 
+The 2026-11-19 audit correction makes missing action-category preferences grant
+no categories (including observation), as confirmed by the user. Opening the
+settings page or enabling the agent does not grant a recommended subset. Already
+saved empty, subset or full selections are preserved without a data migration.
+
 The core loop is testable without Android: immutable models and a static action
 catalog live in `ai-api`; policy evaluation, protocol parsing, coordination and
 redaction live under `app/ai/device`; the service is the only platform adapter.

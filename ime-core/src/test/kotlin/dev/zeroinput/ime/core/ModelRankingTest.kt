@@ -8,6 +8,58 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ModelRankingTest {
+    @Test fun `personalization refresh preserves the model winner and its native selection route`() {
+        for (index in 0..2) {
+            val editor = Editor()
+            val engine = Engine(state().snapshot)
+            val controller = InputSessionController(editor, { engine }, NoOpPersonalizationStore)
+            controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, InputLanguage.CHINESE, PrivacyConfiguration())
+            try {
+                assertTrue(controller.applyModelWinner(controller.state.candidateRevision, 2))
+                val ranked = controller.state.snapshot
+                controller.refreshPersonalization()
+                assertTrue(controller.state.modelRanked)
+                assertEquals(ranked, controller.state.snapshot)
+                controller.handle(InputCommand.SelectCandidate(index))
+                assertEquals(ranked.candidates[index].text, editor.committed)
+                assertEquals(candidates.indexOfFirst { it.id == ranked.candidates[index].id }, engine.selected)
+            } finally { controller.close() }
+        }
+    }
+
+    @Test fun `new personal priority overrides an existing model winner`() {
+        var count = 0
+        val store = object : PersonalFrequencyStore {
+            override fun frequenciesFor(words: List<String>, language: InputLanguage) = mapOf("指示" to count)
+            override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = emptyList<PersonalSuggestion>()
+            override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit
+            override fun recordUse(id: String, learningAllowed: Boolean) = Unit
+        }
+        val controller = InputSessionController(Editor(), { Engine(state().snapshot) }, store)
+        controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, InputLanguage.CHINESE, PrivacyConfiguration())
+        try {
+            assertTrue(controller.applyModelWinner(controller.state.candidateRevision, 2))
+            count = 3
+            controller.refreshPersonalization()
+            assertFalse(controller.state.modelRanked)
+            assertEquals("c1", controller.state.snapshot.candidates.first().id)
+            assertTrue(controller.modelCandidates().isEmpty())
+        } finally { controller.close() }
+    }
+
+    @Test fun `explicit ranking clear and new engine input do not retain an old winner`() {
+        for (clear in listOf(true, false)) {
+            val controller = InputSessionController(Editor(), { Engine(state().snapshot) }, NoOpPersonalizationStore)
+            controller.start(EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }, InputLanguage.CHINESE, PrivacyConfiguration())
+            try {
+                assertTrue(controller.applyModelWinner(controller.state.candidateRevision, 2))
+                if (clear) controller.clearModelRanking() else controller.handle(InputCommand.Text("x"))
+                assertFalse(controller.state.modelRanked)
+                assertEquals("c0", controller.state.snapshot.candidates.first().id)
+            } finally { controller.close() }
+        }
+    }
+
     private object NoOpPersonalizationStore : PersonalizationStore {
         override fun suggestionsFor(prefix: String, language: InputLanguage, limit: Int) = emptyList<PersonalSuggestion>()
         override fun learn(shortcut: String, value: String, language: InputLanguage, learningAllowed: Boolean) = Unit

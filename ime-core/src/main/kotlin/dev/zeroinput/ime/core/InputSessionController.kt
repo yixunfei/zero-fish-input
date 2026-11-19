@@ -281,7 +281,7 @@ class InputSessionController(
     fun invalidateWordAssociations() {
         val visible = associations.candidates.isNotEmpty()
         associations.clear()
-        if (visible) publish(rawEngineSnapshot)
+        if (visible) publish(rawEngineSnapshot, preserveModelRanking = true)
     }
 
     /** Republishes the active composition after an asynchronous personal query completes. */
@@ -290,7 +290,7 @@ class InputSessionController(
         if (associationsAllowed()) associations.refresh(language) { value ->
             (engine as? CandidateTextNormalizer)?.normalizeCandidateText(value) ?: value
         } else associations.clear()
-        if (state.snapshot.isComposing || associations.candidates.isNotEmpty()) publish(rawEngineSnapshot)
+        if (state.snapshot.isComposing || associations.candidates.isNotEmpty()) publish(rawEngineSnapshot, preserveModelRanking = true)
     }
 
     private fun promotedChineseCandidate(): Boolean {
@@ -807,7 +807,7 @@ class InputSessionController(
         publish(EngineSnapshot.Empty)
     }
 
-    private fun publish(engineSnapshot: EngineSnapshot) {
+    private fun publish(engineSnapshot: EngineSnapshot, preserveModelRanking: Boolean = false) {
         rawEngineSnapshot = engineSnapshot
         val browsed = candidateWindow.snapshot(engineSnapshot)
         val composed = personalPaging.publish(
@@ -823,7 +823,17 @@ class InputSessionController(
         if (composed.isComposing) associations.hide()
         val associated = if (!composed.isComposing && composed.candidates.isEmpty() && associations.candidates.isNotEmpty())
             composed.copy(candidates = associations.candidates) else composed
-        val visibleSnapshot = withKaomoji(associated)
+        val unranked = withKaomoji(associated)
+        // Only a personal-data refresh may retain a model winner. New personal
+        // priority, dictionary edits, browsing or privacy restrictions take precedence.
+        val winner = state.snapshot.candidates.firstOrNull()?.id?.takeIf {
+            preserveModelRanking && state.modelRanked && state.snapshot.rawInput == unranked.rawInput &&
+                !candidateWindow.isBrowsing && !personalPaging.isBrowsing && !personalPaging.editsApplied &&
+                !personalPaging.hasPersonalPriority && ModelRankingPolicy.eligible(
+                    state.copy(snapshot = unranked, modelRanked = false),
+                ).any { candidate -> candidate.id == it }
+        }
+        val visibleSnapshot = winner?.let { ModelRankingPolicy.promote(unranked, it) } ?: unranked
         // The update snapshot is the authoritative view for this event.  Do
         // not resolve engine candidates through the engine's mutable
         // `snapshot` property: adapters may publish that property lazily (or
@@ -832,6 +842,7 @@ class InputSessionController(
         rebuildRoutes(visibleSnapshot)
         state = InputSessionState(language, privacy, visibleSnapshot, languagePackKey, engine?.descriptor,
             canReconvert = recentComposition.available && !visibleSnapshot.isComposing,
+            modelRanked = winner != null,
             candidateRevision = state.candidateRevision + 1)
         // Rendering cannot trigger conversion fallback. Ordinary observer faults
         // leave the published state usable; cancellation and fatal failures propagate.

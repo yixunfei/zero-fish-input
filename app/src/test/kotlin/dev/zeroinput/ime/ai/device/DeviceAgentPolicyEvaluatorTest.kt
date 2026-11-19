@@ -101,6 +101,22 @@ class DeviceAgentPolicyEvaluatorTest {
         )
     }
 
+    @Test fun malformedSwipeCoordinatesAreRejectedBeforeDispatch() {
+        val scrollable = element.copy(label = "Results", text = "Results", clickable = false, scrollable = true,
+            bounds = DeviceBounds(0, 0, 200, 200))
+        val frame = DeviceScreenSnapshot("com.example.app", 7, "swipe", listOf(scrollable))
+        val arguments = mapOf("element_ref" to "0", "start_x" to "10", "start_y" to "10", "end_x" to "10", "end_y" to "100")
+        for (key in listOf("start_x", "start_y", "end_x", "end_y")) {
+            val malformed = listOf(arguments - key) + listOf("NaN", "1.5", "2147483648", "-1", "100001")
+                .map { arguments + (key to it) }
+            for (values in malformed) {
+                val call = DeviceActionCall("swipe-invalid", "swipe", frame.snapshotId, values, 0)
+                assertEquals(DevicePolicyReason.INVALID_ARGUMENT,
+                    evaluator.checkAction(policy, DeviceActionCatalog.find("swipe"), call, frame, "com.example.app").reason)
+            }
+        }
+    }
+
     @Test fun incompleteSnapshotRejectsCoordinateSwipe() {
         val scrollable = element.copy(
             label = "Results", text = "Results", clickable = false, scrollable = true,

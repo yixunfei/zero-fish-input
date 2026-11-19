@@ -94,10 +94,11 @@ class SettingsRepository(context: Context) {
             preferences.edit().putStringSet(KEY_DEVICE_AGENT_ALLOWLIST, value.toSet()).apply()
         }
 
+    /** Missing preferences grant no actions; only explicitly saved categories are allowed. */
     var deviceAgentAllowedCategories: Set<dev.zeroinput.ai.api.DeviceActionCategory>
         get() {
             val values = preferences.getStringSet("ai.device-agent.categories", null)
-                ?: return dev.zeroinput.ai.api.DeviceActionCategory.entries.toSet()
+                ?: return emptySet()
             return dev.zeroinput.ai.api.DeviceActionCategory.entries.filter { it.name in values }.toSet()
         }
         set(value) { preferences.edit().putStringSet("ai.device-agent.categories", value.map { it.name }.toSet()).apply() }

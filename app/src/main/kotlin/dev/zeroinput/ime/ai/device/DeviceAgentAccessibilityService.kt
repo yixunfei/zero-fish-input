@@ -398,10 +398,10 @@ class DeviceAgentAccessibilityService : AccessibilityService() {
             ?: return rejected(call, "Scrollable element not found")
         val node = resolve(root, element.ref) ?: return expired(call)
         try { if (!matches(node, element) || !node.isScrollable) return expired(call) } finally { node.recycle() }
-        val startX = call.arguments.getValue("start_x").toInt()
-        val startY = call.arguments.getValue("start_y").toInt()
-        val endX = call.arguments.getValue("end_x").toInt()
-        val endY = call.arguments.getValue("end_y").toInt()
+        val startX = call.arguments["start_x"]?.toIntOrNull() ?: return rejected(call, "Invalid swipe coordinates")
+        val startY = call.arguments["start_y"]?.toIntOrNull() ?: return rejected(call, "Invalid swipe coordinates")
+        val endX = call.arguments["end_x"]?.toIntOrNull() ?: return rejected(call, "Invalid swipe coordinates")
+        val endY = call.arguments["end_y"]?.toIntOrNull() ?: return rejected(call, "Invalid swipe coordinates")
         if (!DeviceAgentSafety.contains(element.bounds, startX, startY) ||
             !DeviceAgentSafety.contains(element.bounds, endX, endY) || !current()) return rejected(call, "Invalid swipe bounds")
         val path = Path().apply { moveTo(startX.toFloat(), startY.toFloat()); lineTo(endX.toFloat(), endY.toFloat()) }

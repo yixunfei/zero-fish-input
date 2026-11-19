@@ -1318,6 +1318,15 @@ alone does not capture a screen or run an action. The operation service is
 separate from the read-only page-reference service and is protected by
 `BIND_ACCESSIBILITY_SERVICE`.
 
+Missing action-category preferences grant no observation or action categories.
+Opening settings and enabling the agent do not write implicit grants. Existing
+explicit empty, subset and full selections are preserved; unknown stored names
+grant nothing. Regression tests cover fresh preferences, enabling without a
+category choice, reload and unknown values. Swipe coordinates use bounded
+shared validation at the final platform entrance and non-throwing parsing at
+the use site; missing, non-integer, overflowing and out-of-range values are
+rejected before dispatch.
+
 The model sees only the independent device-task draft, a bounded snapshot of the
 current focused window, and redacted action results. The snapshot is limited to
 512 nodes, 32 levels and 512 characters per element text; the task, model rounds,

@@ -5,6 +5,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AiContextSelectionTest {
+    @Test fun incompleteAppendKeepsOnlyValidPreviouslySelectedHistory() {
+        for (size in 0..1) {
+            val selection = AiContextSelection()
+            selection.reset(listOf(AiMessage(AiRole.USER, "first"), AiMessage(AiRole.ASSISTANT, "second")), true)
+            val messages = listOf(AiMessage(AiRole.ASSISTANT, "second")).take(size)
+            selection.append(messages, 1)
+            assertTrue(selection.state.selectedHistory.all { it in messages.indices })
+            assertEquals(messages, selection.history())
+        }
+    }
+
+    @Test fun completeAppendSelectsTheNewPairWhileRebasingOldSelections() {
+        val selection = AiContextSelection()
+        val old = listOf(AiMessage(AiRole.USER, "first"), AiMessage(AiRole.ASSISTANT, "second"))
+        selection.reset(old, true)
+        val messages = old.takeLast(1) + listOf(AiMessage(AiRole.USER, "next"), AiMessage(AiRole.ASSISTANT, "answer"))
+        selection.append(messages, 1)
+        assertEquals(setOf(0, 1, 2), selection.state.selectedHistory)
+        assertEquals(messages, selection.history())
+    }
+
     @Test fun workspaceSharesRecentHistoryBudgetAndClearRemovesAllSelectedSources() {
         val selection = AiContextSelection()
         selection.reset(listOf(AiMessage(AiRole.USER, "x".repeat(16_380)), AiMessage(AiRole.ASSISTANT, "new")))

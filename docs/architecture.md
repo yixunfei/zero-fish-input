@@ -751,7 +751,11 @@ offline ONNX Runtime. `app` composes it through `CandidateScorer`; Rime/JNI neve
 owns the model. `ime-core/ModelRankingPolicy` and controller revisions preserve
 candidate identity and routing. The app coordinator owns successful-commit context
 and UI/privacy lifecycle; `AsyncCandidateRanker` owns one lazy worker, one pending
-request and a coalesced content-free delivery. Disabled input creates no model
+request and a coalesced content-free delivery. A personal-data-only refresh
+reapplies the current model winner by candidate identity and rebuilds native
+selection routes. Fresh personal priority, dictionary edits, browsing, privacy
+restrictions, changed input and explicit ranking clear revoke that preservation.
+Disabled input creates no model
 or worker. See [ADR 0011](adr/0011-experimental-model-ranking.md) and
 [model integration](model-integration.md).
 
@@ -1148,6 +1152,11 @@ events, accessibility window changes and task cancellation. The coordinator
 also enforces bounded model rounds, action count, tool results and five-minute
 wall time. Unknown tools, unknown/duplicate arguments, stale snapshots and
 sensitive editable nodes fail closed before an Android action is attempted.
+Missing action-category preferences grant no categories, including observation.
+Settings only persist the categories the user explicitly selects; opening the
+page or enabling the agent never grants a recommended subset. Existing explicit
+selections retain their meaning. The final swipe dispatcher also rejects
+unparseable coordinates locally after the shared argument-validation gate.
 Locally denied calls are returned to the model as bounded rejected turns without
 executing an Android action; authority loss, stale snapshots and malformed
 responses still terminate the task. Visible leaf text and notification title/text
