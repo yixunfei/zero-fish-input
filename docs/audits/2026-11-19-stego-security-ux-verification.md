@@ -104,3 +104,29 @@ API 37 隔离模拟器最终版 **24 项通过、0 跳过/失败**：`LocalDraft
 模拟器显示/密度/fontScale/深浅主题已恢复为启动前值，默认 IME 未变，未设置临时凭据；任务启动的模拟器已关闭。最终 Debug x86_64 主 APK 为 98,409,615 字节，SHA-256 `5f09cd4561be052ce5a997f441af3c2ebfdab8117a014235c8fc8f5876386e65`，记录在 `.tmp-evidence/stego-verification-followup-artifact.json`。它替代上一轮模拟器产物，不是新 ARM64 分发或正式 Release。
 
 未重跑横屏、完整系统剪贴板拒绝矩阵、旧 Android、实体 ARM/OEM、消息通道、fuzz 或独立密码学审计；上一轮证据仍仅作历史证据。无新增权限/导出/数据格式/密码学/凭据粘贴路径，无提交或发布。
+
+
+## 7. 代码复查、提交与重新打包
+
+按用户“复查代码，无问题后提交推送并重新打包”的授权完成本轮。复查覆盖本次隐写修复及其依赖：门控期限与认证/导航撤销、草稿字节预算和组合拒绝、退格恢复的显式启用范围、粘贴一次性结果与删除代次、反馈与资源一致性。未发现新增阻断问题；第 6 节列出的产品边界与未验证项仍有效。
+
+隐写及必要前置依赖已提交为 `33a2db9`。为验证提交本身，在独立干净检出构建，未带入工作区的表情导出修复和 AI 评估。干净 Windows 检出暴露两个固定输入的 CRLF 问题，分别通过 `88aeed2`、`af8a84b` 的 `.gitattributes` 精确保留许可证及固定 Rime `default.yaml` 字节；不修改上游内容、固定哈希或校验门禁。初次提交夹带的两条表情导出资源通过 `4481541` 移除，原工作区保留它们供所属工作使用。以上提交已推送 `origin/main`。
+
+最终 APK 的源码提交为 **`44815410e6a7ba365ac720303f25862088d934c6`**，独立检出为 `C:/Users/yixun/.codex/worktrees/stego-reviewed-package/zeroInput`，构建完成时 `git status --porcelain` 为空。代码文件已与 Git blob 核对（仅容许检出行尾差异），许可证与固定配置的 `core.autocrlf=true` 检出样本与 Git blob 字节完全一致。临时 Gradle home 复用本机缓存和既有镜像配置，仅本轮进程生效。
+
+```powershell
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000 `
+  -OutputDirectory 'K:/zeroInput/app/build/outputs/test-apk'
+```
+
+最终运行未使用 `SkipChecks`，脚本退出 0。全量 `test`、`privacyCheck`、`:app:lintDebug` 检查阶段 `BUILD SUCCESSFUL in 1m 22s`，真实 Rime ARM64 打包阶段 `BUILD SUCCESSFUL in 31s`。完整 Debug/Release 单测 XML 报告共 2288 项：**2284 通过、4 项可选 provider 跳过、0 失败/错误**，包括 up-to-date/from-cache 的套件，不声称每项本次重新执行。Lint 为 `No issues found.`；APK 内容、签名、ABI、包名及权限检查通过。此前失败运行只作诊断证据，不计为通过。
+
+产物： [ARM64 Debug 测试 APK](../../app/build/outputs/test-apk/20261119-213202/zero-fish-input-0.7.7-debug-arm64-v8a.apk)，包名 `dev.zeroinput.ime.debug`，96,418,147 字节（96.418 MB），SHA-256：
+
+```text
+06e7de44b13ea15085e3e401d75c7d98c610c2115cebb14dd27f644695e9a2e3
+```
+
+同目录 `SHA256SUMS.txt` 中 APK、许可证 notices ZIP、手写对应源码 ZIP 三项重新计算全部匹配。`BUILD-PROVENANCE.json` 记录包名、版本、来源 APK 路径、时间、大小和哈希；源码提交另记录于本节与 `.tmp-evidence/stego-reviewed-unit-results.json`，该脚本生成的 provenance 本身不含 Git 提交。180 MB 上限通过，独立的 80 MB 目标仍未达到。
+
+最终日志：`.tmp-evidence/stego-reviewed-arm64-package-complete.log`；报告统计、源码提交及复算校验值：`.tmp-evidence/stego-reviewed-unit-results.json`；检出字节检查：`.tmp-evidence/stego-reviewed-byte-check.json`。本轮未重新运行平台用例，未安装到实体 ARM/OEM、未补旧 Android 或完整系统剪贴板拒绝矩阵；第 6 节平台结果仅为上一轮证据。本产物为 Debug 签名测试包，无正式 Release 构建或发布。

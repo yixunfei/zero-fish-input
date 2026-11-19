@@ -2,6 +2,28 @@
 
 Updated 2026-11-19.
 
+## Stego review and ARM64 test delivery (2026-11-19)
+
+Reviewed the stego fixes and required draft/input dependencies; no new blocking
+issue was found. Changes are pushed through source commit
+`44815410e6a7ba365ac720303f25862088d934c6`. A separate clean checkout excludes
+unrelated expression-export and AI work. Exact-byte checkout attributes preserve
+upstream licenses and the pinned Rime configuration on Windows without weakening
+integrity checks. See the [review and delivery record](audits/2026-11-19-stego-security-ux-verification.md#7-代码复查提交与重新打包).
+
+The full package script ran without SkipChecks: 2,284 unit passes, four optional
+provider skips, no failures/errors (including up-to-date/from-cache reports),
+privacyCheck, zero-issue Debug Lint, real-Rime ARM64 build and APK/signature/ABI/
+permission checks pass. All three distribution checksums match.
+The [ARM64 Debug test APK](../app/build/outputs/test-apk/20261119-213202/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+is 96,418,147 bytes; SHA-256
+`06e7de44b13ea15085e3e401d75c7d98c610c2115cebb14dd27f644695e9a2e3`.
+The 180 MB budget passes; the 80 MB target remains exceeded. No platform rerun,
+physical-device install, Release build or publication was performed in this round.
+Next: physical ARM/OEM, older Android and the full system-clipboard rejection
+matrix. Final evidence: `.tmp-evidence/stego-reviewed-arm64-package-complete.log`
+and `.tmp-evidence/stego-reviewed-unit-results.json`.
+
 ## Stego audit verification follow-up (2026-11-19)
 
 The [second source verification](audits/2026-11-19-stego-security-ux-verification.md#6-二次回源复核与修正)
