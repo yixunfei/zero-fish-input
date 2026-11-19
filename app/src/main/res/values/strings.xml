@@ -288,5 +288,4 @@
     <string name="appearance_color_channel_red">红色 %d</string>
     <string name="appearance_color_channel_green">绿色 %d</string>
     <string name="appearance_color_channel_blue">蓝色 %d</string>
-    <string name="expression_export_failed">导出未完成，文件可能为空或不完整。请重新选择导出。</string>
 </resources>
