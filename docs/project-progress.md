@@ -4,6 +4,10 @@ Updated 2026-11-20.
 
 ## Natural wording transport design (2026-11-20)
 
+Continue the host experiment on `zn/stego-themed-verse` using the
+[new-session handoff](stego-themed-verse-handoff.md). The local checkpoint
+before this branch is `465ffd7`.
+
 The [design and implementation plan](natural-wording-steganography.md) maps the
 16 pinned Wanxiang tables, public associations and optional short-word scorer
 to resource preparation and evaluation. Current envelope sizes rule out an
