@@ -9,6 +9,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiFileToolsTest {
+    @Test fun approvalLiteralEscapesLineAndDirectionControls() {
+        val visible = AiFileTools.previewLiteral("a\n\u202eb\u2029c")
+        assertTrue(visible.contains("\\n"))
+        assertTrue(visible.contains("\\u202e"))
+        assertTrue(visible.contains("\\u2029"))
+        assertFalse(visible.contains('\u202e'))
+    }
+
     @Test fun catalogUsesOnlySelectedFileIdsAndCannotAcceptUrisOrUnknownParameters() {
         val tool = AiFileTools.definitions(listOf("file1")).first()
         val schema = AiToolJson.schema(tool.schema)

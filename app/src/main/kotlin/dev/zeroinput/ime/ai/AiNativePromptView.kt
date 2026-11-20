@@ -38,7 +38,7 @@ internal class AiNativePromptView(context: Context) : LinearLayout(context) {
     }
     fun ready(ready: Boolean) { send.isEnabled = ready }
     fun running(value: Boolean) { send.isEnabled = !value; prompt.isEnabled = !value; stop.isEnabled = value }
-    fun result(text: String) { answer.text = text.take(8_192) }
+    fun result(text: String) { answer.text = text }
     fun status(label: Int) { status.setText(label) }
     fun clear() { prompt.text?.clear(); answer.text = ""; status.setText(R.string.ai_native_notice); running(false) }
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

@@ -14,7 +14,7 @@ internal interface AiTaskObserver {
     fun event(value: AiToolRunEvent)
     fun cleared(wasRunning: Boolean)
 }
-internal class AiTaskSnapshot(val request: AiToolRequest, val labels: List<String>, val model: String)
+internal class AiTaskSnapshot(val request: AiToolRequest, val labels: Map<String, String>, val model: String)
 
 /** App-owned transient run. Only a weak observer points at the UI. All control methods run on main. */
 internal class AiTaskRuntime(private val context: Context, private val configuration: () -> AiConfiguration?,
@@ -76,7 +76,7 @@ internal class AiTaskRuntime(private val context: Context, private val configura
         if (!lease.destroy(owner)) revoke()
     }
     fun validOpen(token: String?) = token != null && lease.valid(token) && bindingAllowed()
-    fun start(owner: String, request: AiToolRequest, executors: Map<String, AiToolExecutor>, labels: List<String>, model: String,
+    fun start(owner: String, request: AiToolRequest, executors: Map<String, AiToolExecutor>, labels: Map<String, String>, model: String,
         remote: AiRemoteTools?, notifications: Boolean, background: Boolean): Boolean {
         if (uiOwner != owner || !foreground || running || !baseAllowed() || background && !notifications ||
             notifications && !this.notifications.available() || background && request.tools.any { it.origin == AiToolOrigin.FILE && it.effect != AiToolEffect.READ }) return false
@@ -86,7 +86,7 @@ internal class AiTaskRuntime(private val context: Context, private val configura
         config = currentConfig; dataToken = data.current(); connectionToken = connections.current()
         this.remote = remote; this.notify = notifications; this.background = background
         val token = lease.begin(owner, background); nonce = token
-        snapshot = AiTaskSnapshot(request, labels.toList(), model); pending = request to executors.toMap()
+        snapshot = AiTaskSnapshot(request, labels.toMap(), model); pending = request to executors.toMap()
         main.postDelayed(expiry, lease.remaining())
         if (background) {
             try {

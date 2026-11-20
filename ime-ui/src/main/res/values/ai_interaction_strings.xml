@@ -8,4 +8,9 @@
     <string name="ai_queue_remove">移除</string>
     <string name="ai_queue_draft_occupied">请先发送或清空当前草稿，再取回待发消息。</string>
     <string name="ai_capabilities">工具与能力</string>
+    <string name="ai_context_review_latest">本轮未纳入 · 调整上下文</string>
+    <string name="ai_context_budget_warning">上下文已满，本轮问答未完整选入。可选择最近历史或调整勾选。</string>
+    <string name="ai_queue_retry">发送此条</string>
+    <string name="ai_queue_paused">已暂停自动发送，请逐条发送、编辑或移除。</string>
+    <string name="ai_insert_unconfirmed">编辑器未确认插入，请检查正文后决定是否重试。</string>
 </resources>

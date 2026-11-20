@@ -43,6 +43,22 @@ class AiNativeAssistantPlatformTest {
             } finally { public.recycle() }
         }
     }
+    @Test fun scrollableAnswerRetainsTheLastCharacterAtTheProviderLimitAndClearsOnExit() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            val view = AiNativePromptView(instrumentation.targetContext)
+            val scroll = descendants(view).filterIsInstance<android.widget.ScrollView>().single()
+            val answer = scroll.getChildAt(0) as TextView
+            for (size in listOf(8191, 8192, 8193, dev.zeroinput.ai.api.AiLimits.MAX_OUTPUT_CHARS)) {
+                val text = "x".repeat(size - 1) + "尾"
+                view.result(text)
+                assertEquals(text, answer.text.toString())
+            }
+            view.clear()
+            assertEquals("", answer.text.toString())
+        }
+    }
+
     @Test fun compactPromptKeepsControlsVisibleInBothThemesAndLandscape() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {

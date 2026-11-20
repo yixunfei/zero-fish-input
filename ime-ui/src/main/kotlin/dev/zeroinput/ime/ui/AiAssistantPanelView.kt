@@ -22,6 +22,7 @@ import dev.zeroinput.ai.api.*
 class AiAssistantPanelView(context: Context) : LinearLayout(context) {
     var onSubmit: (AiAction, String, String?) -> Unit = { _, _, _ -> }
     var onInterrupt: (AiAction, String, String?) -> Unit = { _, _, _ -> }
+    var onQueueRetry: (Int) -> Unit = {}
     var onQueueEdit: (Int) -> Unit = {}
     var onQueueRemove: (Int) -> Unit = {}
     var onCapabilities: () -> Unit = {}
@@ -124,6 +125,11 @@ class AiAssistantPanelView(context: Context) : LinearLayout(context) {
     private val undoCompaction = button(R.string.ai_workspace_undo) { onUndoCompaction() }.apply { isEnabled = false }
     private val contextTools = row(compact, undoCompaction).apply { visibility = GONE }
 
+    private val contextButton = button(R.string.ai_context_title) {
+        contextRows.visibility = if (contextRows.visibility == GONE) VISIBLE else GONE
+        contextTools.visibility = contextRows.visibility
+    }
+
     init {
         orientation = VERTICAL
         isSaveEnabled = false
@@ -154,10 +160,7 @@ class AiAssistantPanelView(context: Context) : LinearLayout(context) {
                 history.visibility = if (history.visibility == GONE) VISIBLE else GONE
                 if (history.visibility == VISIBLE) onConversationsRequested()
             },
-            button(R.string.ai_context_title) {
-                contextRows.visibility = if (contextRows.visibility == GONE) VISIBLE else GONE
-                contextTools.visibility = contextRows.visibility
-            },
+            contextButton,
         ))
         content.addView(history)
         content.addView(contextRows)
@@ -243,6 +246,7 @@ class AiAssistantPanelView(context: Context) : LinearLayout(context) {
         undoCompaction.isEnabled = undoAvailable
     }
     fun renderContext(value: AiContextState) {
+        contextButton.setText(if (value.latestTurnOmitted) R.string.ai_context_review_latest else R.string.ai_context_title)
         contextRows.render(value)
         workspace.text = context.getString(R.string.ai_workspace_summary,
             value.workspace.persona?.name ?: context.getString(R.string.ai_workspace_default),
@@ -263,11 +267,13 @@ class AiAssistantPanelView(context: Context) : LinearLayout(context) {
         prompt.requestFocus()
     }
     fun hasDraft() = prompt.text.isNotEmpty()
-    fun renderQueue(messages: List<String>, busy: Boolean) {
+    fun renderQueue(messages: List<String>, busy: Boolean, paused: Boolean = false) {
         queueBusy = busy
         queueRows.removeAllViews()
+        if (paused) queueRows.addView(label(14f).apply { setText(R.string.ai_queue_paused) })
         messages.forEachIndexed { index, text ->
             queueRows.addView(label(14f).apply { this.text = context.getString(R.string.ai_queue_item, index + 1, text.take(160)) })
+            if (paused && !busy) queueRows.addView(button(R.string.ai_queue_retry) { onQueueRetry(index) })
             queueRows.addView(row(button(R.string.ai_queue_edit) { onQueueEdit(index) },
                 button(R.string.ai_queue_remove) { onQueueRemove(index) }))
         }

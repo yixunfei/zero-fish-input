@@ -43,6 +43,10 @@ internal class AiToolTaskView(context: Context) : LinearLayout(context) {
     private val approvalPreview = ScrollView(context).apply { addView(approvalText); visibility = GONE }
     private val approvalActions = LinearLayout(context)
     private var approval: String? = null
+    private val approve = button(R.string.ai_tool_approve) {
+        if (approvalPreviewValid) approval?.let { onApprove(it, true) }
+    }
+    private var approvalPreviewValid = false
     private val prompt = EditText(context).apply {
         id = R.id.ai_tool_prompt; setHint(R.string.ai_tool_prompt)
         inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
@@ -79,7 +83,7 @@ internal class AiToolTaskView(context: Context) : LinearLayout(context) {
         listOf(pick, clearFiles, files, connections, tools, contextButton, skills, contextLabel, virtualScreen, notificationMode, backgroundMode).forEach(setup::addView)
         body.addView(approvalPreview, LayoutParams(LayoutParams.MATCH_PARENT, (160 * resources.displayMetrics.density).toInt()))
         listOf(approvalActions, timeline, sources).forEach(body::addView)
-        approvalActions.addView(button(R.string.ai_tool_approve) { approval?.let { onApprove(it, true) } }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        approvalActions.addView(approve, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         approvalActions.addView(button(R.string.ai_tool_decline) { approval?.let { onApprove(it, false) } }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         addView(prompt)
         addView(LinearLayout(context).apply {
@@ -109,14 +113,16 @@ internal class AiToolTaskView(context: Context) : LinearLayout(context) {
         setupExpanded = expanded; setup.visibility = if (expanded) VISIBLE else GONE
         setupToggle.setText(if (expanded) R.string.ai_tool_setup_hide else R.string.ai_tool_setup_show)
     }
-    fun event(value: AiToolRunEvent) {
+    fun event(value: AiToolRunEvent, snapshot: AiTaskSnapshot? = null) {
         approval = value.approval
         approvalActions.visibility = if (value.state == AiToolRunState.APPROVAL) VISIBLE else GONE
         approvalPreview.visibility = approvalActions.visibility
-        approvalText.text = if (value.call != null && value.tool != null && value.state == AiToolRunState.APPROVAL)
-            context.getString(R.string.ai_tool_approval_preview, title(value.tool), AiToolJson.objectValue(value.call.arguments).toString(2),
-                if (value.tool.origin == AiToolOrigin.FILE) "" else value.tool.description) else ""
+        val preview = if (value.state == AiToolRunState.APPROVAL) approvalDescription(value, snapshot) else null
+        approvalPreviewValid = preview != null && approval != null
+        approve.isEnabled = approvalPreviewValid
+        approvalText.text = preview ?: if (approval != null) context.getString(R.string.ai_tool_target_missing) else ""
         status.setText(when {
+            value.networkFailure != null -> dev.zeroinput.ime.ui.aiNetworkErrorMessage(value.networkFailure)
             value.failure == AiToolRunFailure.UNCERTAIN -> R.string.ai_tool_uncertain
             value.state == AiToolRunState.THINKING -> R.string.ai_tool_thinking
             value.state == AiToolRunState.APPROVAL -> R.string.ai_tool_waiting
@@ -140,6 +146,25 @@ internal class AiToolTaskView(context: Context) : LinearLayout(context) {
             scroll.post { scroll.scrollTo(0, approvalPreview.top); approvalPreview.scrollTo(0, 0) }
         }
     }
+    private fun approvalDescription(event: AiToolRunEvent, snapshot: AiTaskSnapshot?): String? {
+        val tool = event.tool ?: return null
+        val call = event.call ?: return null
+        val args = AiToolJson.objectValue(call.arguments)
+        if (tool.origin != AiToolOrigin.FILE || tool.name !in setOf(AiFileTools.READ, AiFileTools.SEARCH)) {
+            return context.getString(R.string.ai_tool_approval_preview, title(tool), args.toString(2),
+                if (tool.origin == AiToolOrigin.FILE) "" else tool.description)
+        }
+        val target = snapshot?.labels?.get(args.getString("file")) ?: return null
+        return if (tool.name == AiFileTools.READ) {
+            context.getString(R.string.ai_tool_read_approval, target, args.getInt("offset"),
+                args.getInt("length"), snapshot.model)
+        } else {
+            val mode = if (args.getBoolean("ignore_case")) R.string.ai_tool_ignore_case else R.string.ai_tool_match_case
+            context.getString(R.string.ai_tool_search_approval, target, context.getString(mode), snapshot.model,
+                AiFileTools.previewLiteral(args.getString("query")))
+        }
+    }
+
     private fun append(text: String) {
         timeline.text = listOf(timeline.text.toString(), text).filter(String::isNotBlank)
             .joinToString("\n\n").takeLastWholeCodePoints(100_000)

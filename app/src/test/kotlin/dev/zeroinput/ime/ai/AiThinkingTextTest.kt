@@ -4,6 +4,50 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AiThinkingTextTest {
+    @Test fun fenceWithTrailingContentStaysLiteralAcrossSingleCharacterChunks() {
+        val code = "~~~xml\n~~~  still code\n<think>literal</think>\n~~~ \t\n"
+        val raw = code + "<think>hidden</think>end"
+        val stream = AiThinkingText.Stream()
+        assertEquals(code + "end", raw.map { stream.append(it.toString()).answer }.joinToString(""))
+        assertEquals(code + "end", AiThinkingText.split(raw).answer)
+    }
+
+    @Test fun unpairedBacktickCannotMakeReasoningVisibleOrInsertable() {
+        val prefix = "An unmatched ` delimiter "
+        val raw = prefix + "<think>private</think>answer"
+        val stream = AiThinkingText.Stream()
+        val partial = raw.map { stream.append(it.toString()).answer }.joinToString("")
+        assertEquals(prefix, partial)
+        assertEquals("answer", stream.append("", final = true).answer)
+        assertEquals(prefix + "answer", AiThinkingText.split(raw).answer)
+        assertEquals("private", AiThinkingText.split(raw).thinking)
+    }
+
+    @Test fun inlineDelimiterCannotMatchAcrossAnEmptyLine() {
+        for (newline in listOf("\n", "\r\n", "\r")) {
+            val raw = "An unmatched ` <think>reason</think>$newline $newline`code`"
+            assertEquals("An unmatched ` $newline $newline`code`", AiThinkingText.answer(raw))
+        }
+    }
+
+    @Test fun nestedReasoningStaysHiddenUntilTheOutermostClose() {
+        val raw = "<think>a<think>b</think>c</think>done"
+        val stream = AiThinkingText.Stream()
+        assertEquals("done", raw.map { stream.append(it.toString()).answer }.joinToString(""))
+        assertEquals("abc", AiThinkingText.split(raw).thinking)
+        assertEquals("", AiThinkingText.answer("<think>a<think>b</think>c"))
+    }
+
+    @Test fun literalMarkdownSurvivesEveryStreamBoundary() {
+        val literal = "<think>keep</think>"
+        val answer = "```xml\n$literal\n```\n`$literal`\n> $literal\n"
+        val raw = answer + "<think>reason</think>end"
+        val stream = AiThinkingText.Stream()
+        assertEquals(answer + "end", raw.map { stream.append(it.toString()).answer }.joinToString(""))
+        assertEquals(answer + "end", AiThinkingText.split(raw).answer)
+        assertEquals("reason", AiThinkingText.split(raw).thinking)
+    }
+
     @Test fun `large coalesced chunks and partial markers stay separated`() {
         val stream = AiThinkingText.Stream()
         val answer = "a".repeat(16_000)

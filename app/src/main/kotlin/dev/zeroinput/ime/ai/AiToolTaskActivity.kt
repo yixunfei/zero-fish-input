@@ -61,7 +61,7 @@ class AiToolTaskActivity : AppCompatActivity() {
             if (event.state in setOf(AiToolRunState.COMPLETED, AiToolRunState.FAILED, AiToolRunState.STOPPED)) {
                 clearBindings()
             }
-            if (visible()) { panel.event(event); refresh() }
+            if (visible()) { panel.event(event, run.snapshot); refresh() }
             else if (event.state in setOf(AiToolRunState.COMPLETED, AiToolRunState.FAILED, AiToolRunState.STOPPED)) panel.clear()
         }
         override fun cleared(wasRunning: Boolean) {
@@ -98,7 +98,7 @@ class AiToolTaskActivity : AppCompatActivity() {
         panel.onPick = {
             if (visible() && !run.running && files.size < 8) picker.select { uri, label ->
                 if (files.values.none { it == uri }) {
-                    val id = "file${files.size + 1}"; files[id] = uri; labels[id] = getString(R.string.ai_tool_file_label, id, label)
+                    val id = "file${files.size + 1}"; files[id] = uri; labels[id] = getString(R.string.ai_tool_file_label, id, AiFileTools.previewLiteral(label))
                 }
                 refresh()
             }
@@ -162,7 +162,7 @@ class AiToolTaskActivity : AppCompatActivity() {
         } }
         panel.newRun()
         val model = config.activeProvider()?.let { getString(R.string.ai_tool_provider_model, it.name, config.activeModel()) }.orEmpty()
-        val accepted = run.start(owner, request, executors, labels.values.toList(), model, remote, notificationOptIn, backgroundOptIn)
+        val accepted = run.start(owner, request, executors, labels, model, remote, notificationOptIn, backgroundOptIn)
         if (accepted) remote = null
         clearBindings()
         if (!accepted) panel.error()
@@ -240,7 +240,7 @@ class AiToolTaskActivity : AppCompatActivity() {
         val config = graph.aiConfigurationSnapshot()
         val snapshot = run.snapshot
         panel.configure(snapshot?.request?.tools ?: definitions(), snapshot?.request?.tools?.map { it.id }?.toSet() ?: selected,
-            snapshot?.labels ?: labels.values.toList(), snapshot?.request?.workspace ?: workspace, run.running,
+            (snapshot?.labels ?: labels).values.toList(), snapshot?.request?.workspace ?: workspace, run.running,
             visible() && config?.enabled == true && config.networkAllowed && config.hasActiveKey(),
             config?.activeProvider()?.let { getString(R.string.ai_tool_provider_model, it.name, config.activeModel()) }
                 ?: getString(R.string.ai_tool_model_missing))
@@ -269,7 +269,7 @@ class AiToolTaskActivity : AppCompatActivity() {
         if (rejectedEntry) return
         run.attach(owner, taskObserver)
         run.snapshot?.let { panel.restoreDraft(it.request.input) }
-        if (run.events.isNotEmpty()) { panel.newRun(); run.events.forEach(panel::event) }
+        if (run.events.isNotEmpty()) { panel.newRun(); run.events.forEach { panel.event(it, run.snapshot) } }
         graph.readAiConfiguration { main.post { if (foreground.get()) refresh() } }
         refresh()
     }
@@ -298,7 +298,7 @@ class AiToolTaskActivity : AppCompatActivity() {
         this.intent = Intent()
         if (valid && visible()) {
             run.attach(owner, taskObserver); run.snapshot?.let { panel.restoreDraft(it.request.input) }
-            panel.newRun(); run.events.forEach(panel::event); refresh()
+            panel.newRun(); run.events.forEach { panel.event(it, run.snapshot) }; refresh()
         }
     }
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); outState.clear() }

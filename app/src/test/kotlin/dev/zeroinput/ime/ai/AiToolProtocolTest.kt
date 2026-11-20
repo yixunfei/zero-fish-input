@@ -25,6 +25,10 @@ class AiToolProtocolTest {
             assertEquals("read", root.getJSONArray("tools").getJSONObject(0).let {
                 if (protocol == AiProtocol.CHAT_COMPLETIONS) it.getJSONObject("function").getString("name") else it.getString("name")
             })
+            val budgetKey = if (protocol == AiProtocol.RESPONSES) "max_output_tokens" else "max_tokens"
+            assertEquals(4096, root.getInt(budgetKey))
+            assertFalse(root.has(if (budgetKey == "max_tokens") "max_output_tokens" else "max_tokens"))
+            assertFalse(root.has("max_completion_tokens"))
             val system = when (protocol) {
                 AiProtocol.CHAT_COMPLETIONS -> root.getJSONArray("messages").getJSONObject(0).getString("content")
                 AiProtocol.RESPONSES -> root.getString("instructions")

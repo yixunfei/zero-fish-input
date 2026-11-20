@@ -107,7 +107,10 @@ tool definitions, requests/results and provider/executor ports. AiToolRun owns
 bounded serial model/approval/execution state; the existing HTTPS provider
 serializes native tool calls for the three existing protocols. AiToolJson applies
 a strict bounded schema subset. File executors only see the task's selected URI
-map; model arguments never address platform paths. AiTaskDocumentPicker owns a
+map; model arguments never address platform paths. The task snapshot also keeps
+the selected display labels for local approval, including after a UI rebind.
+Read and search previews resolve the file ID against that snapshot and show
+the operation scope and destination model. AiTaskDocumentPicker owns a
 single-use, two-minute picker handoff and Save As destination confirmation.
 All private state is transient; device broker checks remain independent.
 
@@ -1127,8 +1130,10 @@ The 2026-11-01 interaction follow-up separates the standalone chat composer and
 device-task start/stop controls from scrolling content. `AiChatQueue` is an
 owner-thread, memory-only ordinary-chat queue with at most four pending messages
 and a combined `MAX_INPUT_CHARS` budget. Posted drains carry a revocable generation;
-configuration, context/model changes, cancellation, data deletion and leaving the
-host discard pending messages. Queue dispatch also rechecks focus, configuration
+configuration, context/model changes, screen-off, data deletion and leaving the
+host discard pending messages. Explicit stop or provider failure pauses delivery.
+Only the current bound foreground chat can recover its active prompt and pending
+items individually. A completed turn is excluded from recovery on save failure. Queue dispatch also rechecks focus, configuration
 and data generation. It has no device-tool port. Successful queued continuation
 waits for optional conversation persistence to settle; storage failure stops it.
 

@@ -7,84 +7,62 @@ data class AiResultSection(val index: Int, val text: String)
 object AiResultSections {
     const val MAX_SECTIONS = 128
 
-    fun split(value: String): List<AiResultSection> {
-        require(value.length <= AiLimits.MAX_OUTPUT_CHARS) { "AI result is too large" }
-        if (value.isBlank()) return emptyList()
-        val sections = SectionAccumulator()
-        val paragraph = StringBuilder()
-        val lines = value.split('\n')
-        var index = 0
-        while (index < lines.size) {
-            val line = lines[index]
-            val content = line.removeSuffix("\r")
-            val fence = openingFence(content)
-            when {
-                content.isBlank() -> flush(paragraph, sections)
-                fence != null -> {
-                    flush(paragraph, sections)
-                    val code = StringBuilder(line)
-                    index++
-                    while (index < lines.size) {
-                        code.append('\n').append(lines[index])
-                        if (isClosingFence(lines[index].removeSuffix("\r"), fence)) break
-                        index++
-                    }
-                    sections.add(code.toString())
-                }
-                isStandaloneSection(content) -> {
-                    flush(paragraph, sections)
-                    sections.add(line)
-                }
-                else -> {
-                    if (paragraph.isNotEmpty()) paragraph.append('\n')
-                    paragraph.append(line)
-                }
-            }
-            index++
-        }
-        flush(paragraph, sections)
-        if (sections.isEmpty) sections.add(value)
-        return sections.finish().mapIndexed { sectionIndex, text -> AiResultSection(sectionIndex, text) }
+    fun split(value: String): List<AiResultSection> = spans(value).mapIndexed { index, range ->
+        AiResultSection(index, value.substring(range))
     }
 
-    /** All selected returns the exact original response; subsets retain provider order. */
+    /** Each selected span keeps its original whitespace and preceding section separator. */
     fun select(value: String, indices: List<Int>): String? {
-        val sections = split(value)
-        val selected = indices.distinct().sorted()
+        val sections = spans(value)
+        val selected = indices.toSet()
         if (selected.isEmpty() || selected.any { it !in sections.indices }) return null
         if (selected.size == sections.size) return value
-        return selected.joinToString("\n\n") { sections[it].text.trim() }.trim().takeIf(String::isNotBlank)
-    }
-
-    private fun flush(paragraph: StringBuilder, sections: SectionAccumulator) {
-        if (paragraph.isEmpty()) return
-        sections.add(paragraph.toString())
-        paragraph.setLength(0)
-    }
-
-    private class SectionAccumulator {
-        private val sections = ArrayList<String>(MAX_SECTIONS)
-        private val overflow = StringBuilder()
-        private var hasOverflow = false
-
-        val isEmpty: Boolean get() = sections.isEmpty() && !hasOverflow
-
-        fun add(value: String) {
-            if (value.isBlank()) return
-            if (sections.size < MAX_SECTIONS - 1) {
-                sections += value
-                return
+        return buildString {
+            for (i in sections.indices) {
+                if (i !in selected) continue
+                val span = sections[i]
+                if (isNotEmpty()) append(value, sections[i - 1].last + 1, span.first)
+                append(value, span.first, span.last + 1)
             }
-            if (hasOverflow) overflow.append("\n\n")
-            overflow.append(value)
-            hasOverflow = true
         }
+    }
 
-        fun finish(): List<String> = if (hasOverflow) {
-            sections + overflow.toString()
-        } else {
-            sections
+    private fun spans(value: String): List<IntRange> {
+        require(value.length <= AiLimits.MAX_OUTPUT_CHARS) { "AI result is too large" }
+        val sections = ArrayList<IntRange>()
+        var start = 0
+        var previousEnd = 0
+        var blockStart = -1
+        var fence: String? = null
+        fun finishBlock(end: Int) {
+            if (blockStart < 0) return
+            if (sections.size < MAX_SECTIONS) sections.add(blockStart until end)
+            else sections[sections.lastIndex] = sections.last().first until end
+            blockStart = -1
         }
+        while (start < value.length) {
+            val newline = value.indexOf('\n', start).let { if (it < 0) value.length else it }
+            val end = if (newline < value.length && newline > start && value[newline - 1] == '\r') newline - 1 else newline
+            val line = value.substring(start, end)
+            if (fence != null) {
+                if (isClosingFence(line, fence)) {
+                    finishBlock(end)
+                    fence = null
+                }
+            } else if (line.isBlank()) {
+                finishBlock(previousEnd)
+            } else {
+                fence = openingFence(line)
+                val standalone = fence == null && isStandaloneSection(line)
+                if (fence != null || standalone) finishBlock(previousEnd)
+                if (blockStart < 0) blockStart = start
+                if (standalone) finishBlock(end)
+            }
+            previousEnd = end
+            start = newline + 1
+        }
+        finishBlock(previousEnd)
+        return sections
     }
 
     private fun openingFence(line: String): String? {
@@ -109,9 +87,11 @@ object AiResultSections {
         return length >= fence.length && content.drop(length).all { it == ' ' || it == '\t' }
     }
 
+    private val heading = Regex("#{1,6}\\s+.*")
+    private val listItem = Regex("(?:[-*+]\\s+|\\d{1,3}[.)]\\s+).*")
+
     private fun isStandaloneSection(line: String): Boolean {
         val value = line.trimStart()
-        return value.matches(Regex("#{1,6}\\s+.*")) ||
-            value.matches(Regex("(?:[-*+]\\s+|\\d{1,3}[.)]\\s+).*"))
+        return heading.matches(value) || listItem.matches(value)
     }
 }

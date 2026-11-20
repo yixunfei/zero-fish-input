@@ -1,7 +1,10 @@
 package dev.zeroinput.ime.ai
 
 import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +15,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -30,6 +34,11 @@ class AiAssistantActivity : AppCompatActivity() {
     private val graph get() = (application as ZeroInputApplication).graph
     private val main = Handler(Looper.getMainLooper())
     private lateinit var panel: AiAssistantPanelView
+    private val screenOff = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) revoke()
+        }
+    }
     private var started = false
     private var revision = 0L
     private var configurationReadFailed = false
@@ -57,7 +66,7 @@ class AiAssistantActivity : AppCompatActivity() {
                 finally { dispatching = false }
             },
             cancel = { queueTurn++; workbench.stop() },
-            changed = { messages, busy -> panel.renderQueue(messages.map { it.text }, busy) },
+            changed = { messages, busy -> panel.renderQueue(messages.map { it.text }, busy, queue.paused) },
         )
     }
     private val workbench: AiWorkbenchController by lazy {
@@ -70,7 +79,7 @@ class AiAssistantActivity : AppCompatActivity() {
                 val token = queueTurn
                 main.post {
                     if (started && token == queueTurn) {
-                        if (success) queue.completed() else queue.failed()
+                        if (success) queue.completed() else queue.failed(recoverActive = false)
                     }
                 }
             },
@@ -101,12 +110,13 @@ class AiAssistantActivity : AppCompatActivity() {
     private fun bindPanel() {
         panel.onSubmit = { action, text, target -> send(AiChatQueue.Message(action, text, target), false) }
         panel.onInterrupt = { action, text, target -> send(AiChatQueue.Message(action, text, target), true) }
+        panel.onQueueRetry = { queue.retry(it) }
         panel.onQueueRemove = { queue.remove(it) }
         panel.onQueueEdit = { index ->
             if (panel.hasDraft()) panel.draftOccupied()
             else queue.remove(index)?.let { panel.editQueued(it.action, it.text, it.target) }
         }
-        panel.onCancel = { queue.reset(); workbench.cancelRequest() }
+        panel.onCancel = { queueTurn++; queue.failed(); workbench.cancelRequest() }
         panel.onNewConversation = { queue.reset(); workbench.newConversation() }
         panel.onModelSelected = { queue.reset(); workbench.selectModel(it) }
         panel.onReasoningChanged = { queue.reset(); workbench.setReasoningMode(it) }
@@ -138,12 +148,13 @@ class AiAssistantActivity : AppCompatActivity() {
         }
         panel.onToolTask = {
             if (allowed()) {
-                if (!panel.hasDraft() && workbench.contextState.characterCount == 0 && !queue.busy)
+                val context = workbench.contextState
+                if (!panel.hasDraft() && context.characterCount == 0 && context.messages.isEmpty() && !queue.busy && !queue.hasEntries)
                     startActivity(Intent(this, AiToolTaskActivity::class.java))
                 else {
                     skillNavigationDialog?.dismiss()
                     skillNavigationDialog = MaterialAlertDialogBuilder(this).setTitle(R.string.ai_tool_title)
-                        .setMessage(R.string.ai_tool_leave_notice).setNegativeButton(R.string.cancel, null)
+                        .setMessage(R.string.ai_chat_leave_for_tools).setNegativeButton(R.string.cancel, null)
                         .setPositiveButton(R.string.ai_tool_open) { _, _ -> if (allowed()) startActivity(Intent(this, AiToolTaskActivity::class.java)) }
                         .create().also { it.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE); it.show() }
                 }
@@ -159,12 +170,12 @@ class AiAssistantActivity : AppCompatActivity() {
     private fun send(message: AiChatQueue.Message, interrupt: Boolean) {
         val config = graph.aiConfigurationSnapshot()
         if (!hasWindowFocus() || !allowed() || config?.enabled != true || !config.networkAllowed || !config.hasActiveKey() ||
-            queue.busy && (config != queueConfiguration || !graph.aiDataGeneration.isCurrent(queueGeneration))) {
+            (queue.busy || queue.hasEntries) && (config != queueConfiguration || !graph.aiDataGeneration.isCurrent(queueGeneration))) {
             queue.reset()
             refresh()
             return
         }
-        if (!queue.busy) {
+        if (!queue.busy && !queue.hasEntries) {
             queueConfiguration = graph.aiConfigurationSnapshot()
             queueGeneration = graph.aiDataGeneration.current()
         }
@@ -176,6 +187,7 @@ class AiAssistantActivity : AppCompatActivity() {
         if (dispatching && event == AiStreamEvent.Cancelled) return
         panel.render(event)
         when (event) {
+            is AiStreamEvent.Completed -> queue.answered()
             is AiStreamEvent.Failed, AiStreamEvent.Cancelled -> queue.failed()
             else -> Unit
         }
@@ -235,6 +247,8 @@ class AiAssistantActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         started = true
+        ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF),
+            ContextCompat.RECEIVER_NOT_EXPORTED)
         settingsObserver = graph.settings.addChangeListener { main.post { revoke() } }
         configurationObserver = graph.observeAiConfiguration { main.post { revoke() } }
         val token = ++revision
@@ -308,6 +322,7 @@ class AiAssistantActivity : AppCompatActivity() {
 
     override fun onStop() {
         started = false
+        unregisterReceiver(screenOff)
         queueConfiguration = null
         queueGeneration = -1L
         revision++

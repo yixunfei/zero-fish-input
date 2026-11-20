@@ -36,6 +36,7 @@ class AiContextState(
     val selectedHistory: Set<Int> = emptySet(),
     val references: List<AiReference> = emptyList(),
     val workspace: AiWorkspaceContext = AiWorkspaceContext(),
+    val latestTurnOmitted: Boolean = false,
 ) {
     val characterCount: Int get() = messages.filterIndexed { index, _ -> index in selectedHistory }
         .sumOf { it.content.length } + references.sumOf { it.text.length } + workspace.characterCount

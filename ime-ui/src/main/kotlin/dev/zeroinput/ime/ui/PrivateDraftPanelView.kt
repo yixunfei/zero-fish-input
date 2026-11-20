@@ -43,7 +43,7 @@ internal class PrivateDraftPanelView(context: Context) : ScrollView(context) {
     init {
         isSaveFromParentEnabled = false
         importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-        if (android.os.Build.VERSION.SDK_INT >= 29) {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
             importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         }
         addView(LinearLayout(context).apply {

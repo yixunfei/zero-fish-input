@@ -27,7 +27,7 @@ class AiChatQueueTest {
         queue.send(message("active"))
         repeat(4) { assertTrue(queue.send(message("next"))) }
         assertFalse(queue.send(message("fifth")))
-        queue.failed(); queue.send(message("active"))
+        queue.reset(); queue.send(message("active"))
         assertTrue(queue.send(message("x".repeat(AiLimits.MAX_INPUT_CHARS))))
         assertFalse(queue.send(message("overflow")))
         assertEquals(1, entries.size)
@@ -39,9 +39,39 @@ class AiChatQueueTest {
             if (reset) queue.reset() else queue.failed()
             posted.removeAt(0)()
             assertFalse(queue.busy)
-            assertTrue(entries.isEmpty())
+            assertEquals(if (reset) emptyList() else listOf("stale"), entries.map { it.text })
         }
         assertFalse("stale" in sent)
+    }
+
+    @Test fun failedTurnAndQueueCanBeRecoveredIndividuallyWithoutAutomaticReplay() {
+        queue.send(message("active")); queue.send(message("later"))
+        queue.failed()
+        assertEquals(listOf("active", "later"), entries.map { it.text })
+        assertTrue(queue.retry(0))
+        queue.completed()
+        assertTrue(posted.isEmpty())
+        assertEquals(listOf("active", "active"), sent)
+        ready = false
+        assertNull(queue.remove(0))
+        assertTrue(entries.isEmpty())
+    }
+
+    @Test fun cancellationAtCapacityRetainsEveryQuestionWithinTheOriginalBounds() {
+        queue.send(message("x".repeat(AiLimits.MAX_INPUT_CHARS)))
+        repeat(4) { queue.send(message("queued $it")) }
+        queue.failed()
+        assertEquals(5, entries.size)
+        assertFalse(queue.send(message("extra")))
+        queue.reset()
+        assertTrue(entries.isEmpty())
+        assertFalse(queue.retry(0))
+    }
+
+    @Test fun storageFailureRecoversOnlyUnsentMessages() {
+        queue.send(message("answered")); queue.send(message("later"))
+        queue.failed(recoverActive = false)
+        assertEquals(listOf("later"), entries.map { it.text })
     }
 
     @Test fun changedPermissionAtDrainDiscardsRemainingMessages() {

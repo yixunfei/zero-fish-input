@@ -8,4 +8,9 @@
     <string name="ai_queue_remove">Remove</string>
     <string name="ai_queue_draft_occupied">Send or clear your draft before editing a queued message.</string>
     <string name="ai_capabilities">Tools and capabilities</string>
+    <string name="ai_context_review_latest">Latest turn omitted · Review</string>
+    <string name="ai_context_budget_warning">Context is full. The latest turn was not fully selected. Choose recent history or adjust the selection.</string>
+    <string name="ai_queue_retry">Send this message</string>
+    <string name="ai_queue_paused">Automatic sending paused. Send, edit or remove each message.</string>
+    <string name="ai_insert_unconfirmed">The editor did not confirm insertion. Check the text before retrying.</string>
 </resources>

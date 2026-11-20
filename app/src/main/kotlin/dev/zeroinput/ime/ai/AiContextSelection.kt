@@ -55,7 +55,7 @@ internal class AiContextSelection {
 
     fun workspace(revision: Long, value: AiWorkspaceContext): Boolean {
         if (revision != state.revision || runCatching { value.validate(history(), state.references) }.isFailure) return false
-        state = AiContextState(state.revision + 1, state.messages, state.selectedHistory, state.references, value)
+        state = AiContextState(state.revision + 1, state.messages, state.selectedHistory, state.references, value, state.latestTurnOmitted)
         return true
     }
 
@@ -69,7 +69,7 @@ internal class AiContextSelection {
 
     fun restore(revision: Long, previous: AiContextState): Boolean {
         if (revision != state.revision || previous.messages != state.messages) return false
-        state = AiContextState(state.revision + 1, previous.messages, previous.selectedHistory, previous.references, previous.workspace)
+        state = AiContextState(state.revision + 1, previous.messages, previous.selectedHistory, previous.references, previous.workspace, previous.latestTurnOmitted)
         return true
     }
 
@@ -81,16 +81,20 @@ internal class AiContextSelection {
     /** Preserve explicitly selected history when the bounded stored transcript drops its oldest turns. */
     fun append(messages: List<AiMessage>, dropped: Int) {
         val previous = state.selectedHistory.mapNotNull { (it - dropped).takeIf { index -> index in messages.indices } }.toSet()
-        state = AiContextState(state.revision + 1, messages.toList(), previous, state.references, state.workspace)
-        // Continuing this active chat includes its new turn only when the complete pair fits.
         val pair = if (messages.size >= 2) setOf(messages.lastIndex - 1, messages.lastIndex) else emptySet()
-        replace(previous + pair, state.references)
+        val selected = previous + pair
+        val history = messages.filterIndexed { index, _ -> index in selected }
+        val fits = runCatching { state.workspace.validate(history, state.references) }.isSuccess
+        state = AiContextState(state.revision + 1, messages.toList(), if (fits) selected else previous,
+            state.references, state.workspace, latestTurnOmitted = !fits)
     }
 
     private fun replace(selected: Set<Int>, references: List<AiReference>): Boolean {
         val history = state.messages.filterIndexed { index, _ -> index in selected }
         if (runCatching { state.workspace.validate(history, references) }.isFailure) return false
-        state = AiContextState(state.revision + 1, state.messages, selected.toSet(), references.toList(), state.workspace)
+        state = AiContextState(state.revision + 1, state.messages, selected.toSet(), references.toList(), state.workspace,
+            latestTurnOmitted = state.latestTurnOmitted &&
+                (state.messages.lastIndex !in selected || state.messages.lastIndex - 1 !in selected))
         return true
     }
 }

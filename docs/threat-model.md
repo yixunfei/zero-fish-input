@@ -62,7 +62,10 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   single-use approvals, serial dispatch and task/data/configuration fences.
   Duplicate IDs, unknown names, extra arguments and unsupported schemas reject
   execution. Task deadlines and UI-delivery failure close the task. Source file
-  IDs bind only selected SAF URIs; no model path or URI is accepted. Save As uses
+  IDs bind only selected SAF URIs; no model path or URI is accepted. Display
+  names stay in the local task snapshot. Approval quotes names and search terms
+  and escapes formatting controls. An unresolved read or search target can
+  only be declined. Save As uses
   fresh creation and destination review, rejects known/reused URI targets and
   treats dispatch errors as uncertain without retry. Metadata/read/write work is
   off the main thread. Picker cancellation, timeout, screen-off and recreation
@@ -1319,6 +1322,11 @@ the replacement. Posted continuation is revoked on leave/lock, settings/model/
 context changes, data deletion, failure or explicit stop; configuration and data
 generation are revalidated before dispatch. Optional persistence must settle
 before the next request, so request cancellation cannot silently skip that save.
+After a request failure or explicit stop, recovery can hold the active prompt
+and four unsent messages in memory. Only a fresh user action can dispatch a
+recovered item. Recovery checks focus, current configuration, unlocked state
+and AI data generation before returning text. Screen-off and host exit clear it.
+A save failure exposes only unsent items for recovery.
 No queue, steering or automatic retry is added to device actions.
 
 Capability discovery reads configuration/permission/feature metadata only, never

@@ -47,11 +47,18 @@ internal class AiNativeSession(private val appContext: Context) : VoiceInteracti
     override fun onCreateContentView(): View = AiNativePromptView(context).also { view ->
         panel = view; view.onSend = ::send
         view.onStop = { generation.incrementAndGet(); coordinator.invalidate(); pending = false; view.running(false); view.status(R.string.ai_run_stopped); ready() }
-        view.onFull = {
-            if (allowed()) {
-                clear(); runCatching { startAssistantActivity(Intent(appContext, AiAssistantActivity::class.java)) }; finish()
-            }
+        view.onFull = ::openNewChat
+    }
+    private fun openNewChat() {
+        if (!allowed()) return
+        try {
+            startAssistantActivity(Intent(appContext, AiAssistantActivity::class.java))
+        } catch (_: RuntimeException) {
+            if (allowed()) panel?.status(R.string.ai_native_chat_unavailable)
+            return
         }
+        clear()
+        finish()
     }
     override fun onShow(args: Bundle?, showFlags: Int) {
         clear(); super.onShow(Bundle.EMPTY, 0)
@@ -78,14 +85,23 @@ internal class AiNativeSession(private val appContext: Context) : VoiceInteracti
         pending = true; panel?.result(""); panel?.running(true); panel?.status(R.string.ai_run_running)
         try {
             coordinator.submit(AiRequest(null, AiAction.ASK, text), AiStandalonePolicy.generationPolicy(config, true)) { event ->
-                handler.post { weak.get()?.receive(token, event) }
+                if (event !is AiStreamEvent.Delta && event != AiStreamEvent.Started) {
+                    handler.post { weak.get()?.receive(token, event) }
+                }
             }
         } catch (_: Exception) { pending = false; panel?.running(false); panel?.status(R.string.ai_run_failed); ready() }
     }
     private fun receive(token: Long, event: AiStreamEvent) {
-        if (generation.get() != token || !allowed()) return
+        if (!pending || generation.get() != token || !allowed()) return
         when (event) {
-            is AiStreamEvent.Completed -> { pending = false; panel?.running(false); panel?.result(event.text); panel?.status(R.string.ai_run_finished); ready() }
+            is AiStreamEvent.Completed -> {
+                val answer = AiThinkingText.completed(event)?.text
+                pending = false
+                panel?.running(false)
+                panel?.result(answer.orEmpty())
+                panel?.status(if (answer == null) R.string.ai_run_failed else R.string.ai_run_finished)
+                ready()
+            }
             is AiStreamEvent.Failed, AiStreamEvent.Cancelled -> { pending = false; panel?.running(false); panel?.status(R.string.ai_run_failed); ready() }
             else -> Unit
         }

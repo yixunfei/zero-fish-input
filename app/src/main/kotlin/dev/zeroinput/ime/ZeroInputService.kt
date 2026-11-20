@@ -1498,15 +1498,30 @@ class ZeroInputService : InputMethodService() {
 
     private fun insertAiResult(displayedResult: String, includeThinking: Boolean, sections: List<Int>?) {
         syncSessionPrivacy()
-        if (!aiAllowed()) return
-        if (!aiPages.ensureCurrent()) return
-        val text = aiWorkbench.consumeResult(includeThinking, displayedResult, sections) ?: return
         val session = activeSession ?: return
-        val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
-        registerInteraction()
-        session.controller.reset()
-        if (isSessionActive(session, connection)) connection.commitText(text, 1)
-        inputView?.returnToKeyboard()
+        val connection = session.connectionBinding.resolve(currentInputConnection)
+        if (connection == null) {
+            aiWorkbench.invalidate()
+            inputView?.returnToKeyboard()
+            return
+        }
+        if (!aiAllowed() || !aiPages.ensureCurrent()) return
+        val inserted = aiWorkbench.consumeResult(includeThinking, displayedResult, sections) { text ->
+            if (!isSessionActive(session, connection)) return@consumeResult false
+            registerInteraction()
+            session.controller.reset()
+            if (!isSessionActive(session, connection)) return@consumeResult false
+            try {
+                connection.commitText(text, 1)
+            } catch (_: RuntimeException) {
+                // A broken editor connection cannot confirm whether it applied the text.
+                false
+            }
+        }
+        if (activeSession !== session || inputView?.isAiOpen != true) return
+        if (inserted != null) inputView?.returnToKeyboard()
+        else android.widget.Toast.makeText(this, dev.zeroinput.ime.ui.R.string.ai_insert_unconfirmed,
+            android.widget.Toast.LENGTH_SHORT).show()
     }
 
     private fun handleKeyboardAction(action: KeyboardAction) {

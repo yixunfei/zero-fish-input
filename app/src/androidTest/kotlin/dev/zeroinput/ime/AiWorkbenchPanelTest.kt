@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.descendants
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.button.MaterialButton
@@ -24,6 +25,29 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AiWorkbenchPanelTest {
+    @Test fun sectionRowsAreCreatedOnDemandAndSelectionsSurviveToggling() = onMain {
+        val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
+        val panel = AiWorkbenchPanelView(context)
+        val count = dev.zeroinput.ai.api.AiResultSections.MAX_SECTIONS
+        val text = (1..count).joinToString("\n\n") { "Part $it" }
+        fun rows() = panel.descendants.filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>()
+            .filter { it.text.startsWith("Part ") }
+        panel.render(AiStreamEvent.Started)
+        panel.render(AiStreamEvent.Completed(text))
+        assertTrue(rows().none())
+        val toggle = panel.findViewById<View>(dev.zeroinput.ime.ui.R.id.ai_result_sections_toggle)
+        toggle.performClick()
+        assertEquals(count, rows().count())
+        val first = rows().first()
+        first.isChecked = true
+        toggle.performClick()
+        toggle.performClick()
+        assertSame(first, rows().first())
+        assertTrue(first.isChecked)
+        panel.render(AiStreamEvent.Cancelled)
+        assertTrue(rows().none())
+    }
+
     @Test fun draftShowsUnconvertedCodeAsAnUnderlinedComposition() = onMain {
         val context = ContextThemeWrapper(InstrumentationRegistry.getInstrumentation().targetContext, R.style.Theme_ZeroInput_InputMethod)
         val panel = AiWorkbenchPanelView(context)

@@ -11,6 +11,8 @@ internal class AiStreamDelivery(
     private val lock = Any()
     private val delta = StringBuilder()
     private val thinking = StringBuilder()
+    private var receivedText = 0
+    private var receivedThinking = 0
     private var terminal: AiStreamEvent? = null
     private var posted = false
     private var ended = false
@@ -22,11 +24,16 @@ internal class AiStreamDelivery(
             when (event) {
                 AiStreamEvent.Started -> return
                 is AiStreamEvent.Delta -> {
-                    if (event.text.length > AiLimits.MAX_OUTPUT_CHARS - delta.length ||
-                        event.thinking.length > AiLimits.MAX_OUTPUT_CHARS - thinking.length) {
+                    if (event.text.length > AiLimits.MAX_OUTPUT_CHARS - receivedText ||
+                        event.thinking.length > AiLimits.MAX_OUTPUT_CHARS - receivedThinking) {
                         terminal = AiStreamEvent.Failed(dev.zeroinput.ai.api.AiProviderError.Response("AI output exceeded limit"))
                         ended = true
-                    } else { delta.append(event.text); thinking.append(event.thinking) }
+                    } else {
+                        receivedText += event.text.length
+                        receivedThinking += event.thinking.length
+                        delta.append(event.text)
+                        thinking.append(event.thinking)
+                    }
                 }
                 else -> { terminal = event; ended = true }
             }

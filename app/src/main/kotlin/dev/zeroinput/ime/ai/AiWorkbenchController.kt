@@ -305,15 +305,13 @@ internal class AiWorkbenchController(
                     // without going through the bounded SSE reader. Reject
                     // malformed/empty output before exposing it as a usable
                     // result or persisting it.
-                    val split = AiThinkingText.split(event.text)
-                    val answer = split.answer
-                    if (event.text.isBlank() || event.text.length > AiLimits.MAX_OUTPUT_CHARS || answer.isBlank() ||
-                        event.thinking.length > AiLimits.MAX_OUTPUT_CHARS - split.thinking.length) {
+                    val completed = AiThinkingText.completed(event)
+                    if (completed == null) {
                         result = null
                         renderOutput(AiStreamEvent.Failed(AiProviderError.Response("AI response is invalid")))
                     } else {
-                        complete(request, previous, answer, token, data, config.saveConversations)
-                        renderOutput(event.copy(text = answer, thinking = event.thinking + split.thinking))
+                        complete(request, previous, completed.text, token, data, config.saveConversations)
+                        renderOutput(completed)
                     }
                 }
                 is AiStreamEvent.Delta -> {
@@ -342,6 +340,7 @@ internal class AiWorkbenchController(
         includeThinking: Boolean = false,
         displayedResult: String? = null,
         selectedSections: List<Int>? = null,
+        commit: (String) -> Boolean,
     ): String? {
         reconcilePersistence()
         if (!allowed() || !contextCurrent() || !dataGeneration.isCurrent(resultDataGeneration)) return null
@@ -354,11 +353,15 @@ internal class AiWorkbenchController(
             selectedSections == null -> source
             else -> AiResultSections.select(source, selectedSections)
         } ?: return null
+        val token = generation.get()
+        // Reserve the result during the editor callback, including reentrant callbacks.
         result = null
-        return insertable
+        if (commit(insertable)) return insertable
+        if (generation.get() == token && dataGeneration.isCurrent(resultDataGeneration) && allowed() && contextCurrent()) {
+            result = source
+        }
+        return null
     }
-
-    fun splitResult(value: String): AiThinkingText.Split = AiThinkingText.split(value)
 
     private fun complete(request: AiRequest, previous: AiConversation?, text: String,
         token: Long, data: Long, save: Boolean) {

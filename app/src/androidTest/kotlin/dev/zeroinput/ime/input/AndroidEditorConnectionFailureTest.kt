@@ -40,13 +40,16 @@ class AndroidEditorConnectionFailureTest {
         assertFalse(adapter.reopenCommittedText("fixture"))
     }
 
-    @Test fun throwingCursorPlacementFailsThePairWithoutCommittingItTwice() {
+    @Test fun throwingCursorPlacementKeepsTheAcceptedPairAndInvalidatesItsContext() {
         val connection = Fixture("selection")
-        val adapter = AndroidEditorConnection(0, 0) { connection }
+        var invalidations = 0
+        val adapter = AndroidEditorConnection(0, 0, onContextInvalidated = { invalidations++ }) { connection }
 
-        assertFalse(adapter.commitPairedText("()", 1))
+        assertTrue(adapter.commitPairedText("()", 1))
 
         assertEquals(1, connection.commits)
+        assertEquals(1, connection.selections)
+        assertTrue(invalidations > 0)
         assertFalse(adapter.reopenCommittedText("()"))
     }
 

@@ -27,17 +27,38 @@ class AiFileToolsPlatformTest {
         instrumentation.runOnMainSync {
             val context = androidx.appcompat.view.ContextThemeWrapper(instrumentation.targetContext, R.style.Theme_ZeroInput)
             val view = AiToolTaskView(context)
-            val tool = AiFileTools.definitions(listOf("file1")).first { it.name == AiFileTools.READ }
-            view.configure(listOf(tool), setOf(tool.id), listOf("file1: Public.txt"), AiWorkspaceContext(), true, true, "Public model")
+            val tools = AiFileTools.definitions(listOf("file1", "file2"))
+            val tool = tools.single { it.name == AiFileTools.READ }
+            val labels = mapOf("file1" to "file1: First.txt", "file2" to "file2: Second.txt")
+            val snapshot = AiTaskSnapshot(AiToolRequest("Public task", tools), labels, "Public model")
+            view.configure(listOf(tool), setOf(tool.id), labels.values.toList(), AiWorkspaceContext(), true, true, "Public model")
             var approved: Pair<String, Boolean>? = null
             view.onApprove = { token, accepted -> approved = token to accepted }
             view.event(AiToolRunEvent(AiToolRunState.APPROVAL, approval = "public-approval", tool = tool,
-                call = AiToolCall("call", tool.name, """{"file":"file1","offset":0,"length":4000}""")))
+                call = AiToolCall("call", tool.name, """{"file":"file2","offset":12,"length":50}""")), snapshot)
             val views = descendants(view)
             assertEquals(View.GONE, views.filterIsInstance<android.widget.Button>().single { it.text == context.getString(R.string.ai_tool_pick) }.parent.let { it as View }.visibility)
+            fun hasPreview(expected: String) = views.filterIsInstance<android.widget.TextView>().any { it.text.toString() == expected }
+            assertTrue(hasPreview(context.getString(R.string.ai_tool_read_approval, labels.getValue("file2"), 12, 50, snapshot.model)))
+            val search = tools.single { it.name == AiFileTools.SEARCH }
+            val next = AiToolRunEvent(AiToolRunState.APPROVAL, approval = "search", tool = search,
+                call = AiToolCall("find", search.name, """{"file":"file1","query":"Public","ignore_case":true}"""))
+            view.event(next, snapshot)
+            assertTrue(hasPreview(context.getString(R.string.ai_tool_search_approval, labels.getValue("file1"),
+                context.getString(R.string.ai_tool_ignore_case), snapshot.model, org.json.JSONObject.quote("Public"))))
+            val allow = views.filterIsInstance<android.widget.Button>().single { it.text == context.getString(R.string.ai_tool_approve) }
+            assertTrue(allow.isEnabled)
+            assertNull(approved)
+            allow.performClick()
+            assertEquals("search" to true, approved)
+            approved = null
+            view.event(next, AiTaskSnapshot(snapshot.request, mapOf("file2" to labels.getValue("file2")), snapshot.model))
+            assertTrue(hasPreview(context.getString(R.string.ai_tool_target_missing)))
+            assertFalse(allow.isEnabled)
+            allow.performClick()
             assertNull(approved)
             views.filterIsInstance<android.widget.Button>().single { it.text == context.getString(R.string.ai_tool_decline) }.performClick()
-            assertEquals("public-approval" to false, approved)
+            assertEquals("search" to false, approved)
             view.event(AiToolRunEvent(AiToolRunState.STOPPED))
             assertEquals(View.GONE, views.filterIsInstance<android.widget.Button>().single { it.text == context.getString(R.string.ai_tool_decline) }.parent.let { it as View }.visibility)
         }

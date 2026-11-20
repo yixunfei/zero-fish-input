@@ -37,4 +37,10 @@
     <string name="ai_tool_write">写入这个文档</string>
     <string name="ai_tool_leave_notice">离开会停止当前任务，清除未发送草稿、上下文选择和本次文件授权。已保存的对话、角色、记忆和 Skills 保留。</string>
     <string name="ai_tool_open">打开工具任务</string>
+    <string name="ai_chat_leave_for_tools">离开后，当前草稿、待发消息和临时对话会清除。继续打开工具任务？</string>
+    <string name="ai_tool_read_approval">读取文件 %1$s\n从位置 %2$d 开始，最多读取 %3$d 个 UTF-16 单元（从 0 起算）。\n批准后将片段发送至 %4$s。</string>
+    <string name="ai_tool_search_approval">搜索文件 %1$s\n在整份文档中按字面搜索，%2$s。批准后将最多 10 条匹配片段发送至 %3$s。\n搜索文本 %4$s</string>
+    <string name="ai_tool_match_case">区分大小写</string>
+    <string name="ai_tool_ignore_case">忽略大小写</string>
+    <string name="ai_tool_target_missing">无法核对此任务的目标文件，请拒绝此次操作。</string>
 </resources>

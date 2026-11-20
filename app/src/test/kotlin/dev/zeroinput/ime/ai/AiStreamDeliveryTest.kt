@@ -18,6 +18,19 @@ class AiStreamDeliveryTest {
         assertEquals(AiStreamEvent.Completed("done"), events.last())
         assertEquals(2, events.size)
     }
+    @Test fun drainingDoesNotResetThePerResponseTextBudget() {
+        val tasks = mutableListOf<() -> Unit>()
+        val events = mutableListOf<AiStreamEvent>()
+        val delivery = AiStreamDelivery({ tasks.add(it); true }, events::add)
+        delivery.offer(AiStreamEvent.Delta("x".repeat(dev.zeroinput.ai.api.AiLimits.MAX_OUTPUT_CHARS)))
+        tasks.removeAt(0)()
+        delivery.offer(AiStreamEvent.Delta("x"))
+        delivery.offer(AiStreamEvent.Completed("late"))
+        tasks.removeAt(0)()
+        assertEquals(2, events.size)
+        assertTrue(events.last() is AiStreamEvent.Failed)
+    }
+
     @Test fun closedDeliveryErasesQueuedText() {
         val tasks = mutableListOf<() -> Unit>()
         val events = mutableListOf<AiStreamEvent>()

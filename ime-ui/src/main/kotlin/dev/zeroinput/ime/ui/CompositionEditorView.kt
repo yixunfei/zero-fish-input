@@ -47,7 +47,7 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
         setPadding(dp(8), 0, dp(8), 0)
         isSaveEnabled = false
         importantForAutofill = IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-        if (android.os.Build.VERSION.SDK_INT >= 29) importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+        if (android.os.Build.VERSION.SDK_INT >= 30) importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
         isFocusable = false
         setTextIsSelectable(false)
         ViewCompat.setAccessibilityDelegate(this, object : AccessibilityDelegateCompat() {

@@ -53,10 +53,42 @@ class AiWorkbenchFlowTest {
             DeviceTouch.tap { f.panel.findViewById<TextView>(UiR.id.ai_insert_result) }
             onMain {
                 assertEquals(listOf("public answer"), f.inserted)
-                assertNull(f.controller.consumeResult())
+                assertNull(f.controller.consumeResult { true })
                 f.inserted.clear()
                 assertFalse(f.panel.isAiOpen)
             }
+        }
+    }
+
+    @Test fun rejectingConnectionKeepsAnswerForExplicitSecondTap() = withFixture { f ->
+        DeviceTouch.tap { f.labelled(UiR.string.ai_open) }
+        onMain { f.panel.renderAiDraft("question", ready) }
+        DeviceTouch.tap { f.button(UiR.string.ai_submit) }
+        val literal = "    `<think>literal</think>`  \n"
+        onMain { f.acceptsCommit = false; f.provider.emit(AiStreamEvent.Completed("<think>outer<think>inner</think>outer</think>$literal")) }
+        await { f.panel.findViewById<View>(UiR.id.ai_insert_result).isEnabled }
+        DeviceTouch.tap { f.panel.findViewById<View>(UiR.id.ai_insert_result) }
+        onMain { assertTrue(f.panel.isAiOpen); assertTrue(f.inserted.isEmpty()); f.acceptsCommit = true }
+        DeviceTouch.tap { f.panel.findViewById<View>(UiR.id.ai_insert_result) }
+        onMain { assertEquals(listOf(literal), f.inserted); assertFalse(f.panel.isAiOpen) }
+    }
+
+    @Test fun editorThatWritesWithoutAcknowledgingIsNotReplayedWhenUserLeaves() = withFixture { f ->
+        DeviceTouch.tap { f.labelled(UiR.string.ai_open) }
+        onMain { f.panel.renderAiDraft("question", ready) }
+        DeviceTouch.tap { f.button(UiR.string.ai_submit) }
+        onMain {
+            f.acceptsCommit = false
+            f.writesBeforeRejecting = true
+            f.provider.emit(AiStreamEvent.Completed("public answer"))
+        }
+        await { f.panel.findViewById<View>(UiR.id.ai_insert_result).isEnabled }
+        DeviceTouch.tap { f.panel.findViewById<View>(UiR.id.ai_insert_result) }
+        onMain {
+            assertTrue(f.panel.isAiOpen)
+            f.panel.returnToKeyboard()
+            assertNull(f.controller.consumeResult { error("stale editor commit") })
+            assertEquals(listOf("public answer"), f.inserted)
         }
     }
 
@@ -68,7 +100,7 @@ class AiWorkbenchFlowTest {
         DeviceTouch.tap { f.button(UiR.string.ai_cancel) }
         onMain { cancelled(AiStreamEvent.Completed("late public response")) }
         instrumentation.waitForIdleSync()
-        onMain { assertFalse(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled); assertNull(f.controller.consumeResult()) }
+        onMain { assertFalse(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled); assertNull(f.controller.consumeResult { true }) }
         DeviceTouch.tap { f.button(UiR.string.ai_submit) }
         val oldEditor = onMain { checkNotNull(f.provider.listener) }
         onMain {
@@ -77,7 +109,7 @@ class AiWorkbenchFlowTest {
             oldEditor(AiStreamEvent.Completed("obsolete public response"))
         }
         instrumentation.waitForIdleSync()
-        onMain { assertFalse(f.panel.isAiOpen); assertNull(f.controller.consumeResult()); assertTrue(f.inserted.isEmpty()) }
+        onMain { assertFalse(f.panel.isAiOpen); assertNull(f.controller.consumeResult { true }); assertTrue(f.inserted.isEmpty()) }
     }
 
     @Test fun multipleResponseSectionsCanBeSelectedBeforeInsertion() = withFixture { f ->
@@ -158,6 +190,14 @@ class AiWorkbenchFlowTest {
         val panel = activity.keyboard
         val provider = PublicProvider()
         val inserted = mutableListOf<String>()
+        var acceptsCommit = true
+        var writesBeforeRejecting = false
+        private val connection = object : android.view.inputmethod.BaseInputConnection(panel, true) {
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                if (acceptsCommit || writesBeforeRejecting) inserted += text.toString()
+                return acceptsCommit
+            }
+        }
         var allowed = true
         private val profile = AiProviderProfile(
             id = "fixture",
@@ -187,8 +227,9 @@ class AiWorkbenchFlowTest {
             panel.onAiSubmit = controller::submit
             panel.onAiCancel = controller::stop
             panel.onAiInsert = { displayed, thinking, sections ->
-                controller.consumeResult(thinking, displayed, sections)?.let(inserted::add)
-                panel.returnToKeyboard()
+                if (controller.consumeResult(thinking, displayed, sections) { connection.commitText(it, 1) } != null) {
+                    panel.returnToKeyboard()
+                }
             }
             panel.onAiVisibilityChanged = { if (!it) controller.invalidate() }
         }

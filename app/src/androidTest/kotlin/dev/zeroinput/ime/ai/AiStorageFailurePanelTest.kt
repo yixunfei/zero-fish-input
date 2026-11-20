@@ -34,7 +34,7 @@ class AiStorageFailurePanelTest {
             assertTrue(f.panel.findViewById<TextView>(UiR.id.ai_insert_result).isEnabled)
             f.panel.findViewById<TextView>(UiR.id.ai_insert_result).performClick()
             assertEquals("public answer", f.inserted)
-            assertNull(f.controller.consumeResult())
+            assertNull(f.controller.consumeResult { true })
             f.controller.invalidate()
         }
     }
@@ -96,7 +96,7 @@ class AiStorageFailurePanelTest {
             panel.renderDraft("public question")
             panel.onConversationsRequested = { controller.refreshConversations() }
             panel.onInsert = { displayed, thinking, sections ->
-                inserted = controller.consumeResult(thinking, displayed, sections)
+                inserted = controller.consumeResult(thinking, displayed, sections) { true }
             }
         }
 

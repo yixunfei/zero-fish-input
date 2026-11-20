@@ -38,12 +38,12 @@ internal class AiResultSelectionView(context: Context) : LinearLayout(context) {
 
     val selection: List<Int> get() = selected.sorted()
 
-    fun render(value: String) {
-        val sections = AiResultSections.split(value)
+    fun prepare(value: CharSequence) {
+        if (checks.isNotEmpty()) return
+        val sections = AiResultSections.split(value.toString())
         rendering = true
         try {
             selected = emptySet()
-            releaseChecks()
             sections.forEach { section ->
                 val check = MaterialCheckBox(context).apply {
                     text = section.text

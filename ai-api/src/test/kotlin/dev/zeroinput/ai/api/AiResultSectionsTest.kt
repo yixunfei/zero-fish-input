@@ -28,12 +28,18 @@ class AiResultSectionsTest {
         )
     }
 
-    @Test fun selectedSectionsAreOrderedDeduplicatedAndTrimmed() {
+    @Test fun selectedSectionsAreOrderedAndDeduplicated() {
         val response = "Keep this\n\nRemove this\n\nKeep this too"
 
         assertEquals("Keep this\n\nKeep this too", AiResultSections.select(response, listOf(2, 0, 2)))
         assertNull(AiResultSections.select(response, emptyList()))
         assertNull(AiResultSections.select(response, listOf(99)))
+    }
+
+    @Test fun selectingAdjacentSectionsPreservesCrLfIndentationAndSignificantSpaces() {
+        val source = "Omit\r\n\r\n    first  \r\n\r\n- second  \r\n- third\r\n\r\nOmit"
+        assertEquals("    first  \r\n\r\n- second  \r\n- third",
+            AiResultSections.select(source, listOf(1, 2, 3)))
     }
 
     @Test fun capsSectionCountWithoutDroppingResponseText() {
@@ -53,7 +59,9 @@ class AiResultSectionsTest {
 
         assertEquals(AiResultSections.MAX_SECTIONS, sections.size)
         val overflowSections = AiLimits.MAX_OUTPUT_CHARS / 4 - AiResultSections.MAX_SECTIONS + 1
-        assertEquals(List(overflowSections) { "# x" }.joinToString("\n\n"), sections.last().text)
+        val tail = List(overflowSections) { "# x" }.joinToString("\n")
+        assertEquals(tail, sections.last().text)
+        assertEquals(tail, AiResultSections.select(response, listOf(sections.lastIndex)))
         assertEquals(response, AiResultSections.select(response, sections.indices.toList()))
     }
 }

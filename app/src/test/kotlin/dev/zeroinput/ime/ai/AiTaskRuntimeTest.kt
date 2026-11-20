@@ -47,6 +47,13 @@ class AiTaskRuntimeTest {
         val approval = runtime.events.last().approval!!
         assertFalse(runtime.approve("first", approval, true))
         runtime.attach("replacement", observer); runtime.destroy("first")
+        val snapshot = checkNotNull(runtime.snapshot)
+        assertEquals("file1: Public.txt", snapshot.labels["file1"])
+        for (protocol in AiProtocol.entries) {
+            val body = AiToolProtocol.encode(snapshot.request, "fixture", protocol)
+            assertTrue(body.contains("file1"))
+            assertFalse(body.contains("Public.txt"))
+        }
         assertTrue(runtime.approve("replacement", approval, false)); drain()
         assertEquals(2, provider.requests)
         runtime.stop("stale-public-token"); assertTrue(runtime.running)
@@ -69,13 +76,13 @@ class AiTaskRuntimeTest {
     }
     @Test fun backgroundNeedsNotificationsAndRejectsSaveAs() = fixture { runtime, _, _, _ ->
         runtime.attach("owner", Observer())
-        assertFalse(runtime.start("owner", request(), executors(), emptyList(), "Public model", null, false, true))
+        assertFalse(runtime.start("owner", request(), executors(), emptyMap(), "Public model", null, false, true))
         assertFalse(runtime.start("owner", AiToolRequest("Public", AiFileTools.definitions(emptyList())),
-            mapOf(AiFileTools.SAVE to Executor), emptyList(), "Public model", null, true, true))
+            mapOf(AiFileTools.SAVE to Executor), emptyMap(), "Public model", null, true, true))
         assertFalse(runtime.running)
     }
     private fun start(runtime: AiTaskRuntime, owner: String, background: Boolean = false) =
-        runtime.start(owner, request(), executors(), listOf("file1: Public.txt"), "Public model", null, background, background)
+        runtime.start(owner, request(), executors(), mapOf("file1" to "file1: Public.txt"), "Public model", null, background, background)
     private fun request() = AiToolRequest("Public task", AiFileTools.definitions(listOf("file1")).filter { it.name == AiFileTools.READ })
     private fun executors() = mapOf(AiFileTools.READ to Executor)
     private fun drain() = shadowOf(Looper.getMainLooper()).idle()

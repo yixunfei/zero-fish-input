@@ -32,6 +32,7 @@ internal class AiContextView(context: Context) : LinearLayout(context) {
         renderedPreview = preview
         state = value
         removeAllViews()
+        if (value.latestTurnOmitted) addView(label(context.getString(R.string.ai_context_budget_warning)))
         addView(label(context.getString(R.string.ai_context_count, value.references.size,
             value.selectedHistory.size, value.characterCount, AiReference.MAX_CONTEXT_CHARS)))
         addView(android.widget.HorizontalScrollView(context).apply {

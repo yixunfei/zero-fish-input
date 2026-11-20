@@ -17,6 +17,21 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class AiWorkbenchControllerTest {
+    @Test fun budgetWarningMatchesTheHistorySentBeforeAndAfterChoosingRecent() {
+        val f = Fixture(save = false, standalone = true)
+        repeat(8) { index ->
+            f.controller.submit(AiAction.ASK, "q$index", null)
+            f.provider.emit(AiStreamEvent.Completed("a$index"))
+            f.flush()
+        }
+        assertTrue(f.controller.contextState.latestTurnOmitted)
+        assertEquals("a5", f.provider.requests.last().history.last().content)
+        assertTrue(f.controller.recentHistory(f.controller.contextState.revision))
+        f.controller.submit(AiAction.ASK, "follow up", null)
+        assertFalse(f.controller.contextState.latestTurnOmitted)
+        assertEquals("a7", f.provider.requests.last().history.last().content)
+    }
+
     @Test fun laterCompactionRollsThePriorSummaryForwardAndContextEditsRevokeUndo() {
         val f = Fixture(save = false, standalone = true)
         repeat(3) { index ->
@@ -171,6 +186,27 @@ class AiWorkbenchControllerTest {
         assertTrue(f.repository.list().isEmpty())
     }
 
+    @Test fun formattedAnswerRetainsSpacesInTheEditorAndNextRequest() {
+        val f = Fixture(save = false)
+        val answer = "    def example():\n        pass  \n"
+        f.controller.submit(AiAction.ASK, "example", null)
+        f.provider.emit(AiStreamEvent.Completed(answer))
+        f.flush()
+        assertEquals(answer, f.controller.consumeResult { true })
+        f.controller.submit(AiAction.ASK, "continue", null)
+        assertEquals(answer, f.provider.requests.last().history.last().content)
+    }
+
+    @Test fun editorRejectionPreservesResultUntilAcceptedOrRevoked() {
+        val f = Fixture(save = false)
+        f.controller.submit(AiAction.ASK, "question", null)
+        f.provider.emit(AiStreamEvent.Completed("answer"))
+        f.flush()
+        assertNull(f.controller.consumeResult { false })
+        assertEquals("answer", f.controller.consumeResult { true })
+        assertNull(f.controller.consumeResult { error("duplicate commit") })
+    }
+
     @Test fun reasoningIsRenderedSeparatelyAndCannotBeConsumedForInsertion() {
         val f = Fixture(save = false)
         f.controller.submit(AiAction.ASK, "public question", null)
@@ -180,8 +216,8 @@ class AiWorkbenchControllerTest {
         val completed = f.events.filterIsInstance<AiStreamEvent.Completed>().last()
         assertEquals("public answer", completed.text)
         assertEquals("private reasoning", completed.thinking)
-        assertEquals("public answer", f.controller.consumeResult(includeThinking = true))
-        assertNull(f.controller.consumeResult())
+        assertEquals("public answer", f.controller.consumeResult(includeThinking = true) { true })
+        assertNull(f.controller.consumeResult { true })
         assertTrue(f.repository.list().isEmpty())
     }
 
@@ -196,7 +232,7 @@ class AiWorkbenchControllerTest {
         val completed = f.events.filterIsInstance<AiStreamEvent.Completed>().single()
         assertEquals("public answer", completed.text)
         assertEquals("provider reasoning", completed.thinking)
-        assertEquals("public answer", f.controller.consumeResult(includeThinking = true))
+        assertEquals("public answer", f.controller.consumeResult(includeThinking = true) { true })
         f.worker.drain(); f.ui.drain()
         assertEquals(listOf("public question", "public answer"),
             f.repository.list().single().messages.map { it.content })
@@ -243,7 +279,7 @@ class AiWorkbenchControllerTest {
             }
             f.ui.drain()
             assertEquals(0, f.storageFailures)
-            assertNull(f.controller.consumeResult())
+            assertNull(f.controller.consumeResult { true })
             assertTrue(f.repository.list().isEmpty())
         }
     }
@@ -258,7 +294,7 @@ class AiWorkbenchControllerTest {
         f.ui.drain()
         assertTrue(f.historyFailed.last())
         assertFalse(f.events.any { it is AiStreamEvent.Failed })
-        assertEquals("public answer", f.controller.consumeResult())
+        assertEquals("public answer", f.controller.consumeResult { true })
         assertEquals(1, f.repository.list().size)
     }
 
@@ -283,8 +319,8 @@ class AiWorkbenchControllerTest {
             f.flush()
             assertFalse(f.events.any { it is AiStreamEvent.Failed })
             assertEquals(1, f.storageFailures)
-            assertEquals("public answer", f.controller.consumeResult())
-            assertNull(f.controller.consumeResult())
+            assertEquals("public answer", f.controller.consumeResult { true })
+            assertNull(f.controller.consumeResult { true })
             assertTrue(f.repository.list().isEmpty())
         }
     }
@@ -303,7 +339,7 @@ class AiWorkbenchControllerTest {
             assertFalse(f.events.any { it is AiStreamEvent.Failed })
             if (!completed) f.provider.emit(AiStreamEvent.Completed("public answer"))
             f.flush()
-            assertEquals("public answer", f.controller.consumeResult())
+            assertEquals("public answer", f.controller.consumeResult { true })
         }
     }
 
@@ -316,7 +352,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("late answer"))
         f.flush()
         assertEquals(listOf(AiStreamEvent.Cancelled), f.events)
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
     }
 
     @Test fun editingAfterAConfigurationFailureClearsTheErrorOnlyOnce() {
@@ -369,7 +405,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("late"))
         f.controller.cancelRequest()
         f.flush()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         assertTrue(f.controller.contextState.revision > selected.revision)
         assertFalse(f.controller.includeHistory(selected.revision, 0, true))
         f.controller.stop()
@@ -386,7 +422,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("old answer"))
         assertTrue(f.controller.selectModel("other-model"))
         f.flush()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         f.controller.submit(AiAction.ASK, "fresh prompt", null)
         val request = f.provider.requests.last()
         assertEquals("other-model", request.model)
@@ -411,7 +447,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("late"))
         f.controller.newConversation()
         f.flush()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         assertFalse(f.controller.selectModel("unknown"))
         f.allowed = false
         assertFalse(f.controller.selectModel("other-model"))
@@ -428,7 +464,7 @@ class AiWorkbenchControllerTest {
         f.ui.drain()
         f.profile = f.profile.copy(id = "second", models = listOf("second-model"), selectedModel = "second-model")
         f.worker.drain()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         assertTrue(f.repository.list().isEmpty())
         f.controller.submit(AiAction.ASK, "new", null)
         assertTrue(f.provider.requests.last().history.isEmpty())
@@ -436,7 +472,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("late"))
         f.profile = f.profile.copy(apiKey = "replacement-key")
         f.flush()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
     }
 
     @Test fun disablingPersistenceWithoutAnObserverCannotSendPreviouslySelectedHistory() {
@@ -468,7 +504,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("late"))
         f.persistenceEnabled = false
         f.flush()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         assertEquals(1, f.repository.list().size)
     }
 
@@ -478,7 +514,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("old"))
         f.controller.invalidate()
         f.ui.drain(); f.worker.drain(); f.ui.drain()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         assertTrue(f.repository.list().isEmpty())
         assertFalse(f.events.any { it is AiStreamEvent.Completed })
     }
@@ -502,7 +538,7 @@ class AiWorkbenchControllerTest {
         f.controller.deleteConversation(id)
         f.flush()
         assertTrue(f.repository.list().isEmpty())
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
     }
 
     @Test fun loadedConversationContinuesWithRecentHistoryWithoutAnExtraContextAction() {
@@ -546,10 +582,10 @@ class AiWorkbenchControllerTest {
         f.flush()
         val response = "first\n\nsecond\n\nthird"
 
-        assertNull(f.controller.consumeResult(displayedResult = response, selectedSections = listOf(0, 3)))
+        assertNull(f.controller.consumeResult(displayedResult = response, selectedSections = listOf(0, 3)) { true })
         assertEquals("first\n\nthird",
-            f.controller.consumeResult(displayedResult = response, selectedSections = listOf(2, 0, 2)))
-        assertNull(f.controller.consumeResult(displayedResult = response, selectedSections = listOf(0)))
+            f.controller.consumeResult(displayedResult = response, selectedSections = listOf(2, 0, 2)) { true })
+        assertNull(f.controller.consumeResult(displayedResult = response, selectedSections = listOf(0)) { true })
     }
 
     @Test fun clearingDataBeforeQueuedSaveCannotResurrectAConversation() {
@@ -561,7 +597,7 @@ class AiWorkbenchControllerTest {
         f.repository.clear()
         f.worker.drain(); f.ui.drain()
         assertTrue(f.repository.list().isEmpty())
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
     }
 
     @Test fun continuedConversationPreservesMessagesExcludedFromNetworkContext() {
@@ -593,7 +629,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("response"))
         f.flush()
         f.allowed = false
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
     }
 
     @Test fun invalidTerminalOutputIsRejectedBeforeItBecomesInsertable() {
@@ -602,7 +638,7 @@ class AiWorkbenchControllerTest {
             f.controller.submit(AiAction.ASK, "fixture", null)
             f.provider.emit(AiStreamEvent.Completed(text))
             f.flush()
-            assertNull(f.controller.consumeResult())
+            assertNull(f.controller.consumeResult { true })
             assertTrue(f.events.last() is AiStreamEvent.Failed)
             assertFalse(f.events.any { it is AiStreamEvent.Completed })
             assertTrue(f.repository.list().isEmpty())
@@ -614,8 +650,8 @@ class AiWorkbenchControllerTest {
         f.controller.submit(AiAction.ASK, "fixture", null)
         f.provider.emit(AiStreamEvent.Completed("response"))
         f.flush()
-        assertEquals("response", f.controller.consumeResult())
-        assertNull(f.controller.consumeResult())
+        assertEquals("response", f.controller.consumeResult { true })
+        assertNull(f.controller.consumeResult { true })
         assertTrue(f.repository.list().isEmpty())
         f.controller.submit(AiAction.ASK, "continue", null)
         assertEquals(2, f.provider.requests.last().history.size)
@@ -628,7 +664,7 @@ class AiWorkbenchControllerTest {
         f.flush()
         f.controller.refreshConversations()
         f.flush()
-        assertEquals("answer", f.controller.consumeResult())
+        assertEquals("answer", f.controller.consumeResult { true })
         f.controller.submit(AiAction.ASK, "continue", null)
         assertEquals(listOf("first", "answer"), f.provider.requests.last().history.map { it.content })
     }
@@ -639,7 +675,7 @@ class AiWorkbenchControllerTest {
         f.controller.refreshConversations()
         f.provider.emit(AiStreamEvent.Completed("answer"))
         f.flush()
-        assertEquals("answer", f.controller.consumeResult())
+        assertEquals("answer", f.controller.consumeResult { true })
     }
 
     @Test fun settingsInvalidationClearsSelectedConversationWithoutDeletingFromThePanel() {
@@ -677,7 +713,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("answer"))
         f.flush()
         assertEquals(prefix, f.repository.list().single().title)
-        assertEquals("answer", f.controller.consumeResult())
+        assertEquals("answer", f.controller.consumeResult { true })
     }
 
     @Test fun loadedConversationContinuesWithRecentHistoryAndPageReferencesStayTransient() {
@@ -707,7 +743,7 @@ class AiWorkbenchControllerTest {
         f.provider.emit(AiStreamEvent.Completed("old answer"))
         f.controller.clearContext(f.controller.contextState.revision)
         f.flush()
-        assertNull(f.controller.consumeResult())
+        assertNull(f.controller.consumeResult { true })
         assertTrue(f.repository.list().isEmpty())
     }
 
@@ -751,7 +787,7 @@ class AiWorkbenchControllerTest {
             if (completed) f.ui.drain()
             f.contextCurrent = false
             f.flush()
-            assertNull(f.controller.consumeResult())
+            assertNull(f.controller.consumeResult { true })
             assertTrue(f.repository.list().isEmpty())
         }
     }

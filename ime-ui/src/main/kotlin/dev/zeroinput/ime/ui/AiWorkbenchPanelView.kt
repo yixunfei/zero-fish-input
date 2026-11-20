@@ -203,6 +203,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
     private val sectionMode = button(R.string.ai_select_result_sections) {
         if (completedResult) {
             showingSections = !showingSections
+            if (showingSections) resultSections.prepare(result.text)
             detail.scrollTo(0, 0)
             updateResultPresentation()
             refreshCommands()
@@ -387,7 +388,8 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
 
     fun renderContext(value: AiContextState) {
         contextRows.render(value)
-        contextButton.text = context.getString(R.string.ai_context_short_count,
+        contextButton.text = if (value.latestTurnOmitted) context.getString(R.string.ai_context_review_latest)
+        else context.getString(R.string.ai_context_short_count,
             value.references.size + value.selectedHistory.size)
     }
 
@@ -499,7 +501,7 @@ class AiWorkbenchPanelView(context: Context) : LinearLayout(context) {
                 completedResult = event.text.isNotBlank()
                 hasDisplayedResult = event.text.isNotBlank()
                 showingSections = false
-                resultSections.render(event.text)
+                resultSections.clear()
                 detail.scrollTo(0, 0)
                 submit.isEnabled = draft.text.isNotBlank()
                 cancel.isEnabled = false

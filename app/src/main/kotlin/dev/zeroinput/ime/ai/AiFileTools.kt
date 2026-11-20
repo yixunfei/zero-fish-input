@@ -25,6 +25,15 @@ internal object AiFileTools {
     private fun schema(properties: JSONObject, vararg required: String) = JSONObject().put("type", "object")
         .put("properties", properties).put("required", JSONArray(required.toList())).put("additionalProperties", false).toString()
 
+    /** Keep provider-supplied names and model-supplied search terms on one unambiguous UI line. */
+    fun previewLiteral(text: String): String = buildString {
+        for (c in JSONObject.quote(text)) {
+            if (c.category == CharCategory.FORMAT || c == '\u2028' || c == '\u2029') {
+                append("\\u").append(c.code.toString(16).padStart(4, '0'))
+            } else append(c)
+        }
+    }
+
     fun excerpt(text: String, offset: Int, length: Int): String {
         require(offset in 0..text.length && length in 1..3_500)
         val end = minOf(text.length, offset + length)

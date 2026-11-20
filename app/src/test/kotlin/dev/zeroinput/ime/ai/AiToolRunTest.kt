@@ -72,6 +72,19 @@ class AiToolRunTest {
         assertEquals(AiToolRunFailure.INVALID_CALL, f.events.last().failure)
     }
 
+    @Test fun modelNetworkFailureKeepsOnlyTheCategoryAndDoesNotRetry() {
+        for (reason in listOf(AiNetworkFailure.AUTHENTICATION, AiNetworkFailure.REQUEST, AiNetworkFailure.TIMEOUT)) {
+            val f = Fixture()
+            f.start()
+            f.reply(Result.failure(AiProviderError.Network("fixture detail", reason = reason)))
+            assertEquals(AiToolRunState.FAILED, f.events.last().state)
+            assertEquals(reason, f.events.last().networkFailure)
+            assertTrue(f.events.last().message.isEmpty())
+            assertEquals(1, f.requests.size)
+            assertEquals(0, f.executions)
+        }
+    }
+
     @Test fun uncertainWritesStopWithoutRetryAndRevocationCancelsDispatch() {
         val f = Fixture(AiToolEffect.WRITE); f.start(); f.reply(AiToolResponse("", f.call()))
         f.run.approve(f.events.last().approval!!, true)

@@ -9,7 +9,7 @@ internal enum class AiToolRunState { IDLE, THINKING, APPROVAL, EXECUTING, COMPLE
 internal enum class AiToolRunFailure { UNAVAILABLE, INVALID_CALL, LIMIT, MODEL, EXECUTION, UNCERTAIN }
 internal class AiToolRunEvent(val state: AiToolRunState, val message: String = "",
     val approval: String? = null, val call: AiToolCall? = null, val tool: AiToolDefinition? = null,
-    val result: AiToolResult? = null, val failure: AiToolRunFailure? = null) {
+    val result: AiToolResult? = null, val failure: AiToolRunFailure? = null, val networkFailure: AiNetworkFailure? = null) {
     override fun toString() = "AiToolRunEvent(state=$state)"
 }
 
@@ -90,7 +90,7 @@ internal class AiToolRun(
             try {
                 val launched = provider.request(next, modelCallback(ticket))
                 if (current() && serial == ticket && state == AiToolRunState.THINKING) handle = launched else launched.cancel()
-            } catch (_: Exception) { fail(AiToolRunFailure.MODEL) }
+            } catch (error: Exception) { modelFailed(error) }
         }
 
         private fun modelCallback(ticket: Long): (Result<AiToolResponse>) -> Unit {
@@ -104,7 +104,11 @@ internal class AiToolRun(
             if (active !== this || ticket != serial || state != AiToolRunState.THINKING) return
             if (!current()) return fail(AiToolRunFailure.UNAVAILABLE)
             handle = null; serial++
-            result.fold(::response, { fail(AiToolRunFailure.MODEL) })
+            result.fold(::response, ::modelFailed)
+        }
+        private fun modelFailed(error: Throwable) {
+            end(AiToolRunEvent(AiToolRunState.FAILED, failure = AiToolRunFailure.MODEL,
+                networkFailure = (error as? AiProviderError.Network)?.reason))
         }
         private fun deliveryFailed() { if (active === this) fail(AiToolRunFailure.UNAVAILABLE) }
 

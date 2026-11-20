@@ -35,4 +35,10 @@
     <string name="ai_tool_write">Write this document</string>
     <string name="ai_tool_leave_notice">Leaving stops the task and clears the unsent draft, selected context and task file access. Saved chats, roles, memory and Skills remain.</string>
     <string name="ai_tool_open">Open tool task</string>
+    <string name="ai_chat_leave_for_tools">Leaving clears the current draft, queued messages and temporary chat. Open the tool task?</string>
+    <string name="ai_tool_read_approval">Read file %1$s\nRead up to %3$d UTF-16 units starting at offset %2$d (zero-based).\nApproval sends the excerpt to %4$s.</string>
+    <string name="ai_tool_search_approval">Search file %1$s\nSearch the entire document literally, %2$s. Approval sends up to 10 matching excerpts to %3$s.\nSearch text %4$s</string>
+    <string name="ai_tool_match_case">case-sensitive</string>
+    <string name="ai_tool_ignore_case">case-insensitive</string>
+    <string name="ai_tool_target_missing">The target file cannot be verified for this task. Decline this operation.</string>
 </resources>

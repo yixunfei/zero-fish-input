@@ -1,6 +1,39 @@
 # Project status
 
-Updated 2026-11-19.
+Updated 2026-11-20.
+
+## File approvals and Android 10 verification (2026-11-20)
+
+The [local acceptance results](audits/2026-11-19-ai-feature-assessment.md#local-remaining)
+cover file identity, read/search scope, destination model and typed network
+failures in tool tasks. An API 29 keyboard crash was fixed in two views.
+The six tool/device protocol encodings, 26 API 29 platform tests and native
+assistant screen-off recovery were verified locally. Unit reports show 1,155
+passes and two live-provider skips. PrivacyCheck and Debug Lint passed.
+The signed ARM64 Debug APK is 96,431,659 bytes, up 4,028 bytes from the previous
+review. Live-model acceptance and physical OEM behavior still require external
+test resources.
+
+## AI reliability follow-up (2026-11-20)
+
+The [follow-up review](audits/2026-11-19-ai-feature-assessment.md#phase-one-review)
+covers formatted answers and bounded section insertion, reasoning delimiters,
+on-demand section rows, queued-chat navigation and native-assistant launch
+failure. Debug units plus ai-api report 1,153 passes and two live-provider skips.
+PrivacyCheck, Debug Lint, 26 API 37 instrumentation tests and system-assistant
+invocation, screen-off clearing and failed launch recovery passed. The verified
+ARM64 Debug APK is 96,427,631 bytes, up 1,376 bytes from phase one.
+Next checks include live-provider compatibility and physical OEM editor behavior.
+
+## AI conversation reliability (2026-11-20)
+
+Phase one of the [AI assessment](audits/2026-11-19-ai-feature-assessment.md#phase-one)
+is implemented. B01-B05 cover omitted context, foreground-only manual recovery,
+editor acceptance, literal reasoning tags and full bounded native-assistant answers.
+Debug unit tests plus ai-api report 1,146 passes and two opt-in skips. PrivacyCheck
+passes, Debug Lint reports no issues and 13 API 37 emulator tests pass. The full
+ARM64 real-Rime Debug APK is 96,426,255 bytes (+6,848 from the same local baseline).
+The assessment records commands, artifact hash and remaining live-provider/OEM checks.
 
 ## Stego review and ARM64 test delivery (2026-11-19)
 
@@ -65,6 +98,15 @@ Five UI checks repeat at 320x480 dp dark/font 1.3 and actual 640x320 dp landscap
 Next: physical ARM/OEM, older Android and the complete explicit system-clipboard
 rejection matrix; retain existing conservative fixture ownership checks. Existing
 ARM64 distribution packages predate this change. No release or publication occurred.
+
+## AI feature assessment (2026-11-19)
+
+The [AI assessment](audits/2026-11-19-ai-feature-assessment.md) records five
+findings, capability gaps, compatibility risks and proposed priorities. Scoped
+AI tests report 389 passes and two opt-in provider skips; privacyCheck passes.
+Context, queue and output-splitting probes reproduce three logic paths. Editor
+refusal and native-assistant truncation still need targeted platform validation.
+This is an analysis record; no AI implementation fixes were made.
 
 ## Stego defaults and three-field explicit paste (2026-11-19)
 

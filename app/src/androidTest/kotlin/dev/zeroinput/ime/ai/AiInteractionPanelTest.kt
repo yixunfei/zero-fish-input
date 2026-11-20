@@ -45,6 +45,22 @@ class AiInteractionPanelTest {
             assertTrue(interrupted.isEmpty())
             panel.findViewById<View>(UiR.id.ai_assistant_interrupt).performClick()
             assertEquals(listOf("Public follow-up"), interrupted)
+            val retries = mutableListOf<Int>()
+            panel.onQueueRetry = { retries += it }
+            panel.renderQueue(listOf("Unsent public question"), false, paused = true)
+            fun findButton(root: View, label: String): android.widget.Button? {
+                if (root is android.widget.Button && root.text == label) return root
+                if (root is ViewGroup) for (i in 0 until root.childCount) {
+                    findButton(root.getChildAt(i), label)?.let { return it }
+                }
+                return null
+            }
+            assertTrue(retries.isEmpty())
+            checkNotNull(findButton(panel, context.getString(UiR.string.ai_queue_retry))).performClick()
+            assertEquals(listOf(0), retries)
+            panel.renderContext(AiContextState(latestTurnOmitted = true))
+            checkNotNull(findButton(panel, context.getString(UiR.string.ai_context_review_latest))).performClick()
+            assertTrue(checkNotNull(findButton(panel, context.getString(UiR.string.ai_context_recent))).visibility == View.VISIBLE)
             panel.draftOccupied()
             assertEquals("Public follow-up", prompt.text.toString())
             panel.clear()

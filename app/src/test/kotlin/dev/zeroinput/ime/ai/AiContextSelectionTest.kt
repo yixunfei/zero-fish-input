@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AiContextSelectionTest {
+    @Test fun fullSelectionKeepsChosenHistoryAndFlagsMissingLatestTurnUntilReselected() {
+        val selection = AiContextSelection()
+        val messages = mutableListOf<AiMessage>()
+        repeat(8) { index ->
+            messages += AiMessage(AiRole.USER, "question $index")
+            messages += AiMessage(AiRole.ASSISTANT, "answer $index")
+            selection.append(messages, 0)
+            assertEquals(index >= 6, selection.state.latestTurnOmitted)
+            assertEquals(messages.take(12), selection.history())
+        }
+        assertTrue(selection.recent(selection.state.revision))
+        assertFalse(selection.state.latestTurnOmitted)
+        assertEquals(messages.takeLast(12), selection.history())
+    }
+
     @Test fun incompleteAppendKeepsOnlyValidPreviouslySelectedHistory() {
         for (size in 0..1) {
             val selection = AiContextSelection()
@@ -23,6 +38,21 @@ class AiContextSelectionTest {
         val messages = old.takeLast(1) + listOf(AiMessage(AiRole.USER, "next"), AiMessage(AiRole.ASSISTANT, "answer"))
         selection.append(messages, 1)
         assertEquals(setOf(0, 1, 2), selection.state.selectedHistory)
+        assertEquals(messages, selection.history())
+    }
+
+    @Test fun characterBudgetCanExcludeTheFirstPairEvenWithFreeMessageSlots() {
+        val selection = AiContextSelection()
+        selection.add(selection.state.revision, listOf(AiReference("r".repeat(4096))))
+        selection.workspace(selection.state.revision, AiWorkspaceContext(AiPersona("id", "Role", "", "Concise")))
+        val messages = listOf(AiMessage(AiRole.USER, "ask"), AiMessage(AiRole.ASSISTANT, "a".repeat(12_288)))
+        selection.append(messages, 0)
+        assertTrue(selection.state.latestTurnOmitted)
+        assertTrue(selection.history().isEmpty())
+        selection.remove(selection.state.revision, 0)
+        assertTrue(selection.state.latestTurnOmitted)
+        selection.recent(selection.state.revision)
+        assertFalse(selection.state.latestTurnOmitted)
         assertEquals(messages, selection.history())
     }
 

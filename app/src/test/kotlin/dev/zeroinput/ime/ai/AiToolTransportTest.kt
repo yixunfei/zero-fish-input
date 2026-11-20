@@ -20,6 +20,8 @@ class AiToolTransportTest {
         val profile = AiProviderProfile("fixture", "Fixture", "https://example.test/v1", "fixture-key", listOf("model"), "model")
         var config = AiConfiguration(enabled = true, networkAllowed = true, providers = listOf(profile), selectedProviderId = profile.id)
         var exchanges = 0
+        var statusCode = 200
+        var stall = false
         val body = ByteArrayOutputStream()
         val provider = OpenAiCompatibleProvider({ config }, executor, exchangeFactory = { uri ->
             assertEquals("/v1/chat/completions", uri.path); exchanges++
@@ -28,7 +30,7 @@ class AiToolTransportTest {
                     assertEquals("POST", method); assertEquals("fixture-key", key)
                 }
                 override fun send(bytes: ByteArray?) { if (bytes != null) body.write(bytes) }
-                override fun status() = 200
+                override fun status(): Int = if (stall) throw java.net.SocketTimeoutException() else statusCode
                 override fun contentType() = "application/json"
                 override fun input() = ByteArrayInputStream("""{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Public answer"}}]}""".toByteArray())
                 override fun disconnect() = Unit
@@ -45,15 +47,22 @@ class AiToolTransportTest {
             }
             assertEquals("Public answer", execute().getOrThrow().message)
             assertEquals(1, AiToolJson.objectValue(body.toString("UTF-8")).getJSONArray("tools").length())
+            statusCode = 401
+            assertEquals(AiNetworkFailure.AUTHENTICATION, (execute().exceptionOrNull() as AiProviderError.Network).reason)
+            stall = true
+            assertEquals(AiNetworkFailure.TIMEOUT, (execute().exceptionOrNull() as AiProviderError.Network).reason)
+            assertEquals(3, exchanges)
+            stall = false
+            statusCode = 200
             config = config.copy(networkAllowed = false)
-            assertTrue(execute().isFailure); assertEquals(1, exchanges)
+            assertTrue(execute().isFailure); assertEquals(3, exchanges)
             config = config.copy(networkAllowed = true)
             val gate = CountDownLatch(1); executor.submit { gate.await() }
             val done = CountDownLatch(1); val results = CopyOnWriteArrayList<Result<AiToolResponse>>()
             provider.request(request) { results += it; done.countDown() }
             config = config.copy(providers = listOf(profile.copy(apiKey = "replacement-fixture")))
             gate.countDown(); assertTrue(done.await(5, TimeUnit.SECONDS))
-            assertTrue(results.single().isFailure); assertEquals(1, exchanges)
+            assertTrue(results.single().isFailure); assertEquals(3, exchanges)
         } finally { executor.shutdownNow() }
     }
 }
