@@ -17,7 +17,7 @@ enum class StegoAction {
     PREPARE, CONFIRM, EDIT, SELECTION, VAULT, KEY_FILE, SAVE, INSERT, CLOSE,
     SAVE_COVER, SAVE_CIPHERTEXT, SAVE_CARRIER, SAVE_FIELD, NEXT, ADVANCED,
     VAULT_COVER, CREDENTIAL_MODE, KEY_BITS, GENERATE_KEY, ALGORITHMS, VAULT_SECRET,
-    CLEAR_FIELD, PASTE_FIELD,
+    CLEAR_FIELD, PASTE_FIELD, RANDOM_POETRY,
 }
 
 data class StegoFieldUi(val text: String, val caret: DraftCaretUi? = null, val preeditLength: Int = 0)
@@ -108,6 +108,7 @@ class StegoPanelView(context: Context) : LinearLayout(context) {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), 0, dp(8), dp(4))
             field(this, StegoField.COVER, StegoAction.COVER, R.string.stego_cover, R.string.stego_cover_hint)
+            row(this, StegoAction.RANDOM_POETRY to R.string.stego_random_poetry)
             field(this, StegoField.SECRET, StegoAction.SECRET, R.string.stego_secret, R.string.stego_secret_hint)
             field(this, StegoField.CARRIER, StegoAction.CARRIER, R.string.stego_carrier, R.string.stego_carrier_hint)
             row(this, StegoAction.SELECTION to R.string.stego_selection, StegoAction.VAULT to R.string.stego_vault)
@@ -206,6 +207,7 @@ class StegoPanelView(context: Context) : LinearLayout(context) {
                 StegoAction.PASTE_FIELD -> if (value.canPaste && editing && value.field in
                     listOf(StegoField.COVER, StegoField.SECRET, StegoField.CARRIER)) VISIBLE else GONE
                 StegoAction.CLEAR_FIELD -> if (editing) VISIBLE else GONE
+                StegoAction.RANDOM_POETRY -> if (editing && !value.decrypt && value.field == StegoField.COVER) VISIBLE else GONE
                 StegoAction.PREPARE, StegoAction.NEXT -> if (editing) VISIBLE else GONE
                 StegoAction.OPTIONS -> if (advanced && editing) VISIBLE else GONE
                 StegoAction.ALGORITHMS -> if (editing && !value.decrypt) VISIBLE else GONE

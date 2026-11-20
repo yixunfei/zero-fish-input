@@ -45,6 +45,10 @@ internal object MessageKeys {
             try {
                 factor = when (credential.mode) {
                     MessageCredentialMode.PASSPHRASE -> text.copyOf()
+                    MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD -> {
+                        val input = fields(domain("local-biometric-password"), salt, text)
+                        try { credential.authenticateLocal(input) } finally { input.fill(0) }
+                    }
                     MessageCredentialMode.PASSPHRASE_FILE -> {
                         val input = fields(domain("passphrase-file"), text)
                         try { hmac(requireNotNull(file), input) } finally { input.fill(0) }

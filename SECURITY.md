@@ -626,3 +626,10 @@ Stego random master material accepts canonical 32..512-byte Base64url credential
 and generation at 256..4096 bits in byte increments. Existing 32-byte credentials
 and the envelope/vault formats are unchanged. HKDF and each cipher keep their
 existing widths; longer material is not a claim of 512/1024/4096-bit cipher strength.
+
+## Local biometric message credentials
+
+The personal notes credential requires both the exact passphrase and a fresh
+biometric-authorized Keystore MAC for each message operation. The original
+device key cannot be recovered from a copied envelope. See
+[ADR 0040](docs/adr/0040-local-biometric-message.md) for enrollment and key loss.

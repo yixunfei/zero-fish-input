@@ -54,4 +54,5 @@
     <string name="stego_paste_field">Paste field</string>
     <string name="stego_clear_field">Clear field</string>
     <string name="stego_bits_value">%1$d bits</string>
+    <string name="stego_random_poetry">Append random verse</string>
 </resources>

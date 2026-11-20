@@ -185,6 +185,10 @@ to wording requires regeneration with that profile's binding context.
 
 ### 3.3 Controlled visible-wording track
 
+The [implementation plan and resource inventory](natural-wording-steganography.md)
+specifies the Simplified Chinese host experiment, a candidate weighted codebook,
+capacity preflight, and release gates. This profile is still experimental.
+
 Use only local, fixed-version data resources with reviewed reversible alternatives:
 context-qualified phrases, clause forms and punctuation where natural. Do not use
 homoglyphs, exotic spaces, invisibles, Unicode normalization tricks, generic global

@@ -31,7 +31,7 @@ enum class MessageKdf(val id: Int, val memoryKiB: Int, val iterations: Int) {
 
 enum class MessageCredentialMode(val id: Int, val password: Boolean, val file: Boolean) {
     PASSPHRASE(1, true, false), RANDOM_KEY(2, false, false), KEY_FILE(3, false, true),
-    PASSPHRASE_FILE(4, true, true), RANDOM_KEY_FILE(5, false, true);
+    PASSPHRASE_FILE(4, true, true), RANDOM_KEY_FILE(5, false, true), LOCAL_BIOMETRIC_PASSWORD(6, true, false);
 
     companion object {
         fun fromId(id: Int): MessageCredentialMode = entries.singleOrNull { it.id == id } ?: throw MessageFailure()
@@ -39,17 +39,25 @@ enum class MessageCredentialMode(val id: Int, val password: Boolean, val file: B
 }
 
 /** Owned transient factors. Callers retain no reference to its private copies. */
-class MessageCredential(val mode: MessageCredentialMode, text: CharArray, fileFactor: ByteArray? = null) : AutoCloseable {
+class MessageCredential(val mode: MessageCredentialMode, text: CharArray, fileFactor: ByteArray? = null,
+                        localOperation: javax.crypto.Mac? = null) : AutoCloseable {
     private val value = text.copyOf()
     private val file = fileFactor?.copyOf()
     private var closed = false
+    private var localMac = localOperation
+
+    internal fun authenticateLocal(input: ByteArray): ByteArray {
+        val operation = localMac ?: throw MessageFailure()
+        localMac = null
+        return operation.doFinal(input)
+    }
 
     internal fun <T> withFactors(block: (CharArray, ByteArray?) -> T): T {
         if (closed || mode.file != (file != null) || file != null && file.size != 32) throw MessageFailure()
         return block(value, file)
     }
 
-    override fun close() { closed = true; value.fill('\u0000'); file?.fill(0) }
+    override fun close() { closed = true; localMac = null; value.fill('\u0000'); file?.fill(0) }
 }
 
 /** Deliberately carries no content or provider error in its diagnostic text. */

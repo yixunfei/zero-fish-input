@@ -54,4 +54,5 @@
     <string name="stego_paste_field">粘贴此项</string>
     <string name="stego_clear_field">清空此项</string>
     <string name="stego_bits_value">%1$d 位</string>
+    <string name="stego_random_poetry">追加随机诗句</string>
 </resources>

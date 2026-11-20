@@ -57,7 +57,7 @@ class MessageVectorsTest {
     @Test fun `five credential combinations and file digest match independent RustCrypto`() {
         val file = MessageKeyFile.factor(java.io.ByteArrayInputStream(ByteArray(128) { it.toByte() }))
         assertArrayEquals(bytes(fixtures().single { it.startsWith("# key-file-factor=") }.substringAfter('=')), file)
-        for (mode in MessageCredentialMode.entries) {
+        for (mode in MessageCredentialMode.entries.filter { it.id in 1..5 }) {
             val text = when {
                 mode == MessageCredentialMode.KEY_FILE -> ""
                 mode.password -> "public fixture passphrase"

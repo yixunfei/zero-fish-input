@@ -2,6 +2,53 @@
 
 Updated 2026-11-20.
 
+## Natural wording transport design (2026-11-20)
+
+The [design and implementation plan](natural-wording-steganography.md) maps the
+16 pinned Wanxiang tables, public associations and optional short-word scorer
+to resource preparation and evaluation. Current envelope sizes rule out an
+ordinary 512-unit cover for the proposed two-to-four-variant profile. Next is
+a host-only capacity study using reviewed rules and licensed continuous text.
+Runtime behavior and the existing carrier choices are unchanged.
+
+Follow-up research in section 7 compares edit-based text, conditional poetry
+generation, compact envelopes and local-only references. An unconditioned
+five-character dictionary index round-tripped 162 public test bytes in 462
+visible characters, including punctuation. Filtering for the moon character
+raises the calculated length to 708. The next generation experiment should
+measure candidate capacity and blind-rated coherence together. No production
+format or biometric decision follows from this experiment.
+
+## Personal stego notes and public verse (2026-11-20)
+
+The user subsequently clarified the personal credential acceptance criteria:
+an independently enrolled fingerprint plus the passphrase must work on a new
+phone, and other fingerprints enrolled in the phone's OS must not authorize
+the biometric factor. The device-bound feature below does not meet those
+criteria. Stock Android's public APIs for built-in sensors do not expose an
+individual fingerprint identity or portable template. The personal fingerprint
+feature remains open pending a decision on supported hardware.
+
+[ADR 0040](adr/0040-local-biometric-message.md) adds the device-bound passphrase
+mode, its private Activity entry, and the short-word scorer feasibility assessment.
+The editor appends complete couplets selected from the bundled Wanxiang poetry
+table. Natural wording remains a research item.
+
+The API 37 emulator exercised two distinct fingerprint prompts for sealing and
+opening a note. The private page displayed masked plaintext until reveal, and
+the original editor remained empty. The poetry panel tests covered filling an
+empty cover, appending, and hiding the control in the secret field. For the
+biometric round trip, run StegoKeyboardIntegrationTest's
+localDiaryRoundTripRequiresTwoFreshBiometricOperations with instrumentation
+argument `-e stegoTestFingerprint true` and touch the enrolled test fingerprint
+at each system prompt. OEM biometric behavior remains to be checked.
+
+The offline x86_64 Rime Debug build, Debug unit tests, privacyCheck and Debug
+Lint passed. All 54 stego platform cases were covered across the fingerprint
+run and the explicit eight-case vault PIN run on the disposable API 37 AVD.
+The layout checks also passed with dark theme at 360 x 640 and 640 x 360 dp.
+The reviewed dictionary currently yields 13 complete verse pairs.
+
 ## File approvals and Android 10 verification (2026-11-20)
 
 The [local acceptance results](audits/2026-11-19-ai-feature-assessment.md#local-remaining)
@@ -182,6 +229,24 @@ Old provenance/checksum text and the path/hash cleanup manifest are preserved in
 `.tmp-evidence/stego-panel-repackage.log`. Source changes, native caches, validation
 records and remote release assets were retained. Historical local APK links below
 may now be unavailable; their recorded hashes remain historical evidence.
+
+## Current code audit (2026-11-19)
+
+All three defects from the audit of `33ff309` are repaired: rejected engine commits
+retain a session-local pending result with explicit retry/cancel; expression export
+waits for foreground task availability; stego preedit and caret use one projection.
+The user approved the pending-commit recovery policy. See the original
+[report](audits/2026-11-19-current-code-audit.md) and
+[repair/validation record](audits/2026-11-19-current-code-audit-fixes.md).
+
+Current Debug/JVM results contain 1,177 passes and two opt-in live-provider skips,
+with cached/up-to-date tasks noted. Privacy, zero-issue Debug Lint, real-Rime x86_64
+Debug/instrumentation builds and main merged-manifest checks pass. API 37 passes
+30 distinct platform cases, including actual English/native-Rime refusal recovery,
+plus four repeated stego touch cases across small/dark/large-font and
+landscape/light configurations. Installed APK hashes match; display settings were
+restored and the task-owned emulator stopped. No Release or three-ABI package was
+produced. Next: physical ARM/OEM, older Android and real DocumentsUI acceptance.
 
 ## v0.7.7 published (2026-11-19)
 

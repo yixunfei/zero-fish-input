@@ -19,6 +19,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StegoPanelInteractionTest {
+    @Test fun randomPoetryFillsAndExtendsOnlyThePublicCover() = withWorkspace { panel, workspace ->
+        val cover = nodes(panel).filterIsInstance<TextView>().single {
+            it.hint?.toString() == panel.context.getString(R.string.stego_cover_hint)
+        }
+        val poetry = button(panel, R.string.stego_random_poetry)
+        poetry.performClick()
+        val first = cover.text.toString()
+        assertTrue(first.matches(Regex("[一-龥]{5}，[一-龥]{5}。")))
+        poetry.performClick()
+        assertTrue(cover.text.toString().startsWith(first + "\n"))
+        assertNotEquals(first, cover.text.toString().substringAfter('\n'))
+        val extended = cover.text.toString()
+        button(panel, R.string.stego_secret).performClick()
+        assertFalse(poetry.isShown)
+        workspace.type(KeyboardAction.LiteralText("fixture"))
+        assertEquals(extended, cover.text.toString())
+    }
+
     @Test fun disclosuresKeepDraftsAndSelectionAcrossTypingAndResetWhenReopened() = withWorkspace { panel, workspace ->
         val layers = button(panel, R.string.stego_layers_short)
         val more = button(panel, R.string.stego_advanced)

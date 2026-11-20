@@ -59,6 +59,13 @@ uncertain commits cannot be retried. Session/privacy/reset/close boundaries revo
 pending state. LocalDraftInput refuses partial submission and caret moves while a
 failed commit is unresolved; explicit submission may retry a definite rejection.
 
+ExpressionManagerActivity keeps a picker destination only in its current instance,
+bound to the explicitly requested export and repository deletion generation. The
+foreground task queue drains picker results before refreshing the list, or after
+an existing list operation. Export bytes and I/O stay on the bounded worker.
+Recreation, cancellation and uncertain writes never automatically retry; recreation
+retains only a nonsecret failure flag so the user can start a fresh export.
+
 StegoFieldUi carries the displayed composition length alongside the committed-text
 caret. StegoWorkspace inserts formatted preedit at that caret, and DraftTextView
 uses that same length for drawing and touch projection. Hidden secret fields expose
@@ -1466,3 +1473,10 @@ existing HKDF extraction and stage keys are unchanged, as are message envelopes,
 vault data and old 32-byte credential behavior. Longer master material does not
 raise cipher widths or the 256-bit derivation ceiling. UI presets and focus-free
 numeric entry share the existing protected page. No new permissions/dependencies.
+
+## Personal stego credentials (2026-11-20)
+
+The [local credential decision](adr/0040-local-biometric-message.md) assigns
+Keystore operation creation to security, foreground biometric prompts to the
+workspace, and the passphrase and device factor combination to MessageKeys.
+The cover editor can append a reviewed Wanxiang couplet entirely in memory.

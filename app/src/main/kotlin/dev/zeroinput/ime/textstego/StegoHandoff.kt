@@ -17,7 +17,7 @@ import java.util.UUID
 /** One-use internal transfer. Only an opaque ID crosses an Intent. No editor/Activity/callback. */
 internal class StegoHandoff(private val context: Context, private val settings: SettingsRepository,
                             private val generation: () -> Long) : AutoCloseable {
-    enum class Kind { CARRIER, VAULT, FILE, SAVE }
+    enum class Kind { CARRIER, VAULT, FILE, SAVE, LOCAL_NOTE }
     class Request(val kind: Kind, var text: CharArray? = null, val editor: PasteEditorIdentity? = null,
                   val target: StegoField = StegoField.CARRIER, var carrier: CharArray? = null) : AutoCloseable {
         var generation = -1L

@@ -44,27 +44,31 @@ open class ExpressionManagerActivity : AppCompatActivity() {
     private var foreground = false
     private var requestedId: String? = null
     private var pendingImportUri: Uri? = null
+    private var pendingExportUri: Uri? = null
+    private var exportInFlight = false
+    private var exportInterrupted = false
+    private var exportRequested = false
+    private var exportGeneration: Long? = null
 
     private val exporter = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        if (uri != null) runOperation({
-            val bytes = repository.exportEncrypted()
-            try {
-                contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) }
-                    ?: error("Unable to open export")
-            } finally {
-                bytes.fill(0)
-            }
-            Unit
-        }) { Toast.makeText(this, R.string.expression_exported, Toast.LENGTH_SHORT).show() }
+        if (!exportRequested) {
+            if (uri != null) { exportInterrupted = true; if (foreground) reportInterruptedExport() }
+            return@registerForActivityResult
+        }
+        exportRequested = false
+        if (uri != null && exportGeneration == repository.generation()) pendingExportUri = uri
+        else if (uri != null) { exportInterrupted = true; if (foreground) reportInterruptedExport() }
+        drainPendingDocuments()
     }
 
     private val importer = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) pendingImportUri = uri
-        drainPendingImport()
+        drainPendingDocuments()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null)
+        exportInterrupted = savedInstanceState?.getBoolean(EXPORT_INTERRUPTED) == true
         catalogPreparation = dev.zeroinput.ime.ui.EmojiCatalog.prepare(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         requestedId = intent.getStringExtra(EDIT_ID)?.takeIf { it.length == 36 }
@@ -74,11 +78,13 @@ open class ExpressionManagerActivity : AppCompatActivity() {
             runOnUiThread {
                 if (foreground) {
                     tasks.cancel()
+                    if (exportInFlight) { exportInFlight = false; exportInterrupted = true }
                     adapter.submit(emptyList())
                     form?.dialog?.dismiss()
                     form = null
                     confirmation?.dismiss()
                     refresh()
+                    reportInterruptedExport()
                 }
             }
         }
@@ -87,12 +93,13 @@ open class ExpressionManagerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         foreground = true
-        refresh()
-        drainPendingImport()
+        reportInterruptedExport()
+        if (pendingExportUri != null || pendingImportUri != null) drainPendingDocuments() else refresh()
     }
 
     override fun onPause() {
         foreground = false
+        if (exportInFlight) { exportInFlight = false; exportInterrupted = true }
         tasks.cancel()
         form?.dialog?.dismiss()
         form = null
@@ -108,9 +115,13 @@ open class ExpressionManagerActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.clear()
+        outState.putBoolean(EXPORT_INTERRUPTED, exportRequested || exportInFlight ||
+            pendingExportUri != null || exportInterrupted)
     }
 
     override fun onDestroy() {
+        pendingExportUri = null
+        pendingImportUri = null
         catalogPreparation?.close()
         observer?.close()
         tasks.close()
@@ -180,9 +191,31 @@ open class ExpressionManagerActivity : AppCompatActivity() {
         }
     }
 
-    private fun drainPendingImport() {
-        val uri = pendingImportUri ?: return
+    private fun drainPendingDocuments() {
         if (!foreground || busy) return
+        val export = pendingExportUri
+        if (export != null) {
+            pendingExportUri = null
+            exportInFlight = true
+            val deletion = exportGeneration
+            runOperation({ current ->
+                check(current() && deletion == repository.generation()) { "Export cancelled" }
+                val bytes = repository.exportEncrypted()
+                try {
+                    check(current() && deletion == repository.generation()) { "Export cancelled" }
+                    contentResolver.openOutputStream(export, "wt")?.use {
+                        check(current() && deletion == repository.generation()) { "Export cancelled" }
+                        it.write(bytes)
+                    } ?: error("Unable to open export")
+                } finally { bytes.fill(0) }
+            }) {
+                exportInFlight = false
+                Toast.makeText(this, R.string.expression_exported, Toast.LENGTH_SHORT).show()
+                refresh()
+            }
+            return
+        }
+        val uri = pendingImportUri ?: return
         pendingImportUri = null
         runOperation({ current ->
             val bytes = contentResolver.openInputStream(uri)?.use { input -> input.readBoundedBytes(EXPRESSION_IMPORT_BYTES) }
@@ -196,6 +229,13 @@ open class ExpressionManagerActivity : AppCompatActivity() {
             graph.notifyExpressionsChanged()
             Toast.makeText(this, R.string.expression_imported, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun reportInterruptedExport() {
+        if (!exportInterrupted) return
+        exportInterrupted = false
+        status.failure(R.string.expression_export_failed) { refresh() }
+        Toast.makeText(this, R.string.expression_export_failed, Toast.LENGTH_LONG).show()
     }
 
     private fun edit(entry: PersonalExpression?) {
@@ -233,6 +273,8 @@ open class ExpressionManagerActivity : AppCompatActivity() {
             .setMessage(R.string.expression_export_message)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.expression_export) { _, _ ->
+                exportRequested = true
+                exportGeneration = repository.generation()
                 exporter.launch("zeroinput-expressions.zexp")
             }
             .show()
@@ -244,12 +286,14 @@ open class ExpressionManagerActivity : AppCompatActivity() {
         loadingList = listRead
         tasks.execute(operation) {
             success(it)
-            drainPendingImport()
+            drainPendingDocuments()
         }
     }
 
     private fun showFailure(error: Throwable) {
-        val message = when ((error as? ExpressionException)?.failure) {
+        val failedExport = exportInFlight
+        exportInFlight = false
+        val message = if (failedExport) R.string.expression_export_failed else when ((error as? ExpressionException)?.failure) {
             ExpressionFailure.INVALID -> R.string.expression_invalid
             ExpressionFailure.DUPLICATE -> R.string.expression_duplicate
             ExpressionFailure.CAPACITY -> R.string.expression_capacity
@@ -258,6 +302,7 @@ open class ExpressionManagerActivity : AppCompatActivity() {
         if (loadingList) adapter.submit(emptyList())
         status.failure(message) { refresh() }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        drainPendingDocuments()
     }
 
     private fun setBusy(value: Boolean) {
@@ -287,5 +332,6 @@ open class ExpressionManagerActivity : AppCompatActivity() {
         private const val MENU_IMPORT = 2
         private const val MENU_EXPORT = 3
         private const val EXPRESSION_IMPORT_BYTES = 512 * 1024 + 64
+        private const val EXPORT_INTERRUPTED = "expression_export_interrupted"
     }
 }

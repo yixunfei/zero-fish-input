@@ -40,6 +40,15 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   stale candidate identifiers and privacy revocation. Pending text is never persisted
   or included in generic failure feedback.
 
+- Expression export destinations remain ephemeral, foreground-only and bound to the
+  current request and deletion generation. Picker delivery before resume waits for
+  the task queue; list refresh cannot cancel the pending export. Bytes are cleared
+  after writing. Cancellation, recreation or uncertain provider writes have no
+  automatic retry, and visible failure feedback warns that the file may be incomplete.
+  A document provider's write cannot be rolled back or guaranteed atomic. Tests use
+  public fixtures for importable output, picker cancellation, recreation, deletion
+  and destination failure. No storage grant or persisted URI permission is added.
+
 - Stego composition projection uses the committed caret and displayed (including
   formatting spaces) preedit length for both rendering and touch mapping. Hidden
   fields keep masking and publish no caret/preedit metadata. Public-fixture tests
@@ -1706,3 +1715,12 @@ System paste changes neither the system clipboard nor the private vault. OS/JVM
 clipboard Strings cannot be guaranteed erased. Vault saves still authenticate and
 confirm separately. Existing 32-byte random credentials derive identical roots;
 new longer material does not change serialized envelopes or persisted data.
+
+## Personal stego notes (2026-11-20)
+
+Copying a mode-6 envelope and obtaining the passphrase still requires the
+original device key. New biometric enrollment, key loss or uninstall can
+destroy access. An attacker already enrolled on the device can authorize the
+device factor and would also need the passphrase. Workspace closure cancels
+the prompt and generation checks reject stale callbacks. See
+[ADR 0040](adr/0040-local-biometric-message.md).

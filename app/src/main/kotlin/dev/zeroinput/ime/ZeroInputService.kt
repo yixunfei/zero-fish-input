@@ -1217,7 +1217,9 @@ class ZeroInputService : InputMethodService() {
                         carrier = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER) workspaceDetachedCarrier() else null))
                 }
             }, onSave = { value -> launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(
-                dev.zeroinput.ime.textstego.StegoHandoff.Kind.SAVE, value)) })
+                dev.zeroinput.ime.textstego.StegoHandoff.Kind.SAVE, value)) },
+            openLocalNote = { carrier -> launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(
+                dev.zeroinput.ime.textstego.StegoHandoff.Kind.LOCAL_NOTE, carrier)) })
         textStego = workspace
         view.onTextStegoRequested = {
             syncSessionPrivacy()

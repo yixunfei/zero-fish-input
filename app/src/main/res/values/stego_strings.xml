@@ -88,4 +88,9 @@
     <string name="stego_authentication_expired">身份认证已超时，草稿已清除</string>
     <string name="stego_entry_time">条目 %1$d · %2$s</string>
     <string name="stego_bits_range">可输入 256–4096 位，须为 8 的倍数</string>
+    <string name="stego_local_mode">本机生物识别＋口令</string>
+    <string name="stego_local_warning">仅供自己在这台设备上解密。每次加密或解密都需要强生物识别和口令。本机已录入且符合要求的指纹或人脸均可用于认证。换机、卸载、清除应用数据或更改生物识别登记后，原消息可能永久无法解密。</string>
+    <string name="stego_local_touch">请使用本机强生物识别认证。可关闭面板取消。</string>
+    <string name="stego_local_failed">本次生物认证未完成，或本机密钥不可用。</string>
+    <string name="stego_local_move">进入个人随笔页？当前草稿和口令将清除，解密时只带入密文载体。请在新页面填写并保存。仅供自己在本机使用，每次加解密都需要本机已登记的强生物识别和口令。换机、卸载、清除应用数据或新增生物识别后，旧消息可能永久无法解密。</string>
 </resources>

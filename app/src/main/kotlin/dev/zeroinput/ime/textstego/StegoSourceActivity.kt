@@ -43,6 +43,7 @@ class StegoSourceActivity : AppCompatActivity() {
     private var authorizedSave: Boolean? = null
     private var selectedId: String? = null
     private var vaultTarget = StegoField.CARRIER
+    private var vaultLocalNote = false
     private var selectedUri: Uri? = null
     private var resumed = false
     private var detour = false
@@ -79,7 +80,7 @@ class StegoSourceActivity : AppCompatActivity() {
         ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
         resetDeadline(120_000)
         when (request?.kind) {
-            StegoHandoff.Kind.CARRIER -> launchWorkspace()
+            StegoHandoff.Kind.CARRIER, StegoHandoff.Kind.LOCAL_NOTE -> launchWorkspace()
             StegoHandoff.Kind.FILE -> showAction(R.string.stego_file_warning, R.string.stego_select_file, ::pickFile)
             StegoHandoff.Kind.VAULT -> showAction(R.string.stego_read_start, dev.zeroinput.ime.ui.R.string.stego_vault, ::listVault)
             StegoHandoff.Kind.SAVE -> showAction(R.string.stego_save_start, dev.zeroinput.ime.ui.R.string.stego_save) { authenticate(save = true) }
@@ -141,6 +142,7 @@ class StegoSourceActivity : AppCompatActivity() {
                 when (action) {
                     StegoAction.KEY_FILE -> pickFile()
                     StegoAction.VAULT, StegoAction.VAULT_COVER, StegoAction.VAULT_SECRET -> {
+                        vaultLocalNote = workspace?.localNoteSelected == true
                         vaultTarget = when (action) {
                             StegoAction.VAULT_COVER -> StegoField.COVER
                             StegoAction.VAULT_SECRET -> StegoField.SECRET
@@ -173,7 +175,7 @@ class StegoSourceActivity : AppCompatActivity() {
             addView(view, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
             protectInsets(this)
         })
-        controller.open(InputLanguage.CHINESE, ChineseInputOptions(), carrier, file)
+        controller.open(InputLanguage.CHINESE, ChineseInputOptions(), carrier, file, localNote = request?.kind == StegoHandoff.Kind.LOCAL_NOTE)
         request?.let { source -> if (source.target != StegoField.CARRIER)
             source.text?.let { controller.pasteText(source.target, String(it)) } }
         request?.text?.fill('\u0000'); request?.text = null
@@ -301,7 +303,8 @@ class StegoSourceActivity : AppCompatActivity() {
                 message(if (accepted) R.string.stego_paste_return else R.string.stego_paste_failed); discard(); return
             }
             val carrier = request?.carrier?.copyOf()
-            request?.close(); request = StegoHandoff.Request(StegoHandoff.Kind.CARRIER, value, target = vaultTarget, carrier = carrier)
+            val kind = if (vaultLocalNote) StegoHandoff.Kind.LOCAL_NOTE else StegoHandoff.Kind.CARRIER
+            request?.close(); request = StegoHandoff.Request(kind, value, target = vaultTarget, carrier = carrier)
             launchWorkspace()
         } else { value?.fill('\u0000'); message(if (success) R.string.clipboard_import_saved else R.string.stego_failed); discard() }
     }

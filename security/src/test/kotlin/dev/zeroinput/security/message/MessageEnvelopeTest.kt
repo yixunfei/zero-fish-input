@@ -65,7 +65,7 @@ class MessageEnvelopeTest {
 
     @Test fun `all five credential modes require every selected factor and exact passphrase`() {
         val crypto = MessageEnvelope(SecureRandom()) { input, salt, _ -> MessageKeys.argon(input, salt, MessageKdf.STANDARD) }
-        MessageCredentialMode.entries.forEach { mode ->
+        MessageCredentialMode.entries.filter { it != MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD }.forEach { mode ->
             credential(mode, if (mode.file) ByteArray(32) { 5 } else null).use { key ->
                 val sealed = crypto.seal(cover, secret, key, kdf = if (mode.password) MessageKdf.STANDARD else MessageKdf.NONE)
                 assertArrayEquals(secret, crypto.open(cover, sealed, key))
@@ -73,6 +73,28 @@ class MessageEnvelopeTest {
                     assertThrows(MessageFailure::class.java) { crypto.open(cover, sealed, wrong) }
                 }
             }
+        }
+    }
+
+    @Test fun `personal messages require a fresh device operation and the original passphrase`() {
+        val mode = MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD
+        fun local(device: Byte = 1, password: String = "local fixture password"): MessageCredential {
+            val mac = javax.crypto.Mac.getInstance("HmacSHA256").apply {
+                init(javax.crypto.spec.SecretKeySpec(ByteArray(32) { device }, "HmacSHA256"))
+            }
+            return MessageCredential(mode, password.toCharArray(), localOperation = mac)
+        }
+        val crypto = MessageEnvelope()
+        val sealed = local().use { key ->
+            crypto.seal(cover, secret, key).also {
+                assertThrows(MessageFailure::class.java) { crypto.open(cover, it, key) }
+            }
+        }
+        assertEquals(mode, crypto.inspect(sealed).mode)
+        local().use { assertArrayEquals(secret, crypto.open(cover, sealed, it)) }
+        for (invalid in listOf(local(device = 2), local(password = "wrong fixture password"), credential(mode),
+            credential(MessageCredentialMode.PASSPHRASE))) invalid.use {
+            assertThrows(MessageFailure::class.java) { crypto.open(cover, sealed, it) }
         }
     }
 

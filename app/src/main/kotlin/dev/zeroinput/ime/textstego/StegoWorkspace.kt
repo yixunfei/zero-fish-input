@@ -28,6 +28,7 @@ internal class StegoWorkspace(
     private val onSave: (CharArray) -> Unit,
     private val isKeyboard: Boolean = true,
     private val onDraftActivity: () -> Unit = {},
+    private val openLocalNote: ((CharArray?) -> Unit)? = null,
 ) : AutoCloseable {
     private val gate = StegoOperationGate(SystemClock::elapsedRealtime)
     private val drafts = mutableMapOf<StegoField, LocalDraftInput>()
@@ -48,8 +49,13 @@ internal class StegoWorkspace(
     private var result: CharArray? = null
     private var outputs: StegoOutputs? = null
     private val options = StegoOptions()
-    private val dialogs = StegoOptionsDialog(view, ::current).apply { attachToIme = isKeyboard }
+    val localNoteSelected: Boolean get() = options.mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD
+    private val dialogs = StegoOptionsDialog(view, ::current).apply {
+        attachToIme = isKeyboard
+        leaveForLocalNote = openLocalNote?.let { launch -> { launch(null) } }
+    }
     @Volatile private var pending: StegoCryptoOperation? = null
+    private var biometric: StegoBiometricPrompt? = null
     private var vaultGeneration = 0L
     private var workspaceGeneration = 0L
     private val valid = AtomicBoolean(false)
@@ -61,13 +67,14 @@ internal class StegoWorkspace(
         }
     }
 
-    fun open(language: InputLanguage, chinese: ChineseInputOptions, carrier: String? = null, file: ByteArray? = null) {
+    fun open(language: InputLanguage, chinese: ChineseInputOptions, carrier: String? = null, file: ByteArray? = null,
+             localNote: Boolean = false) {
         close()
         gate.open()
         valid.set(true)
         val defaults = graph().settings.stegoDefaults
         options.stages = defaults.stages.toList()
-        options.mode = MessageCredentialMode.PASSPHRASE
+        options.mode = if (localNote) MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD else MessageCredentialMode.PASSPHRASE
         options.kdf = MessageKdf.STANDARD
         options.transport = StegoTransport.DENSE_UNICODE
         keyBits = defaults.masterBits.toString(); replaceBits = true
@@ -343,6 +350,12 @@ internal class StegoWorkspace(
                 clearSensitive()
             }
             StegoAction.COVER -> field = StegoField.COVER
+            StegoAction.RANDOM_POETRY -> if (!decrypt && field == StegoField.COVER) {
+                val draft = drafts[field] ?: return
+                if (states[field]?.snapshot?.isComposing == true) notify(R.string.stego_composition_unfinished)
+                else if (!draft.replaceCommittedText(StegoPoetry.extend(draft.committedText())))
+                    notify(R.string.stego_length_limit)
+            }
             StegoAction.SECRET -> field = StegoField.SECRET
             StegoAction.CREDENTIAL -> field = StegoField.CREDENTIAL
             StegoAction.KEY_BITS -> { field = StegoField.KEY_BITS; replaceBits = true }
@@ -457,13 +470,43 @@ internal class StegoWorkspace(
             } else if (options.mode.password) options.kdf else MessageKdf.NONE
         } catch (_: Exception) { notify(R.string.stego_failed); return }
         if (options.mode.file && factor == null) { notify(R.string.stego_file_missing); return }
+        if (isKeyboard && options.mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD) {
+            dialogs.confirm(R.string.stego_local_move) {
+                moveEncryptedNote()
+            }
+            return
+        }
         if (kdf != MessageKdf.NONE && !StegoOptions.available(kdf)) { notify(R.string.stego_memory_unavailable); return }
         if (kdf == MessageKdf.INCREASED || kdf == MessageKdf.HIGH_MEMORY)
             dialogs.confirm(R.string.stego_cost_warning) { enqueue(kdf, insert) }
         else enqueue(kdf, insert)
     }
 
-    private fun enqueue(kdf: MessageKdf, insert: Boolean) {
+    private fun moveEncryptedNote() {
+        val launch = openLocalNote ?: return
+        if (!editable() || !decrypt) return
+        val carrier = submittedField(StegoField.CARRIER) ?: return
+        val verified = try { inspectCarrier(carrier).mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD }
+            catch (_: Exception) { false }
+        if (verified) launch(carrier) else { carrier.fill('\u0000'); notify(R.string.stego_failed) }
+    }
+
+    private fun authenticateLocal(kdf: MessageKdf, insert: Boolean) {
+        val token = gate.begin() ?: return
+        notice = R.string.stego_local_touch
+        render()
+        biometric = StegoBiometricPrompt(view.context, main) { mac ->
+            biometric = null
+            if (current() && gate.accepts(token)) {
+                gate.fail(token)
+                if (mac != null) enqueue(kdf, insert, mac)
+                else { notify(R.string.stego_local_failed); render() }
+            }
+        }
+        biometric?.start(!decrypt) { current() && gate.accepts(token) }
+    }
+
+    private fun enqueue(kdf: MessageKdf, insert: Boolean, mac: javax.crypto.Mac? = null) {
         if (!editable()) return
         val cover = submittedField(StegoField.COVER) ?: return
         val secret = submittedField(StegoField.SECRET) ?: run {
@@ -490,8 +533,14 @@ internal class StegoWorkspace(
             cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000')
             notify(R.string.stego_failed); render(); return
         }
+        if (options.mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD && mac == null) {
+            cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000')
+            if (decrypt) dialogs.confirm(R.string.stego_local_warning) { authenticateLocal(kdf, insert) }
+            else authenticateLocal(kdf, insert)
+            return
+        }
         val chars = CharArray(credential.length) { credential[it] }
-        val master = MessageCredential(options.mode, chars, if (options.mode.file) factor else null)
+        val master = MessageCredential(options.mode, chars, if (options.mode.file) factor else null, mac)
         chars.fill('\u0000')
         val token = gate.begin() ?: run { master.close(); cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000'); return }
         val lease = StegoCryptoOperation(token, SystemClock.elapsedRealtime() + 120_000)
@@ -568,7 +617,7 @@ internal class StegoWorkspace(
             else -> fieldDisplay(field).text
         }
         val status = when {
-            busy -> view.context.getString(R.string.stego_busy)
+            busy -> view.context.getString(if (notice == R.string.stego_local_touch) R.string.stego_local_touch else R.string.stego_busy)
             preview -> view.context.getString(R.string.stego_preview, text, prepared?.length ?: 0,
                 prepared?.let(StegoCarrierCodec::utf8Length) ?: 0)
             hasResult -> view.context.getString(R.string.stego_result)
@@ -642,6 +691,7 @@ internal class StegoWorkspace(
     override fun close() {
         workspaceGeneration++
         valid.set(false)
+        biometric?.close(); biometric = null
         gate.close(); pending?.close(); pending = null; main.removeCallbacks(expire)
         dialogs.close(); clearCredential(); factor?.fill(0); factor = null; clearPrepared()
         drafts.values.forEach(LocalDraftInput::close); drafts.clear(); states.clear(); carets.clear()

@@ -43,7 +43,7 @@ internal class StegoOptions {
 
     companion object {
         val MODE_LABELS = intArrayOf(R.string.stego_passphrase, R.string.stego_random_key,
-            R.string.stego_file_only, R.string.stego_passphrase_file, R.string.stego_random_file)
+            R.string.stego_file_only, R.string.stego_passphrase_file, R.string.stego_random_file, R.string.stego_local_mode)
         fun label(stage: MessageStage): String = when (stage.cipher) {
             MessageCipher.XCHACHA20 -> "XChaCha20-Poly1305 (256)"
             else -> "${stage.cipher.name}-${stage.bits}-GCM"
@@ -59,6 +59,7 @@ internal class StegoOptions {
 internal class StegoOptionsDialog(private val owner: View, private val isCurrent: () -> Boolean) : AutoCloseable {
     private var dialog: AlertDialog? = null
     var attachToIme = true
+    var leaveForLocalNote: (() -> Unit)? = null
 
     fun show(options: StegoOptions, decrypt: Boolean, changed: () -> Unit, fileChanged: () -> Unit) {
         if (decrypt) { message(R.string.stego_decrypt_options_fixed); return }
@@ -86,9 +87,16 @@ internal class StegoOptionsDialog(private val owner: View, private val isCurrent
 
     fun mode(options: StegoOptions, changed: () -> Unit) {
         choose(R.string.stego_credential_mode, StegoOptions.MODE_LABELS.map(owner.context::getString)) {
-            options.mode = MessageCredentialMode.entries[it]
-            if (options.mode.password && options.kdf == MessageKdf.NONE) options.kdf = MessageKdf.STANDARD
-            changed()
+            val selected = MessageCredentialMode.entries[it]
+            val applyMode = {
+                options.mode = selected
+                if (selected.password && options.kdf == MessageKdf.NONE) options.kdf = MessageKdf.STANDARD
+                changed()
+            }
+            val leave = leaveForLocalNote
+            if (selected == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD && leave != null) confirm(R.string.stego_local_move, leave)
+            else if (selected == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD) confirm(R.string.stego_local_warning, applyMode)
+            else applyMode()
         }
     }
 

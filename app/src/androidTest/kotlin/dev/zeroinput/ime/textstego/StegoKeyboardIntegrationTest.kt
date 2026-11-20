@@ -25,6 +25,70 @@ import org.junit.runner.RunWith
 class StegoKeyboardIntegrationTest {
     private val graph get() = (Device.context.applicationContext as ZeroInputApplication).graph
 
+    /** Run on a disposable emulator with a test fingerprint supplied at each system prompt. */
+    @Test fun localDiaryRoundTripRequiresTwoFreshBiometricOperations() {
+        org.junit.Assume.assumeTrue(androidx.test.platform.app.InstrumentationRegistry.getArguments()
+            .getString("stegoTestFingerprint") == "true")
+        withEditor { activity ->
+            val password = "public fixture passphrase"
+            val secret = "public diary fixture"
+            Device.onMain {
+                val view = keyboard()
+                view.onTextStegoRequested()
+                view.textStegoPanel.onAction(StegoAction.RANDOM_POETRY)
+                view.textStegoPanel.onAction(StegoAction.SECRET)
+                view.dispatchKeyboardAction(KeyboardAction.LiteralText(secret))
+                view.textStegoPanel.onAction(StegoAction.CREDENTIAL_MODE)
+            }
+            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_local_mode))
+            Device.click(Device.context.getString(android.R.string.ok))
+            fun note() = androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).filterIsInstance<StegoSourceActivity>().single()
+            fun noteKeyboard() = views(note().window.decorView).filterIsInstance<ZeroInputView>().single()
+            await { onMain { runCatching { noteKeyboard().isShown }.getOrDefault(false) } }
+            Device.onMain {
+                val view = noteKeyboard()
+                assertFalse(secret in labels(view))
+                view.textStegoPanel.onAction(StegoAction.RANDOM_POETRY)
+                view.textStegoPanel.onAction(StegoAction.SECRET)
+                view.dispatchKeyboardAction(KeyboardAction.LiteralText(secret))
+                view.textStegoPanel.onAction(StegoAction.CREDENTIAL)
+                view.dispatchKeyboardAction(KeyboardAction.LiteralText(password))
+                view.textStegoPanel.onAction(StegoAction.PREPARE)
+            }
+            val saveLabel = Device.context.getString(dev.zeroinput.ime.ui.R.string.stego_save_carrier)
+            await(45_000) { onMain { runCatching { saveLabel in labels(noteKeyboard()) }.getOrDefault(false) } }
+            val encoded = onMain {
+                noteKeyboard().textStegoPanel.onAction(StegoAction.SAVE_CARRIER)
+                val host = note()
+                val request = host.javaClass.getDeclaredField("request").apply { isAccessible = true }.get(host) as StegoHandoff.Request
+                String(requireNotNull(request.text)).also { host.finish() }
+            }
+            val carrier = StegoCarrierCodec.decode(encoded)
+            assertEquals(MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD, MessageEnvelope().inspect(carrier.envelope).mode)
+            val unauthenticated = LocalMessageKey.begin(creatingMessage = false)
+            assertThrows(java.security.ProviderException::class.java) { unauthenticated.doFinal(ByteArray(32)) }
+            val token = onMain { graph.stegoHandoff.put(StegoHandoff.Request(StegoHandoff.Kind.CARRIER, encoded.toCharArray())) }
+            Device.instrumentation.startActivitySync(Intent(Device.context, StegoSourceActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(StegoSourceActivity.EXTRA_TOKEN, token))
+            Device.onMain {
+                val view = noteKeyboard()
+                view.dispatchKeyboardAction(KeyboardAction.LiteralText(password))
+                view.textStegoPanel.onAction(StegoAction.PREPARE)
+            }
+            Device.click(Device.context.getString(android.R.string.ok))
+            val result = Device.context.getString(dev.zeroinput.ime.R.string.stego_result)
+            await(45_000) { onMain { runCatching { result in labels(noteKeyboard()) }.getOrDefault(false) } }
+            Device.onMain {
+                assertFalse(secret in labels(noteKeyboard()))
+                noteKeyboard().textStegoPanel.onAction(StegoAction.REVEAL)
+                assertTrue(secret in labels(noteKeyboard()))
+                assertEquals("", activity.editor.text.toString())
+                note().finish()
+            }
+        }
+    }
+
     @Test fun authenticatedCoverPasteSurvivesRealEditorReturnAndWaitsForAnExplicitStegoTap() = authenticatedPaste(StegoField.COVER)
     @Test fun authenticatedSecretPasteReturnsMaskedOnlyAfterExplicitStegoTapWithoutWritingEditor() = authenticatedPaste(StegoField.SECRET)
 

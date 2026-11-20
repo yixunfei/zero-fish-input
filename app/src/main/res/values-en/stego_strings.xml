@@ -89,4 +89,9 @@
     <string name="stego_authentication_expired">Authentication timed out. Draft cleared.</string>
     <string name="stego_entry_time">Entry %1$d · %2$s</string>
     <string name="stego_bits_range">Enter 256–4096 bits, in multiples of 8</string>
+    <string name="stego_local_mode">Device biometrics + passphrase</string>
+    <string name="stego_local_warning">For your own use on this device. Each encryption and decryption requires strong biometrics and your passphrase. Any qualifying fingerprint or face enrolled on this device may authenticate. Switching devices, uninstalling, clearing app data or changing biometric enrollment may permanently prevent decryption.</string>
+    <string name="stego_local_touch">Authenticate using strong biometrics. Close the panel to cancel.</string>
+    <string name="stego_local_failed">Biometric authentication did not finish or the device key is unavailable.</string>
+    <string name="stego_local_move">Open personal notes? Current drafts and the passphrase will be cleared. For decryption only the encrypted carrier will be carried over. Edit and save on the new page. For your own use on this device, each operation requires an enrolled strong biometric and your passphrase. Changing devices, reinstalling, clearing app data or enrolling new biometrics can permanently prevent recovery.</string>
 </resources>

@@ -7,6 +7,16 @@ plugins {
 }
 
 val includeTestUniversalApk = providers.gradleProperty("testUniversalApk").orNull == "true"
+val poetrySource = layout.buildDirectory.dir("generated/stegoPoetry")
+val prepareStegoPoetry = tasks.register<Exec>("prepareStegoPoetry") {
+    dependsOn(":engine-rime:verifyPublicDictionaryAssets")
+    val script = rootProject.file("tools/dictionaries/prepare-stego-poetry.py")
+    inputs.file(script)
+    inputs.file(rootProject.file("engine-rime/build/generated/publicDictionaryAssets/rime/dicts/shici.dict.yaml"))
+    outputs.dir(poetrySource)
+    commandLine("python", script.absolutePath)
+}
+tasks.named("preBuild").configure { dependsOn(prepareStegoPoetry) }
 val licenseAssets = layout.buildDirectory.dir("generated/licenseAssets")
 val handwritingAndroidTestAssets = layout.buildDirectory.dir("generated/handwritingAndroidTestAssets")
 val handwritingAssetManifest = rootProject.file("app/src/androidTest/assets/handwriting-test-assets.properties")
@@ -62,6 +72,7 @@ val prepareHandwritingAndroidTestAssets = tasks.register("prepareHandwritingAndr
 }
 
 android {
+    sourceSets["main"].java.srcDir(poetrySource)
     sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("build/handwriting-evaluation/platform-fixtures"))
     sourceSets.getByName("androidTest").assets.srcDir(handwritingAndroidTestAssets)
     namespace = "dev.zeroinput.ime"

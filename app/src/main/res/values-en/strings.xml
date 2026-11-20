@@ -295,4 +295,5 @@
     <string name="appearance_color_channel_red">Red %d</string>
     <string name="appearance_color_channel_green">Green %d</string>
     <string name="appearance_color_channel_blue">Blue %d</string>
+    <string name="expression_export_failed">Export did not finish. The file may be empty or incomplete. Please export again.</string>
 </resources>
