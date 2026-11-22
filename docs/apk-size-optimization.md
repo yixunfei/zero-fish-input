@@ -2,6 +2,30 @@
 
 Date: 2026-11-05. Status: lossless improvements verified; strict size target not met.
 
+## Steganography review, 2026-11-22
+
+Inspected the archived full ARM64 Debug 0.7.7 delivery (97,773,670 bytes).
+Physical compressed payload includes 25,545,767 bytes of prebuilt Rime data,
+19,319,192 of source dictionaries, 16,003,194 of emoji, 12,213,601 of Mini
+INT8 assets, and 1,209,952 for all three Debug wording profiles and fixtures.
+The shared profile data powers the keyboard. Removing its settings sample
+button cannot recover the profile size.
+
+Grouping nonempty ZIP entries by SHA-256 found 104,617 compressed bytes in
+duplicate copies across the APK. Deduplicating those entries would require
+preserving named resources, lookup behavior and license paths. A separate
+in-memory test compressed the original ONNX model with XZ preset 6 and a
+4 MiB dictionary. It recovered identical bytes under a 16 MiB decoder limit.
+The XZ payload measured 11,434,756 bytes against 12,154,663 in the APK,
+saving 719,907 bytes before packaging. One host decode took 370 ms versus
+41 ms for ZIP. These timings are illustrative host measurements. The app
+keeps the current model path and offline resources. Neither experiment
+establishes a way to reach 80 MB while preserving startup performance.
+
+The rebuilt full ARM64 Debug is 97,777,830 bytes, 4,160 bytes larger than the
+archive above. The rebuilt full ARM64 unsigned Release is 84,179,882 bytes, exceeding the
+80,000,000-byte target by 4,179,882 bytes. Full-resource verification passed.
+
 ## Goal and scope
 
 Target a physical APK size of at most **80,000,000 bytes** (80 decimal MB,

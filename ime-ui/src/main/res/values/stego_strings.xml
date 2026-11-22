@@ -3,6 +3,7 @@
     <string name="stego_short">隐</string>
     <string name="stego_encrypt">加密</string>
     <string name="stego_decrypt">解密</string>
+    <string name="stego_decrypt_start">开始解密</string>
     <string name="stego_close">关闭清除</string>
     <string name="stego_cover">公开文本</string>
     <string name="stego_secret">秘密正文</string>
@@ -16,6 +17,11 @@
     <string name="stego_selection">导入选区</string>
     <string name="stego_vault">从安全剪贴板读取</string>
     <string name="stego_prepare">仅生成</string>
+    <string name="stego_wording_prepare">生成并预览</string>
+    <string name="stego_random_stage_widths">随机选择各层位数</string>
+    <string name="stego_wording_kdf_cost">口令派生成本</string>
+    <string name="stego_key_file_ready">已载入密钥文件</string>
+    <string name="stego_carrier_choice">载体 · %1$s</string>
     <string name="stego_confirm">提交到输入框</string>
     <string name="stego_edit">重新编辑</string>
     <string name="stego_save">认证后保存正文</string>

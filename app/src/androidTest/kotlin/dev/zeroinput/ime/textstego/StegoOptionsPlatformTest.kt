@@ -30,7 +30,8 @@ class StegoOptionsPlatformTest {
                 val workspace = StegoWorkspace({ graph }, Handler(Looper.getMainLooper()), view, { active }, { null }, {}, {}, {})
                 try {
                     view.openTextStego(); workspace.open(InputLanguage.ENGLISH, ChineseInputOptions())
-                    val checks = nodes(view.textStegoPanel).filterIsInstance<CheckBox>()
+                    val algorithms = nodes(view.textStegoPanel).filterIsInstance<StegoAlgorithmView>().single()
+                    val checks = nodes(algorithms).filterIsInstance<CheckBox>()
                     assertEquals(6, checks.size)
                     val aes = checks.single { "AES" in it.text }
                     val sm4 = checks.single { "SM4" in it.text }

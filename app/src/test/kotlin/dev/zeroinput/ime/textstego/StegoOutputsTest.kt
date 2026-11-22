@@ -59,6 +59,21 @@ class StegoOutputsTest {
         }
     }
 
+    @Test fun `changing distributed cover or a canonical frame cannot release plaintext`() {
+        MessageCredential(MessageCredentialMode.RANDOM_KEY, key.toCharArray()).use { credential ->
+            val envelope = MessageEnvelope().seal("ABCDE".toCharArray(), secret.toCharArray(), credential, kdf = MessageKdf.NONE)
+            val encoded = StegoCarrierCodec.encode("ABCDE", envelope, StegoTransport.VISIBLE_BASE64)
+            val firstByte = encoded.indexOf("[ZIS1:2:") + "[ZIS1:2:".length
+            val replacement = if (encoded[firstByte] == 'A') "B" else "A"
+            for (changed in listOf(encoded.dropLast(1) + "F", encoded.replaceRange(firstByte, firstByte + 1, replacement))) {
+                val parsed = StegoCarrierCodec.decode(changed)
+                assertThrows(MessageFailure::class.java) {
+                    MessageEnvelope().open(parsed.cover.toCharArray(), parsed.envelope, credential)
+                }
+            }
+        }
+    }
+
     @Test fun `saved copies survive disposal while disposed outputs cannot be copied again`() {
         val sourceCover = cover.toCharArray()
         val sourceSecret = secret.toCharArray()

@@ -60,7 +60,7 @@ class StegoSourcePlatformTest {
                 keyboard.dispatchKeyboardAction(KeyboardAction.LiteralText(randomKey))
                 keyboard.textStegoPanel.onAction(StegoAction.PREPARE)
                 assertTrue(nodes(keyboard).filterIsInstance<TextView>().any { it.isShown &&
-                    it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_failed) })
+                    it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_carrier_invalid) })
                 assertFalse(nodes(keyboard).filterIsInstance<TextView>().any { it.isShown &&
                     it.text.toString() == Device.context.getString(dev.zeroinput.ime.R.string.stego_busy) })
             }

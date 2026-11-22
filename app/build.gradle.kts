@@ -17,6 +17,32 @@ val prepareStegoPoetry = tasks.register<Exec>("prepareStegoPoetry") {
     commandLine("python", script.absolutePath)
 }
 tasks.named("preBuild").configure { dependsOn(prepareStegoPoetry) }
+val verseTestAssets = layout.buildDirectory.dir("generated/verifiedWordingAssets")
+val verseTestAssetStaging = layout.buildDirectory.dir("generated/wordingAssetsStaging")
+val prepareVerseTestAssets = tasks.register<Exec>("prepareVerseTestAssets") {
+    dependsOn(":engine-rime:verifyPublicDictionaryAssets")
+    val directory = rootProject.file("tools/themed-verse")
+    inputs.files(listOf("prepare_android_verse.py", "verse.py", "p2_theme_pools.py", "p2_corpus.py")
+        .map(directory::resolve))
+    val frozen = directory.resolve("android-test-profile")
+    inputs.files(listOf("ATTRIBUTION.md", "fixture.json", "gb18030.zdict", "window-observation-v4.bin",
+        "word-context-v1.bin").map(frozen::resolve))
+    inputs.file(rootProject.file("docs/themed-verse/p2-corpus-lock.json"))
+    inputs.file(rootProject.file("tools/dictionaries/sources.lock.json"))
+    inputs.file(rootProject.file("engine-rime/build/generated/publicDictionaryAssets/rime/dicts/shici.dict.yaml"))
+    outputs.dir(verseTestAssetStaging)
+    commandLine("python", "-B", directory.resolve("prepare_android_verse.py").absolutePath,
+        verseTestAssetStaging.get().dir("themed-verse").asFile.absolutePath)
+}
+val syncVerseTestAssets = tasks.register<Sync>("syncVerseTestAssets") {
+    from(prepareVerseTestAssets) {
+        val files = listOf("ATTRIBUTION.md", "body.txt", "gb-map.bin", "gb18030.zdict", "host-carrier.txt",
+            "opening.bin", "seven.bin", "window-observation.bin", "word-context-sources.json", "word-context-v1.bin")
+        include(files.map { "themed-verse/$it" })
+    }
+    into(verseTestAssets)
+}
+tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(syncVerseTestAssets) }
 val licenseAssets = layout.buildDirectory.dir("generated/licenseAssets")
 val handwritingAndroidTestAssets = layout.buildDirectory.dir("generated/handwritingAndroidTestAssets")
 val handwritingAssetManifest = rootProject.file("app/src/androidTest/assets/handwriting-test-assets.properties")
@@ -73,6 +99,7 @@ val prepareHandwritingAndroidTestAssets = tasks.register("prepareHandwritingAndr
 
 android {
     sourceSets["main"].java.srcDir(poetrySource)
+    sourceSets["debug"].assets.srcDir(verseTestAssets)
     sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("build/handwriting-evaluation/platform-fixtures"))
     sourceSets.getByName("androidTest").assets.srcDir(handwritingAndroidTestAssets)
     namespace = "dev.zeroinput.ime"

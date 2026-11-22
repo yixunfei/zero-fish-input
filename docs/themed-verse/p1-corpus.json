@@ -1,0 +1,95 @@
+{
+  "commit": "b763675eb724fc036f720028234e3173fc30c338",
+  "training": [
+    {
+      "path": "docs/releases/v0.1.0.md",
+      "sha256": "2ce5076438c983f1a3bf13d22148cbb2762353cc7cfeee046beaf01b26a8984f"
+    },
+    {
+      "path": "docs/releases/v0.2.0.md",
+      "sha256": "8047ec191b365d44aaec566e083249caeb614f04db10338d3c1427fc92a94315"
+    },
+    {
+      "path": "docs/releases/v0.3.0.md",
+      "sha256": "8c242e85029a835f532f7eb36ba512cec8159f65f2b3fbc817332dae0ecd0a47"
+    },
+    {
+      "path": "docs/releases/v0.4.0.md",
+      "sha256": "71d6b521f8602d1e3ffc486e8fe273f83940cf6ccd818e7d8dadefece85b302c"
+    },
+    {
+      "path": "docs/releases/v0.5.0.md",
+      "sha256": "9c53f280cc8cf6f3350b4a00c36c4c769ea89cd0e236632ecb46fb300d92e3ef"
+    },
+    {
+      "path": "docs/releases/v0.6.0.md",
+      "sha256": "a2c7a816a72c3ef4fe7ebfa93f87f16c2facd323d746418872258f3980a01481"
+    },
+    {
+      "path": "docs/releases/v0.7.0.md",
+      "sha256": "9956658e5db407df2d1011d0fdfd5f47f631efd3e081c09b276f58d964f1a536"
+    },
+    {
+      "path": "docs/releases/v0.7.1.md",
+      "sha256": "01e51de222a6fcd2771637d74622b71759660057e1f82b746821dc67dcadcebd"
+    },
+    {
+      "path": "docs/releases/v0.7.2.md",
+      "sha256": "2b24b7d3f2e92b7dc72646d93377df9a45103f94db4fcf94f23c48c85679c23f"
+    },
+    {
+      "path": "docs/releases/v0.7.3.md",
+      "sha256": "782bbb89a865ac98357e8d276863a10cfc699aa62402146388015ed401ee2faa"
+    }
+  ],
+  "documents": [
+    {
+      "path": "docs/natural-wording-steganography.md",
+      "sha256": "a7f8188402dbddaee349ef35fae4152825f06d95b21a6a3f5a1da42d4f5b2015"
+    },
+    {
+      "path": "docs/clipboard-product-repair-plan.md",
+      "sha256": "dbe758e03d9102fa0c788de9e86ad778f55f50ac23f37aa8bea55209f4f4a6af"
+    },
+    {
+      "path": "docs/releases/v0.7.4.md",
+      "sha256": "8fa0afd3969f763dedfedbaead181b28b9a80fad2eb66b56296916d6fd8efac2"
+    },
+    {
+      "path": "docs/releases/v0.7.5.md",
+      "sha256": "bb6ec6ad1d2bbfbb398479a145e04db991b8e7f43d84a6145fb3f46e0bb79425"
+    },
+    {
+      "path": "docs/releases/v0.7.6.md",
+      "sha256": "a1aea38a0b86f235ed2363a95a50195ea6a29740ccf48d43d43cdfacf70be006"
+    },
+    {
+      "path": "docs/releases/v0.7.7.md",
+      "sha256": "749c91c2a2741233c0afd85d74aff98c0ddd6c9a20ca2a6022b4624b9da88090"
+    },
+    {
+      "path": "docs/adr/0002-private-clipboard.md",
+      "sha256": "8d6590e417cc3a29c82f6a9f3157dbad4fefd02dfe2d2580ac277b0f79426bc4"
+    },
+    {
+      "path": "docs/audits/2026-11-17-code-audit.md",
+      "sha256": "c134a721a6b25ed1a4215197e25e15f6f01b983fb96cca1fc8219e13b7f1cab8"
+    },
+    {
+      "path": "docs/stego-themed-verse-handoff.md",
+      "sha256": "075e26d06e9d69b27d92f3d63c3e3e12d5175e07b9754f2e938cb1844ee1e41b"
+    }
+  ],
+  "controls": [
+    {
+      "name": "synthetic-form",
+      "utf8": "第1次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办7项。\n第2次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办1项。\n第3次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办8项。\n第4次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办2项。\n第5次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办9项。\n第6次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办3项。\n第7次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办10项。\n第8次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办4项。\n第9次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办11项。\n第10次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办5项。\n第11次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办12项。\n第12次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办6项。\n第13次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办0项。\n第14次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办7项。\n第15次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办1项。\n第16次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办8项。\n第17次巡检：东侧入口照明正常，西侧入口照明正常；已完成设备复核，剩余待办2项。",
+      "sha256": "4a053a258fd731cdb8c600712571ca50725d9ac097f6b00c8a5bdb1d1b475a88"
+    },
+    {
+      "name": "public-verse-excerpt",
+      "utf8": "空山新雨后，天气晚来秋。明月松间照，清泉石上流。星垂平野阔，月涌大江流。海上生明月，天涯共此时。",
+      "sha256": "de4a0cb99eb3b3b20aeb42b88760a4d61b31b76fe5f0be452fb1c69b479996cc"
+    }
+  ]
+}

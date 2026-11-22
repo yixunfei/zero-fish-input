@@ -13,11 +13,15 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Button
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.ZeroInputService
 import dev.zeroinput.ime.clipboardguard.ClipboardDeviceTestSupport
 import dev.zeroinput.ime.testing.InputFixtureActivity
+import dev.zeroinput.ime.ui.KeyboardAction
+import dev.zeroinput.ime.ui.StegoAction
+import dev.zeroinput.ime.ui.ZeroInputView
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -77,13 +81,153 @@ class SystemClipboardImportPrototypeTest {
             await { activity.hasWindowFocus() && !locked() }
         }
     }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 29)
+    fun imeCanPasteWordingBeforeChoosingStyleAndOpenWithTheIndicatedRandomKey() =
+        withCleanDevice(ordinaryEditor = true) { activity, manager, ownership ->
+            val password = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() })
+            val body = "公开平台回归样本\r\n保留原文本。"
+            val sample = Sample.WORDING_WINDOW
+            val encoded = publicFixture(sample).getItemAt(0).text.toString()
+            val graph = (context.applicationContext as ZeroInputApplication).graph
+            val defaults = graph.settings.stegoDefaults
+            val driver = ClipboardDeviceTestSupport
+            val original = driver.shell("settings get secure default_input_method").trim()
+            val own = ComponentName(context, ZeroInputService::class.java).flattenToString()
+            val wasEnabled = driver.shell("ime list -s").lineSequence().any { it.trim() == own }
+            val incognito = graph.settings.incognitoMode
+            try {
+                driver.onMain {
+                    graph.settings.incognitoMode = false
+                    graph.settings.stegoDefaults = defaults.copy(systemPaste = true)
+                }
+                driver.shell("ime enable $own")
+                driver.shell("ime set $own")
+                driver.showFixtureKeyboard(activity as InputFixtureActivity)
+                instrumentation.uiAutomation.waitForIdle(300, 3000)
+                assertTrue(ownership.mayReplace(manager.primaryClipDescription?.timestamp))
+                manager.setPrimaryClip(publicFixture(sample))
+                ownership.record(manager.primaryClipDescription?.timestamp)
+                lateinit var keyboard: ZeroInputView
+                driver.onMain {
+                    keyboard = android.view.inspector.WindowInspector.getGlobalWindowViews().asSequence()
+                        .flatMap { fixtureViews(it).asSequence() }.filterIsInstance<ZeroInputView>().first { it.isShown }
+                    keyboard.onTextStegoRequested()
+                    assertTrue(keyboard.isTextStegoOpen)
+                    keyboard.textStegoPanel.onAction(StegoAction.DECRYPT)
+                }
+                touchStegoControl(keyboard, dev.zeroinput.ime.ui.R.string.stego_carrier_hint, hold = true)
+                assertTrue("The current item must still be the public fixture",
+                    ownership.mayReplace(manager.primaryClipDescription?.timestamp))
+                tapStegoMenu(dev.zeroinput.ime.R.string.stego_paste_system, activity)
+                awaitPanelText(keyboard, encoded, "Wording must remain in the private draft before a style is chosen")
+
+                touchStegoControl(keyboard, dev.zeroinput.ime.ui.R.string.stego_decrypt_start)
+                tapStegoMenu(dev.zeroinput.ime.R.string.stego_wording_category, activity)
+                tapStegoMenu(dev.zeroinput.ime.R.string.stego_wording_window, activity)
+                awaitPanelText(keyboard, context.getString(dev.zeroinput.ime.R.string.stego_wording_receive_key),
+                    "Inspect the carrier before the first decryption attempt")
+                driver.onMain {
+                    keyboard.dispatchKeyboardAction(KeyboardAction.LiteralText(password))
+                }
+                touchStegoControl(keyboard, dev.zeroinput.ime.ui.R.string.stego_decrypt_start)
+                awaitPanelText(keyboard, context.getString(dev.zeroinput.ime.R.string.stego_result),
+                    "The first submitted credential should open the carrier")
+                driver.onMain {
+                    assertFalse(fixtureViews(keyboard.textStegoPanel).any {
+                        it is android.widget.TextView && it.isShown && it.text.toString() == body
+                    })
+                    keyboard.textStegoPanel.onAction(StegoAction.REVEAL)
+                    assertTrue(fixtureViews(keyboard.textStegoPanel).any { it is android.widget.TextView && it.text.toString() == body })
+                    assertTrue(activity.editor.text.isEmpty())
+                }
+            } finally {
+                driver.onMain {
+                    graph.settings.stegoDefaults = defaults
+                    graph.settings.incognitoMode = incognito
+                }
+                if (original.isNotBlank() && original != "null") {
+                    driver.shell("ime set $original")
+                    if (!wasEnabled && original != own) driver.shell("ime disable $own")
+                }
+            }
+        }
+
+    private fun touchStegoControl(keyboard: ZeroInputView, labelId: Int, hold: Boolean = false) {
+        val driver = ClipboardDeviceTestSupport
+        val point = IntArray(2)
+        lateinit var field: android.widget.TextView
+        driver.onMain {
+            val controls = fixtureViews(keyboard.textStegoPanel).filterIsInstance<android.widget.TextView>()
+            field = checkNotNull(controls.singleOrNull {
+                it.isShown && (if (hold) it.hint else it.text)?.toString() == it.resources.getString(labelId)
+            }) {
+                val known = listOf(dev.zeroinput.ime.ui.R.string.stego_decrypt, dev.zeroinput.ime.ui.R.string.stego_decrypt_start,
+                    dev.zeroinput.ime.ui.R.string.stego_working, dev.zeroinput.ime.R.string.stego_choose_received_style)
+                val visible = known.filter { id -> controls.any { it.isShown && it.text.toString() == it.resources.getString(id) } }
+                "Missing ${keyboard.resources.getResourceEntryName(labelId)} in open=${keyboard.isTextStegoOpen}, " +
+                    "visible controls: ${visible.map(keyboard.resources::getResourceEntryName)}"
+            }
+            field.requestRectangleOnScreen(android.graphics.Rect(0, 0, field.width, field.height), true)
+        }
+        instrumentation.uiAutomation.waitForIdle(300, 3000)
+        driver.onMain {
+            val bounds = android.graphics.Rect()
+            assertTrue(field.getGlobalVisibleRect(bounds))
+            field.rootView.getLocationOnScreen(point)
+            point[0] += bounds.centerX()
+            point[1] += bounds.centerY()
+        }
+        val coordinates = "${point[0]} ${point[1]}"
+        driver.shell(if (hold) "input swipe $coordinates $coordinates 750" else "input tap $coordinates")
+    }
+
+    private fun tapStegoMenu(label: Int, editorActivity: Activity) {
+        val driver = ClipboardDeviceTestSupport
+        val text = context.getString(label)
+        driver.await("Menu item should be shown") { driver.findText(text) != null }
+        val bounds = android.graphics.Rect()
+        requireNotNull(driver.findText(text)).getBoundsInScreen(bounds)
+        assertFalse(bounds.isEmpty)
+        driver.onMain { assertTrue("A Stego picker must keep the editor focused", editorActivity.hasWindowFocus()) }
+        driver.shell("input tap ${bounds.centerX()} ${bounds.centerY()}")
+    }
+
+    private fun awaitPanelText(keyboard: ZeroInputView, expected: String, diagnostic: String) {
+        try {
+            ClipboardDeviceTestSupport.await(diagnostic) {
+                var present = false
+                ClipboardDeviceTestSupport.onMain {
+                    present = fixtureViews(keyboard.textStegoPanel).any {
+                        it is android.widget.TextView && it.isShown && it.text.toString() == expected
+                    }
+                }
+                present
+            }
+        } catch (_: AssertionError) {
+            ClipboardDeviceTestSupport.onMain {
+                val labels = listOf(dev.zeroinput.ime.R.string.stego_system_paste_no_text, dev.zeroinput.ime.R.string.stego_carrier_invalid,
+                    dev.zeroinput.ime.R.string.stego_choose_received_style, dev.zeroinput.ime.R.string.stego_wording_style_mismatch,
+                    dev.zeroinput.ime.R.string.stego_wording_receive_key, dev.zeroinput.ime.R.string.stego_wording_open_failed)
+                val visible = labels.filter { id -> fixtureViews(keyboard.textStegoPanel).any {
+                    it is android.widget.TextView && it.isShown && it.text.toString() == it.resources.getString(id)
+                } }
+                fail("$diagnostic. open=${keyboard.isTextStegoOpen}, notices=${visible.map(keyboard.resources::getResourceEntryName)}")
+            }
+        }
+    }
+
+    private fun fixtureViews(view: android.view.View): List<android.view.View> = listOf(view) +
+        if (view is android.view.ViewGroup) (0 until view.childCount).flatMap { fixtureViews(view.getChildAt(it)) } else emptyList()
+
     @Test fun stegoPasteReadsOnlyExplicitTextAndRejectsWrongTargetsBoundsAndRevocation() = withCleanDevice { _, manager, ownership ->
         val adapter = dev.zeroinput.ime.textstego.StegoSystemPaste(context)
         val settings = (context.applicationContext as ZeroInputApplication).graph.settings
         val defaults = settings.stegoDefaults
         try {
         instrumentation.runOnMainSync { settings.stegoDefaults = defaults.copy(systemPaste = true) }
-        for (sample in Sample.entries) {
+        for (sample in prototypeSamples) {
             assumeTrue(ownership.mayReplace(manager.primaryClipDescription?.timestamp))
             manager.setPrimaryClip(publicFixture(sample))
             ownership.record(manager.primaryClipDescription?.timestamp)
@@ -189,7 +333,7 @@ class SystemClipboardImportPrototypeTest {
 
     @Test
     fun parserPreservesPublicCharactersAndRejectsNonTextWithoutCoercion() {
-        for (sample in Sample.entries) verify(sample, parse(publicFixture(sample)))
+        for (sample in prototypeSamples) verify(sample, parse(publicFixture(sample)))
     }
 
     @Test
@@ -197,12 +341,12 @@ class SystemClipboardImportPrototypeTest {
         assertFalse(matchesFixture(null, Sample.UNICODE))
         assertFalse(matchesFixture(publicFixture(Sample.GUARD), Sample.UNICODE))
         assertFalse(matchesFixture(publicFixture(Sample.URI), Sample.INTENT))
-        for (sample in Sample.entries) assertTrue(matchesFixture(publicFixture(sample), sample))
+        for (sample in prototypeSamples) assertTrue(matchesFixture(publicFixture(sample), sample))
     }
 
     @Test
     fun focusedExplicitButtonReadsOnlyFixturesOnAnOptedInCleanDevice() = withCleanDevice { activity, manager, ownership ->
-        for (sample in Sample.entries) {
+        for (sample in prototypeSamples) {
             assumeTrue("Current item changed outside the fixture", ownership.mayReplace(manager.primaryClipDescription?.timestamp))
             manager.setPrimaryClip(publicFixture(sample))
             var acquired = false
@@ -309,6 +453,7 @@ class SystemClipboardImportPrototypeTest {
 
     private fun withCleanDevice(
         onClear: (() -> Unit)? = null,
+        ordinaryEditor: Boolean = false,
         block: (Activity, ClipboardManager, FixtureOwnership) -> Unit,
     ) {
         assumeTrue("Requires a dedicated disposable emulator and explicit runner argument",
@@ -316,7 +461,8 @@ class SystemClipboardImportPrototypeTest {
         val graph = (context.applicationContext as ZeroInputApplication).graph
         assumeTrue("Disable the real clipboard guard first", !graph.clipboardGuardPreferences.options.listening)
         val activity = instrumentation.startActivitySync(Intent(context, InputFixtureActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            .putExtra("ordinary_fixture", ordinaryEditor))
         val manager = context.getSystemService(ClipboardManager::class.java)
         val ownership = FixtureOwnership()
         try {
@@ -381,10 +527,12 @@ class SystemClipboardImportPrototypeTest {
     private enum class Sample(val expected: String? = null) {
         UNICODE("  00123\t中文 English\nCRLF\r\n\u00a0！ https://example.invalid e\u0301 👨‍👩‍👧‍👦 👍🏽 🇨🇳  "),
         LIMIT("字".repeat(8192)), GUARD("public guard fixture"), HTML("public plain fallback"),
-        EMPTY, BLANK, NUL, HIGH_SURROGATE, LOW_SURROGATE, OVER_LIMIT, URI, INTENT, MULTIPLE,
+        EMPTY, BLANK, NUL, HIGH_SURROGATE, LOW_SURROGATE, OVER_LIMIT, URI, INTENT, MULTIPLE, WORDING_WINDOW,
     }
 
     companion object {
+        private val prototypeSamples = Sample.entries - Sample.WORDING_WINDOW
+
         private fun matchesFixture(actual: ClipData?, sample: Sample): Boolean {
             val expected = publicFixture(sample)
             if (actual == null || actual.itemCount != expected.itemCount) return false
@@ -433,6 +581,8 @@ class SystemClipboardImportPrototypeTest {
                 ClipData.Item(Uri.parse("content://invalid.example/public-fixture")))
             Sample.INTENT -> ClipData.newIntent("", Intent("dev.zeroinput.PUBLIC_FIXTURE"))
             Sample.MULTIPLE -> ClipData.newPlainText("", "public first").apply { addItem(ClipData.Item("public second")) }
+            Sample.WORDING_WINDOW -> ClipData.newPlainText("", InstrumentationRegistry.getInstrumentation().context.assets
+                .open("stego-wording-window-public.txt").bufferedReader().use { it.readText() })
         }
     }
 }

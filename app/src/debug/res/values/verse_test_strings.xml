@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="verse_test_title">五言集句公开样例</string>
+    <string name="verse_test_intro">使用内置公开正文和测试密钥生成五言集句，或打开已有样例，核对还原的正文。</string>
+    <string name="verse_test_generate">生成公开样例</string>
+    <string name="verse_test_reopen">回读当前成品</string>
+    <string name="verse_test_open_host">打开主机样例</string>
+    <string name="verse_test_idle">请选择要生成或打开的样例</string>
+    <string name="verse_test_working">正在核对数据</string>
+    <string name="verse_test_generated">已生成并自检</string>
+    <string name="verse_test_verified">认证成功，正文逐字节一致</string>
+    <string name="verse_test_capacity">当前样例超出整条载体容量</string>
+    <string name="verse_test_failed">样例或配置无法通过验证</string>
+    <string name="verse_test_target_met" formatted="false">达到 20% 利用率</string>
+    <string name="verse_test_target_missed" formatted="false">低于 20% 利用率</string>
+    <string name="verse_test_sizes">%1$s\n原文 %2$d B · 封装 %3$d B\n全文 %4$d B · %5$d 个 UTF-16 单元\n%6$s</string>
+    <string name="verse_test_carrier">完整集句</string>
+    <string name="verse_test_recovered">回读正文</string>
+    <item type="id" name="verse_test_entry" />
+    <item type="id" name="verse_test_generate" />
+    <item type="id" name="verse_test_reopen" />
+    <item type="id" name="verse_test_open_host" />
+    <item type="id" name="verse_test_status" />
+    <item type="id" name="verse_test_carrier" />
+    <item type="id" name="verse_test_recovered" />
+</resources>

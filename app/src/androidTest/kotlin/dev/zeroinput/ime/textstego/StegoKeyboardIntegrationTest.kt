@@ -160,7 +160,8 @@ class StegoKeyboardIntegrationTest {
         Device.onMain {
             val view = keyboard()
             view.dispatchKeyboardAction(KeyboardAction.LiteralText(passphrase))
-            val checks = views(view.textStegoPanel).filterIsInstance<android.widget.CheckBox>()
+            val algorithms = views(view.textStegoPanel).filterIsInstance<StegoAlgorithmView>().single()
+            val checks = views(algorithms).filterIsInstance<android.widget.CheckBox>()
             assertEquals(6, checks.size)
             checks.single { "SM4" in it.text }.performClick()
             checks.single { "XChaCha20" in it.text }.performClick()
@@ -222,7 +223,7 @@ class StegoKeyboardIntegrationTest {
         val point = IntArray(2)
         Device.onMain {
             val visible = android.graphics.Rect()
-            assertTrue("Public fixture control must be visible", button.getGlobalVisibleRect(visible))
+            assertTrue("${button.resources.getResourceEntryName(label)} must be visible", button.getGlobalVisibleRect(visible))
             // Global-visible rectangles are relative to the root, while injected
             // events use screen coordinates. An IME window need not start at y=0.
             val origin = IntArray(2)
@@ -285,6 +286,199 @@ class StegoKeyboardIntegrationTest {
             assertTrue(activity.editorActions.isEmpty())
             assertFalse(keyboard().isTextStegoOpen)
         }
+    }
+
+    @Test fun fiveCharacterVerseOpensTheStylePickerDirectlyWhenDecryptingUnmarkedText() =
+        wordingRoundTrip(dev.zeroinput.ime.R.string.stego_wording)
+
+    @Test fun wordingFromTheImeUsesSevenCharacterVerseWithoutALegacyReceiveOption() =
+        wordingRoundTrip(dev.zeroinput.ime.R.string.stego_wording_seven)
+
+    @Test fun wordingFromTheImeUsesTheRefinedWindowObservationProfile() =
+        wordingRoundTrip(dev.zeroinput.ime.R.string.stego_wording_window)
+
+    private fun wordingRoundTrip(style: Int) = withEditor { activity ->
+        val body = "公开往返样本，繁體、𠀋、🙂、组合字 e\u0301。\r\n保留末尾。"
+        Device.onMain { keyboard().onTextStegoRequested() }
+        val resources = onMain { keyboard().resources }
+        selectWording(style)
+        val password = "a"
+        Device.onMain {
+            keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText(body))
+            val panel = keyboard().textStegoPanel
+            panel.onSelectAlgorithm(dev.zeroinput.security.message.MessageCipher.TWOFISH.id, true)
+            val algorithmLabel = panel.resources.getString(dev.zeroinput.ime.ui.R.string.stego_layers_short)
+            assertTrue(views(panel).filterIsInstance<com.google.android.material.button.MaterialButton>()
+                .single { it.isShown && it.text.toString() == algorithmLabel }.performClick())
+            val widthsLabel = panel.resources.getString(dev.zeroinput.ime.ui.R.string.stego_random_stage_widths)
+            val widths = views(panel).filterIsInstance<com.google.android.material.checkbox.MaterialCheckBox>()
+                .single { it.isShown && it.text.toString() == widthsLabel }
+            assertFalse(widths.isChecked)
+            assertTrue(widths.performClick())
+            assertTrue(widths.isChecked)
+            panel.onAction(StegoAction.CREDENTIAL)
+            keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText(password))
+            assertTrue(textsWithHint(dev.zeroinput.ime.ui.R.string.stego_credential_hint).single().text.toString() == "•")
+        }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_wording_prepare)
+        val confirm = resources.getString(dev.zeroinput.ime.ui.R.string.stego_confirm)
+        await { onMain { confirm in labels(keyboard()) } }
+        val encoded = onMain {
+            assertEquals("", activity.editor.text.toString())
+            assertFalse(labels(keyboard()).any { body in it })
+            val preview = views(keyboard().textStegoPanel).filterIsInstance<TextView>().single {
+                it.isShown && it.text.endsWith("。") && it.text.length > 155
+            }
+            assertEquals(style != dev.zeroinput.ime.R.string.stego_wording_window, '\n' in preview.text)
+            assertEquals(Int.MAX_VALUE, preview.maxLines)
+            assertTrue("The first line of the preview must be on screen", preview.getGlobalVisibleRect(android.graphics.Rect()))
+            val text = preview.text.toString()
+            val sourceBytes = body.toByteArray().size
+            val carrierBytes = text.toByteArray().size
+            val expectedStatus = preview.context.getString(dev.zeroinput.ime.R.string.stego_wording_preview,
+                sourceBytes, carrierBytes, sourceBytes * 100.0 / carrierBytes)
+            assertTrue(expectedStatus in labels(keyboard().textStegoPanel))
+            text
+        }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_confirm)
+        await { onMain { activity.editor.text.isNotEmpty() } }
+        Device.onMain {
+            assertEquals(encoded, activity.editor.text.toString())
+            assertTrue(activity.editorActions.isEmpty())
+            assertFalse(keyboard().isTextStegoOpen)
+            activity.editor.selectAll()
+        }
+        await { onMain { selectedLength() == encoded.length } }
+        Device.onMain {
+            keyboard().onTextStegoRequested()
+            keyboard().textStegoPanel.onAction(StegoAction.DECRYPT)
+        }
+        Device.onMain { keyboard().textStegoPanel.onAction(StegoAction.SELECTION) }
+        await { onMain { resources.getString(dev.zeroinput.ime.R.string.stego_choose_received_style) in labels(keyboard()) } }
+        if (style == dev.zeroinput.ime.R.string.stego_wording) {
+            tapLabel(dev.zeroinput.ime.ui.R.string.stego_decrypt_start)
+            assertCarrierMenu(dev.zeroinput.ime.R.string.stego_wording, dev.zeroinput.ime.R.string.stego_wording_seven,
+                dev.zeroinput.ime.R.string.stego_wording_window)
+            Device.click(resources.getString(dev.zeroinput.ime.R.string.stego_wording_seven))
+        } else selectWording(checkReceiveMenu = true)
+        await { onMain { resources.getString(dev.zeroinput.ime.R.string.stego_wording_style_mismatch) in labels(keyboard()) } }
+        selectWording(style)
+        await { onMain { resources.getString(dev.zeroinput.ime.R.string.stego_wording_password_required) in labels(keyboard()) } }
+        Device.onMain {
+            keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText(password))
+        }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_decrypt_start)
+        val authenticated = resources.getString(dev.zeroinput.ime.R.string.stego_result)
+        await { onMain { authenticated in labels(keyboard()) } }
+        Device.onMain {
+            assertFalse(body in labels(keyboard()))
+            keyboard().textStegoPanel.onAction(StegoAction.REVEAL)
+            assertTrue(body in labels(keyboard()))
+            assertEquals(encoded, activity.editor.text.toString())
+            activity.editor.setSelection(0)
+        }
+        await { onMain { !keyboard().isTextStegoOpen } }
+    }
+
+    @Test fun wordingPrepareShowsMissingInputsAndInvalidKeyWithoutScrollingTheForm() = withEditor { activity ->
+        Device.onMain { keyboard().onTextStegoRequested() }
+        selectWording()
+        val prepare = dev.zeroinput.ime.ui.R.string.stego_wording_prepare
+        tapLabel(prepare)
+        assertWordingNoticeIsVisible(dev.zeroinput.ime.R.string.stego_secret_required)
+        Device.onMain {
+            keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText("公开回归正文"))
+            keyboard().textStegoPanel.onAction(StegoAction.CREDENTIAL_MODE)
+        }
+        Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_random_key))
+        tapLabel(prepare)
+        assertWordingNoticeIsVisible(dev.zeroinput.ime.R.string.stego_wording_send_key)
+        Device.onMain {
+            val panel = keyboard().textStegoPanel
+            val generate = panel.resources.getString(dev.zeroinput.ime.ui.R.string.stego_generate_key)
+            val button = views(panel).filterIsInstance<TextView>().single { it.isShown && it.text.toString() == generate }
+            assertTrue("The generation action must be reachable without scrolling", button.getGlobalVisibleRect(android.graphics.Rect()))
+            assertEquals("", activity.editor.text.toString())
+            keyboard().dispatchKeyboardAction(KeyboardAction.LiteralText("!".repeat(43)))
+        }
+        tapLabel(prepare)
+        val invalid = dev.zeroinput.ime.R.string.stego_wording_generate_failed
+        await { onMain { Device.context.getString(invalid) in labels(keyboard().textStegoPanel) } }
+        assertWordingNoticeIsVisible(invalid)
+        Device.onMain { assertEquals("", activity.editor.text.toString()) }
+        tapLabel(dev.zeroinput.ime.ui.R.string.stego_generate_key)
+        await { onMain { Device.context.getString(dev.zeroinput.ime.R.string.stego_wording_key_ready) in labels(keyboard().textStegoPanel) } }
+        assertWordingNoticeIsVisible(dev.zeroinput.ime.R.string.stego_wording_key_ready)
+    }
+
+    private fun assertWordingNoticeIsVisible(label: Int) {
+        Device.onMain {
+            val panel = keyboard().textStegoPanel
+            val status = views(panel).filterIsInstance<TextView>().single { it.text.toString() == panel.resources.getString(label) }
+            val bounds = android.graphics.Rect()
+            assertTrue("${status.resources.getResourceEntryName(label)} must be visible after the tap", status.getGlobalVisibleRect(bounds))
+            assertTrue("Keep the full message on screen", bounds.height() >= status.height - 2)
+        }
+    }
+
+    @Test fun carrierHelpExplainsSendingAndReceiving() = withEditor {
+        Device.onMain { keyboard().onTextStegoRequested() }
+        for ((action, help) in listOf(StegoAction.ENCRYPT to dev.zeroinput.ime.R.string.stego_send_help,
+            StegoAction.DECRYPT to dev.zeroinput.ime.R.string.stego_receive_help)) {
+            Device.onMain {
+                keyboard().textStegoPanel.onAction(action)
+                keyboard().textStegoPanel.onAction(StegoAction.TRANSPORT)
+            }
+            Device.instrumentation.waitForIdleSync()
+            Device.onMain {
+                val button = WindowInspector.getGlobalWindowViews().mapNotNull {
+                    it.findViewById<android.widget.Button>(android.R.id.button3)
+                }.single { it.isShown }
+                assertEquals(Device.context.getString(dev.zeroinput.ime.R.string.stego_help_button), button.text.toString())
+                assertTrue(button.performClick())
+            }
+            await { onMain {
+                WindowInspector.getGlobalWindowViews().any { Device.context.getString(help) in labels(it) }
+            } }
+            Device.onMain {
+                val window = WindowInspector.getGlobalWindowViews().single { Device.context.getString(help) in labels(it) }
+                assertTrue(window.filterTouchesWhenObscured)
+                assertTrue(window.findViewById<View>(android.R.id.button1).performClick())
+            }
+            Device.instrumentation.waitForIdleSync()
+        }
+    }
+
+    private fun selectWording(label: Int = dev.zeroinput.ime.R.string.stego_wording, checkReceiveMenu: Boolean = false) {
+        Device.onMain { keyboard().textStegoPanel.onAction(StegoAction.TRANSPORT) }
+        val resources = onMain { keyboard().resources }
+        val category = dev.zeroinput.ime.R.string.stego_wording_category
+        if (checkReceiveMenu) assertCarrierMenu(dev.zeroinput.ime.R.string.stego_exact_auto, category)
+        Device.click(resources.getString(category))
+        if (checkReceiveMenu) assertCarrierMenu(dev.zeroinput.ime.R.string.stego_wording,
+            dev.zeroinput.ime.R.string.stego_wording_seven,
+            dev.zeroinput.ime.R.string.stego_wording_window)
+        Device.click(resources.getString(label))
+    }
+
+    private fun assertCarrierMenu(vararg labels: Int) {
+        Device.onMain {
+            val menu = WindowInspector.getGlobalWindowViews().flatMap(::views)
+                .filterIsInstance<android.widget.ListView>().single { it.isShown }
+            val expected = labels.map(keyboard().resources::getString)
+            assertEquals(expected, (0 until menu.adapter.count).map { menu.adapter.getItem(it).toString() })
+        }
+    }
+
+    private fun textsWithHint(label: Int) = views(keyboard().textStegoPanel).filterIsInstance<TextView>().filter {
+        it.hint?.toString() == it.context.getString(label)
+    }
+
+    private fun selectedLength(): Int? {
+        val owner = service()
+        val editor = owner.javaClass.getDeclaredField("editorConnection").apply { isAccessible = true }
+            .get(owner) as? dev.zeroinput.ime.input.AndroidEditorConnection
+        return editor?.selectedLength()
     }
 
     @Test fun selectionDecryptIsMaskedLocalAndSessionChangesRevokePreparedOutput() = withEditor { activity ->

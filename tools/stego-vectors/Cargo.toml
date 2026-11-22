@@ -3,6 +3,7 @@ name = "zero-input-message-vectors"
 version = "0.1.0"
 edition = "2021"
 publish = false
+default-run = "zero-input-message-vectors"
 
 # Host-only independent vectors. None of these crates enters the APK.
 [dependencies]

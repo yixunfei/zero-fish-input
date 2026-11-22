@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="verse_test_title">Public five-character verse sample</string>
+    <string name="verse_test_intro">Generate verse with the built-in public text and test key, or open a sample to check the recovered text.</string>
+    <string name="verse_test_generate">Generate public sample</string>
+    <string name="verse_test_reopen">Open current verse</string>
+    <string name="verse_test_open_host">Open host sample</string>
+    <string name="verse_test_idle">Choose a sample to generate or open</string>
+    <string name="verse_test_working">Checking the sample</string>
+    <string name="verse_test_generated">Generated and checked</string>
+    <string name="verse_test_verified">Authenticated and recovered byte-for-byte</string>
+    <string name="verse_test_capacity">The sample exceeds the full carrier limit</string>
+    <string name="verse_test_failed">The sample or configuration failed verification</string>
+    <string name="verse_test_target_met" formatted="false">Meets the 20% utilization target</string>
+    <string name="verse_test_target_missed" formatted="false">Below the 20% utilization target</string>
+    <string name="verse_test_sizes">%1$s\nOriginal %2$d B · Envelope %3$d B\nFull verse %4$d B · %5$d UTF-16 units\n%6$s</string>
+    <string name="verse_test_carrier">Full verse</string>
+    <string name="verse_test_recovered">Recovered text</string>
+</resources>

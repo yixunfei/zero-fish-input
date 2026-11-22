@@ -1,5 +1,6 @@
 package dev.zeroinput.ime.clipboard
 
+import dev.zeroinput.ime.core.stego.StegoCarrierCodec
 import dev.zeroinput.userdata.SecureClipboardVault
 
 /** Shared validation for explicit text imports; owns characters and drops spans. */
@@ -14,8 +15,7 @@ internal object ClipboardImportText {
                 if (index == value.length || !value[index++].isLowSurrogate()) return null
             } else if (character.isLowSurrogate()) return null
         }
-        val carrier = value.contains(dev.zeroinput.ime.core.stego.StegoCarrierCodec.DENSE_START) ||
-            value.contains(dev.zeroinput.ime.core.stego.StegoCarrierCodec.VISIBLE_START)
+        val carrier = StegoCarrierCodec.hasMarker(value)
         return ClipboardImportRequest(CharArray(value.length) { value[it] }, allowsAiImport && !carrier, carrier)
     }
 }

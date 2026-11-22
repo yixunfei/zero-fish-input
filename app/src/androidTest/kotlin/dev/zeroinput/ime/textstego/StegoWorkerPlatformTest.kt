@@ -16,7 +16,7 @@ class StegoWorkerPlatformTest {
         val outputs = StegoOutputs("cover".toCharArray(), chars, byteArrayOf(1), "public partial carrier")
         val delivery = StegoDelivery().apply { result = chars; encoded = "public partial carrier"; this.outputs = outputs }
         delivery.compute { throw OutOfMemoryError("public allocation fixture") }
-        assertTrue(delivery.memoryUnavailable)
+        assertEquals(dev.zeroinput.ime.R.string.stego_memory_unavailable, delivery.failure)
         assertNull(delivery.result)
         assertNull(delivery.encoded)
         assertNull(delivery.outputs)

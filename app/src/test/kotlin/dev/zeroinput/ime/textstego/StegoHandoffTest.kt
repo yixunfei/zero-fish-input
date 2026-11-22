@@ -13,6 +13,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class StegoHandoffTest {
+    @Test fun authenticatedWordingPastePreservesTheExplicitModeForOneEditorBoundDelivery() {
+        val context: Context = RuntimeEnvironment.getApplication()
+        val settings = SettingsRepository(context)
+        val handoff = StegoHandoff(context, settings) { 1L }
+        val editor = dev.zeroinput.ime.clipboard.PasteEditorIdentity("public.fixture", 1, 1)
+        val verse = "江水浸云光，山径通幽处。".toCharArray()
+        try {
+            assertTrue(handoff.offerPaste(verse, editor, dev.zeroinput.ime.ui.StegoField.CARRIER, 1L,
+                wording = StegoWordingProfile.SEVEN_VERSE))
+            requireNotNull(handoff.takePaste(editor)).use { received ->
+                assertEquals(StegoWordingProfile.SEVEN_VERSE, received.wording)
+                assertSame(verse, received.text)
+            }
+            assertTrue(verse.all { it == '\u0000' })
+            assertNull(handoff.takePaste(editor))
+        } finally { handoff.destroy() }
+    }
+
     @Test fun secretPasteIsOneUseAndRejectsDisabledPasteOversizeAndCredentialTargets() {
         val context: Context = RuntimeEnvironment.getApplication()
         val settings = SettingsRepository(context)

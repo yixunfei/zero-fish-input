@@ -1334,7 +1334,48 @@ authentication/confirmation. Crypto and source workers each keep one process-wid
 slot until completion, even after UI cancellation. Weak owner references and
 operation leases prevent late publication and retain no destroyed UI/connection.
 The initially declined system-body import is superseded by the explicit 2026-11-19 two-field paste exception below.
-Natural wording is gated unavailable. See [ADR 0039](adr/0039-text-steganography.md).
+Release keeps the two approved exact transports. See [ADR 0039](adr/0039-text-steganography.md).
+
+The Debug verse workbench has three variant-scoped components. `ime-core`
+implements the frozen GB18030 packet and canonical five-character surface in
+plain Kotlin. `security` exposes a Debug adapter for the public fixture envelope
+through the shared message primitives. `app` loads pinned public assets on a
+bounded worker and presents the result in a private Settings page. The Debug
+workspace reuses the five-character surface with its own body codec and
+authenticated binding. Explicit selection, one-use vault return and preview
+publication reuse the current workspace lifetime and editor checks.
+The verse editor places validation beside its preview action. Published verse
+uses the protected panel viewport with the typing keyboard hidden.
+The maintained Debug profiles use wrapped per-layer keys with five-character verse,
+seven-character verse or window observations. Senders and receivers share the Natural
+wording style picker. Starting decryption on unmarked text opens that picker directly.
+Preview measures the original body and entire rendered text in UTF-8 bytes.
+The profiles use pinned public resources
+and recover the envelope length from a canonical integer frame. The workspace
+checks credential and cost requirements on the worker before deriving any keys.
+The Debug word-context writer uses a pinned public model to select direct
+Huffman or one of two message-local rANS predictors by wrapped size. The
+current profile binding includes both the carrier surface and model hashes.
+The authenticated body selects one of these three decoders. The standalone
+fixture workbench loads its GB18030 resources independently.
+The window profile ranks sentences over a frozen grammar. The host joins the
+locked Wanxiang lexicon with a tagged window scene corpus and uses public
+n-gram and Mini scores for ordering eligible variants. The Debug build
+stages verified assets, then synchronizes only the current surface, model
+and public fixture files into the Debug asset source directory. Additional reviewed pairs use nonaccepting
+intermediate states for relative depth and local physical effects.
+The isolated crypto worker computes exact
+suffix counts up to the current carrier length and reuses them for the
+sender's immediate readback. The grammar can be shared across operations.
+Counts are discarded after readback and before receiver key derivation.
+The wrapped verse surfaces check the same revocable worker lease during
+ranking, parsing and canonical readback. Taking a queued result rechecks
+the deadline and clears expired output buffers.
+The private source host also handles standalone random key-file generation and
+one-use import returns through Android's document picker. The earlier single-layer
+format belongs to the public fixture workbench.
+[Debug profiles and release criteria](adr/0041-natural-wording-trial.md) ·
+[Scope and verification](themed-verse/android-test-build.md)
 
 The approved usability completion keeps one bounded `StegoOutputs` bundle during
 the existing 30-second preview/result window. The worker creates it only after
@@ -1458,6 +1499,14 @@ or native selection menu. StegoSystemPaste is the sole payload adapter: one expl
 menu click, one plain-text item, no URI/Intent coercion, no listener/write/cache.
 Reads run on the bounded source worker. Workspace lease/current editor, lock,
 settings, deletion generation and completion checks reject revoked delivery.
+The Debug receive workspace can stage bounded unmarked text before the user
+chooses the wording profile. Profile selection submits a structural inspection
+to the crypto worker. The inspection returns only public credential and cost
+hints for the current workspace. A separate Start decryption click verifies
+the selected profile and authenticates the envelope.
+The IME's protected dialogs leave input focus with the editor. A choice or
+confirmation is bound to the interaction that opened the dialog. Outside
+edits, closing the dialog and real editor changes revoke the action.
 COVER is limited to 512 UTF-16 units / 1536 UTF-8 bytes, SECRET to 2048 units /
 2048 bytes, and CARRIER to 8192 units / 16384 bytes; malformed Unicode/NUL fails.
 Vault navigation clears drafts and retains only the public target/editor
@@ -1480,3 +1529,9 @@ The [local credential decision](adr/0040-local-biometric-message.md) assigns
 Keystore operation creation to security, foreground biometric prompts to the
 workspace, and the passphrase and device factor combination to MessageKeys.
 The cover editor can append a reviewed Wanxiang couplet entirely in memory.
+
+## Distributed exact-text exchange (2026-11-22)
+
+The exact-text codec distributes bounded frames using the portable layout in
+[ADR 0042](adr/0042-distributed-exact-carriers.md). Detached ciphertext uses
+its separately entered authenticated cover.

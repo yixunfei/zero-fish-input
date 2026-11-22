@@ -63,6 +63,8 @@ class ZeroInputView @JvmOverloads constructor(
     var onTextStegoVisibilityChanged: (Boolean) -> Unit = {}
     val isTextStegoOpen: Boolean get() = mode == PanelMode.TEXT_STEGO
     val textStegoPanel = StegoPanelView(context)
+    private var stegoReadOnly = false
+    private val isStegoEditing get() = isTextStegoOpen && !stegoReadOnly
     private var stegoSnapshot = EngineSnapshot.Empty
     val isSecureClipboardOpen: Boolean get() = mode == PanelMode.SECURE_CLIPBOARD
     var onCopySelectionRequested: () -> Unit = {}
@@ -746,8 +748,13 @@ class ZeroInputView @JvmOverloads constructor(
 
     fun openPrivateDraft() = showMode(PanelMode.PRIVATE_DRAFT, userInitiated = false)
     fun openTextStego() = showMode(PanelMode.TEXT_STEGO, userInitiated = false)
-    fun renderTextStegoInput(state: InputSessionState?) {
+    fun renderTextStegoInput(state: InputSessionState?, readOnly: Boolean = false) {
         if (!isTextStegoOpen) return
+        if (stegoReadOnly != readOnly) {
+            stegoReadOnly = readOnly
+            setPanelVisible(keyboardContainer, isStegoEditing)
+            updatePanelLayout()
+        }
         commitFailureNotice.render(state)
         stegoSnapshot = state?.snapshot ?: EngineSnapshot.Empty
         candidateStrip.render(stegoSnapshot)
@@ -1117,6 +1124,7 @@ class ZeroInputView @JvmOverloads constructor(
         }
         if (leavingSearch) emoji.closeSearch()
         mode = target
+        if (stegoChanged) stegoReadOnly = false
         if (privateChanged || stegoChanged) candidateStrip.setPrivateDraftMode(isPrivateDraftOpen || isTextStegoOpen)
         if (isPrivateDraftOpen || isTextStegoOpen) {
             keyboard.startEditor(EditorInputOptions())
@@ -1185,7 +1193,7 @@ class ZeroInputView @JvmOverloads constructor(
         setPanelVisible(
             keyboardContainer,
             target == PanelMode.KEYBOARD || emoji.isSearchActive && target == PanelMode.EMOJI ||
-                target == PanelMode.AI && ai.editing || isShapeLookupOpen && shapeEditing || isPrivateDraftOpen || isTextStegoOpen,
+                target == PanelMode.AI && ai.editing || isShapeLookupOpen && shapeEditing || isPrivateDraftOpen || isStegoEditing,
         )
         if (target == PanelMode.AI && aiChanged) onAiConversationsRequested()
         updatePanelLayout()
@@ -1347,7 +1355,7 @@ class ZeroInputView @JvmOverloads constructor(
         val aiEditing = mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded
         val searchActive = isSearchEditing && !searchCandidatesExpanded
         val shapeTyping = isShapeLookupOpen && shapeEditing
-        val editing = searchActive || aiEditing || shapeTyping || isPrivateDraftOpen || isTextStegoOpen
+        val editing = searchActive || aiEditing || shapeTyping || isPrivateDraftOpen || isStegoEditing
         val splitSearch = editing && viewportPlan.splitDetailPanel
         // AI keeps three primary commands visible; reserve their width in a short landscape window.
         val detailWeight = if (aiEditing) 5f * resources.configuration.fontScale.coerceIn(1f, 1.5f) else 1f
@@ -1361,6 +1369,7 @@ class ZeroInputView @JvmOverloads constructor(
                 searchActive -> 224
                 else -> ai.editingHeightDp
             })
+            isTextStegoOpen && stegoReadOnly -> dp(320)
             mode == PanelMode.CANDIDATES || aiCandidatesExpanded || searchCandidatesExpanded -> keyboard.preferredHeight
             mode == PanelMode.AI && !editing -> dp(360)
             else -> compactPanel
@@ -1379,7 +1388,7 @@ class ZeroInputView @JvmOverloads constructor(
         privateDraft.layoutParams = if (splitSearch && isPrivateDraftOpen) LayoutParams(0, body, 2f)
             else LayoutParams(LayoutParams.MATCH_PARENT, if (isPrivateDraftOpen) detailHeight else body)
         textStegoPanel.layoutParams = if (splitSearch && isTextStegoOpen) LayoutParams(0, body, 2f)
-            else LayoutParams(LayoutParams.MATCH_PARENT, if (isTextStegoOpen) detailHeight else body)
+            else LayoutParams(LayoutParams.MATCH_PARENT, if (isStegoEditing) detailHeight else body)
         handwriting.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, body)
         ai.layoutParams = if (splitSearch) LayoutParams(0, body, detailWeight)
             else LayoutParams(LayoutParams.MATCH_PARENT, if (aiEditing) detailHeight else body)
@@ -1389,7 +1398,7 @@ class ZeroInputView @JvmOverloads constructor(
     private fun isDetailEditing(): Boolean =
         (isSearchEditing && !searchCandidatesExpanded) || (mode == PanelMode.AI && ai.editing && !aiCandidatesExpanded) ||
             (isShapeLookupOpen && shapeEditing)
-            || isPrivateDraftOpen || isTextStegoOpen
+            || isPrivateDraftOpen || isStegoEditing
 
     private fun applyViewportPlan(plan: KeyboardViewportPlan) {
         if (viewportPlan == plan) return

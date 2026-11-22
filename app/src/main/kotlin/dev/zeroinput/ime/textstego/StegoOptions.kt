@@ -14,6 +14,8 @@ internal class StegoOptions {
     var transport = StegoTransport.DENSE_UNICODE
     var stages = listOf(MessageStage(MessageCipher.AES))
 
+    val transportLabel: Int get() = if (transport == StegoTransport.DENSE_UNICODE) R.string.stego_dense else R.string.stego_visible
+
     fun select(cipher: MessageCipher, selected: Boolean) {
         if (selected && stages.none { it.cipher == cipher }) stages = stages + MessageStage(cipher)
         if (!selected) stages = stages.filterNot { it.cipher == cipher }
@@ -34,10 +36,10 @@ internal class StegoOptions {
         stages = stages.toMutableList().apply { add(index - 1, removeAt(index)) }
     }
 
-    fun summary(view: View, fileReady: Boolean): String = view.context.getString(R.string.stego_options_summary,
+    fun summary(view: View, fileReady: Boolean, carrierLabel: Int = transportLabel): String = view.context.getString(R.string.stego_options_summary,
         stages.joinToString(" → ") { label(it) },
         view.context.getString(MODE_LABELS[mode.ordinal]),
-        view.context.getString(if (transport == StegoTransport.DENSE_UNICODE) R.string.stego_dense else R.string.stego_visible),
+        view.context.getString(carrierLabel),
         view.context.getString(if (!mode.file) R.string.stego_file_not_required
             else if (fileReady) R.string.stego_file_ready else R.string.stego_file_absent))
 
@@ -56,12 +58,17 @@ internal class StegoOptions {
 }
 
 /** Owned dialogs are protected, revocable and use no editable Android fields. */
-internal class StegoOptionsDialog(private val owner: View, private val isCurrent: () -> Boolean) : AutoCloseable {
+internal class StegoOptionsDialog(
+    private val owner: View,
+    private val isCurrent: () -> Boolean,
+    private val interaction: () -> Long = { 0L },
+) : AutoCloseable {
     private var dialog: AlertDialog? = null
     var attachToIme = true
     var leaveForLocalNote: (() -> Unit)? = null
 
-    fun show(options: StegoOptions, decrypt: Boolean, changed: () -> Unit, fileChanged: () -> Unit) {
+    fun show(options: StegoOptions, decrypt: Boolean, chooseCarrier: () -> Unit,
+             changed: () -> Unit, fileChanged: () -> Unit) {
         if (decrypt) { message(R.string.stego_decrypt_options_fixed); return }
         val choices = buildList {
             add(R.string.stego_credential_mode)
@@ -71,23 +78,24 @@ internal class StegoOptionsDialog(private val owner: View, private val isCurrent
         choose(dev.zeroinput.ime.ui.R.string.stego_options, choices.map(owner.context::getString)) { index ->
             when (choices[index]) {
                 R.string.stego_credential_mode -> mode(options) { fileChanged(); changed() }
-                R.string.stego_kdf -> choose(R.string.stego_kdf, listOf("Argon2id · 64 MiB / 3", "Argon2id · 128 MiB / 3", "Argon2id · 256 MiB / 4")) {
-                    val profile = MessageKdf.entries[it + 1]
-                    if (!StegoOptions.available(profile)) message(R.string.stego_memory_unavailable)
-                    else { options.kdf = profile; changed() }
-                }
-                R.string.stego_transport -> choose(R.string.stego_transport, listOf(R.string.stego_dense, R.string.stego_visible,
-                    R.string.stego_wording_unavailable).map(owner.context::getString)) {
-                    if (it == 2) message(R.string.stego_wording_explanation)
-                    else { options.transport = StegoTransport.entries[it]; changed() }
-                }
+                R.string.stego_kdf -> cost(options, changed)
+                R.string.stego_transport -> chooseCarrier()
             }
         }
     }
 
-    fun mode(options: StegoOptions, changed: () -> Unit) {
-        choose(R.string.stego_credential_mode, StegoOptions.MODE_LABELS.map(owner.context::getString)) {
-            val selected = MessageCredentialMode.entries[it]
+    fun cost(options: StegoOptions, changed: () -> Unit) {
+        choose(R.string.stego_kdf, listOf("Argon2id · 64 MiB / 3", "Argon2id · 128 MiB / 3", "Argon2id · 256 MiB / 4")) {
+            val profile = MessageKdf.entries[it + 1]
+            if (!StegoOptions.available(profile)) message(R.string.stego_memory_unavailable)
+            else { options.kdf = profile; changed() }
+        }
+    }
+
+    fun mode(options: StegoOptions, portableOnly: Boolean = false, changed: () -> Unit) {
+        val modes = MessageCredentialMode.entries.filter { !portableOnly || it != MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD }
+        choose(R.string.stego_credential_mode, modes.map { owner.context.getString(StegoOptions.MODE_LABELS[it.ordinal]) }) {
+            val selected = modes[it]
             val applyMode = {
                 options.mode = selected
                 if (selected.password && options.kdf == MessageKdf.NONE) options.kdf = MessageKdf.STANDARD
@@ -101,10 +109,11 @@ internal class StegoOptionsDialog(private val owner: View, private val isCurrent
     }
 
     fun confirm(message: Int, action: () -> Unit) {
+        val revision = interaction()
         lateinit var value: AlertDialog
         value = MaterialAlertDialogBuilder(owner.context).setMessage(message)
             .setNegativeButton(android.R.string.cancel, null).setPositiveButton(android.R.string.ok) { _, _ ->
-                if (isCurrent() && dialog === value) action()
+                if (isCurrent() && dialog === value && interaction() == revision) action()
             }.create()
         present(value)
     }
@@ -113,11 +122,19 @@ internal class StegoOptionsDialog(private val owner: View, private val isCurrent
         present(MaterialAlertDialogBuilder(owner.context).setMessage(message).setPositiveButton(android.R.string.ok, null).create())
     }
 
-    fun choose(title: Int, labels: List<String>, action: (Int) -> Unit) {
+    fun choose(title: Int, labels: List<String>, help: Int? = null, action: (Int) -> Unit) {
         if (labels.isEmpty()) return
+        val revision = interaction()
         lateinit var value: AlertDialog
         value = MaterialAlertDialogBuilder(owner.context).setTitle(title).setItems(labels.toTypedArray()) { _, index ->
-            if (isCurrent() && dialog === value) { dialog = null; action(index) }
+            if (isCurrent() && dialog === value && interaction() == revision) {
+                close()
+                action(index)
+            }
+        }.apply {
+            if (help != null) setNeutralButton(R.string.stego_help_button) { _, _ ->
+                if (isCurrent() && dialog === value && interaction() == revision) message(help)
+            }
         }.create()
         present(value)
     }
@@ -126,12 +143,31 @@ internal class StegoOptionsDialog(private val owner: View, private val isCurrent
         close()
         if (!isCurrent()) return
         dialog = value
+        value.setOnDismissListener { if (dialog === value) dialog = null }
         value.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         if (attachToIme) value.window?.apply {
             setType(WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
+            // These touch-only controls must leave the external editor focused.
+            // A focusable IME dialog can cause Android to restart the input session on dismissal.
+            addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
+            // A second picker must be touchable as soon as its rows appear.
+            setWindowAnimations(0)
             attributes = attributes.apply { token = owner.windowToken }
+            value.setCanceledOnTouchOutside(true)
         }
-        value.show()
+        value.window?.decorView?.filterTouchesWhenObscured = true
+        try {
+            value.show()
+        } catch (_: WindowManager.BadTokenException) {
+            // The system can detach an input window between validation and presentation.
+            if (dialog === value) dialog = null
+        }
+    }
+
+    fun dismissShowing(): Boolean {
+        if (dialog?.isShowing != true) return false
+        close()
+        return true
     }
 
     override fun close() { dialog?.dismiss(); dialog = null }

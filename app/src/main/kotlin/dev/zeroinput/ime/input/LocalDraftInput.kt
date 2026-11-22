@@ -207,6 +207,7 @@ internal class LocalDraftInput(
 
     fun committedText(): String = text.toString()
     val length: Int get() = text.length
+    fun committedUtf8Bytes(): Int? = exactUtf8ByteLength(text)
 
     fun replaceCommittedText(value: String): Boolean {
         val input = controller ?: return false

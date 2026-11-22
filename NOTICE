@@ -86,6 +86,9 @@ lianxiang and renming retain their independently pinned reviewed source.
 Only upstream data is used, not program code. See LICENSES/wanxiang-data-LICENSE-SCOPE.md.
 Dictionary reading tone marks are removed for ZeroInput full-pinyin conversion;
 words and frequencies are retained. See LICENSES/wanxiang-CC-BY-4.0.txt.
+Debug wording profiles include derived shici pools, a Wanxiang- and corpus-based
+window grammar, a public-excerpt dictionary and a word-context model. Credits and terms are in assets/themed-verse/ATTRIBUTION.md
+in the Debug APK and tools/themed-verse/android-test-profile/ATTRIBUTION.md in source.
 Octagram is developed by the RIME Developers under BSD-3-Clause.
 See LICENSES/librime-octagram-BSD-3-Clause.txt.
 SnakeYAML 2.4 is Apache-2.0 (LICENSES/Apache-2.0.txt); jsoup 1.18.3 is MIT

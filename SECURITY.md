@@ -538,12 +538,35 @@ before any secret is displayed. The default result is local and masked; editor
 insertion and authenticated vault saving are separate explicit actions. Credentials
 are never saved; losing a required factor makes recovery impossible.
 
+The distributed layout depends on public cover bytes. A format-aware observer can
+recover the encrypted envelope. Shared text with even a surviving end marker or
+visible version prefix is restricted to local carrier handling.
+
 Unicode hidden characters and visible Base64url are detectable and can be altered
 or removed by destination apps. There is no undetectability or delivery guarantee.
-Natural wording remains unavailable until reviewed resources pass the design's
-capacity, semantics and detector gates. Generic GCM/cascades do not add key-bit
+Release activation of natural wording requires the design's capacity, reading
+and detector gates. Generic GCM/cascades do not add key-bit
 strengths or imply certification. Managed crypto/engine/View copies cannot promise
 complete erasure, constant-time behavior or protection against a compromised OS.
+
+The [P1 themed-verse tools](docs/themed-verse/p1.md) are an offline host
+experiment for public fixtures. The public profile digest and canonical
+surface are checked on receipt. The visible length can expose a compression
+bucket. Treat the published keys and outputs as public test data.
+The [P2 public regression experiments](docs/themed-verse/p2-results.md) also
+use isolated emulator deployments for bounded key replay after authentication.
+
+The [Android Debug verse workbench](docs/themed-verse/android-test-build.md)
+runs the frozen scenery profile with a packaged public test key and public
+fixtures. A private, non-exported page shows the canonical complete carrier
+and authenticated result in memory. Treat these inputs and outputs as public.
+The Debug keyboard workspace also offers the explicit five-character verse
+trial for private drafts. It uses a user-supplied or newly generated 256-bit
+random shared key, a profile-specific authenticated binding and canonical
+whole-carrier validation before decryption. The public fixtures have their own
+binding. The trial uses the existing foreground lifetime and private source
+controls. Its public text can expose the message's length bucket.
+[Proposed trial protocol and release gates](docs/adr/0041-natural-wording-trial.md)
 
 Only bounded editor selection, plain-text share/PROCESS_TEXT and newly authenticated
 private-vault reads supply carriers. On 2026-11-19 the user explicitly authorized

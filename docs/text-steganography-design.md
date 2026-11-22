@@ -160,7 +160,10 @@ Preserving visible text exactly while carrying substantial extra data in invisib
 characters conflicts with resisting D1: the code points still have to be present.
 Encrypting them or permuting their positions does not change that fact.
 
-### 3.2 Proposed transport profiles
+### 3.2 Original proposed transport profiles
+
+The following terminal frames and size examples describe the original proposal.
+The current complete wire format and maximum sizes are specified in [ADR 0042](adr/0042-distributed-exact-carriers.md).
 
 | Profile | Visible text | Capacity and detection boundary | Role |
 | --- | --- | --- | --- |

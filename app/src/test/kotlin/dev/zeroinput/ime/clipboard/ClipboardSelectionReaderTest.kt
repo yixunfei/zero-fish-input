@@ -23,6 +23,23 @@ class ClipboardSelectionReaderTest {
         assertNull(result.copyText())
     }
 
+    @Test fun onlyAnExplicitWordingReadCanOfferMarkerlessSelectionToTheDecryptDraft() = withReader { reader, posts ->
+        val text = "江水浸云光，山径通幽处。"
+        for (natural in listOf(false, true)) {
+            reader.read(text.length, { text }, { true }, naturalWording = natural) { draft ->
+                requireNotNull(draft).use {
+                    assertFalse(it.allowsAiImport)
+                    assertEquals(natural, it.allowsStegoImport)
+                    assertEquals(if (natural) text else null, it.takeForStego()?.let(::String))
+                }
+            }
+            next(posts).invoke()
+        }
+        val oversized = "江".repeat(5462)
+        reader.read(oversized.length, { oversized }, { true }, naturalWording = true) { assertNull(it) }
+        next(posts).invoke()
+    }
+
     @Test
     fun emptyOrOversizedSelectionsNeverReadTheEditor() = withReader { reader, _ ->
         for (length in listOf(0, -1, 8193, Int.MAX_VALUE)) {

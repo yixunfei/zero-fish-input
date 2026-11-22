@@ -127,6 +127,20 @@ https://github.com/amzxyz/RIME-LMDG, under CC-BY-4.0. Tone marks are removed onl
 from readings; source words/frequencies and dictionary header notices are retained.
 The grammar reader source is https://github.com/lotem/librime-octagram/tree/57d18b9f58e5284bd891d559f6bdd16cf60341e9.
 
+The Debug wording profiles are built by `tools/themed-verse/prepare_android_verse.py`
+from the locked shici table, the frozen GB18030 dictionary, the public interop
+fixture and the frozen window grammar. The window exporter joins words
+from the authored scene corpus with the 16 locked Wanxiang tables.
+The asset credits list the source for each retained dictionary excerpt.
+[Profile notices](tools/themed-verse/android-test-profile/ATTRIBUTION.md)
+
+The host-only sparse verse comparison reads one pinned Tang poetry JSON shard,
+477,671 bytes, SHA-256 `8ccf0783888b15bec60d0253e278cd4b67e94a77725df8ed079d4d8062d050b4`.
+The evidence directory includes the MIT notice and an index of original author,
+work title, source ID and paragraph number for each admitted ordered couplet.
+The existing pinned OpenCC mappings supply the simplified surface form.
+[Source at the reviewed revision](https://github.com/chinese-poetry/chinese-poetry/blob/b8594f81a89752241442f2ce267d6f66f96704ee/全唐诗/poet.tang.20000.json) ·
+[Upstream MIT notice](tools/themed-verse/Tang-corpus-LICENSE.txt)
 
 ## Optional resource releases
 

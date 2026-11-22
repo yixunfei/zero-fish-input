@@ -50,7 +50,7 @@ class MessageCascadeTest {
         val header = sealed.copyOfRange(0, 44)
         val length = ByteBuffer.wrap(header, 18, 2).short.toInt() and 65535
         val binding = hash(fields(domain("exact-cover"), utf8(cover, MessageLimits.COVER_BYTES)))
-        val root = MessageKeys.root(credential, header.copyOfRange(0, 16), MessageKdf.NONE, false)
+        val root = MessageKeys.root(credential, header.copyOfRange(0, 16), MessageKdf.NONE, 1)
         val metadataKey = MessageKeys.expand(root, "metadata-key", header, binding)
         val metadata = MessagePrimitives.aead(false, MessageCipher.XCHACHA20, metadataKey,
             header.copyOfRange(20, 44), fields(domain("metadata-aad"), header, binding), sealed.copyOfRange(44, 44 + length))

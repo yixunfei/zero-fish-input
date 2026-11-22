@@ -1,6 +1,7 @@
 package dev.zeroinput.ime.textstego
 
 import android.content.Context
+import android.content.Intent
 import android.text.InputFilter
 import android.text.InputType
 import android.widget.EditText
@@ -11,6 +12,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import dev.zeroinput.ime.R
+import dev.zeroinput.ime.ZeroInputApplication
 import dev.zeroinput.ime.ui.StegoAlgorithmView
 import dev.zeroinput.ime.ui.StegoAlgorithmUi
 import dev.zeroinput.security.message.MessageCipher
@@ -48,6 +50,12 @@ internal class StegoSettingsView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
         note(R.string.stego_settings_help)
+        if (StegoWordingCodec.available) addView(MaterialButton(context).apply {
+            setText(R.string.stego_export_key_entry)
+            filterTouchesWhenObscured = true
+            minHeight = dp(48)
+            setOnClickListener { exportKeyFile() }
+        })
         addView(bits, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         note(R.string.stego_settings_bits_help)
         heading(R.string.stego_settings_algorithms)
@@ -59,6 +67,18 @@ internal class StegoSettingsView(context: Context) : LinearLayout(context) {
         addView(system)
         note(R.string.stego_settings_paste_help)
         render(value)
+    }
+
+    private fun exportKeyFile() {
+        val app = context.applicationContext as? ZeroInputApplication ?: return
+        val handoff = app.graph.stegoHandoff
+        val token = handoff.put(StegoHandoff.Request(StegoHandoff.Kind.EXPORT_KEY_FILE))
+        try {
+            context.startActivity(Intent(context, StegoSourceActivity::class.java).putExtra(StegoSourceActivity.EXTRA_TOKEN, token))
+        } catch (_: RuntimeException) {
+            handoff.discard(token)
+            android.widget.Toast.makeText(context, R.string.stego_failed, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun render(defaults: StegoDefaults) {

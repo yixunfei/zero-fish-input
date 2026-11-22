@@ -1609,6 +1609,45 @@ authentication change is introduced.
 
 ## Text steganography (ADR 0039, 2026-11-18)
 
+The separate [binary verse host experiment](themed-verse/prototype.md) uses
+public fixtures, a disposable raw key and a frozen resource profile bound to
+the authenticated envelope. Untrusted verse must have a unique canonical
+layout and a bounded frame size. Both tags are verified before parsing the
+codec selector or decompressing. The decoder checks original length, trailing
+bytes and exact UTF-8. Negative tests alter metadata, payload, tag, profile,
+layout and output bounds. Compression can expose length buckets and the verse
+can be recognizable. Python buffers, host files and this experimental binding
+are unsuitable for production secrets. Android imports and providers have no
+path to this host tool.
+
+The [P1 joint host experiment](themed-verse/p1.md) checks a pinned manifest
+digest and every consumed asset before decoding. The receiver loads the full
+reverse index from the agreed public configuration. It re-renders the recovered
+envelope and compares the whole surface, checks both authentication tags, then
+bounds the inflated position stream to three times the declared input length.
+Only a complete result reaches the output file. The published vectors use a
+public fixture key. The visible length exposes the padded envelope bucket
+chosen after compression. Formal binary framing and surface binding require
+the planned protocol review.
+
+The [P2 public regression experiment](themed-verse/p2-results.md) binds its
+bit layouts, frequency tables and dictionaries to a separate profile digest.
+It checks the canonical carrier and authenticates the envelope before parsing
+bounded fields, inflating streams or replaying keys. The experiment permits at most 128 distinct
+lowercase key sequences of up to 12 letters per message and resolves the first
+32 candidates in a separate locked emulator deployment. The receiver rebuilds
+only the queries specified by the authenticated stream, then publishes a
+complete result after the bounds and UTF-8 checks.
+
+The [Android Debug verse workbench](themed-verse/android-test-build.md)
+consumes bundled public fixtures in a private page. The Kotlin receiver
+validates the frozen pool asset, canonical full verse, unique envelope bucket
+and authenticated AES-256 stage before accepting the bounded GB18030 stream.
+The receiver rejects trailing compressed data, malformed byte sequences and a
+mismatch with the declared UTF-8 length. Fixture credentials are public. The
+page owns its result in memory, cancels publication on backgrounding and
+clears on screen lock or recreation. Its source set and assets are Debug-only.
+
 Additional protected assets are secret drafts, message credentials/file factors,
 the fully authenticated local result, and pending authenticated vault saves.
 Carriers are untrusted public text. The cover, lengths, credential/KDF IDs and
@@ -1650,7 +1689,9 @@ Explicit warnings explain this; no new retention/export/credential-paste path ex
 | Vault deletion/auth replay/background result | New one-use grant per read/save, another foreground click, captured generation and active/deadline checks before and after I/O; auth callback stages only a grant |
 | Lock, settings change, recreation or leaving the mode | Drop drafts, credentials, factors and results; mutable worker results clear on cancellation; no saved view state/autofill/content capture |
 | Untrusted destination strips selectors | Local self-check cannot prove channel retention; report detectable/unverified transport, never automatically resubmit or substitute plaintext |
-| Save chooses the wrong intermediate content or a credential | Four explicit output buttons select an owned typed result; draft save rejects the credential field. One selected buffer transfers after consuming the phase; host authentication and foreground confirmation still precede every write |
+| Save chooses the wrong intermediate content or a credential | Explicit output buttons select an owned typed result. Separate cover and detached ciphertext are available for the exact transports. Draft save rejects credentials. The selected buffer transfers after consuming the phase, before host authentication and foreground save confirmation |
+| Wording trial text or profile changes | Decode the bounded canonical surface using the frozen pools, authenticate the selected trial binding and complete frame before decompressing, then check original length and UTF-8. A changed layout, profile or key yields no plaintext |
+| Stale markerless selection or vault result | A wording read starts only in the explicitly selected receive mode. Selection publication rechecks the editor, workspace and draft revision. Vault return keeps the selected mode in its one-use, authenticated handoff |
 | Additional plaintext retained after encryption | Only the bounded result bundle remains for the existing 30-second preview; close/edit/lock/session/settings/deletion revocation and late/duplicate/OOM delivery dispose mutable outputs. No persistent cache is created |
 | Detached ciphertext uses an invented cover or changes normalization | Worker requires the exact user-entered original cover; metadata and every layer still authenticate it. Public bootstrap inspection only reads requirements and releases no plaintext. Empty, malformed or oversized covers reject before KDF |
 
@@ -1658,8 +1699,10 @@ The initial system-body-read refusal is superseded only by the explicit two-fiel
 paste exception of 2026-11-19 below. No new permission, export, network or AI path is present.
 Result insertion deliberately exposes plaintext to the chosen external editor
 after a separate warning; standalone decryption supports local view or separately
-authenticated save only. Natural wording remains unavailable pending actual
-resource/corpus/capacity/semantic/detector evidence. Managed providers and strings
+authenticated save only. The Debug wording trial uses bounded local inputs and
+explicit mode selection. The markerless surface can reveal compression buckets,
+and its text can be recognized or altered in other applications. Release activation
+requires the separate review in [ADR 0041](adr/0041-natural-wording-trial.md). Managed providers and strings
 do not guarantee complete erasure or constant-time execution. Generic GCM profiles
 and layered encryption carry no certification or additive-strength claim.
 
@@ -1724,3 +1767,71 @@ destroy access. An attacker already enrolled on the device can authorize the
 device factor and would also need the passphrase. Workspace closure cancels
 the prompt and generation checks reject stale callbacks. See
 [ADR 0040](adr/0040-local-biometric-message.md).
+
+## Wrapped natural wording in Debug (2026-11-22)
+
+| Threat | Control |
+| --- | --- |
+| Offline guessing of a user-selected short passphrase | The preview flow accepts nonempty passphrases and shows the guessing risk. Password credentials use Argon2id and a fresh salt. A separately kept random key file supplies an additional independent factor. The credential protecting the metadata determines the cost of guessing it |
+| Key reuse across stages or messages | Generate a fresh valid-width key and nonce for each stage and wrap the keys in authenticated metadata. Bind the profile and descriptor to the transcript, verify every layer and clear mutable secret buffers |
+| Attacker requests an expensive derivation with a forged carrier | Bound and canonically re-encode the complete carrier before inspecting the credential and cost. Gate higher cost profiles with foreground confirmation and worker memory checks. Authenticate the bootstrap, metadata and body before decoding plaintext |
+| Forged or oversized window observation graph or text | Pin the Debug graph by size and SHA-256. Check sentence membership, order and required continuation before allocating exact count rows. Bound each accepted BMP sentence stream by both carrier limits and cap the recovered envelope at 833 bytes. The 896-state graph uses 15 count rows. Check cancellation while building rows and ranking sentences. The send path checks capacity before KDF and builds rows after sealing. The receive path releases rows before any credential check or KDF |
+| Cancelled verse operation or queued result past its deadline | Check the worker lease while ranking, parsing and verifying the canonical verse. Clear the recovered envelope when this verification aborts. The receiver rechecks the deadline when taking a queued delivery and wipes the mutable buffers on expiry |
+| Canonical ciphertext rendered under an alternate profile | The v3 digests bind the selected frozen surface and current model hash. The keyboard uses a single binding and rejects old or mismatched bindings during authentication. Malformed, overlong and noncanonical surfaces fail closed. The public fixture workbench has its own independent assets |
+| Forged body mode, mismatched model or compressed expansion | Dispatch compression only after successful AEAD open. Modes 5–7 identify the pinned public model and bounded UTF-8 packet. Unknown modes, invalid terminal states, length mismatches and trailing data fail closed |
+| Message context affects later messages or surfaces in shared state | A cache lives inside a single compression or recovery operation, uses only its own earlier symbols, and is cleared with candidate buffers. Public models carry no editor or personalization state. Compression retains the existing 64-byte encrypted body buckets and visible length behavior |
+| Unmarked or malformed text entered through explicit paste or selection | The bounded unmarked draft stays in the protected Debug workspace. Starting decryption opens the style picker and requires an explicit profile selection. Exact carrier markers route through the exact parser. The selected surface and header provide untrusted credential hints only. KDF and authenticated open require Start decryption and current operation checks |
+| Input session restarted by a chooser, or a stale click after an outside edit | IME dialogs accept touch without taking editor focus. The secure dialog flag stays in force. A callback must match the displayed dialog and draft interaction, as well as the live workspace. The carrier picker closes its first level before presenting the style picker. Real editor rebinding still revokes its drafts and pending reads |
+| Wrong destination, cancellation or interruption during file export | A private host takes an opaque one-use ID and obtains one temporary local document URI. Foreground confirmation authorizes generation and a single write to a verifiably empty file. Lock, expiry, navigation or settings revoke the lease and close provider I/O. Uncertain writes require the user to check the file. Persistent grants and automatic retries are absent |
+| Disclosure of the exported raw file | The export page explains the file's sensitivity before selection. It contains independently generated random bytes and can be used as a key-file credential. The file provider and anyone with access to its contents can obtain those bytes. The app does not persist an extra copy |
+
+The public carrier size depends on the encrypted frame bucket and layer
+overhead. The independent window language review covers three-sentence
+excerpts. Whole-carrier naturalness and detector evaluation remain open.
+[ADR 0041](adr/0041-natural-wording-trial.md#window-observation-profile)
+
+### Host-only scene calibration (2026-11-22)
+
+The public-fixture scene check uses a separate host research binding and
+version; it is not an Android receive mode or release protocol. It writes
+only locked public samples to a local evidence directory. A fresh receiver
+rebuilds the public scene pools, checks the fixed model hash and authenticates
+the envelope before decoding a bounded body. Its controls reject changed or
+missing model resources, a wrong key or profile digest, truncated or changed
+surface text, and mutations of the header, metadata, body and outer tag. It
+publishes no output on rejection. The receiver uses the same host codec as the
+sender in a separate process; this check does not establish independent
+implementation interoperability or human readability.
+
+The sparse host comparison binds the schedule, public line order and pair
+tables to distinct profile digests. Source couplets are rebuilt from a pinned
+public Tang shard with pinned normalization tables. A partial pair, a pair
+outside the designated table or a rank outside the canonical byte frame is
+rejected. Invalid UTF-8 and oversized files are per-carrier failures and do
+not prevent processing a later valid fixture. The Kotlin body check accepts
+only public calibration packets opened under the host fixture key and synthetic
+boundary controls. The host Tang data and research bindings stay outside the APK.
+
+The host Essay experiment binds the public frequency source, character mapping
+and body rule version to each route digest. Only authenticated packets may
+select the added modes. The decoder confines a copy to the already recovered
+prefix of this message, caps expansion at the declared 1–2,048 original
+bytes, checks final UTF-8 and rejects trailing bytes or nonzero padding.
+Character mapping applies to dictionary leaves and never rewrites literals.
+The separate JVM implementation checks the pinned inputs and withholds output
+until all checks pass. The new modes are limited to the offline fixture tools.
+
+## Distributed exact-text exchange (2026-11-22)
+
+The public layout can be detected, copied or stripped by a destination. Each
+column is bounded before reconstruction, the complete framing is checked before
+KDF selection, and the existing AEAD authenticates the original cover and
+envelope before releasing plaintext. Share/selection import treats surviving
+dense start/end markers and visible version prefixes as local carrier input,
+including damaged messages. Unmarked text cannot reliably be classified.
+
+The reviewed Android route accepts bounded text and displays native Views.
+The stego source Activity is nonexported. Import discards URI/Intent payloads,
+and the dialogs filter obscured touches and abandon a revoked window token.
+The repository privacy check scans for embedded WebView APIs. Compromised OS
+components and destination apps retaining a message are outside this boundary.

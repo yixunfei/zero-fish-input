@@ -194,6 +194,16 @@ repository's original program code is not licensed by its data grant and is not
 copied or executed. Existing main pins remain authoritative until a data PR is
 reviewed and merged; this source policy does not itself update bundled data.
 
+The Debug wording profiles derive verse lines from the CC BY 4.0 shici table.
+The window grammar joins scene corpus terms with the locked CC BY 4.0
+Wanxiang tables. Their GB18030 byte dictionary
+contains excerpts of government abstracts
+under the Taiwan Open Government Data License v1.0 and historical Chinese
+works retrieved from Project Gutenberg. The word-context model derives
+vocabulary and token counts from the same locked training split and
+ZeroInput's public association data. Per-work credits and transformation
+details ship with the Debug assets. [Verse asset notices](tools/themed-verse/android-test-profile/ATTRIBUTION.md)
+
 
 ## Offline Han shape lookup
 

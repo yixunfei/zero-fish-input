@@ -1,0 +1,3324 @@
+{
+  "archives": {
+    "calibration": {
+      "bytes": 50009,
+      "sha256": "004e5d676fb42c2460b9a28be9ba8d9ee49904582c523749122a89435907cd1b"
+    },
+    "holdout": {
+      "bytes": 72463,
+      "sha256": "8a9c93e748ff744a1dee2425f04fe78f06607d0f438577faeda06b3047bdf891"
+    },
+    "training": {
+      "bytes": 38892,
+      "sha256": "a4c8464d8498562317fcb3425ca87edb6b590c80ff3b168e8536b6c5d0f96061"
+    }
+  },
+  "candidate_index_sha256": "2080ad780a7f32b4d351b1ec0768d577a691b35eb012e02d668e09e03919cb7c",
+  "date": "2026-11-20",
+  "duplicates": {
+    "excluded": [
+      {
+        "id": "exam-28439",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "ndc-cf154456bc848b35",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-339785",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28467",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "ndc-d96c029f905a66b8",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "ndc-dc2a76a2a4cadbf4",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340053",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28456",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340050",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28454",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340248",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340203",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "ndc-38fbd71794e44fb3",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340366",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340204",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28465",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-336829",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340225",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28418",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-39419",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-339789",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-336830",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28468",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28484",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-340246",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28466",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28488",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "ndc-a5b3723d3918e27e",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "abri-339453",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28438",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28489",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28493",
+        "reason": "author-or-work-group"
+      },
+      {
+        "id": "exam-28434",
+        "reason": "author-or-work-group"
+      }
+    ],
+    "normalized_matches": 0,
+    "pairs_after_selection": 8646,
+    "threshold": "alphanumeric NFKC casefold; run 48 or Jaccard(7) >= 0.20"
+  },
+  "format": "zeroinput-p2-public-corpus-1",
+  "records": [
+    {
+      "author_groups": [
+        "洪英彰",
+        "簡仁德",
+        "黃瑞隆"
+      ],
+      "authors": [
+        "洪英彰",
+        "簡仁德",
+        "黃瑞隆"
+      ],
+      "body_bytes": 19732,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-340254",
+      "publication": "2026-01-01",
+      "sha256": "5e391069bdf5fdd50b74eeceb5a555bbe145c807abf92a5c8fa9b928c71c3c57",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340254",
+      "split": "training",
+      "start_byte": 0,
+      "title": "建築物導入淨零創新技術應用示範計畫",
+      "work_group": "report-建築物導入淨零創新技術應用示範計畫"
+    },
+    {
+      "author_groups": [
+        "羅時麒",
+        "陳振誠"
+      ],
+      "authors": [
+        "羅時麒",
+        "陳振誠"
+      ],
+      "body_bytes": 8613,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-340049",
+      "publication": "2025-12-31",
+      "sha256": "d4483b7fd45e316e7d71f1bb6fb28442a0dc4db741b1c9fba180dff80db36b84",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340049",
+      "split": "training",
+      "start_byte": 0,
+      "title": "健康綠建材評定項目與基準增修訂之研究",
+      "work_group": "report-健康綠建材評定項目與基準增修訂之研究"
+    },
+    {
+      "author_groups": [
+        "張建一",
+        "花佳正",
+        "龔明鑫"
+      ],
+      "authors": [
+        "張建一",
+        "花佳正",
+        "龔明鑫"
+      ],
+      "body_bytes": 1182,
+      "bytes": 1182,
+      "end_byte": 1182,
+      "genre": "work-record",
+      "id": "ndc-0e91876378f7fb71",
+      "publication": "105",
+      "sha256": "7fd9a5d3e0234a78ecb3a1cf3cbbe740f0312bdb6000fc1ac5553e6ea8179fca",
+      "source": "ndc",
+      "source_field": "資料說明",
+      "source_url": "https://ws.ndc.gov.tw/001/administrator/10/relfile/5672/4271/f495e49c-214e-44d0-b96a-38ecfead7991.pdf",
+      "split": "training",
+      "start_byte": 0,
+      "title": "「國家發展前瞻規劃」委託研究計畫－產業人力供需評估(含模型建立)(第三年度計畫)(一)各部會重點產業人力短期供需分析",
+      "work_group": "report-國家發展前瞻規劃委託研究計畫產業人力供需評估含模型建立第三年度計畫一各部會重點產業人力短期供需分析"
+    },
+    {
+      "author_groups": [
+        "宋學文",
+        "蔡昌言"
+      ],
+      "authors": [
+        "宋學文",
+        "蔡昌言"
+      ],
+      "body_bytes": 1696,
+      "bytes": 1696,
+      "end_byte": 1696,
+      "genre": "work-record",
+      "id": "exam-28429",
+      "publication": "93",
+      "sha256": "98bd4e7b0ce06d1594c3b6a298745e0d3dfb670baed49cd59784292c1af2adc2",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28429",
+      "split": "training",
+      "start_byte": 0,
+      "title": "全球化對我國公務人員公務執行之挑戰（考試院委託國立中正大學研究案）",
+      "work_group": "report-全球化對我國公務人員公務執行之挑戰考試院委託國立中正大學研究案"
+    },
+    {
+      "author_groups": [
+        "蕭文生",
+        "鄭津津"
+      ],
+      "authors": [
+        "蕭文生",
+        "鄭津津"
+      ],
+      "body_bytes": 4814,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "exam-28433",
+      "publication": "93",
+      "sha256": "8b3cf7b09993b1f37cbba1dadd33f4ff46031829339483fa0339d505cfe79f24",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28433",
+      "split": "training",
+      "start_byte": 0,
+      "title": "法律工作執行人員聘任問題之研究（考試院委託國立中正大學研究案）",
+      "work_group": "report-法律工作執行人員聘任問題之研究考試院委託國立中正大學研究案"
+    },
+    {
+      "author_groups": [
+        "林杰宏"
+      ],
+      "authors": [
+        "林杰宏"
+      ],
+      "body_bytes": 5191,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-336552",
+      "publication": "2026-01-30",
+      "sha256": "c0f8a3d4cfd96a251dd92e8a3074bc8cdc0096dc52a274c1636edaa54795fb5e",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=336552",
+      "split": "training",
+      "start_byte": 0,
+      "title": "淨零建築跨領域人才培育與產學研發展平台推廣計畫",
+      "work_group": "report-淨零建築跨領域人才培育與產學研發展平台推廣計畫"
+    },
+    {
+      "author_groups": [
+        "孟義超",
+        "蕭輔民",
+        "許恆壽"
+      ],
+      "authors": [
+        "孟義超",
+        "蕭輔民",
+        "許恆壽"
+      ],
+      "body_bytes": 5720,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-340251",
+      "publication": "2026-01-31",
+      "sha256": "f38d6be92b3b94e2860395780e44439a192d2d72b2a9300a3ca00d56cf817be9",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340251",
+      "split": "training",
+      "start_byte": 0,
+      "title": "淨零建築智慧化暨產業溝通轉型升級計畫",
+      "work_group": "report-淨零建築智慧化暨產業溝通轉型升級計畫"
+    },
+    {
+      "author_groups": [
+        "呂秋慧",
+        "趙其文"
+      ],
+      "authors": [
+        "呂秋慧",
+        "趙其文"
+      ],
+      "body_bytes": 1444,
+      "bytes": 1444,
+      "end_byte": 1444,
+      "genre": "work-record",
+      "id": "exam-28461",
+      "publication": "84",
+      "sha256": "c3afc59414de6771ad27e43d79364cb0d3b8ebe81c12e856bcc9fce71619c93e",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28461",
+      "split": "training",
+      "start_byte": 0,
+      "title": "專門職業及技術人員轉任公務人員條例公布後相關問題之探討",
+      "work_group": "report-專門職業及技術人員轉任公務人員條例公布後相關問題之探討"
+    },
+    {
+      "author_groups": [
+        "呂育誠"
+      ],
+      "authors": [
+        "呂育誠"
+      ],
+      "body_bytes": 3082,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "exam-28480",
+      "publication": "100",
+      "sha256": "75f6de54ad4bd0fa704c42b960bc52dacc7a3c62ccfec86cbef05087e588d42f",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28480",
+      "split": "training",
+      "start_byte": 0,
+      "title": "中華民國建國一百年文官制度的回顧與前瞻",
+      "work_group": "report-中華民國建國一百年文官制度的回顧與前瞻"
+    },
+    {
+      "author_groups": [
+        "蕭乃沂"
+      ],
+      "authors": [
+        "蕭乃沂"
+      ],
+      "body_bytes": 1464,
+      "bytes": 1464,
+      "end_byte": 1464,
+      "genre": "work-record",
+      "id": "exam-42615",
+      "publication": "109",
+      "sha256": "5354872fbf0b66530b3a63fdbb18eb5fd571621627af707350243588f4e8a7f8",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=42615",
+      "split": "training",
+      "start_byte": 0,
+      "title": "考試院公務資料開放與管理之研究",
+      "work_group": "report-考試院公務資料開放與管理之研究"
+    },
+    {
+      "author_groups": [
+        "陳文卿",
+        "陳文欽"
+      ],
+      "authors": [
+        "陳文卿",
+        "陳文欽"
+      ],
+      "body_bytes": 10494,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-340224",
+      "publication": "2025-12-31",
+      "sha256": "d544e46587903a97284ae3fc807c5196e7f7084ee215a5a7608ecc4e1d9b6420",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340224",
+      "split": "training",
+      "start_byte": 0,
+      "title": "強化低碳與循環經濟效益之再生綠建材推廣應用",
+      "work_group": "report-強化低碳與循環經濟效益之再生綠建材推廣應用"
+    },
+    {
+      "author_groups": [
+        "陳敦源"
+      ],
+      "authors": [
+        "陳敦源"
+      ],
+      "body_bytes": 2416,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "exam-46751",
+      "publication": "111",
+      "sha256": "927781fb6e91c301e623e4d030a2d5b42b176226d36d36bcaf6551d66b8f17e5",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=46751",
+      "split": "training",
+      "start_byte": 0,
+      "title": "公務人員報考與錄取類科及職涯發展，與其畢業科系相關性之研究",
+      "work_group": "report-公務人員報考與錄取類科及職涯發展與其畢業科系相關性之研究"
+    },
+    {
+      "author_groups": [
+        "江明修"
+      ],
+      "authors": [
+        "江明修"
+      ],
+      "body_bytes": 3450,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "exam-28477",
+      "publication": "99",
+      "sha256": "0a1c288fd365cb97e0d0370fcb742225366433642fe216ffede75809df776b56",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28477",
+      "split": "training",
+      "start_byte": 0,
+      "title": "我國高階文官培訓之前瞻研究",
+      "work_group": "report-我國高階文官培訓之前瞻研究"
+    },
+    {
+      "author_groups": [
+        "趙偉慈"
+      ],
+      "authors": [
+        "趙偉慈"
+      ],
+      "body_bytes": 1393,
+      "bytes": 1393,
+      "end_byte": 1393,
+      "genre": "work-record",
+      "id": "ndc-2c58625870e109ea",
+      "publication": "103",
+      "sha256": "2981d2b2fd2e14c8f33b5b51f0513908582090601ea6493e970616295e6f4a2b",
+      "source": "ndc",
+      "source_field": "資料說明",
+      "source_url": "https://ws.ndc.gov.tw/001/administrator/10/relfile/0/10256/a21bcba5-c254-4b33-91a6-0f2047196f27.pdf",
+      "split": "training",
+      "start_byte": 0,
+      "title": "台灣及香港產業人力供需推估之比較－以觀光旅館業和物流業為例－",
+      "work_group": "report-台灣及香港產業人力供需推估之比較以觀光旅館業和物流業為例"
+    },
+    {
+      "author_groups": [
+        "陳淳文"
+      ],
+      "authors": [
+        "陳淳文"
+      ],
+      "body_bytes": 1676,
+      "bytes": 1676,
+      "end_byte": 1676,
+      "genre": "work-record",
+      "id": "exam-28428",
+      "publication": "94",
+      "sha256": "6f7c7d66eca4634f4d6cd8817828c9aa1b285b2d6fc6b2a929f3d18b87cf4f98",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28428",
+      "split": "training",
+      "start_byte": 0,
+      "title": "法國中央人事行政組織之研究（考試院委託國立台灣大學研究案）",
+      "work_group": "report-法國中央人事行政組織之研究考試院委託國立台灣大學研究案"
+    },
+    {
+      "author_groups": [
+        "廖朝軒",
+        "欒中丕"
+      ],
+      "authors": [
+        "廖朝軒",
+        "欒中丕"
+      ],
+      "body_bytes": 8889,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-339786",
+      "publication": "2025-12-31",
+      "sha256": "419b0be5b3666024e5cee953ab443246085226e9f4276f36a32fdc593c218cfd",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339786",
+      "split": "training",
+      "start_byte": 0,
+      "title": "綠建築基地保水設施維護管理指引研訂之研究",
+      "work_group": "report-綠建築基地保水設施維護管理指引研訂之研究"
+    },
+    {
+      "author_groups": [
+        "詹靜芬",
+        "邢瑜",
+        "陳金貴"
+      ],
+      "authors": [
+        "詹靜芬",
+        "邢瑜",
+        "陳金貴"
+      ],
+      "body_bytes": 2051,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "exam-28416",
+      "publication": "97",
+      "sha256": "30da0478439f89038fdde5d971ff9e4185fb53cc6bf8f9b67010cc483426a711",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28416",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "國家考試普通科目設置改進之研究",
+      "work_group": "report-國家考試普通科目設置改進之研究"
+    },
+    {
+      "author_groups": [
+        "伍錦霖",
+        "翁振明"
+      ],
+      "authors": [
+        "伍錦霖",
+        "翁振明"
+      ],
+      "body_bytes": 1552,
+      "bytes": 1552,
+      "end_byte": 1552,
+      "genre": "work-record",
+      "id": "exam-28464",
+      "publication": "84",
+      "sha256": "e148353001e34da7ce90fc2c376731ab8ff4dcb2c3fe75fb86ff61ed24cb5749",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28464",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "建立公務人員保障制度之研究",
+      "work_group": "report-建立公務人員保障制度之研究"
+    },
+    {
+      "author_groups": [
+        "許聖章",
+        "賴偉文",
+        "辛炳隆"
+      ],
+      "authors": [
+        "許聖章",
+        "賴偉文",
+        "辛炳隆"
+      ],
+      "body_bytes": 3407,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "ndc-04eb4ed05aef4ab4",
+      "publication": "110",
+      "sha256": "72f5a37a7e8aa147131834fc548f62d6b73f12f548cc98916c0abdc869718cd7",
+      "source": "ndc",
+      "source_field": "資料說明",
+      "source_url": "https://ws.ndc.gov.tw/001/administrator/10/relfile/5672/35533/737ff722-f86a-44c0-aa56-23308d06170c.pdf",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "未來10年我國職業別遞補人力需求推估",
+      "work_group": "report-未來10年我國職業別遞補人力需求推估"
+    },
+    {
+      "author_groups": [
+        "鍾基強",
+        "陳又嘉"
+      ],
+      "authors": [
+        "鍾基強",
+        "陳又嘉"
+      ],
+      "body_bytes": 9529,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "abri-336816",
+      "publication": "2025-12-31",
+      "sha256": "e43ba8413eb6145832fca28dd702379dd224b44cae6f263143e266f1c2881b77",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=336816",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "停車場增設排煙設備影響滅火設備及與換氣設備合併效益評估之研究",
+      "work_group": "report-停車場增設排煙設備影響滅火設備及與換氣設備合併效益評估之研究"
+    },
+    {
+      "author_groups": [
+        "邱建國"
+      ],
+      "authors": [
+        "邱建國"
+      ],
+      "body_bytes": 2356,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-339436",
+      "publication": "2026-01-31",
+      "sha256": "62cafb0dbc99f2d06d51182d9d74a954125a5c30af50ef36e49c4ffd40883afc",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339436",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "智慧營造與數位轉型之實證與應用推廣",
+      "work_group": "report-智慧營造與數位轉型之實證與應用推廣"
+    },
+    {
+      "author_groups": [
+        "江大樹",
+        "陳德禹"
+      ],
+      "authors": [
+        "江大樹",
+        "陳德禹"
+      ],
+      "body_bytes": 5944,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "exam-28452",
+      "publication": "86",
+      "sha256": "5c51c7a3f56be432bb95ecae5caae41421ef9e8e3aa6b2a9b33931b15a7796af",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28452",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "人事機構設置及人事人員管理制度改進之研究",
+      "work_group": "report-人事機構設置及人事人員管理制度改進之研究"
+    },
+    {
+      "author_groups": [
+        "嚴佳茹",
+        "李魁鵬",
+        "林憲德",
+        "郭柏巖",
+        "黃國倉"
+      ],
+      "authors": [
+        "嚴佳茹",
+        "李魁鵬",
+        "林憲德",
+        "郭柏巖",
+        "黃國倉"
+      ],
+      "body_bytes": 7649,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-340245",
+      "publication": "2026-01-31",
+      "sha256": "d4daa408f4c6f3e036dd3a596e37a0c055e28d9a1718df7133543fef85c3e960",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340245",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "健全近零碳建築評估制度建構及應用推廣計畫",
+      "work_group": "report-健全近零碳建築評估制度建構及應用推廣計畫"
+    },
+    {
+      "author_groups": [
+        "吳杰穎",
+        "王榮進"
+      ],
+      "authors": [
+        "吳杰穎",
+        "王榮進"
+      ],
+      "body_bytes": 7864,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-336828",
+      "publication": "2025-12-31",
+      "sha256": "8273937040bf37e6cf80fb20ad5382eec1eafb01261ded069291ee5383ad4bf2",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=336828",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "氣候變遷下土地使用減災科技發展架構先期研究",
+      "work_group": "report-氣候變遷下土地使用減災科技發展架構先期研究"
+    },
+    {
+      "author_groups": [
+        "黃煥榮"
+      ],
+      "authors": [
+        "黃煥榮"
+      ],
+      "body_bytes": 1537,
+      "bytes": 1537,
+      "end_byte": 1537,
+      "genre": "work-record",
+      "id": "exam-28492",
+      "publication": "106",
+      "sha256": "8d86ec2bda89f4ed994da581529a7851c7cae08a33e285a2d745e057cd39b0a1",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28492",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "公部門面對世代差異之人力資源運用策略",
+      "work_group": "report-公部門面對世代差異之人力資源運用策略"
+    },
+    {
+      "author_groups": [
+        "邱志淳"
+      ],
+      "authors": [
+        "邱志淳"
+      ],
+      "body_bytes": 2390,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "exam-42616",
+      "publication": "109",
+      "sha256": "61b4711b1a4942bdfa19655a95792343fd726d4c192a7b8863f3392b79f05bd6",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=42616",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "公部門專門職業及技術人員人力資源管理政策之研究",
+      "work_group": "report-公部門專門職業及技術人員人力資源管理政策之研究"
+    },
+    {
+      "author_groups": [
+        "黃正翰"
+      ],
+      "authors": [
+        "黃正翰"
+      ],
+      "body_bytes": 4842,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-339758",
+      "publication": "2025-12-31",
+      "sha256": "88d3cb1cfb590b1f578bca5680fc4baf9d069549fada9c1ab099d19f4f2bbf60",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339758",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "循環建築設計整合標準化及數位化評估之研究",
+      "work_group": "report-循環建築設計整合標準化及數位化評估之研究"
+    },
+    {
+      "author_groups": [
+        "王韻茹"
+      ],
+      "authors": [
+        "王韻茹"
+      ],
+      "body_bytes": 1493,
+      "bytes": 1493,
+      "end_byte": 1493,
+      "genre": "work-record",
+      "id": "exam-45127",
+      "publication": "110",
+      "sha256": "0cf904301eed2c5985f8c8eeb352b219ab1f64049dc89dee06975dfb46a87270",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=45127",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "建構多合一法律專業資格考試之研究",
+      "work_group": "report-建構多合一法律專業資格考試之研究"
+    },
+    {
+      "author_groups": [
+        "温琇玲",
+        "繆嘉成"
+      ],
+      "authors": [
+        "温琇玲",
+        "繆嘉成"
+      ],
+      "body_bytes": 5560,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-340185",
+      "publication": "2025-12-31",
+      "sha256": "939e97143426fffb867f100757f6209b695cb530e6774d2716a0a98b7a3721e6",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340185",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "智慧建築標章審查作業精進及推廣宣導計畫",
+      "work_group": "report-智慧建築標章審查作業精進及推廣宣導計畫"
+    },
+    {
+      "author_groups": [
+        "王俊元"
+      ],
+      "authors": [
+        "王俊元"
+      ],
+      "body_bytes": 2037,
+      "bytes": 2037,
+      "end_byte": 2037,
+      "genre": "work-record",
+      "id": "exam-28474",
+      "publication": "99",
+      "sha256": "0ef8debcf62a94d4af41c2a6382db519e8f26e7836708694fcefd65f0e5c3e08",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28474",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "高階文官在決策過程扮演的角色",
+      "work_group": "report-高階文官在決策過程扮演的角色"
+    },
+    {
+      "author_groups": [
+        "侯雅壹",
+        "崔懋森",
+        "李明賢",
+        "江友直",
+        "王婉芝"
+      ],
+      "authors": [
+        "侯雅壹",
+        "崔懋森",
+        "李明賢",
+        "江友直",
+        "王婉芝"
+      ],
+      "body_bytes": 3374,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-340202",
+      "publication": "2025-12-31",
+      "sha256": "421a099726a3272222970430f1dcc8e216b93aaf9cd7090686087b0357eb21be",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340202",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "綠建築、綠建材、智慧建築標章及建築能效標示資訊揭露",
+      "work_group": "report-綠建築綠建材智慧建築標章及建築能效標示資訊揭露"
+    },
+    {
+      "author_groups": [
+        "孫同文"
+      ],
+      "authors": [
+        "孫同文"
+      ],
+      "body_bytes": 1591,
+      "bytes": 1591,
+      "end_byte": 1591,
+      "genre": "work-record",
+      "id": "exam-28491",
+      "publication": "105",
+      "sha256": "9a671e1bfc8c169e3e800801eb5674a5f2893f6ea3b1ef8fcaf3816275227c31",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28491",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "中央與地方人事制度分立之研究",
+      "work_group": "report-中央與地方人事制度分立之研究"
+    },
+    {
+      "author_groups": [
+        "劉宜君",
+        "張惠堂",
+        "曹瑞泰",
+        "柯三吉",
+        "黃榮源"
+      ],
+      "authors": [
+        "劉宜君",
+        "張惠堂",
+        "曹瑞泰",
+        "柯三吉",
+        "黃榮源"
+      ],
+      "body_bytes": 2204,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "exam-28414",
+      "publication": "97",
+      "sha256": "0967a6435e4ad3a103e6883ece1ffa06856e98066282dbca5713cc9ac8fd7f5c",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28414",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "考試院擬定之「聘用人員人事條例」草案對現行公務人員體制影響之研究",
+      "work_group": "report-考試院擬定之聘用人員人事條例草案對現行公務人員體制影響之研究"
+    },
+    {
+      "author_groups": [
+        "王人牧",
+        "羅元隆"
+      ],
+      "authors": [
+        "王人牧",
+        "羅元隆"
+      ],
+      "body_bytes": 1744,
+      "bytes": 1744,
+      "end_byte": 1744,
+      "genre": "work-record",
+      "id": "abri-340886",
+      "publication": "2026-08-31",
+      "sha256": "4a7a28d1529afacf12fba765d9a8485694d9c873a8c0d2dd92bd54d52b7bc568",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340886",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "建築物耐風設計之應用資料庫與分析模式研析",
+      "work_group": "report-建築物耐風設計之應用資料庫與分析模式研析"
+    },
+    {
+      "author_groups": [
+        "張瓊玲"
+      ],
+      "authors": [
+        "張瓊玲"
+      ],
+      "body_bytes": 1299,
+      "bytes": 1299,
+      "end_byte": 1299,
+      "genre": "work-record",
+      "id": "exam-28475",
+      "publication": "99",
+      "sha256": "8a1cf540ee4e3a349bf53b51c7ffca31835843090394d42eb51fc26f2251f0cc",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28475",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "公務部門人力考評、激勵、陞遷制度評析及改善建議",
+      "work_group": "report-公務部門人力考評激勵陞遷制度評析及改善建議"
+    },
+    {
+      "author_groups": [
+        "楊文振"
+      ],
+      "authors": [
+        "楊文振"
+      ],
+      "body_bytes": 1862,
+      "bytes": 1862,
+      "end_byte": 1862,
+      "genre": "work-record",
+      "id": "exam-28413",
+      "publication": "98",
+      "sha256": "f4b440c06a2aeba4a597fdbc2d8544b3a76082c0522e652141ad72647b64308a",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28413",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "精進我國文官制度之取才、育才、用才、留才，提升國家競爭力－從新加坡談起",
+      "work_group": "report-精進我國文官制度之取才育才用才留才提升國家競爭力從新加坡談起"
+    },
+    {
+      "author_groups": [
+        "卓志隆"
+      ],
+      "authors": [
+        "卓志隆"
+      ],
+      "body_bytes": 8763,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-336831",
+      "publication": "2025-12-31",
+      "sha256": "05e8bb813c5b3a954a97f41612c1d6e19ac7f26d4d94bd3ad07944d113620397",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=336831",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "淨零木構造建築之固碳效益評估及接合部防火技術應用計畫",
+      "work_group": "report-淨零木構造建築之固碳效益評估及接合部防火技術應用計畫"
+    },
+    {
+      "author_groups": [
+        "張四明"
+      ],
+      "authors": [
+        "張四明"
+      ],
+      "body_bytes": 1272,
+      "bytes": 1272,
+      "end_byte": 1272,
+      "genre": "work-record",
+      "id": "exam-28482",
+      "publication": "101",
+      "sha256": "a11076a15a882488f08a0c0027c8987ca094895b3a1c622c1e1bb89fbc51f040",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28482",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "公務機關團體績效指標建構之研究",
+      "work_group": "report-公務機關團體績效指標建構之研究"
+    },
+    {
+      "author_groups": [
+        "余致力"
+      ],
+      "authors": [
+        "余致力"
+      ],
+      "body_bytes": 2973,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "exam-28442",
+      "publication": "90",
+      "sha256": "a859f87e97a74a28a0a3e22462e280ef66bd2d9de666c83e8194d13f95b4502f",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28442",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "公務人員考績制度改進制度之研究",
+      "work_group": "report-公務人員考績制度改進制度之研究"
+    },
+    {
+      "author_groups": [
+        "黃國敏"
+      ],
+      "authors": [
+        "黃國敏"
+      ],
+      "body_bytes": 1232,
+      "bytes": 1232,
+      "end_byte": 1232,
+      "genre": "work-record",
+      "id": "exam-28486",
+      "publication": "103",
+      "sha256": "0fcd2b35de7f5995f19099f696a2315793da1943f64db677d30810a327260179",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28486",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "特種考試地方政府公務人員考試制度改革之研究",
+      "work_group": "report-特種考試地方政府公務人員考試制度改革之研究"
+    },
+    {
+      "author_groups": [
+        "蔡志方"
+      ],
+      "authors": [
+        "蔡志方"
+      ],
+      "body_bytes": 1694,
+      "bytes": 1694,
+      "end_byte": 1694,
+      "genre": "work-record",
+      "id": "exam-28424",
+      "publication": "94",
+      "sha256": "96a954371c769c8ab482e62b8975d8a3f0ef4687324d01a0e3f3cf2fb998e5c8",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28424",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "考選機關對考選爭訟案件處理之研究（考試院委託國立成功大學研究案）",
+      "work_group": "report-考選機關對考選爭訟案件處理之研究考試院委託國立成功大學研究案"
+    },
+    {
+      "author_groups": [
+        "陳暉淵"
+      ],
+      "authors": [
+        "陳暉淵"
+      ],
+      "body_bytes": 1486,
+      "bytes": 1486,
+      "end_byte": 1486,
+      "genre": "work-record",
+      "id": "exam-28476",
+      "publication": "99",
+      "sha256": "dc54c45b1c2c641f2b6e3a199d067e2d0f5c9d041fbb8c6f9d586c3633711c0e",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28476",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "創新治理下文官策略性執行力之研究",
+      "work_group": "report-創新治理下文官策略性執行力之研究"
+    },
+    {
+      "author_groups": [
+        "廖硃岑"
+      ],
+      "authors": [
+        "廖硃岑"
+      ],
+      "body_bytes": 2497,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-342586",
+      "publication": "2026-08-31",
+      "sha256": "f1535b3d252fe0bca2454bee3176b19c175cbe9d6f9daf113f7dff73c50aa57d",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=342586",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "RC 造建物結構耐用年限評定準則研析",
+      "work_group": "report-rc造建物結構耐用年限評定準則研析"
+    },
+    {
+      "author_groups": [
+        "傅肅良",
+        "甘雯"
+      ],
+      "authors": [
+        "傅肅良",
+        "甘雯"
+      ],
+      "body_bytes": 1551,
+      "bytes": 1551,
+      "end_byte": 1551,
+      "genre": "work-record",
+      "id": "exam-28458",
+      "publication": "85",
+      "sha256": "f43672dcc65c8c24ce32724ab706f4d68bad31260f23e8501a5d8edebc6cd684",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28458",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "公務人員訓練進修與升遷制度結合問題之研究",
+      "work_group": "report-公務人員訓練進修與升遷制度結合問題之研究"
+    },
+    {
+      "author_groups": [
+        "董祥開"
+      ],
+      "authors": [
+        "董祥開"
+      ],
+      "body_bytes": 1311,
+      "bytes": 1311,
+      "end_byte": 1311,
+      "genre": "work-record",
+      "id": "exam-28494",
+      "publication": "107",
+      "sha256": "27dbb80e7aafc2990b59181a72d9e52fcdafc5c792ff367d778bb0072844b472",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28494",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "公務人力高齡化的人力資源管理對策",
+      "work_group": "report-公務人力高齡化的人力資源管理對策"
+    },
+    {
+      "author_groups": [
+        "黃一峯"
+      ],
+      "authors": [
+        "黃一峯"
+      ],
+      "body_bytes": 1795,
+      "bytes": 1795,
+      "end_byte": 1795,
+      "genre": "work-record",
+      "id": "exam-28483",
+      "publication": "102",
+      "sha256": "7c6c02d5e5ea66e55a68e4f6ba7fd525d18c295e88f04b908282bbc32d685fa1",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28483",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "高階文官培訓策略聯盟之研究",
+      "work_group": "report-高階文官培訓策略聯盟之研究"
+    },
+    {
+      "author_groups": [
+        "李武育",
+        "許濱松"
+      ],
+      "authors": [
+        "李武育",
+        "許濱松"
+      ],
+      "body_bytes": 1308,
+      "bytes": 1308,
+      "end_byte": 1308,
+      "genre": "work-record",
+      "id": "exam-28470",
+      "publication": "84",
+      "sha256": "47a1ce4d504739a2f9c1b7e6ff0d6fff158c9c09f0b056ab6a01802ed9f4608e",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28470",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "探鑽文官體系黑洞及公僕難為等二篇報導研究案",
+      "work_group": "report-探鑽文官體系黑洞及公僕難為等二篇報導研究案"
+    },
+    {
+      "author_groups": [
+        "林美滿"
+      ],
+      "authors": [
+        "林美滿"
+      ],
+      "body_bytes": 1479,
+      "bytes": 1479,
+      "end_byte": 1479,
+      "genre": "work-record",
+      "id": "exam-28411",
+      "publication": "98",
+      "sha256": "b66b44c9a88b884aa249da03262a2224d69f852ed084f157e21f55a3fae47b17",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28411",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "成立「文官制度研究發展基金」之可行性研究",
+      "work_group": "report-成立文官制度研究發展基金之可行性研究"
+    },
+    {
+      "author_groups": [
+        "周光宙"
+      ],
+      "authors": [
+        "周光宙"
+      ],
+      "body_bytes": 2117,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "abri-340355",
+      "publication": "2025-12-31",
+      "sha256": "8b6eac8960a37332fb6422c31a3b4f1eb7e86791d6799cd28c601ab5b9ab7c07",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=340355",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "智慧化居住空間展示推廣計畫",
+      "work_group": "report-智慧化居住空間展示推廣計畫"
+    },
+    {
+      "author_groups": [
+        "陳光照"
+      ],
+      "authors": [
+        "陳光照"
+      ],
+      "body_bytes": 2300,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "exam-28412",
+      "publication": "98",
+      "sha256": "50d99efc6ac4e173e23dfb3598568d2c64bd7a442ac9c41ebd31e4be90d9a8df",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28412",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "籌建我國「文官制度資料庫」之可行性研究",
+      "work_group": "report-籌建我國文官制度資料庫之可行性研究"
+    },
+    {
+      "author_groups": [
+        "朱慶倫",
+        "黃榮堯"
+      ],
+      "authors": [
+        "朱慶倫",
+        "黃榮堯"
+      ],
+      "body_bytes": 5764,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "abri-339788",
+      "publication": "2025-12-31",
+      "sha256": "c1ba58ca9e27ea6c46ac94f741821683b386ec98aec02eb604f8ca8ff7bbb218",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339788",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "建築資源零廢棄技術指引研訂之研究",
+      "work_group": "report-建築資源零廢棄技術指引研訂之研究"
+    },
+    {
+      "author_groups": [
+        "林明鏘"
+      ],
+      "authors": [
+        "林明鏘"
+      ],
+      "body_bytes": 1086,
+      "bytes": 1086,
+      "end_byte": 1086,
+      "genre": "work-record",
+      "id": "exam-28419",
+      "publication": "96",
+      "sha256": "8bb966c888d351c6d44cc8f71dbb695d007450318aea015708eb348e6ad31087",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28419",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "政務人員退職制度及相關問題之研究",
+      "work_group": "report-政務人員退職制度及相關問題之研究"
+    },
+    {
+      "author_groups": [
+        "顏嘉慶"
+      ],
+      "authors": [
+        "顏嘉慶"
+      ],
+      "body_bytes": 4743,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-339180",
+      "publication": "2025-12-31",
+      "sha256": "714b1baab326d23562d2a73ef7cc18e5dba85e08320fea31902face94ef42423",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339180",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "智慧建造：基於數位雙生演算與機械手臂列印發展減碳預鑄免拆模鋼筋混凝土柱體工法之研究",
+      "work_group": "report-智慧建造基於數位雙生演算與機械手臂列印發展減碳預鑄免拆模鋼筋混凝土柱體工法之研究"
+    },
+    {
+      "author_groups": [
+        "楊正裕"
+      ],
+      "authors": [
+        "楊正裕"
+      ],
+      "body_bytes": 5482,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-336832",
+      "publication": "2025-12-31",
+      "sha256": "c4fbf58f4e24f65e241c8aab793b985ddcd10412f20078265ee4c7a27efe71fc",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=336832",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "直交集成板(CLT)複合構造之固碳效益評估及防火技術應用計畫",
+      "work_group": "report-直交集成板clt複合構造之固碳效益評估及防火技術應用計畫"
+    },
+    {
+      "author_groups": [
+        "楊戊龍"
+      ],
+      "authors": [
+        "楊戊龍"
+      ],
+      "body_bytes": 1401,
+      "bytes": 1401,
+      "end_byte": 1401,
+      "genre": "work-record",
+      "id": "exam-28435",
+      "publication": "93",
+      "sha256": "952a4b353dc7fc76a1aed07d12c07b89047b8810faa3c1182ef5264c4ce2b223",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28435",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "美國(聯邦)人事行政組織與職權分工",
+      "work_group": "report-美國聯邦人事行政組織與職權分工"
+    },
+    {
+      "author_groups": [
+        "童春發"
+      ],
+      "authors": [
+        "童春發"
+      ],
+      "body_bytes": 1254,
+      "bytes": 1254,
+      "end_byte": 1254,
+      "genre": "work-record",
+      "id": "exam-28430",
+      "publication": "93",
+      "sha256": "56ba2580aeb9b4d311c3ef3dc439c1027e5ab6bfb9d105b257eff937299dbe05",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28430",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "原住民公務人員特種考試方式意見調查（考試院委託國立東華大學研究案）",
+      "work_group": "report-原住民公務人員特種考試方式意見調查考試院委託國立東華大學研究案"
+    },
+    {
+      "author_groups": [
+        "蔡孟廷"
+      ],
+      "authors": [
+        "蔡孟廷"
+      ],
+      "body_bytes": 6508,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "abri-339332",
+      "publication": "2026-01-31",
+      "sha256": "857485b025943f52aebcb611819106d80063570427b16881880148e4abe6db9a",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339332",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "木構造建築耐震行為、震後防災原則及工法",
+      "work_group": "report-木構造建築耐震行為震後防災原則及工法"
+    },
+    {
+      "author_groups": [
+        "羅偉誠"
+      ],
+      "authors": [
+        "羅偉誠"
+      ],
+      "body_bytes": 11024,
+      "bytes": 2047,
+      "end_byte": 2047,
+      "genre": "work-record",
+      "id": "abri-336845",
+      "publication": "2025-12-31",
+      "sha256": "b172b6d62cde92ac866cc6d4b4cc61396cf3cb2d9e43d3df984a5b89bed9b6ee",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=336845",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "台灣都會區域計畫之內水減洪韌性規劃（二）",
+      "work_group": "report-台灣都會區域計畫之內水減洪韌性規劃"
+    },
+    {
+      "author_groups": [
+        "傅宗懋",
+        "張釗嘉"
+      ],
+      "authors": [
+        "傅宗懋",
+        "張釗嘉"
+      ],
+      "body_bytes": 1789,
+      "bytes": 1789,
+      "end_byte": 1789,
+      "genre": "work-record",
+      "id": "exam-28455",
+      "publication": "85",
+      "sha256": "ff215d9bbcac15c568b8b8abbfd906e1c94bbe3cb9d7c1c663abed2f6b9d035d",
+      "source": "exam",
+      "source_field": "內容",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28455",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "公務人員升等考試制度暨有關問題之研究",
+      "work_group": "report-公務人員升等考試制度暨有關問題之研究"
+    },
+    {
+      "author_groups": [
+        "龍文彬"
+      ],
+      "authors": [
+        "龍文彬"
+      ],
+      "body_bytes": 1973,
+      "bytes": 1973,
+      "end_byte": 1973,
+      "genre": "work-record",
+      "id": "exam-28479",
+      "publication": "100",
+      "sha256": "1c14c6c4e00947abca78c3ad17bd0a31fe15f864a3d69dc0450f9031c134c949",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28479",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "民國101-105年我國公務人力供需之前瞻性研究",
+      "work_group": "report-民國101105年我國公務人力供需之前瞻性研究"
+    },
+    {
+      "author_groups": [
+        "李國維"
+      ],
+      "authors": [
+        "李國維"
+      ],
+      "body_bytes": 1976,
+      "bytes": 1976,
+      "end_byte": 1976,
+      "genre": "work-record",
+      "id": "abri-339300",
+      "publication": "2026-01-31",
+      "sha256": "b7c29939266cac803be33bd0d9f38b82fa3adae7098b2760d6ee74e39af762e7",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339300",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "114年度建築物智慧能源及維運管理服務平台營運與精進計畫",
+      "work_group": "report-建築物智慧能源及維運管理服務平台營運與精進計畫"
+    },
+    {
+      "author_groups": [
+        "潘振宇"
+      ],
+      "authors": [
+        "潘振宇"
+      ],
+      "body_bytes": 3269,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "abri-339755",
+      "publication": "2025-12-31",
+      "sha256": "55935fba299c8c3cc9bb6f3aa12a24b6dcc7a6ed5245f7a9d6c4f39ba442d107",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=339755",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "室內溫熱環境與建築外殼隔熱U值適切性之研究",
+      "work_group": "report-室內溫熱環境與建築外殼隔熱u值適切性之研究"
+    },
+    {
+      "author_groups": [
+        "周慧瑜",
+        "林穎立"
+      ],
+      "authors": [
+        "周慧瑜",
+        "林穎立"
+      ],
+      "body_bytes": 2352,
+      "bytes": 2046,
+      "end_byte": 2046,
+      "genre": "work-record",
+      "id": "abri-342682",
+      "publication": "2026-08-31",
+      "sha256": "79b096e47fc91ac7c230d922936a6b9365607aafc6a7d365fba398b4622f95f2",
+      "source": "abri",
+      "source_field": "中文摘要",
+      "source_url": "https://www.abri.gov.tw/News_Content_Table.aspx?n=807&s=342682",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "BIM精進教學暨機電手冊編撰",
+      "work_group": "report-bim精進教學暨機電手冊編撰"
+    },
+    {
+      "author_groups": [
+        "傅從喜"
+      ],
+      "authors": [
+        "傅從喜"
+      ],
+      "body_bytes": 1340,
+      "bytes": 1340,
+      "end_byte": 1340,
+      "genre": "work-record",
+      "id": "exam-28485",
+      "publication": "102",
+      "sha256": "d166084146c5e70215e8dc28edb47e25670e6322ea7b08b4e187a82d6b35407b",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28485",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "韓國公共年金制度之研究",
+      "work_group": "report-韓國公共年金制度之研究"
+    },
+    {
+      "author_groups": [
+        "陳純音"
+      ],
+      "authors": [
+        "陳純音"
+      ],
+      "body_bytes": 2097,
+      "bytes": 2048,
+      "end_byte": 2048,
+      "genre": "work-record",
+      "id": "exam-45128",
+      "publication": "110",
+      "sha256": "424263b98b99459e0c5b63bf927f9de20d8c6be04e36a2ff134b5adc53a05d4d",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=45128",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "推動雙語國家政策於公務人員訓練之英語力培訓策略",
+      "work_group": "report-推動雙語國家政策於公務人員訓練之英語力培訓策略"
+    },
+    {
+      "author_groups": [
+        "吳宗憲"
+      ],
+      "authors": [
+        "吳宗憲"
+      ],
+      "body_bytes": 1368,
+      "bytes": 1368,
+      "end_byte": 1368,
+      "genre": "work-record",
+      "id": "exam-28481",
+      "publication": "101",
+      "sha256": "133bd5349af13d626fe76aa2d7064d3d2b6c27993545b1530c4ffa2000f129c5",
+      "source": "exam",
+      "source_field": "中文摘要",
+      "source_url": "https://www.exam.gov.tw/News_Content.aspx?n=3832&s=28481",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "職務分類制架構檢討改進之研究",
+      "work_group": "report-職務分類制架構檢討改進之研究"
+    },
+    {
+      "author_groups": [
+        "liboyuan18671906"
+      ],
+      "authors": [
+        "Li, Boyuan, 1867-1906"
+      ],
+      "body_bytes": 51242,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/4/1/3/24138/24138-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Li, Boyuan, 1867-1906",
+      "id": "pg-24138",
+      "sha256": "b94a7756cc1101e49b009efcf86020c8c9cb44d3aeb4a4bc60e0dfcd0e4684c3",
+      "source": "gutenberg",
+      "source_field": "chapter-line:12",
+      "source_sha256": "6f39d8e90481a172a26e9e816cba2b44e40ed8abd3a92f0c9e01c9bd173b291f",
+      "source_url": "https://www.gutenberg.org/ebooks/24138",
+      "split": "training",
+      "start_byte": 0,
+      "title": "官場現形記",
+      "work_group": "fiction-官場現形記"
+    },
+    {
+      "author_groups": [
+        "luxun18811936"
+      ],
+      "authors": [
+        "Lu, Xun, 1881-1936"
+      ],
+      "body_bytes": 50320,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/4/0/4/24042/24042-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Lu, Xun, 1881-1936",
+      "id": "pg-24042",
+      "sha256": "c5ae2468508127bd7a3c95c154a0d5b4b4875941f1e8f0bee84bdc0c7d0ae4b5",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "70c2e4248d5da6556c6b551930cc52cd365472345637bd5c2c0f538b89d4f3eb",
+      "source_url": "https://www.gutenberg.org/ebooks/24042",
+      "split": "training",
+      "start_byte": 0,
+      "title": "徬徨",
+      "work_group": "fiction-徬徨"
+    },
+    {
+      "author_groups": [
+        "hanshangmengrenactive19thcentury"
+      ],
+      "authors": [
+        "Hanshangmengren, active 19th century"
+      ],
+      "body_bytes": 52664,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/6/9/3/26931/26931-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Hanshangmengren, active 19th century",
+      "id": "pg-26931",
+      "sha256": "846b4ed0dd315062a3fcd2d45f91c5293006bfdc897649e131fc2f324e801fa6",
+      "source": "gutenberg",
+      "source_field": "chapter-line:210",
+      "source_sha256": "5d3cc949af3db36858cc07da30230adebaec37ec7bc534777b2f2e643f1d4a01",
+      "source_url": "https://www.gutenberg.org/ebooks/26931",
+      "split": "training",
+      "start_byte": 0,
+      "title": "風月夢",
+      "work_group": "fiction-風月夢"
+    },
+    {
+      "author_groups": [
+        "yangjingchangactive18thcentury19thcentury"
+      ],
+      "authors": [
+        "Yang, Jingchang, active 18th century-19th century"
+      ],
+      "body_bytes": 52884,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/7/1/7/27171/27171-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Yang, Jingchang, active 18th century-19th century",
+      "id": "pg-27171",
+      "sha256": "917909d43429a4a293b5a087171e641b4a9a3b1cb56336ef3402a2853ae1487f",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "25b4e70539cf5c45e1563387e5c40c7f561afc86c299565c171ec30da2bf41ce",
+      "source_url": "https://www.gutenberg.org/ebooks/27171",
+      "split": "training",
+      "start_byte": 0,
+      "title": "鬼谷四友志",
+      "work_group": "fiction-鬼谷四友志"
+    },
+    {
+      "author_groups": [
+        "wuyitangactive19century"
+      ],
+      "authors": [
+        "Wu, Yitang, active 19 century"
+      ],
+      "body_bytes": 51134,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/1/9/25195/25195-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-25195",
+      "sha256": "19ca2ee9e36b24faed2e1835527a7b7bcaafa5a466b6e5189f958dc9abec3768",
+      "source": "gutenberg",
+      "source_field": "chapter-line:69",
+      "source_sha256": "dc9835458726bd4401c58296289e86531275ef0f09b58240f53c14176bb89a84",
+      "source_url": "https://www.gutenberg.org/ebooks/25195",
+      "split": "training",
+      "start_byte": 0,
+      "title": "風月鑒",
+      "work_group": "fiction-風月鑒"
+    },
+    {
+      "author_groups": [
+        "suanzhurenactive18thcentury"
+      ],
+      "authors": [
+        "Su'anzhuren, active 18th century"
+      ],
+      "body_bytes": 53564,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/5/2/7/25279/25279-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Su'anzhuren, active 18th century",
+      "id": "pg-25279",
+      "sha256": "d25d8499b4a0f9036fb424aad9ea34b5546e3761291c5156f425190b41712389",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "429d5ad6731f9eeca02d72e71c1796ce20bf7b7a83aa8474053188ae7d3bd92a",
+      "source_url": "https://www.gutenberg.org/ebooks/25279",
+      "split": "training",
+      "start_byte": 0,
+      "title": "錦香亭",
+      "work_group": "fiction-錦香亭"
+    },
+    {
+      "author_groups": [
+        "weizian18191874"
+      ],
+      "authors": [
+        "Wei, Zi'an, 1819-1874"
+      ],
+      "body_bytes": 53544,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/5/1/8/25187/25187-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wei, Zi'an, 1819-1874",
+      "id": "pg-25187",
+      "sha256": "5c307bc480fe8b803a5fb802a6dccbe505d36f0ac7b9e7de7d243e09cf41c50a",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "a2f9cb7cefeb5c8e7a87b315b8b92b7cc91c4626700d81ae8eba2bd94c5539a9",
+      "source_url": "https://www.gutenberg.org/ebooks/25187",
+      "split": "training",
+      "start_byte": 0,
+      "title": "花月痕",
+      "work_group": "fiction-花月痕"
+    },
+    {
+      "author_groups": [
+        "shenqifeng1741"
+      ],
+      "authors": [
+        "Shen, Qifeng, 1741-"
+      ],
+      "body_bytes": 53464,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/5/3/7/25375/25375-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Shen, Qifeng, 1741-",
+      "id": "pg-25375",
+      "sha256": "c267558cb0506acc46ef81450aede7fdf75d329b59aa3a0577e1458a571e9c58",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "c20780e9fd6d9fb174c79250c29d204a9b392df2a607d693c49cbde74cce7314",
+      "source_url": "https://www.gutenberg.org/ebooks/25375",
+      "split": "training",
+      "start_byte": 0,
+      "title": "諧鐸",
+      "work_group": "fiction-諧鐸"
+    },
+    {
+      "author_groups": [
+        "cuixiangchuanactive1836"
+      ],
+      "authors": [
+        "Cui, Xiangchuan, active 1836"
+      ],
+      "body_bytes": 52750,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/7/0/2/27023/27023-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Cui, Xiangchuan, active 1836",
+      "id": "pg-27023",
+      "sha256": "a7c69d27e9f48e3ade068e8c426dac7731fd97d071f20d897cabe30ad8d311b8",
+      "source": "gutenberg",
+      "source_field": "chapter-line:15",
+      "source_sha256": "e2a9a9dcaead0a3fa496b7f03cd1eaa8ed794959865b8c68e161e60c7c8f42da",
+      "source_url": "https://www.gutenberg.org/ebooks/27023",
+      "split": "training",
+      "start_byte": 0,
+      "title": "白圭志",
+      "work_group": "fiction-白圭志"
+    },
+    {
+      "author_groups": [
+        "xuzhenya18891937"
+      ],
+      "authors": [
+        "Xu, Zhenya, 1889-1937"
+      ],
+      "body_bytes": 53764,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/5/5/2/25521/25521-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Xu, Zhenya, 1889-1937",
+      "id": "pg-25521",
+      "sha256": "bd5ab8298144fd82807314a0aeae1c3d8c659b23adcbd620c7f23dc9705cb6f5",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "7c26a45b9a2c0fa7edb93237b7f7698fbe76cb1af9d68ac7534add3627c30aec",
+      "source_url": "https://www.gutenberg.org/ebooks/25521",
+      "split": "training",
+      "start_byte": 0,
+      "title": "玉梨魂",
+      "work_group": "fiction-玉梨魂"
+    },
+    {
+      "author_groups": [
+        "zhouqingyuanactive16thcentury17thcentury"
+      ],
+      "authors": [
+        "Zhou, Qingyuan, active 16th century-17th century"
+      ],
+      "body_bytes": 52733,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/3/9/25392/25392-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Zhou, Qingyuan, active 16th century-17th century",
+      "id": "pg-25392",
+      "sha256": "e9582336d341ce22d8b98b06ed82a28a29bd78d8d7a50ef029ed7cd1c54bdaad",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "38db6cb4ba3e48b901efdac6462c219de3fe16812547d8de07eb3c20f2ea8cde",
+      "source_url": "https://www.gutenberg.org/ebooks/25392",
+      "split": "training",
+      "start_byte": 0,
+      "title": "西湖二集",
+      "work_group": "fiction-西湖二集"
+    },
+    {
+      "author_groups": [
+        "ainajushi"
+      ],
+      "authors": [
+        "Ainajushi"
+      ],
+      "body_bytes": 52954,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/5/3/2/25328/25328-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-25328",
+      "sha256": "f3f7940ec15ea707db1106808a26998e6e4217fb6fa06e83153f2349577c9021",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "d6d0a249a08f9051873475baa2aa5fa8ad00792c15e3493ba2d013a31ab353c5",
+      "source_url": "https://www.gutenberg.org/ebooks/25328",
+      "split": "training",
+      "start_byte": 0,
+      "title": "豆棚閒話",
+      "work_group": "fiction-豆棚閒話"
+    },
+    {
+      "author_groups": [
+        "liue18571909"
+      ],
+      "authors": [
+        "Liu, E, 1857-1909"
+      ],
+      "body_bytes": 53658,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/3/8/5/23850/23850-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Liu, E, 1857-1909",
+      "id": "pg-23850",
+      "sha256": "526872f4a56e204c8557fa379a2318e120fdf2c11b447f56498a2d707a432427",
+      "source": "gutenberg",
+      "source_field": "chapter-line:12",
+      "source_sha256": "fb4afc4e92f69a3dcc7304fe1bf340a1ecbb8d9c4701c024392d06128aa3ac58",
+      "source_url": "https://www.gutenberg.org/ebooks/23850",
+      "split": "training",
+      "start_byte": 0,
+      "title": "老殘遊記",
+      "work_group": "fiction-老殘遊記"
+    },
+    {
+      "author_groups": [
+        "zhangyingyuactive16thcentury17thcentury"
+      ],
+      "authors": [
+        "Zhang, Yingyu, active 16th century-17th century"
+      ],
+      "body_bytes": 52642,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/4/0/2/24021/24021-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Zhang, Yingyu, active 16th century-17th century",
+      "id": "pg-24021",
+      "sha256": "49586124d8c9d885ad6a65404f16339a0b1c92a28ac1c454ae76f0f009f15891",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "89c47d08bb55c3ed19321c61179428eaa5a967d465ddfc8cdbe1780efdcbe2f6",
+      "source_url": "https://www.gutenberg.org/ebooks/24021",
+      "split": "training",
+      "start_byte": 0,
+      "title": "杜騙新書",
+      "work_group": "fiction-杜騙新書"
+    },
+    {
+      "author_groups": [
+        "zhumingshi12601340"
+      ],
+      "authors": [
+        "Zhu, Mingshi, 1260-1340"
+      ],
+      "body_bytes": 52926,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/7/2/1/27217/27217-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Zhu, Mingshi, 1260-1340",
+      "id": "pg-27217",
+      "sha256": "d0f383ce8befab667b5a51f4b83840387f6241c5ad30861c657dbb21bfae06bf",
+      "source": "gutenberg",
+      "source_field": "chapter-line:104",
+      "source_sha256": "84de1e9904bdf69fc1fd9f23f9e008eb93bb466b05f004b3521112a29860f9d4",
+      "source_url": "https://www.gutenberg.org/ebooks/27217",
+      "split": "training",
+      "start_byte": 0,
+      "title": "牛郎織女傳",
+      "work_group": "fiction-牛郎織女傳"
+    },
+    {
+      "author_groups": [
+        "luxixing15201606"
+      ],
+      "authors": [
+        "Lu, Xixing, 1520-1606"
+      ],
+      "body_bytes": 53750,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/3/9/1/23910/23910-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Lu, Xixing, 1520-1606",
+      "id": "pg-23910",
+      "sha256": "1eda1832660498d1f052ed64fa8f998b48b0b248637ad7ee666409640a3184f9",
+      "source": "gutenberg",
+      "source_field": "chapter-line:7",
+      "source_sha256": "120e80a272b7566df8c716b11c4aa76d74fb27385e29a08b52bafb617642c0e9",
+      "source_url": "https://www.gutenberg.org/ebooks/23910",
+      "split": "training",
+      "start_byte": 0,
+      "title": "封神演義",
+      "work_group": "fiction-封神演義"
+    },
+    {
+      "author_groups": [
+        "yuanhuyanshuisanrenactive17thcentury18thcentury"
+      ],
+      "authors": [
+        "Yuanhuyanshuisanren, active 17th century-18th century"
+      ],
+      "body_bytes": 52918,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/6/8/7/26877/26877-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Yuanhuyanshuisanren, active 17th century-18th century",
+      "id": "pg-26877",
+      "sha256": "80a80d1561d2b04f756f1aa7d30d301a5e75271a4bcbbbe82155602b657d0ce5",
+      "source": "gutenberg",
+      "source_field": "chapter-line:179",
+      "source_sha256": "a1b4d829563b20b79b2ad73ea98e3cc2de8d90167499642cf3aea6075e5af026",
+      "source_url": "https://www.gutenberg.org/ebooks/26877",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "珍珠舶",
+      "work_group": "fiction-珍珠舶"
+    },
+    {
+      "author_groups": [
+        "liyu16111680"
+      ],
+      "authors": [
+        "Li, Yu, 1611-1680?"
+      ],
+      "body_bytes": 52172,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/3/9/0/23907/23907-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Li, Yu, 1611-1680?",
+      "id": "pg-23907",
+      "sha256": "faf320c12b8092f5d7e645fea02dadd614e7b486859b57ae0366017d8838ee52",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "e57273a69af6ac79f87c684311cec0cf1742058135f8436a6bf6370076275af4",
+      "source_url": "https://www.gutenberg.org/ebooks/23907",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "無聲戲",
+      "work_group": "fiction-無聲戲"
+    },
+    {
+      "author_groups": [
+        "liuzhang"
+      ],
+      "authors": [
+        "Liu, Zhang"
+      ],
+      "body_bytes": 52838,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/3/8/6/23867/23867-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-23867",
+      "sha256": "17f2c272d630f919ee2b958fe2454d1fb5f438e882a43784b46f864083931caa",
+      "source": "gutenberg",
+      "source_field": "chapter-line:13",
+      "source_sha256": "9294655d6a308b54fc44d7232f52a932f5a714a724d103b53710f4187d3336e2",
+      "source_url": "https://www.gutenberg.org/ebooks/23867",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "斬鬼傳",
+      "work_group": "fiction-斬鬼傳"
+    },
+    {
+      "author_groups": [
+        "yanxiazhurenactive18thcentury"
+      ],
+      "authors": [
+        "Yanxiazhuren, active 18th century"
+      ],
+      "body_bytes": 50652,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/6/7/4/26748/26748-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Yanxiazhuren, active 18th century",
+      "id": "pg-26748",
+      "sha256": "a0f21ff5aa9e02075d0979f0ae21d9380e8a5ca0a39b918a6074dd330c1d6e71",
+      "source": "gutenberg",
+      "source_field": "chapter-line:213",
+      "source_sha256": "dc70e169d503003d54e3a52bf869a9179b8a4441cfd03f628d9af7e5bf96a9ab",
+      "source_url": "https://www.gutenberg.org/ebooks/26748",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "幻中游",
+      "work_group": "fiction-幻中游"
+    },
+    {
+      "author_groups": [
+        "lixiuxingjinshi1715"
+      ],
+      "authors": [
+        "Li, Xiuxing, jin shi 1715"
+      ],
+      "body_bytes": 53670,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/3/9/0/23908/23908-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Li, Xiuxing, jin shi 1715",
+      "id": "pg-23908",
+      "sha256": "9dee4db8362a99702588bac7dfb7da357880c6d07d81bb57f7de74408310fafd",
+      "source": "gutenberg",
+      "source_field": "chapter-line:17",
+      "source_sha256": "2a23728c16b0598bb99c1e6d87980ff7f43c4b32f67414dc5b66d80909406d94",
+      "source_url": "https://www.gutenberg.org/ebooks/23908",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "夢中緣",
+      "work_group": "fiction-夢中緣"
+    },
+    {
+      "author_groups": [
+        "shenjiji740800"
+      ],
+      "authors": [
+        "Shen, Jiji, 740?-800?"
+      ],
+      "body_bytes": 4407,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/5/2/2/3/52238/52238-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Shen, Jiji, 740?-800?",
+      "id": "pg-52238",
+      "sha256": "0531823f2e63c5c772b9db531e044143ecc0699288ff7f21805628df127fe1a0",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "22e56c506ffdc5c79ec40f5e11ffcf81bcfbee7dd5ee596d0fdb681fa5ab6a31",
+      "source_url": "https://www.gutenberg.org/ebooks/52238",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "枕中記",
+      "work_group": "fiction-枕中記"
+    },
+    {
+      "author_groups": [
+        "bixianzou"
+      ],
+      "authors": [
+        "Bixian, Zou"
+      ],
+      "body_bytes": 52762,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/7/3/3/27331/27331-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-27331",
+      "sha256": "18567aca259e16e1bd7fb062bd4f523f826cd355e6c99895f56bbd9d2d9778dd",
+      "source": "gutenberg",
+      "source_field": "chapter-line:39",
+      "source_sha256": "c1cc65e4cd2b1e70c8c7b1cbc377ace79c23de04540f09947bfec28e1430cd80",
+      "source_url": "https://www.gutenberg.org/ebooks/27331",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "飛跎全傳",
+      "work_group": "fiction-飛跎全傳"
+    },
+    {
+      "author_groups": [
+        "luoguanzhong13301400"
+      ],
+      "authors": [
+        "Luo, Guanzhong, 1330?-1400?"
+      ],
+      "body_bytes": 52230,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/4/5/8/4580/4580-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Luo, Guanzhong, 1330?-1400?",
+      "id": "pg-4580",
+      "sha256": "5eb078e8fa4429cd865b6a961ef1b02a0023d7bd348a01e12f7bb00985c16643",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "bb49c97011d50007754c40db1fcf1358b9996b4e695fed1bcee0ea1082fd7169",
+      "source_url": "https://www.gutenberg.org/ebooks/4580",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "粉妝樓",
+      "work_group": "fiction-粉妝樓"
+    },
+    {
+      "author_groups": [
+        "wenkangactive18421851"
+      ],
+      "authors": [
+        "Wenkang, active 1842-1851"
+      ],
+      "body_bytes": 52906,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/5/3/2/25327/25327-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wenkang, active 1842-1851",
+      "id": "pg-25327",
+      "sha256": "245eb98fbb7fe7bb412f42ad655f65334462b85b07f2dc166788e988d2016a35",
+      "source": "gutenberg",
+      "source_field": "chapter-line:166",
+      "source_sha256": "b38b374cf871df5f424228461e88e8adb1661c5961c16912a033dd086eb2b46d",
+      "source_url": "https://www.gutenberg.org/ebooks/25327",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "兒女英雄傳",
+      "work_group": "fiction-兒女英雄傳"
+    },
+    {
+      "author_groups": [
+        "sumanshu18841918"
+      ],
+      "authors": [
+        "Su, Manshu, 1884-1918"
+      ],
+      "body_bytes": 52032,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/3/9/8/23983/23983-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Su, Manshu, 1884-1918",
+      "id": "pg-23983",
+      "sha256": "707fb91a2fa50e5e265713edbbd4f7e065c29ff948ebc7041a871208c23eac15",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "4eda2b20f32db636f520530430c5b8fb5973329622cdd5520e327bd899ec4df2",
+      "source_url": "https://www.gutenberg.org/ebooks/23983",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "斷鴻零雁記",
+      "work_group": "fiction-斷鴻零雁記"
+    },
+    {
+      "author_groups": [
+        "hanbangqing18561894"
+      ],
+      "authors": [
+        "Han, Bangqing, 1856-1894"
+      ],
+      "body_bytes": 52944,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/6/8/7/26872/26872-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Han, Bangqing, 1856-1894",
+      "id": "pg-26872",
+      "sha256": "991d4f659faa84097b90216d4d2a0676ba8bd1d9a291aa5a840864475ff00c39",
+      "source": "gutenberg",
+      "source_field": "chapter-line:22",
+      "source_sha256": "46b8d740a333e828b45b8ac62b3fc6556b5304c037a4c880bad60b4cb32345bb",
+      "source_url": "https://www.gutenberg.org/ebooks/26872",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "海上花列傳",
+      "work_group": "fiction-海上花列傳"
+    },
+    {
+      "author_groups": [
+        "huayangsanren16101675"
+      ],
+      "authors": [
+        "Huayangsanren, 1610?-1675?"
+      ],
+      "body_bytes": 52792,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/7/7/5/27753/27753-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Huayangsanren, 1610?-1675?",
+      "id": "pg-27753",
+      "sha256": "a8d71441f620bfe5f7e1c3e796cac40c65c3422479c146c5aef6f8cc09d2452c",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "b0090ebd5147c3612d3341bb6fc809ec204ab3a6b421ce1a853ac3e33aaf861e",
+      "source_url": "https://www.gutenberg.org/ebooks/27753",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "一枕奇",
+      "work_group": "fiction-一枕奇"
+    },
+    {
+      "author_groups": [
+        "tianzhuisheng"
+      ],
+      "authors": [
+        "Tianzhuisheng"
+      ],
+      "body_bytes": 52968,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/4/0/7/24079/24079-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-24079",
+      "sha256": "8ac28a0c996af94f44fac807dad3086a7e3208af57c20aface4381ee853d6809",
+      "source": "gutenberg",
+      "source_field": "chapter-line:12",
+      "source_sha256": "80557503551750b0d0eb171e15af26354313e5c735780670c5fd1ea665bb846a",
+      "source_url": "https://www.gutenberg.org/ebooks/24079",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "商界現形記",
+      "work_group": "fiction-商界現形記"
+    },
+    {
+      "author_groups": [
+        "yuanzhen779831"
+      ],
+      "authors": [
+        "Yuan, Zhen, 779-831"
+      ],
+      "body_bytes": 10751,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/5/2/2/6/52267/52267-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Yuan, Zhen, 779-831",
+      "id": "pg-52267",
+      "sha256": "9ffd1722f175ff031ecd4801b62c7d620d6773178a568c5d9c1e54358a595f7d",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "49f0ae0914f905927e803953008c66905a5a341182b26ae044c7608495aad375",
+      "source_url": "https://www.gutenberg.org/ebooks/52267",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "鶯鶯傳",
+      "work_group": "fiction-鶯鶯傳"
+    },
+    {
+      "author_groups": [
+        "tongyuanzi"
+      ],
+      "authors": [
+        "Tongyuanzi"
+      ],
+      "body_bytes": 53278,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/1/3/25137/25137-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-25137",
+      "sha256": "8cbeecf161a00f2922a210ba58a7f2a2e8d8ff8a9bcc4fb572eb63be066e7fa0",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "a76d64ce316ea5e5ca55b615d043ba534da142bb8aae9afa39e0283e5016bbfe",
+      "source_url": "https://www.gutenberg.org/ebooks/25137",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "玉蟾記",
+      "work_group": "fiction-玉蟾記"
+    },
+    {
+      "author_groups": [
+        "wangji1796"
+      ],
+      "authors": [
+        "Wang, Ji, -1796?"
+      ],
+      "body_bytes": 52804,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/9/0/3/29032/29032-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wang, Ji, -1796?",
+      "id": "pg-29032",
+      "sha256": "9355fbfe63c9a7528a9710f5d1bb7f88408dc6cabff75ee87c14452b4f583eb2",
+      "source": "gutenberg",
+      "source_field": "chapter-line:26",
+      "source_sha256": "7415567819d63572aa701b9f3130030873e0963f1eeabe71748e27fe09640c6e",
+      "source_url": "https://www.gutenberg.org/ebooks/29032",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "海國春秋",
+      "work_group": "fiction-海國春秋"
+    },
+    {
+      "author_groups": [
+        "tianranchisou"
+      ],
+      "authors": [
+        "Tianranchisou"
+      ],
+      "body_bytes": 52968,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/5/3/9/25399/25399-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Ming dynasty, 1368-1644",
+      "id": "pg-25399",
+      "sha256": "70dc516e88cdd395f843fb0be8a3275069b03db3963bf304d20fae2d030a494d",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "4bdd048db3b9dcb8fff7a5d0d4ae61c8dd04fef49aec8d0aa7c071a59e1e1cba",
+      "source_url": "https://www.gutenberg.org/ebooks/25399",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "石點頭",
+      "work_group": "fiction-石點頭"
+    },
+    {
+      "author_groups": [
+        "yudafu18961945"
+      ],
+      "authors": [
+        "Yu, Dafu, 1896-1945"
+      ],
+      "body_bytes": 50508,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/7/6/3/27636/27636-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Yu, Dafu, 1896-1945",
+      "id": "pg-27636",
+      "sha256": "0827877d31bcbd6de5cc348cfeeed687e049809884a19ce6667fabcc1b5bd9f4",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "ed57d2624fdebb7353426edfaed6c38a5e30d1eb0feca175afd88275877506cb",
+      "source_url": "https://www.gutenberg.org/ebooks/27636",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "沉沦",
+      "work_group": "fiction-沉沦"
+    },
+    {
+      "author_groups": [
+        "churenhuactive16751695"
+      ],
+      "authors": [
+        "Chu, Renhu, active 1675-1695"
+      ],
+      "body_bytes": 52774,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/3/8/3/23835/23835-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Chu, Renhu, active 1675-1695",
+      "id": "pg-23835",
+      "sha256": "04fa4f4809f015148947a34d52bcadb5c568682715bfdbb0702ac9a915d08518",
+      "source": "gutenberg",
+      "source_field": "chapter-line:166",
+      "source_sha256": "d88837e2a9cbca28441861d97385292f21f4d9a1331752c8369ddddf48e41ed1",
+      "source_url": "https://www.gutenberg.org/ebooks/23835",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "隋唐演義",
+      "work_group": "fiction-隋唐演義"
+    },
+    {
+      "author_groups": [
+        "yuda1884"
+      ],
+      "authors": [
+        "Yu, Da, -1884"
+      ],
+      "body_bytes": 53586,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/5/7/2/7/57278/57278-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-57278",
+      "sha256": "9d046532869305a10c1c8e439519614569c0a37abe2cbacebfb93fb04da23bd9",
+      "source": "gutenberg",
+      "source_field": "chapter-line:24",
+      "source_sha256": "cb72df3d51873bb7eb89ed091209aa6fa33904cace941d95768991404cec5a54",
+      "source_url": "https://www.gutenberg.org/ebooks/57278",
+      "split": "calibration",
+      "start_byte": 0,
+      "title": "青樓夢",
+      "work_group": "fiction-青樓夢"
+    },
+    {
+      "author_groups": [
+        "wujingzi17011754"
+      ],
+      "authors": [
+        "Wu, Jingzi, 1701-1754"
+      ],
+      "body_bytes": 53078,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/4/0/3/24032/24032-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wu, Jingzi, 1701-1754",
+      "id": "pg-24032",
+      "sha256": "cb1d9c9422afb32b7dc906844eb2ac55beb7b2229c60a3871f37ed0af47f808d",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "2e3fc99cca1f12cae0b20197e0a96a644eca8176eeacc056faa6367c1bf01d40",
+      "source_url": "https://www.gutenberg.org/ebooks/24032",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "儒林外史",
+      "work_group": "fiction-儒林外史"
+    },
+    {
+      "author_groups": [
+        "wenggui"
+      ],
+      "authors": [
+        "Weng, Gui"
+      ],
+      "body_bytes": 52846,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/3/8/4/23843/23843-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-23843",
+      "sha256": "fe914c84d0f1e44cea7d9a9df0dc9e6fbff667dced28bbd698c48d3830773938",
+      "source": "gutenberg",
+      "source_field": "chapter-line:71",
+      "source_sha256": "19b98dbe49e7b026e5fc64e0311eebbebf7d883c116e2d7b9f0a0ec37959692c",
+      "source_url": "https://www.gutenberg.org/ebooks/23843",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "明月台",
+      "work_group": "fiction-明月台"
+    },
+    {
+      "author_groups": [
+        "shinaian12901365"
+      ],
+      "authors": [
+        "Shi, Nai'an, 1290?-1365?"
+      ],
+      "body_bytes": 52416,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/3/8/6/23863/23863-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Shi, Nai'an, 1290?-1365?",
+      "id": "pg-23863",
+      "sha256": "a8fe33c3ebb1530823b633c90378b123ce738cdd72f3c891e06fd5d28f02a9c9",
+      "source": "gutenberg",
+      "source_field": "chapter-line:218",
+      "source_sha256": "0359f6c063510047610b1e1e35ac94adc703591f7b10a451742056b1004465b9",
+      "source_url": "https://www.gutenberg.org/ebooks/23863",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "水滸傳",
+      "work_group": "fiction-水滸傳"
+    },
+    {
+      "author_groups": [
+        "pusongling16401715"
+      ],
+      "authors": [
+        "Pu, Songling, 1640-1715"
+      ],
+      "body_bytes": 53508,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/5/1/8/2/51828/51828-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Pu, Songling, 1640-1715",
+      "id": "pg-51828",
+      "sha256": "b97b75642ea94b2410bcfbe4480622120dcf6b598fae0a0d3ff25eaa6108a9cd",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "b62aca0abbb05df3ea22755972ce3d8d63804508cc9d0c1323f648930128ecff",
+      "source_url": "https://www.gutenberg.org/ebooks/51828",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "聊齋志異",
+      "work_group": "fiction-聊齋志異"
+    },
+    {
+      "author_groups": [
+        "tengguguxiang18801919"
+      ],
+      "authors": [
+        "Tenggu, Guxiang, 1880-1919"
+      ],
+      "body_bytes": 53620,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/4/1/4/24142/24142-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Tenggu, Guxiang, 1880-1919",
+      "id": "pg-24142",
+      "sha256": "095c582832fd0f1dddac7eae0d4e0844c329851c0c7f6c6f565bf1277c0c81ae",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "2ae8f50daee09b1a23b894fe633cb3e48d49adbbfb17d6e44eb046293e1e6442",
+      "source_url": "https://www.gutenberg.org/ebooks/24142",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "轟天雷",
+      "work_group": "fiction-轟天雷"
+    },
+    {
+      "author_groups": [
+        "guoxianactive1stcentury"
+      ],
+      "authors": [
+        "Guo, Xian, active 1st century"
+      ],
+      "body_bytes": 20451,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/5/2/2/7/52271/52271-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Guo, Xian, active 1st century",
+      "id": "pg-52271",
+      "sha256": "020356bf5534312dc7e7774d4c6c1713f33dbd959d0c69fe56a0a2c160b71eba",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "483d54bc3e1164079999deb54dccb440cd71fc631c8e10fe79c8db5779540bd3",
+      "source_url": "https://www.gutenberg.org/ebooks/52271",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "漢武帝別國洞冥記",
+      "work_group": "fiction-漢武帝別國洞冥記"
+    },
+    {
+      "author_groups": [
+        "donglugukuangshengactive17thcentury"
+      ],
+      "authors": [
+        "Donglugukuangsheng, active 17th century"
+      ],
+      "body_bytes": 53770,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/4/0/2/24027/24027-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Donglugukuangsheng, active 17th century",
+      "id": "pg-24027",
+      "sha256": "c1db70f6ce20d1a1f1a4a7a1ae13a3e63882ec35249bfcc908114010461a4760",
+      "source": "gutenberg",
+      "source_field": "chapter-line:15",
+      "source_sha256": "a19aae71740019b51da6a77c4f67656954e7d87357ed595cc4acdf5a4c1b1a93",
+      "source_url": "https://www.gutenberg.org/ebooks/24027",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "醉醒石",
+      "work_group": "fiction-醉醒石"
+    },
+    {
+      "author_groups": [
+        "fengmenglong15741646"
+      ],
+      "authors": [
+        "Feng, Menglong, 1574-1646"
+      ],
+      "body_bytes": 53674,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/4/1/4/24141/24141-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Feng, Menglong, 1574-1646",
+      "id": "pg-24141",
+      "sha256": "193382ef02f50cbc6c4b8c01741134ae9ed34fe80034401886d78bb922eb4e3b",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "3e3f7b35b84ca0abe98a6a9b89e96ca47db17e5de3ba9ec556049fb31b4416d0",
+      "source_url": "https://www.gutenberg.org/ebooks/24141",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "警世通言",
+      "work_group": "fiction-警世通言"
+    },
+    {
+      "author_groups": [
+        "yunyangchichidaorenactive17thcentury18thcentury"
+      ],
+      "authors": [
+        "Yunyangchichidaoren, active 17th century-18th century"
+      ],
+      "body_bytes": 53790,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/4/2/9/24294/24294-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Yunyangchichidaoren, active 17th century-18th century",
+      "id": "pg-24294",
+      "sha256": "1c4a9fdf9cce9642da19e29fdfabdd3e3f50e2206451812ad7f35b70d61ddc94",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "524e96d017ac63347cf5dc71a6f56179c9f1f46074a49627d78a9a19f3628f0a",
+      "source_url": "https://www.gutenberg.org/ebooks/24294",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "警悟鐘",
+      "work_group": "fiction-警悟鐘"
+    },
+    {
+      "author_groups": [
+        "yangerzengactive17thcentury"
+      ],
+      "authors": [
+        "Yang, Erzeng, active 17th century"
+      ],
+      "body_bytes": 52871,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/4/2/3/24231/24231-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Yang, Erzeng, active 17th century",
+      "id": "pg-24231",
+      "sha256": "97250b6c5d7c8bcf61806e9e49cac68fc91655a34a175b1b69aba3fde24f27f2",
+      "source": "gutenberg",
+      "source_field": "chapter-line:252",
+      "source_sha256": "efe9c2700c26bcf35641e66978b79c0057010cd5bdf6f6536d32ebe1dd76dab0",
+      "source_url": "https://www.gutenberg.org/ebooks/24231",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "韓湘子全傳",
+      "work_group": "fiction-韓湘子全傳"
+    },
+    {
+      "author_groups": [
+        "qingxidaorenactive17thcentury"
+      ],
+      "authors": [
+        "Qingxidaoren, active 17th century"
+      ],
+      "body_bytes": 52746,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/4/2/3/24233/24233-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Qingxidaoren, active 17th century",
+      "id": "pg-24233",
+      "sha256": "8a61f2c5d8ef067178fe3e12d5d721057535ea0f2afeef9d65d94408cd12c1eb",
+      "source": "gutenberg",
+      "source_field": "chapter-line:17",
+      "source_sha256": "8cf227af3d840fda3ec044401a9378142fa99ef7036dac1eb3eb0029905f80a7",
+      "source_url": "https://www.gutenberg.org/ebooks/24233",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "東度記",
+      "work_group": "fiction-東度記"
+    },
+    {
+      "author_groups": [
+        "wangjunqing"
+      ],
+      "authors": [
+        "Wang, Junqing"
+      ],
+      "body_bytes": 52916,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/4/0/2/24029/24029-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-24029",
+      "sha256": "52203700058dc78970b06ea537f527bf669835b87ccb4771d06bc42bd846311a",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "6545a31b3b71a417bb77a1a40b655bbd418d24acfec7628cee7fd58f710ece9a",
+      "source_url": "https://www.gutenberg.org/ebooks/24029",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "冷眼观",
+      "work_group": "fiction-冷眼观"
+    },
+    {
+      "author_groups": [
+        "wujianren18661910"
+      ],
+      "authors": [
+        "Wu, Jianren, 1866-1910"
+      ],
+      "body_bytes": 52010,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/3/8/6/23865/23865-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wu, Jianren, 1866-1910",
+      "id": "pg-23865",
+      "sha256": "d19dba2af871e672c04278e361381b7bfc3908b627a997486f880d737121feb6",
+      "source": "gutenberg",
+      "source_field": "chapter-line:7",
+      "source_sha256": "fa7e30c9d26be41bce716af5515ebb204410048f638107cae7df03440902b3d1",
+      "source_url": "https://www.gutenberg.org/ebooks/23865",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "恨海",
+      "work_group": "fiction-恨海"
+    },
+    {
+      "author_groups": [
+        "shiyukunactive19thcentury"
+      ],
+      "authors": [
+        "Shi, Yukun, active 19th century"
+      ],
+      "body_bytes": 53806,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/3/7/25376/25376-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Shi, Yukun, active 19th century",
+      "id": "pg-25376",
+      "sha256": "f1ce830ecc10e7ba1e89841c1567f52741ffbbdc586375894969db7b8d8f22cc",
+      "source": "gutenberg",
+      "source_field": "chapter-line:48",
+      "source_sha256": "d1a787e33edfb444d533da9226b7325553797321a2e6b7160fe99cf5d22c2ea8",
+      "source_url": "https://www.gutenberg.org/ebooks/25376",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "三俠五義",
+      "work_group": "fiction-三俠五義"
+    },
+    {
+      "author_groups": [
+        "yinmeishanren"
+      ],
+      "authors": [
+        "Yinmeishanren"
+      ],
+      "body_bytes": 53684,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/6/0/25602/25602-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-25602",
+      "sha256": "633351aa0ea216b00ffdde3eb0fa05c975c14308f5309b379b9f9d81d5acb279",
+      "source": "gutenberg",
+      "source_field": "chapter-line:19",
+      "source_sha256": "a9499600f6e97118ef418f91f245af83a9dc1543143587cdb36261220b983133",
+      "source_url": "https://www.gutenberg.org/ebooks/25602",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "蘭花夢奇傳",
+      "work_group": "fiction-蘭花夢奇傳"
+    },
+    {
+      "author_groups": [
+        "zhangzhuo660740"
+      ],
+      "authors": [
+        "Zhang, Zhuo, 660?-740?"
+      ],
+      "body_bytes": 33715,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/4/2/9/24295/24295-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Zhang, Zhuo, 660?-740?",
+      "id": "pg-24295",
+      "sha256": "c0f70d81f29d043d3381615917b901b990b236b1569900731d31aa787229a666",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "e906790cffcce898d8ef217b3838b35d84c908e3fba6ca2334e9d46725d72162",
+      "source_url": "https://www.gutenberg.org/ebooks/24295",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "遊仙窟",
+      "work_group": "fiction-遊仙窟"
+    },
+    {
+      "author_groups": [
+        "xuanding18321880"
+      ],
+      "authors": [
+        "Xuan, Ding, 1832-1880?"
+      ],
+      "body_bytes": 53784,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/1/3/25130/25130-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Xuan, Ding, 1832-1880?",
+      "id": "pg-25130",
+      "sha256": "737af3515ce3ad27a0f6d05902596d4d8cc8e2e65c3d461ebf33f13cfa22a2e0",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "e1c75a648dbcf5cb4052fe644507538730da30201f3f8fab1d18980220d52100",
+      "source_url": "https://www.gutenberg.org/ebooks/25130",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "夜雨秋燈錄",
+      "work_group": "fiction-夜雨秋燈錄"
+    },
+    {
+      "author_groups": [
+        "duguangting850933"
+      ],
+      "authors": [
+        "Du, Guangting, 850-933"
+      ],
+      "body_bytes": 7723,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/3/9/1/23915/23915-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Du, Guangting, 850-933",
+      "id": "pg-23915",
+      "sha256": "4a8de0fe219b8945bb0582199e1adaf9ed25a126621b4b0facde6b562afa5898",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "aa406c5129aa74ea470a1e51c18c61dda436234c783194571a310327d685aed9",
+      "source_url": "https://www.gutenberg.org/ebooks/23915",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "虬髯客傳",
+      "work_group": "fiction-虬髯客傳"
+    },
+    {
+      "author_groups": [
+        "shanben"
+      ],
+      "authors": [
+        "Shan, Ben"
+      ],
+      "body_bytes": 52164,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/7/1/4/27148/27148-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Ming dynasty, 1368-1644",
+      "id": "pg-27148",
+      "sha256": "3f3742abb8d9bda2d4beaf606794d5ca2890ad47ff78ac22c4ea23402d59eb77",
+      "source": "gutenberg",
+      "source_field": "chapter-line:164",
+      "source_sha256": "2ebb2ba5b0d11099d9ca001489d80468cf635e866469df839cf20f2114566772",
+      "source_url": "https://www.gutenberg.org/ebooks/27148",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "蕉葉帕",
+      "work_group": "fiction-蕉葉帕"
+    },
+    {
+      "author_groups": [
+        "shaobinru"
+      ],
+      "authors": [
+        "Shao, Binru"
+      ],
+      "body_bytes": 53723,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/5/2/2/25223/25223-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-25223",
+      "sha256": "827c052d220c44877e6b41284dbed664368a0c1ed87f003e8a9bab4fe2574bf8",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "9fa0176890a902294e62e258d6d506ee2d97479e34a922318ceb9549c29d8c9c",
+      "source_url": "https://www.gutenberg.org/ebooks/25223",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "俗話傾談",
+      "work_group": "fiction-俗話傾談"
+    },
+    {
+      "author_groups": [
+        "wuseshizhurenjuren1738"
+      ],
+      "authors": [
+        "Wuseshizhuren, ju ren 1738"
+      ],
+      "body_bytes": 52880,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/5/2/3/25237/25237-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wuseshizhuren, ju ren 1738",
+      "id": "pg-25237",
+      "sha256": "0f408dce24a99cf07b10aee52780be3bcc27f434125bb71297b42cf63ed47bad",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "ad9a7b85fddc9b1726160e601848a9f5a88c6e437b9ea24328ad9c060e507c5e",
+      "source_url": "https://www.gutenberg.org/ebooks/25237",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "快士傳",
+      "work_group": "fiction-快士傳"
+    },
+    {
+      "author_groups": [
+        "yuwanchun17941849"
+      ],
+      "authors": [
+        "Yu, Wanchun, 1794-1849"
+      ],
+      "body_bytes": 52968,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/3/5/25350/25350-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Yu, Wanchun, 1794-1849",
+      "id": "pg-25350",
+      "sha256": "35f3a073d6599ddab01a6136004a5774fc472b63880f48e0d1d03c11e830555e",
+      "source": "gutenberg",
+      "source_field": "chapter-line:31",
+      "source_sha256": "ebbd5ed1bce4e1c345ca04c078bf7e1c53f3806977cda2c3e97893e5e748763c",
+      "source_url": "https://www.gutenberg.org/ebooks/25350",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "蕩寇志",
+      "work_group": "fiction-蕩寇志"
+    },
+    {
+      "author_groups": [
+        "wuchengen15001582"
+      ],
+      "authors": [
+        "Wu, Cheng'en, 1500?-1582?"
+      ],
+      "body_bytes": 52676,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/3/9/6/23962/23962-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Wu, Cheng'en, 1500?-1582?",
+      "id": "pg-23962",
+      "sha256": "733c6ebb3cb350506248e3555ed75f242a4ee719f0cdc38425cc7fa42e68e976",
+      "source": "gutenberg",
+      "source_field": "chapter-line:286",
+      "source_sha256": "04795538e4c2fe40779387952d1addf65a089dcc9b4baf80bbb698a3f20de406",
+      "source_url": "https://www.gutenberg.org/ebooks/23962",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "西遊記",
+      "work_group": "fiction-西遊記"
+    },
+    {
+      "author_groups": [
+        "liruzhen17631830"
+      ],
+      "authors": [
+        "Li, Ruzhen, 1763?-1830?"
+      ],
+      "body_bytes": 52664,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/3/8/1/23818/23818-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Li, Ruzhen, 1763?-1830?",
+      "id": "pg-23818",
+      "sha256": "eed6384056765b5b89bc46495169c08d731b39a148e939feb06ebec7217ccb31",
+      "source": "gutenberg",
+      "source_field": "chapter-line:16",
+      "source_sha256": "c21f0aedd115bd4e2228b596ac2e2f773766af8548d3df22f3dc7477c5ec39b3",
+      "source_url": "https://www.gutenberg.org/ebooks/23818",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "鏡花緣",
+      "work_group": "fiction-鏡花緣"
+    },
+    {
+      "author_groups": [
+        "wuxuanactive18thcentury"
+      ],
+      "authors": [
+        "Wu, Xuan, active 18th century"
+      ],
+      "body_bytes": 52710,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/5/2/2/25229/25229-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author active period: Wu, Xuan, active 18th century",
+      "id": "pg-25229",
+      "sha256": "c9d5088460146b5f09bc81cb8b203247a4965f3823f12bc95ca26ffec029ca55",
+      "source": "gutenberg",
+      "source_field": "chapter-line:198",
+      "source_sha256": "b5d8a3dfb3d954817450b106789ab6b42bce8be7ed1c6182aa0fa8043ee4ec1b",
+      "source_url": "https://www.gutenberg.org/ebooks/25229",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "飛龍全傳",
+      "work_group": "fiction-飛龍全傳"
+    },
+    {
+      "author_groups": [
+        "baixingjian776826"
+      ],
+      "authors": [
+        "Bai, Xingjian, 776-826"
+      ],
+      "body_bytes": 13618,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/4/0/5/24051/24051-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Bai, Xingjian, 776-826",
+      "id": "pg-24051",
+      "sha256": "17c403ba2e824641ce8911e0bb6ef67eedd5b6bdd95e958faa3cb0cda94a2a8f",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "8d8d5dc3cfd5e5531a08ae342cbfde9e852c9e5192f1b76fb5d02ca3af68ae75",
+      "source_url": "https://www.gutenberg.org/ebooks/24051",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "李娃傳",
+      "work_group": "fiction-李娃傳"
+    },
+    {
+      "author_groups": [
+        "yezi19121939"
+      ],
+      "authors": [
+        "Ye, Zi, 1912?-1939"
+      ],
+      "body_bytes": 51998,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/5/2/6/25260/25260-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Ye, Zi, 1912?-1939",
+      "id": "pg-25260",
+      "sha256": "1c89779172c52bbb1e797a374ff715f002c153d830806eed44e5939e55408d64",
+      "source": "gutenberg",
+      "source_field": "story:豐收",
+      "source_sha256": "cec4c233941d1c04d258d6b4b7c6158fcdf5b61c59eb3987fecc594f11fd5a3b",
+      "source_url": "https://www.gutenberg.org/ebooks/25260",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "豐收",
+      "work_group": "fiction-豐收"
+    },
+    {
+      "author_groups": [
+        "zhangnanzhuang"
+      ],
+      "authors": [
+        "Zhang, Nanzhuang"
+      ],
+      "body_bytes": 53610,
+      "bytes": 2046,
+      "download": "https://gutenberg.pglaf.org/2/4/3/2/24327/24327-0.txt",
+      "end_byte": 2046,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF historical classification: Chinese fiction -- Qing dynasty, 1644-1912",
+      "id": "pg-24327",
+      "sha256": "8f11bfbf4c3322a498758a4eaf116f3c47e916f9f9d92bf68bd9417edcacfe5d",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "415f96313bcfd4169ca40ece18cfd6cc631025ff0686cd3a92e7b4fc32755c4c",
+      "source_url": "https://www.gutenberg.org/ebooks/24327",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "何典",
+      "work_group": "fiction-何典"
+    },
+    {
+      "author_groups": [
+        "caoxueqin17171763"
+      ],
+      "authors": [
+        "Cao, Xueqin, 1717?-1763"
+      ],
+      "body_bytes": 52264,
+      "bytes": 2048,
+      "download": "https://gutenberg.pglaf.org/2/4/2/6/24264/24264-0.txt",
+      "end_byte": 2048,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Cao, Xueqin, 1717?-1763",
+      "id": "pg-24264",
+      "sha256": "26d85c8ad9c8b5342ee92dabd8b9797ecc7a9ebab03e44d186685986238b6bff",
+      "source": "gutenberg",
+      "source_field": "first-prose",
+      "source_sha256": "824b0baead58b4bb1c9f6cd365d8323e4799065f4864170db964b1dfa981f557",
+      "source_url": "https://www.gutenberg.org/ebooks/24264",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "紅樓夢",
+      "work_group": "fiction-紅樓夢"
+    },
+    {
+      "author_groups": [
+        "zengpu18721935"
+      ],
+      "authors": [
+        "Zeng, Pu, 1872-1935"
+      ],
+      "body_bytes": 53382,
+      "bytes": 2047,
+      "download": "https://gutenberg.pglaf.org/2/5/1/2/25128/25128-0.txt",
+      "end_byte": 2047,
+      "genre": "free-narrative",
+      "historical_evidence": "PGLAF author dates: Zeng, Pu, 1872-1935",
+      "id": "pg-25128",
+      "sha256": "437d272e27d0ff450eee6d1b95c4e07b80275056fa4c1c4302985fb42c7d619a",
+      "source": "gutenberg",
+      "source_field": "chapter-line:11",
+      "source_sha256": "aac2d0a9863229bb9203a800e3496ae32a9a4ddac7ee587dc8e3f4543092de37",
+      "source_url": "https://www.gutenberg.org/ebooks/25128",
+      "split": "holdout",
+      "start_byte": 0,
+      "title": "孽海花",
+      "work_group": "fiction-孽海花"
+    }
+  ],
+  "selection": {
+    "author_policy": "One independent work per credited author across all splits.",
+    "input_rule": "Normalize CRLF/CR to LF, strip outer whitespace, then keep longest complete UTF-8 scalar prefix at 2048 bytes.",
+    "sort_seed": "ZeroInput/themed-verse/P2/corpus/2026-11-20/",
+    "split_counts_per_genre": {
+      "calibration": 20,
+      "holdout": 30,
+      "training": 16
+    }
+  },
+  "sources": {
+    "abri": {
+      "catalog": "https://data.gov.tw/dataset/25125",
+      "dataset": "內政部建築研究所全球資訊網_研究成果",
+      "download": "https://www.abri.gov.tw/OpenData.aspx?SN=E35AF0F8413059E5",
+      "license": "https://data.gov.tw/license",
+      "name": "內政部建築研究所",
+      "notice": "Released under Taiwan Open Government Data License 1.0. Attribution to the source agency.",
+      "sha256": "aa32249e3c4b5c66d47625ba55107dde3d00891a9cfe7537306c1ba6f8ca6e9f",
+      "snapshot": "gov-25125-0.raw"
+    },
+    "exam": {
+      "catalog": "https://data.gov.tw/dataset/158138",
+      "dataset": "考試院委託研究報告",
+      "download": "https://www.exam.gov.tw/OpenData.aspx?SN=26A0B1DA6A0EBAA2",
+      "license": "https://data.gov.tw/license",
+      "name": "考試院資訊處",
+      "notice": "Released under Taiwan Open Government Data License 1.0. Attribution to the source agency.",
+      "sha256": "b88ccad8306ebca072900a8ae7a9a5a4017b4cb4b8daad6e89285278eb434cf8",
+      "snapshot": "exam.checked"
+    },
+    "gutenberg": {
+      "catalog": "https://gutenberg.pglaf.org/cache/epub/feeds/pg_catalog.csv",
+      "catalog_sha256": "8c06ec1c46751dc184b640b8a8ed5842c873ae3b621d575f8e76837f12f33eb6",
+      "dataset": "Chinese-language historically attributed fiction",
+      "license": "https://www.gutenberg.org/policy/license.html",
+      "name": "Project Gutenberg Literary Archive Foundation",
+      "notice": "Historical work text. E-book branding and front/back matter omitted."
+    },
+    "ndc": {
+      "catalog": "https://data.gov.tw/dataset/55806",
+      "dataset": "人力供需議題相關研究報告",
+      "download": "https://ws.ndc.gov.tw/001/administrator/10/relfile/0/10565/b4d1c5af-c36d-4b85-a74c-2f9d83d2d298.csv",
+      "license": "https://data.gov.tw/license",
+      "name": "國家發展委員會人力發展處",
+      "notice": "Released under Taiwan Open Government Data License 1.0. Attribution to the source agency.",
+      "sha256": "c36e6928a006b02b9a21b2ca64126950b344b3f8b4b1d0411f78db79f595d81e",
+      "snapshot": "gov-55806-0.raw"
+    }
+  }
+}

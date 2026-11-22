@@ -17,9 +17,10 @@ import java.util.UUID
 /** One-use internal transfer. Only an opaque ID crosses an Intent. No editor/Activity/callback. */
 internal class StegoHandoff(private val context: Context, private val settings: SettingsRepository,
                             private val generation: () -> Long) : AutoCloseable {
-    enum class Kind { CARRIER, VAULT, FILE, SAVE, LOCAL_NOTE }
+    enum class Kind { CARRIER, VAULT, FILE, EXPORT_KEY_FILE, SAVE, LOCAL_NOTE }
     class Request(val kind: Kind, var text: CharArray? = null, val editor: PasteEditorIdentity? = null,
-                  val target: StegoField = StegoField.CARRIER, var carrier: CharArray? = null) : AutoCloseable {
+                  val target: StegoField = StegoField.CARRIER, var carrier: CharArray? = null,
+                  val wording: StegoWordingProfile? = null, val fileUse: StegoWordingFile? = null) : AutoCloseable {
         var generation = -1L
             internal set
         /** The write lifetime starts only after authentication and a foreground confirmation. */
@@ -30,11 +31,15 @@ internal class StegoHandoff(private val context: Context, private val settings: 
         @Synchronized override fun close() { text?.fill('\u0000'); text = null; carrier?.fill('\u0000'); carrier = null }
     }
 
+    class FileReturn(val factor: ByteArray, val use: StegoWordingFile?) : AutoCloseable {
+        override fun close() { factor.fill(0) }
+    }
+
     private val main = Handler(Looper.getMainLooper())
     private var id: String? = null
     private var request: Request? = null
     private var deadline = 0L
-    private var file: ByteArray? = null
+    private var file: FileReturn? = null
     private var fileEditor: PasteEditorIdentity? = null
     private var fileGeneration = -1L
     private var paste: Request? = null
@@ -65,15 +70,15 @@ internal class StegoHandoff(private val context: Context, private val settings: 
 
     @Synchronized fun discard(token: String) { if (token == id) close() }
 
-    @Synchronized fun offerFile(factor: ByteArray, editor: PasteEditorIdentity) {
+    @Synchronized fun offerFile(factor: ByteArray, editor: PasteEditorIdentity, use: StegoWordingFile? = null) {
         close()
         observeScreen()
         fileGeneration = generation()
-        file = factor.copyOf(); fileEditor = editor; deadline = SystemClock.elapsedRealtime() + 30_000
+        file = FileReturn(factor.copyOf(), use); fileEditor = editor; deadline = SystemClock.elapsedRealtime() + 30_000
         main.postDelayed(expire, 30_000)
     }
 
-    @Synchronized fun takeFile(editor: PasteEditorIdentity?): ByteArray? {
+    @Synchronized fun takeFile(editor: PasteEditorIdentity?): FileReturn? {
         if (file == null) return null
         if (editor == null || fileEditor != editor || SystemClock.elapsedRealtime() >= deadline || fileGeneration != generation()) { close(); return null }
         return file.also { file = null; fileEditor = null; main.removeCallbacks(expire); stopObservingScreen() }
@@ -81,14 +86,15 @@ internal class StegoHandoff(private val context: Context, private val settings: 
 
     /** A foreground authenticated read may populate a new isolated workspace, never an editor. */
     @Synchronized fun offerPaste(value: CharArray, editor: PasteEditorIdentity, target: StegoField,
-                                expectedGeneration: Long, carrier: CharArray? = null): Boolean {
+                                expectedGeneration: Long, carrier: CharArray? = null,
+                                wording: StegoWordingProfile? = null): Boolean {
         close()
         if (!settings.secureClipboardEnabled || !settings.stegoDefaults.vaultPaste || expectedGeneration != generation() ||
             !StegoPastePolicy.accepts(target, java.nio.CharBuffer.wrap(value))) {
             value.fill('\u0000'); carrier?.fill('\u0000'); return false
         }
         observeScreen()
-        paste = Request(Kind.CARRIER, value, editor, target, carrier).also { it.generation = expectedGeneration }
+        paste = Request(Kind.CARRIER, value, editor, target, carrier, wording).also { it.generation = expectedGeneration }
         deadline = SystemClock.elapsedRealtime() + 30_000
         main.postDelayed(expire, 30_000)
         return true
@@ -119,7 +125,7 @@ internal class StegoHandoff(private val context: Context, private val settings: 
     @Synchronized override fun close() {
         main.removeCallbacks(expire)
         request?.close(); request = null; id = null
-        file?.fill(0); file = null; fileEditor = null
+        file?.close(); file = null; fileEditor = null
         paste?.close(); paste = null; pasteBound = false
         stopObservingScreen()
     }

@@ -1,0 +1,9 @@
+[package]
+name = "verse-rmw-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rmw-utf8 = "=0.0.6"
+bit-vec = "=0.6.3"

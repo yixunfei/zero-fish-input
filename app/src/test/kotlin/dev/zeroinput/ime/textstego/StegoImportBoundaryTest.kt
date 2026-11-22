@@ -20,7 +20,8 @@ class StegoImportBoundaryTest {
         StegoTransport.entries.forEach { mode ->
             val encoded = StegoCarrierCodec.encode("public fixture", ByteArray(162), mode)
             val detached = StegoCarrierCodec.ciphertext(ByteArray(162))
-            listOf(encoded, encoded.dropLast(1), detached, detached.dropLast(1)).forEach { text ->
+            listOf(encoded, encoded.dropLast(1), detached, detached.dropLast(1),
+                "public${StegoCarrierCodec.DENSE_END}", "public[ZIS1", "public[ZIS1:2").forEach { text ->
                 val request = requireNotNull(ClipboardImportText.parse(text, allowsAiImport = true))
                 assertFalse(request.allowsAiImport)
                 assertNull(request.copyForAi())

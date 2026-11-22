@@ -1,6 +1,8 @@
 package dev.zeroinput.ime.clipboard
 
 import dev.zeroinput.ime.concurrency.BoundedExecutors
+import dev.zeroinput.ime.textstego.StegoPastePolicy
+import dev.zeroinput.ime.ui.StegoField
 import dev.zeroinput.userdata.SecureClipboardVault
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
@@ -14,7 +16,7 @@ internal class ClipboardSelectionReader(
     private var pending: Read? = null
 
     fun read(length: Int, selectedText: () -> CharSequence?, isCurrent: () -> Boolean,
-        result: (ClipboardImportRequest?) -> Unit) {
+             naturalWording: Boolean = false, result: (ClipboardImportRequest?) -> Unit) {
         cancel()
         if (length !in 1..SecureClipboardVault.MAX_VALUE_LENGTH || !isCurrent()) {
             result(null)
@@ -26,7 +28,9 @@ internal class ClipboardSelectionReader(
             request.task = worker.submit {
                 if (request.cancelled) return@submit
                 val value = try {
-                    selectedText()?.takeIf { it.length == length }?.let { ClipboardImportText.parse(it) }
+                    selectedText()?.takeIf { it.length == length }?.let { value ->
+                        if (naturalWording) parseWordingSelection(value) else ClipboardImportText.parse(value)
+                    }
                 } catch (_: RuntimeException) { null }
                 request.offer(value)
                 post {
@@ -41,6 +45,11 @@ internal class ClipboardSelectionReader(
             cancel()
             result(null)
         }
+    }
+
+    private fun parseWordingSelection(value: CharSequence): ClipboardImportRequest? {
+        if (value.isBlank() || !StegoPastePolicy.accepts(StegoField.CARRIER, value)) return null
+        return ClipboardImportRequest(CharArray(value.length) { value[it] }, allowsStegoImport = true)
     }
 
     fun cancel() {

@@ -3,6 +3,7 @@
     <string name="stego_short">隐</string>
     <string name="stego_encrypt">Encrypt</string>
     <string name="stego_decrypt">Decrypt</string>
+    <string name="stego_decrypt_start">Start decryption</string>
     <string name="stego_close">Clear</string>
     <string name="stego_cover">Public cover</string>
     <string name="stego_secret">Secret text</string>
@@ -16,6 +17,11 @@
     <string name="stego_selection">Import selection</string>
     <string name="stego_vault">Read private vault</string>
     <string name="stego_prepare">Generate only</string>
+    <string name="stego_wording_prepare">Generate and preview</string>
+    <string name="stego_random_stage_widths">Randomize each layer’s key width</string>
+    <string name="stego_wording_kdf_cost">Passphrase derivation cost</string>
+    <string name="stego_key_file_ready">Key file loaded</string>
+    <string name="stego_carrier_choice">Carrier · %1$s</string>
     <string name="stego_confirm">Insert into editor</string>
     <string name="stego_edit">Edit again</string>
     <string name="stego_save">Authenticate and save text</string>

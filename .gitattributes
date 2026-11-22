@@ -16,6 +16,7 @@ engine-dictionary/src/test/resources/association-quality*.tsv text eol=lf
 engine-dictionary/src/main/resources/reference-pinyin.tsv text eol=lf
 engine-dictionary/src/test/resources/candidate-quality*.tsv text eol=lf
 app/src/main/assets/shape/han-shapes.tsv text eol=lf
+app/src/androidTest/assets/stego-wording-window-public.txt text eol=lf
 
 # Preserve exact upstream bytes used by the bootstrap SHA-256 checks.
 LICENSES/** -text
@@ -26,3 +27,6 @@ ime-ui/src/main/assets/expressions/rime-kaomoji-source.txt -text
 engine-english/src/main/resources/glide-*.txt -text
 ime-ui/src/main/assets/emoji/** -text
 ime-ui/src/test/resources/emoji/** -text
+tools/themed-verse/android-test-profile/*.zdict -text
+tools/themed-verse/android-test-profile/word-context-v1.bin -text
+tools/themed-verse/android-test-profile/window-observation-*.bin -text

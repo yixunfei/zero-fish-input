@@ -44,13 +44,21 @@ internal class StegoWorkspace(
     private var replaceBits = true
     private var factor: ByteArray? = null
     private var prepared: String? = null
+    private var wordingPreview: StegoWordingCarrier? = null
     private var boundCommit: ((String) -> Boolean)? = null
     private var insertOnReady = false
     private var result: CharArray? = null
     private var outputs: StegoOutputs? = null
     private val options = StegoOptions()
-    val localNoteSelected: Boolean get() = options.mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD
-    private val dialogs = StegoOptionsDialog(view, ::current).apply {
+    var wordingProfile: StegoWordingProfile? = null
+        private set
+    private var randomStageWidths = false
+    val naturalWordingSelected get() = wordingProfile != null
+    private val mode get() = options.mode
+    val localNoteSelected: Boolean get() = mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD
+    private val canChooseWording get() = StegoWordingCodec.available && !localNoteSelected
+    val acceptsUnmarkedCarrier get() = decrypt && canChooseWording
+    private val dialogs = StegoOptionsDialog(view, ::current) { draftInteraction }.apply {
         attachToIme = isKeyboard
         leaveForLocalNote = openLocalNote?.let { launch -> { launch(null) } }
     }
@@ -58,6 +66,7 @@ internal class StegoWorkspace(
     private var biometric: StegoBiometricPrompt? = null
     private var vaultGeneration = 0L
     private var workspaceGeneration = 0L
+    private var draftInteraction = 0L
     private val valid = AtomicBoolean(false)
     private val expire = object : Runnable {
         override fun run() {
@@ -68,7 +77,7 @@ internal class StegoWorkspace(
     }
 
     fun open(language: InputLanguage, chinese: ChineseInputOptions, carrier: String? = null, file: ByteArray? = null,
-             localNote: Boolean = false) {
+             localNote: Boolean = false, wording: StegoWordingProfile? = null, fileUse: StegoWordingFile? = null) {
         close()
         gate.open()
         valid.set(true)
@@ -77,14 +86,18 @@ internal class StegoWorkspace(
         options.mode = if (localNote) MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD else MessageCredentialMode.PASSPHRASE
         options.kdf = MessageKdf.STANDARD
         options.transport = StegoTransport.DENSE_UNICODE
+        wordingProfile = (fileUse?.profile ?: wording)?.takeIf { canChooseWording }
+        if (naturalWordingSelected) options.stages = wordingStages()
         keyBits = defaults.masterBits.toString(); replaceBits = true
         vaultGeneration = graph().secureClipboard.captureGeneration()
-        decrypt = carrier != null
+        decrypt = carrier != null || fileUse?.decrypt == true
         reveal = false
         notice = null
-        field = if (decrypt) StegoField.CREDENTIAL else StegoField.COVER
         factor = file?.copyOf()
-        if (file != null) options.mode = MessageCredentialMode.KEY_FILE
+        if (file != null) options.mode = fileUse?.mode ?: MessageCredentialMode.KEY_FILE
+        field = if (decrypt) {
+            if (file != null && naturalWordingSelected) StegoField.CARRIER else StegoField.CREDENTIAL
+        } else if (naturalWordingSelected) StegoField.SECRET else StegoField.COVER
         val generation = workspaceGeneration
         view.textStegoPanel.onAction = { if (generation == workspaceGeneration) act(it) }
         view.textStegoPanel.onCaret = { if (generation == workspaceGeneration) type(it) }
@@ -92,7 +105,9 @@ internal class StegoWorkspace(
             if (generation == workspaceGeneration) updateAlgorithm(id) { options.select(it, selected) }
         }
         view.textStegoPanel.onAlgorithmWidth = { id ->
-            if (generation == workspaceGeneration) updateAlgorithm(id, options::cycleWidth)
+            if (generation == workspaceGeneration) updateAlgorithm(id) {
+                options.cycleWidth(it); randomStageWidths = false
+            }
         }
         view.textStegoPanel.onAlgorithmEarlier = { id ->
             if (generation == workspaceGeneration) updateAlgorithm(id, options::moveEarlier)
@@ -116,24 +131,42 @@ internal class StegoWorkspace(
             draft.start(if (target == StegoField.CARRIER) InputLanguage.ENGLISH else language,
                 chinese.copy(keyboardLayout = ChineseKeyboardLayout.FULL, doublePinyinScheme = DoublePinyinScheme.OFF))
         }
-        if (carrier != null) {
-            drafts[StegoField.CARRIER]?.replaceCommittedText(carrier)
-            try {
-                val chars = carrier.toCharArray()
-                val requirements = try { inspectCarrier(chars) } finally { chars.fill('\u0000') }
-                options.mode = requirements.mode; options.kdf = requirements.kdf
-                field = if (StegoCarrierCodec.isDetached(carrier)) StegoField.COVER
-                    else if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.CARRIER else StegoField.CREDENTIAL
-            } catch (_: Exception) { notify(R.string.stego_failed) }
-        }
+        if (carrier != null) restoreCarrier(carrier, generation)
         main.postDelayed(expire, 1000)
         render()
+    }
+
+    private fun restoreCarrier(carrier: String, generation: Long) {
+        if (!StegoPastePolicy.accepts(StegoField.CARRIER, carrier) ||
+            drafts[StegoField.CARRIER]?.replaceCommittedText(carrier) != true) {
+            field = StegoField.CARRIER
+            notify(R.string.stego_carrier_invalid)
+        } else if (naturalWordingSelected) {
+            field = StegoField.CARRIER
+            val interaction = draftInteraction
+            if (current()) main.post {
+                if (generation == workspaceGeneration && interaction == draftInteraction) inspectWordingDraft()
+            }
+        } else if (needsWordingChoice(carrier)) {
+            field = StegoField.CARRIER
+            notice = R.string.stego_choose_received_style
+        } else try {
+            val chars = carrier.toCharArray()
+            val requirements = try { inspectCarrier(chars) } finally { chars.fill('\u0000') }
+            applyExactRequirements(carrier, requirements)
+        } catch (_: Exception) { field = StegoField.CARRIER; notify(R.string.stego_carrier_invalid) }
     }
 
     fun current(): Boolean = valid.get() && gate.current() && canUse() && view.isTextStegoOpen &&
         vaultGeneration == graph().secureClipboard.captureGeneration()
 
     fun invalidate() { valid.set(false); pending?.close(); main.post { close() } }
+
+    fun dismissOptions(): Boolean = dialogs.dismissShowing()
+
+    fun wordingFileUse(): StegoWordingFile? = wordingProfile?.takeIf { mode.file }?.let {
+        StegoWordingFile(it, decrypt, mode)
+    }
 
     fun type(action: KeyboardAction) {
         if (!editable()) return
@@ -188,8 +221,15 @@ internal class StegoWorkspace(
         if (next.length <= 4) { keyBits = next; replaceBits = false }
     }
 
-    private fun isRandomMode(): Boolean = options.mode == MessageCredentialMode.RANDOM_KEY ||
-        options.mode == MessageCredentialMode.RANDOM_KEY_FILE
+    private fun isRandomMode(): Boolean = mode == MessageCredentialMode.RANDOM_KEY || mode == MessageCredentialMode.RANDOM_KEY_FILE
+
+    /** A selection read may only return to the same receiving draft and carrier choice. */
+    fun selectionAuthorization(): (() -> Boolean)? {
+        if (!editable() || !decrypt) return null
+        val generation = workspaceGeneration
+        val interaction = draftInteraction
+        return { editable() && workspaceGeneration == generation && draftInteraction == interaction }
+    }
 
     private fun pasteMenu(target: StegoField) {
         if (!editable() || !pasteTargetAllowed(target)) return
@@ -243,13 +283,17 @@ internal class StegoWorkspace(
         if (!current() || !gate.accepts(lease.token)) { lease.close(); return }
         val timely = lease.current()
         pending = null; gate.fail(lease.token); lease.close()
-        if (!timely || !graph().settings.stegoDefaults.systemPaste || value == null || !pasteText(target, value))
-            notify(R.string.stego_paste_failed)
+        when {
+            !timely || !graph().settings.stegoDefaults.systemPaste -> notify(R.string.stego_paste_failed)
+            value == null -> notify(R.string.stego_system_paste_no_text)
+            !pasteText(target, value) && target != StegoField.CARRIER -> notify(R.string.stego_paste_failed)
+        }
         render()
     }
 
     private fun pasteTargetAllowed(target: StegoField): Boolean = when (target) {
-        StegoField.COVER -> !decrypt || StegoCarrierCodec.isDetached(drafts[StegoField.CARRIER]?.committedText().orEmpty())
+        StegoField.COVER -> !naturalWordingSelected &&
+            (!decrypt || StegoCarrierCodec.isDetached(drafts[StegoField.CARRIER]?.committedText().orEmpty()))
         StegoField.CARRIER -> decrypt
         StegoField.SECRET -> !decrypt
         else -> false
@@ -291,28 +335,68 @@ internal class StegoWorkspace(
         if (generation != workspaceGeneration || !current() || !gate.accepts(token)) return
         gate.fail(token)
         if (chars == null) notify(R.string.stego_failed)
-        else { clearCredential(); chars.forEach(credential::append); field = StegoField.CREDENTIAL; reveal = false }
+        else {
+            clearCredential()
+            chars.forEach(credential::append)
+            field = StegoField.CREDENTIAL
+            reveal = false
+            if (naturalWordingSelected) notice = R.string.stego_wording_key_ready
+        }
         render()
     }
 
     fun importCarrier(value: String): Boolean {
         if (!editable()) return false
-        return try {
-            val carrier = StegoCarrierCodec.inspectable(value)
-            val requirement = try { MessageEnvelope().inspect(carrier.envelope) } finally { carrier.envelope.fill(0) }
-            clearSensitive()
-            options.mode = requirement.mode
-            options.kdf = requirement.kdf
-            decrypt = true
-            field = if (StegoCarrierCodec.isDetached(value)) StegoField.COVER
-                else if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.CARRIER else StegoField.CREDENTIAL
-            drafts[StegoField.CARRIER]?.replaceCommittedText(value) == true
-        } catch (_: Exception) { notify(R.string.stego_failed); false }.also { render() }
+        if (!StegoPastePolicy.accepts(StegoField.CARRIER, value)) {
+            notify(R.string.stego_carrier_invalid); render(); return false
+        }
+        val needsStyle = needsWordingChoice(value)
+        val requirements = if (naturalWordingSelected || needsStyle) {
+            if (!decrypt) return false
+            null
+        } else try {
+            val parsed = StegoCarrierCodec.inspectable(value)
+            try { MessageEnvelope().inspect(parsed.envelope) } finally { parsed.envelope.fill(0) }
+        } catch (_: Exception) { notify(R.string.stego_carrier_invalid); render(); return false }
+        if (drafts[StegoField.CARRIER]?.replaceCommittedText(value) != true) {
+            notify(R.string.stego_carrier_invalid); render(); return false
+        }
+        touch(); clearSensitive()
+        decrypt = true
+        notice = if (needsStyle) R.string.stego_choose_received_style else null
+        if (requirements != null) applyExactRequirements(value, requirements)
+        else field = StegoField.CARRIER
+        render()
+        inspectWordingDraft()
+        return true
+    }
+
+    private fun applyExactRequirements(carrier: String, requirements: MessageRequirements) {
+        options.mode = requirements.mode
+        options.kdf = requirements.kdf
+        field = when {
+            StegoCarrierCodec.isDetached(carrier) -> StegoField.COVER
+            mode == MessageCredentialMode.KEY_FILE -> StegoField.CARRIER
+            else -> StegoField.CREDENTIAL
+        }
+    }
+
+    private fun needsWordingChoice(carrier: CharSequence): Boolean =
+        acceptsUnmarkedCarrier && !naturalWordingSelected && carrier.isNotBlank() &&
+            !StegoCarrierCodec.hasMarker(carrier)
+
+    private fun requestWordingChoice(carrier: CharSequence): Boolean {
+        if (!needsWordingChoice(carrier)) return false
+        field = StegoField.CARRIER
+        notice = R.string.stego_choose_received_style
+        render()
+        chooseWordingProfile()
+        return true
     }
 
     /** Only a validated detached encrypted block may accompany a cover-source detour. */
     fun detachedCarrierForPaste(): CharArray? {
-        if (!editable() || !decrypt) return null
+        if (!editable() || !decrypt || naturalWordingSelected) return null
         val value = drafts[StegoField.CARRIER]?.committedText() ?: return null
         if (!StegoCarrierCodec.isDetached(value)) return null
         val chars = value.toCharArray()
@@ -323,7 +407,7 @@ internal class StegoWorkspace(
         if (action == StegoAction.CLOSE) { notify(R.string.stego_cleared); close(); view.returnToKeyboard(); return }
         if (!current()) { close(); view.closeAuxiliaryInput(); return }
         when (action) {
-            StegoAction.CONFIRM -> if (gate.phase == Phase.EDITING) prepare(true) else submit(false)
+            StegoAction.CONFIRM -> if (gate.phase == Phase.EDITING) prepare(!naturalWordingSelected) else submit(false)
             StegoAction.INSERT -> if (gate.phase == Phase.RESULT)
                 dialogs.confirm(R.string.stego_insert_warning) { submit(true) }
             StegoAction.SAVE -> save(StegoOutput.PLAINTEXT)
@@ -346,10 +430,10 @@ internal class StegoWorkspace(
             StegoAction.ENCRYPT, StegoAction.DECRYPT -> {
                 if (decrypt == (action == StegoAction.DECRYPT)) return
                 decrypt = action == StegoAction.DECRYPT
-                field = if (decrypt) StegoField.CARRIER else StegoField.COVER
+                field = if (decrypt) StegoField.CARRIER else if (naturalWordingSelected) StegoField.SECRET else StegoField.COVER
                 clearSensitive()
             }
-            StegoAction.COVER -> field = StegoField.COVER
+            StegoAction.COVER -> if (!naturalWordingSelected) field = StegoField.COVER
             StegoAction.RANDOM_POETRY -> if (!decrypt && field == StegoField.COVER) {
                 val draft = drafts[field] ?: return
                 if (states[field]?.snapshot?.isComposing == true) notify(R.string.stego_composition_unfinished)
@@ -360,17 +444,23 @@ internal class StegoWorkspace(
             StegoAction.CREDENTIAL -> field = StegoField.CREDENTIAL
             StegoAction.KEY_BITS -> { field = StegoField.KEY_BITS; replaceBits = true }
             StegoAction.GENERATE_KEY -> generateKey()
-            StegoAction.CREDENTIAL_MODE -> if (!decrypt) dialogs.mode(options) {
-                clearCredential(); field = if (options.mode == MessageCredentialMode.KEY_FILE) StegoField.COVER else StegoField.CREDENTIAL
+            StegoAction.CREDENTIAL_MODE -> if (!decrypt) dialogs.mode(options, portableOnly = naturalWordingSelected) {
+                clearCredential()
+                field = if (mode != MessageCredentialMode.KEY_FILE) StegoField.CREDENTIAL
+                    else if (naturalWordingSelected) StegoField.SECRET else StegoField.COVER
                 render()
             }
             StegoAction.CARRIER -> field = StegoField.CARRIER
-            StegoAction.OPTIONS -> dialogs.show(options, decrypt, ::render) {
+            StegoAction.TRANSPORT -> chooseCarrier()
+            StegoAction.OPTIONS -> if (naturalWordingSelected) {
+                if (!decrypt && mode.password) dialogs.cost(options, ::render)
+            } else dialogs.show(options, decrypt, ::chooseCarrier, ::render) {
                 clearCredential()
-                if (options.mode == MessageCredentialMode.KEY_FILE && field == StegoField.CREDENTIAL)
+                if (mode == MessageCredentialMode.KEY_FILE && field == StegoField.CREDENTIAL)
                     field = if (decrypt) StegoField.CARRIER else StegoField.COVER
                 notify(R.string.stego_credentials_changed)
             }
+            StegoAction.RANDOM_STAGE_WIDTHS -> if (naturalWordingSelected && !decrypt) randomStageWidths = !randomStageWidths
             StegoAction.NEXT -> nextField()
             StegoAction.CLEAR_FIELD -> clearField()
             StegoAction.PASTE_FIELD -> pasteMenu(field)
@@ -378,14 +468,65 @@ internal class StegoWorkspace(
             StegoAction.SELECTION -> onSource(action)
             StegoAction.VAULT, StegoAction.VAULT_COVER, StegoAction.VAULT_SECRET ->
                 if (graph().settings.stegoDefaults.vaultPaste) onSource(action)
-            StegoAction.KEY_FILE -> dialogs.confirm(R.string.stego_file_warning) {
-                close(); onSource(StegoAction.KEY_FILE)
-            }
+            StegoAction.KEY_FILE -> if (mode.file) dialogs.confirm(R.string.stego_file_warning) { onSource(StegoAction.KEY_FILE) }
             else -> Unit
         }
         reveal = false
         render()
     }
+
+    private fun chooseCarrier() {
+        val labels = if (decrypt) listOf(R.string.stego_exact_auto) else listOf(R.string.stego_dense, R.string.stego_visible)
+        val choices = labels + if (canChooseWording) R.string.stego_wording_category else R.string.stego_wording_unavailable
+        dialogs.choose(if (decrypt) R.string.stego_received_format else R.string.stego_transport,
+            choices.map(view.context::getString), help = if (decrypt) R.string.stego_receive_help else R.string.stego_send_help) { index ->
+            if (!editable()) return@choose
+            when (val label = choices[index]) {
+                R.string.stego_wording_unavailable -> dialogs.message(
+                    if (localNoteSelected && StegoWordingCodec.available) R.string.stego_wording_local_note
+                    else R.string.stego_wording_explanation)
+                R.string.stego_wording_category -> chooseWordingProfile()
+                else -> {
+                    setWording(null)
+                    if (!decrypt) options.transport = if (label == R.string.stego_dense) StegoTransport.DENSE_UNICODE
+                        else StegoTransport.VISIBLE_BASE64
+                    render()
+                }
+            }
+        }
+    }
+
+    private fun chooseWordingProfile() {
+        val profiles = StegoWordingProfile.entries
+        dialogs.choose(R.string.stego_wording_theme, profiles.map { view.context.getString(it.label) }) { index ->
+            setWording(profiles[index])
+        }
+    }
+
+    private fun setWording(selected: StegoWordingProfile?) {
+        if (!editable() || selected == wordingProfile || selected != null && !canChooseWording) return
+        touch()
+        val wasWording = naturalWordingSelected
+        wordingProfile = selected
+        if (wasWording != naturalWordingSelected) {
+            options.mode = MessageCredentialMode.PASSPHRASE
+            options.kdf = MessageKdf.STANDARD
+            options.stages = if (naturalWordingSelected) wordingStages() else graph().settings.stegoDefaults.stages
+            randomStageWidths = false
+        }
+        clearCredential(); factor?.fill(0); factor = null
+        reveal = false; notice = null
+        field = if (decrypt) StegoField.CARRIER else if (selected != null) StegoField.SECRET else StegoField.COVER
+        render()
+        inspectWordingDraft()
+    }
+
+    private fun inspectWordingDraft() {
+        if (decrypt && naturalWordingSelected && (drafts[StegoField.CARRIER]?.length ?: 0) > 0)
+            enqueue(MessageKdf.NONE, insert = false, inspectWording = true)
+    }
+
+    private fun wordingStages(): List<MessageStage> = listOf(MessageStage(MessageCipher.AES), MessageStage(MessageCipher.XCHACHA20))
 
     private fun updateAlgorithm(id: Int, update: (MessageCipher) -> Unit) {
         if (!editable() || decrypt) return
@@ -412,9 +553,20 @@ internal class StegoWorkspace(
     }
 
     private fun nextField() {
+        if (naturalWordingSelected) {
+            if (decrypt && field == StegoField.CARRIER && (drafts[field]?.length ?: 0) > 0) {
+                inspectWordingDraft()
+                return
+            }
+            field = if (field == StegoField.CREDENTIAL || mode == MessageCredentialMode.KEY_FILE) {
+                if (decrypt) StegoField.CARRIER else StegoField.SECRET
+            } else StegoField.CREDENTIAL
+            return
+        }
         if (decrypt && field == StegoField.CARRIER) {
             val chars = submittedField(field) ?: return
             try {
+                if (requestWordingChoice(java.nio.CharBuffer.wrap(chars))) return
                 val requirements = inspectCarrier(chars)
                 options.mode = requirements.mode; options.kdf = requirements.kdf
             } catch (_: Exception) { notify(R.string.stego_failed); return }
@@ -454,6 +606,10 @@ internal class StegoWorkspace(
     private fun prepare(insert: Boolean = false) {
         if (!editable()) return
         touch()
+        if (naturalWordingSelected) {
+            prepareWording()
+            return
+        }
         if (!decrypt && options.stages.isEmpty()) { notify(R.string.stego_choose_algorithm); render(); return }
         if (insert && (decrypt || !isKeyboard || commitTarget() == null)) {
             notify(R.string.stego_commit_unavailable); render(); return
@@ -462,13 +618,16 @@ internal class StegoWorkspace(
         val kdf = try {
             if (decrypt) {
                 val carrier = submittedField(StegoField.CARRIER) ?: return
-                val requirements = try { inspectCarrier(carrier) } finally { carrier.fill('\u0000') }
+                val requirements = try {
+                    if (requestWordingChoice(java.nio.CharBuffer.wrap(carrier))) return
+                    inspectCarrier(carrier)
+                } finally { carrier.fill('\u0000') }
                 options.mode = requirements.mode
                 options.kdf = requirements.kdf
                 render()
                 requirements.kdf
             } else if (options.mode.password) options.kdf else MessageKdf.NONE
-        } catch (_: Exception) { notify(R.string.stego_failed); return }
+        } catch (_: Exception) { notify(R.string.stego_carrier_invalid); render(); return }
         if (options.mode.file && factor == null) { notify(R.string.stego_file_missing); return }
         if (isKeyboard && options.mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD) {
             dialogs.confirm(R.string.stego_local_move) {
@@ -480,6 +639,45 @@ internal class StegoWorkspace(
         if (kdf == MessageKdf.INCREASED || kdf == MessageKdf.HIGH_MEMORY)
             dialogs.confirm(R.string.stego_cost_warning) { enqueue(kdf, insert) }
         else enqueue(kdf, insert)
+    }
+
+    private fun prepareWording() {
+        val input = if (decrypt) StegoField.CARRIER else StegoField.SECRET
+        val draft = drafts[input] ?: return
+        val credentialIssue = wordingCredentialIssue()
+        val problem = when {
+            draft.submissionBlockReason == LocalDraftInput.SubmissionBlockReason.LENGTH_LIMIT -> R.string.stego_length_limit
+            draft.length == 0 && draft.submissionBlockReason == null ->
+                if (decrypt) R.string.stego_wording_carrier_required else R.string.stego_secret_required
+            !decrypt && options.stages.isEmpty() -> R.string.stego_choose_algorithm
+            else -> null
+        }
+        if (problem != null) {
+            field = input
+            notice = problem
+        } else if (!decrypt && credentialIssue != null) {
+            if (credentialIssue != R.string.stego_file_missing) field = StegoField.CREDENTIAL
+            notice = credentialIssue
+        } else {
+            val kdf = if (mode.password) options.kdf else MessageKdf.NONE
+            if (credentialIssue == null && (kdf == MessageKdf.INCREASED || kdf == MessageKdf.HIGH_MEMORY)) {
+                if (!StegoOptions.available(kdf)) { notify(R.string.stego_memory_unavailable); render() }
+                else dialogs.confirm(R.string.stego_cost_warning) { enqueue(kdf, false) }
+            } else enqueue(kdf, false)
+            return
+        }
+        reveal = false
+        render()
+    }
+
+    private fun wordingCredentialIssue(): Int? {
+        if (mode.file && factor == null) return R.string.stego_file_missing
+        if (mode == MessageCredentialMode.KEY_FILE) return null
+        val bytes = dev.zeroinput.ime.input.exactUtf8ByteLength(credential)
+        if (credentialLimit || bytes == null || bytes > MessageLimits.CREDENTIAL_BYTES) return R.string.stego_wording_credential_limit
+        if (mode.password) return if (credential.isEmpty()) R.string.stego_wording_password_required else null
+        if (credential.length in 43..683) return null
+        return if (decrypt) R.string.stego_wording_receive_key else R.string.stego_wording_send_key
     }
 
     private fun moveEncryptedNote() {
@@ -506,19 +704,21 @@ internal class StegoWorkspace(
         biometric?.start(!decrypt) { current() && gate.accepts(token) }
     }
 
-    private fun enqueue(kdf: MessageKdf, insert: Boolean, mac: javax.crypto.Mac? = null) {
+    private fun enqueue(kdf: MessageKdf, insert: Boolean, mac: javax.crypto.Mac? = null, inspectWording: Boolean = false) {
         if (!editable()) return
-        val cover = submittedField(StegoField.COVER) ?: return
-        val secret = submittedField(StegoField.SECRET) ?: run {
+        val cover = if (naturalWordingSelected) CharArray(0) else submittedField(StegoField.COVER) ?: return
+        val secret = (if (naturalWordingSelected && decrypt) CharArray(0) else submittedField(StegoField.SECRET)) ?: run {
             cover.fill('\u0000'); return
         }
-        val carrier = submittedField(StegoField.CARRIER) ?: run {
+        val carrier = (if (naturalWordingSelected && !decrypt) CharArray(0) else submittedField(StegoField.CARRIER)) ?: run {
             cover.fill('\u0000'); secret.fill('\u0000'); return
         }
         val invalid = when {
-            !decrypt && cover.isEmpty() -> R.string.stego_cover_required
+            !decrypt && !naturalWordingSelected && cover.isEmpty() -> R.string.stego_cover_required
             !decrypt && secret.isEmpty() -> R.string.stego_secret_required
-            !decrypt && options.mode.password && Character.codePointCount(credential, 0, credential.length) < 12 -> R.string.stego_passphrase_required
+            decrypt && naturalWordingSelected && carrier.isEmpty() -> R.string.stego_wording_carrier_required
+            !decrypt && !naturalWordingSelected && mode.password &&
+                Character.codePointCount(credential, 0, credential.length) < 12 -> R.string.stego_passphrase_required
             else -> null
         }
         if (invalid != null) {
@@ -526,23 +726,24 @@ internal class StegoWorkspace(
             notify(invalid); render(); return
         }
         // Recheck the exact owned buffer handed to the worker, including after a cost dialog.
-        if (decrypt) try {
+        if (decrypt && !naturalWordingSelected) try {
             val requirements = inspectCarrier(carrier, String(cover))
             if (requirements.mode != options.mode || requirements.kdf != kdf) throw MessageFailure()
         } catch (_: Exception) {
             cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000')
             notify(R.string.stego_failed); render(); return
         }
-        if (options.mode == MessageCredentialMode.LOCAL_BIOMETRIC_PASSWORD && mac == null) {
+        if (localNoteSelected && mac == null) {
             cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000')
             if (decrypt) dialogs.confirm(R.string.stego_local_warning) { authenticateLocal(kdf, insert) }
             else authenticateLocal(kdf, insert)
             return
         }
-        val chars = CharArray(credential.length) { credential[it] }
-        val master = MessageCredential(options.mode, chars, if (options.mode.file) factor else null, mac)
-        chars.fill('\u0000')
-        val token = gate.begin() ?: run { master.close(); cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000'); return }
+        val master = if (inspectWording) null else {
+            val chars = CharArray(credential.length) { credential[it] }
+            try { MessageCredential(mode, chars, if (mode.file) factor else null, mac) } finally { chars.fill('\u0000') }
+        }
+        val token = gate.begin() ?: run { master?.close(); cover.fill('\u0000'); secret.fill('\u0000'); carrier.fill('\u0000'); return }
         val lease = StegoCryptoOperation(token, SystemClock.elapsedRealtime() + 120_000)
         pending = lease
         notice = null
@@ -552,8 +753,10 @@ internal class StegoWorkspace(
         val target = if (!isDecrypt && isKeyboard) commitTarget() else null
         boundCommit = target
         insertOnReady = insert
+        val wordingAssets = if (naturalWordingSelected) view.context.applicationContext.assets else null
         val task = StegoCryptoTask(lease, WeakReference(this), main, isDecrypt, stages, transport, kdf,
-            cover, secret, carrier, master)
+            cover, secret, carrier, master, wordingProfile, wordingAssets, randomStageWidths,
+            if (naturalWordingSelected && !inspectWording) wordingCredentialIssue() else null, inspectWording)
         render()
         try {
             StegoCryptoWorker.executor.execute(task)
@@ -576,9 +779,21 @@ internal class StegoWorkspace(
         lease.close()
         pending = null
         if (delivery.encoded == null && delivery.result == null) {
-            gate.fail(token); notify(if (delivery.memoryUnavailable) R.string.stego_memory_unavailable else R.string.stego_failed)
+            gate.fail(token)
+            if (gate.phase != Phase.EDITING) { delivery.close(); return }
+            val requirements = delivery.requirements
+            if (requirements != null) showWordingRequirements(requirements, delivery.inspectingWording)
+            else {
+                val failure = if (naturalWordingSelected && delivery.failure == R.string.stego_failed) {
+                    if (decrypt) R.string.stego_wording_open_failed else R.string.stego_wording_generate_failed
+                } else delivery.failure
+                if (naturalWordingSelected && decrypt && failure != R.string.stego_file_missing &&
+                    failure == wordingCredentialIssue()) field = StegoField.CREDENTIAL
+                notify(failure)
+            }
         } else if (gate.complete(token, delivery.result != null)) {
             prepared = delivery.encoded; result = delivery.result; delivery.result = null
+            wordingPreview = delivery.wording
             outputs = delivery.outputs; delivery.outputs = null
             reveal = false
             clearCredential()
@@ -588,6 +803,17 @@ internal class StegoWorkspace(
         delivery.close()
         if (insertOnReady && gate.phase == Phase.PREVIEW) { submit(false); return }
         render()
+    }
+
+    private fun showWordingRequirements(requirements: MessageRequirements, inspectedOnly: Boolean) {
+        if (mode != requirements.mode) clearCredential()
+        options.mode = requirements.mode
+        options.kdf = requirements.kdf
+        reveal = false
+        field = if (mode == MessageCredentialMode.KEY_FILE) StegoField.CARRIER else StegoField.CREDENTIAL
+        val message = wordingCredentialIssue() ?: R.string.stego_wording_requirements.takeUnless { inspectedOnly }
+        notice = message
+        if (!inspectedOnly && message != null) notifyUser(message)
     }
 
     private fun submit(plaintext: Boolean) {
@@ -611,13 +837,14 @@ internal class StegoWorkspace(
         val hidden = hasResult || field == StegoField.SECRET || field == StegoField.CREDENTIAL
         val text = when {
             hasResult -> if (reveal) result?.let(::String).orEmpty() else "•".repeat((result?.size ?: 0).coerceAtMost(32))
-            preview -> drafts[StegoField.COVER]?.committedText().orEmpty()
+            preview -> wordingPreview?.text ?: drafts[StegoField.COVER]?.committedText().orEmpty()
             field == StegoField.CREDENTIAL -> if (reveal) credential.toString() else "•".repeat(credential.length.coerceAtMost(32))
             hidden && !reveal -> "•".repeat((drafts[field]?.length ?: 0).coerceAtMost(32))
             else -> fieldDisplay(field).text
         }
         val status = when {
             busy -> view.context.getString(if (notice == R.string.stego_local_touch) R.string.stego_local_touch else R.string.stego_busy)
+            preview && naturalWordingSelected -> wordingPreview?.let(::wordingStatus).orEmpty()
             preview -> view.context.getString(R.string.stego_preview, text, prepared?.length ?: 0,
                 prepared?.let(StegoCarrierCodec::utf8Length) ?: 0)
             hasResult -> view.context.getString(R.string.stego_result)
@@ -625,24 +852,51 @@ internal class StegoWorkspace(
                 val seconds = ((gate.remainingMillis() + 999) / 1000).toInt()
                 view.resources.getQuantityString(R.plurals.stego_expiry_warning, seconds, seconds)
             }
+            naturalWordingSelected && notice == null -> wordingHelp()
             field == StegoField.CREDENTIAL && notice == null -> view.context.getString(
                 if (isRandomMode()) R.string.stego_random_key_help else R.string.stego_credential_input_help)
             else -> view.context.getString(notice ?: if (decrypt) R.string.stego_shared_ready else R.string.stego_intro)
         }
-        val detached = decrypt && StegoCarrierCodec.isDetached(drafts[StegoField.CARRIER]?.committedText().orEmpty())
+        val detached = decrypt && !naturalWordingSelected && StegoCarrierCodec.isDetached(drafts[StegoField.CARRIER]?.committedText().orEmpty())
+        val pinNotice = decrypt || naturalWordingSelected || notice == R.string.stego_system_paste_no_text
+        val actionNotice = if (pinNotice && !busy && !preview && !hasResult)
+            notice?.let(view.context::getString).orEmpty() else ""
         view.textStegoPanel.render(StegoUiState(decrypt, field, text, busy, preview, reveal, hasResult,
             isKeyboard, if (detached && !hasResult && !busy && notice == null) view.context.getString(R.string.stego_detached_hint) else status,
-            if (decrypt) view.context.getString(R.string.stego_decrypt_options_fixed) else options.summary(view, factor != null),
-            options.mode != MessageCredentialMode.KEY_FILE,
-            options.mode.file, detached, field != StegoField.CREDENTIAL &&
+            if (decrypt) view.context.getString(R.string.stego_decrypt_options_fixed)
+                else options.summary(view, factor != null, wordingProfile?.label ?: options.transportLabel),
+            mode != MessageCredentialMode.KEY_FILE,
+            mode.file, detached, field != StegoField.CREDENTIAL &&
                 ((drafts[field]?.length ?: 0) > 0 || states[field]?.snapshot?.isComposing == true),
             fields = fieldDisplays(), algorithms = stegoAlgorithmRows(options.stages),
-            randomKey = isRandomMode(), credentialMode = view.context.getString(StegoOptions.MODE_LABELS[options.mode.ordinal]),
+            randomKey = isRandomMode(), credentialMode = view.context.getString(StegoOptions.MODE_LABELS[mode.ordinal]),
             canPaste = graph().settings.stegoDefaults.let { it.vaultPaste && graph().settings.secureClipboardEnabled || it.systemPaste },
-            canVaultPaste = graph().settings.stegoDefaults.vaultPaste && graph().settings.secureClipboardEnabled),
+            canVaultPaste = graph().settings.stegoDefaults.vaultPaste && graph().settings.secureClipboardEnabled,
+            naturalWording = naturalWordingSelected,
+            wordingPassword = mode.password, randomStageWidths = randomStageWidths,
+            carrierChoice = if (canChooseWording) carrierLabel() else "",
+            actionNotice = actionNotice, fileReady = factor != null),
             if (hidden && !reveal) null else carets[field])
-        view.renderTextStegoInput(if (busy || preview || hasResult || field == StegoField.CREDENTIAL) null else states[field])
+        view.renderTextStegoInput(if (busy || preview || hasResult || field == StegoField.CREDENTIAL) null else states[field],
+            readOnly = naturalWordingSelected && (preview || hasResult))
     }
+
+    private fun carrierLabel(): String = view.context.getString(when {
+        naturalWordingSelected -> requireNotNull(wordingProfile).label
+        decrypt -> R.string.stego_exact_auto
+        else -> options.transportLabel
+    })
+
+    private fun wordingHelp(): String = when {
+        field == StegoField.CREDENTIAL && mode.password -> view.context.getString(R.string.stego_wording_password_help)
+        field == StegoField.CREDENTIAL && isRandomMode() -> view.context.getString(R.string.stego_random_key_help)
+        decrypt -> view.context.getString(R.string.stego_wording_receive)
+        else -> view.context.getString(R.string.stego_wording_draft, drafts[StegoField.SECRET]?.committedUtf8Bytes() ?: 0)
+    }
+
+    private fun wordingStatus(carrier: StegoWordingCarrier): String =
+        view.context.getString(R.string.stego_wording_preview, carrier.originalBytes, carrier.utf8Bytes,
+            carrier.utilizationPercent)
 
     private fun fieldDisplays(): Map<StegoField, StegoFieldUi> = StegoField.entries.associateWith(::fieldDisplay)
 
@@ -676,7 +930,7 @@ internal class StegoWorkspace(
     }
 
     private fun editable(): Boolean = current() && gate.phase == Phase.EDITING
-    private fun touch() { gate.touch(); onDraftActivity() }
+    private fun touch() { draftInteraction++; gate.touch(); onDraftActivity() }
     private fun notify(id: Int) { notice = id; notifyUser(id) }
     private fun clearCredential() {
         for (i in credential.indices) credential.setCharAt(i, '\u0000')
@@ -685,12 +939,15 @@ internal class StegoWorkspace(
     private fun clearSensitive() { clearCredential(); drafts[StegoField.SECRET]?.clear(); clearPrepared(); reveal = false }
     private fun clearPrepared() {
         prepared = null; boundCommit = null; insertOnReady = false; result?.fill('\u0000'); result = null
+        wordingPreview = null
         outputs?.close(); outputs = null
     }
 
     override fun close() {
         workspaceGeneration++
         valid.set(false)
+        wordingProfile = null
+        randomStageWidths = false
         biometric?.close(); biometric = null
         gate.close(); pending?.close(); pending = null; main.removeCallbacks(expire)
         dialogs.close(); clearCredential(); factor?.fill(0); factor = null; clearPrepared()

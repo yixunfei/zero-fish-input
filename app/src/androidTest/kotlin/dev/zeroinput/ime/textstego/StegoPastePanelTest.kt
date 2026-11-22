@@ -113,6 +113,12 @@ class StegoPastePanelTest {
                 panel.onPasteRequested(StegoField.SECRET)
                 panel.onPasteRequested(StegoField.CREDENTIAL)
                 assertEquals(1, sources.size)
+                panel.onPasteRequested(StegoField.COVER)
+                assertTrue(workspace?.pasteText(StegoField.COVER, "public edit while the menu is open") == true)
+            }
+            Device.click(Device.context.getString(dev.zeroinput.ime.R.string.stego_paste_vault))
+            scenario.onActivity { activity ->
+                assertEquals("A source choice for an older draft must be revoked", 1, sources.size)
                 workspace?.close(); activity.keyboard.release()
             }
         }

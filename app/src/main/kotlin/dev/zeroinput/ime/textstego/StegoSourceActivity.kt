@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.*
+import android.provider.DocumentsContract
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -44,6 +45,8 @@ class StegoSourceActivity : AppCompatActivity() {
     private var selectedId: String? = null
     private var vaultTarget = StegoField.CARRIER
     private var vaultLocalNote = false
+    private var vaultWording: StegoWordingProfile? = null
+    private var fileUse: StegoWordingFile? = null
     private var selectedUri: Uri? = null
     private var resumed = false
     private var detour = false
@@ -56,6 +59,7 @@ class StegoSourceActivity : AppCompatActivity() {
     private var settingsObserver: AutoCloseable? = null
     private var dialog: StegoOptionsDialog? = null
     private val fileRead = AtomicReference<StegoKeyFileRead?>()
+    private val fileWrite = AtomicReference<StegoKeyFileWrite?>()
     private var timeoutMessage = R.string.stego_expired
     private val expire = Runnable { message(timeoutMessage); discard() }
     private val screenOff = object : BroadcastReceiver() {
@@ -74,6 +78,8 @@ class StegoSourceActivity : AppCompatActivity() {
         if (request == null || !isPrivateDraftDeviceAvailable(this)) { discard(); return }
         generation = requireNotNull(request).generation
         vaultTarget = requireNotNull(request).target
+        vaultWording = requireNotNull(request).wording
+        fileUse = request?.fileUse
         initialVaultList = request?.kind == StegoHandoff.Kind.VAULT && request?.editor != null
         if (generation != graph.secureClipboard.captureGeneration()) { discard(); return }
         settingsObserver = graph.settings.addChangeListener { if (!enabling) main.post { discard() } }
@@ -82,6 +88,9 @@ class StegoSourceActivity : AppCompatActivity() {
         when (request?.kind) {
             StegoHandoff.Kind.CARRIER, StegoHandoff.Kind.LOCAL_NOTE -> launchWorkspace()
             StegoHandoff.Kind.FILE -> showAction(R.string.stego_file_warning, R.string.stego_select_file, ::pickFile)
+            StegoHandoff.Kind.EXPORT_KEY_FILE -> if (StegoWordingCodec.available) {
+                showAction(R.string.stego_export_key_intro, R.string.stego_export_key_location, ::pickKeyDestination)
+            } else discard()
             StegoHandoff.Kind.VAULT -> showAction(R.string.stego_read_start, dev.zeroinput.ime.ui.R.string.stego_vault, ::listVault)
             StegoHandoff.Kind.SAVE -> showAction(R.string.stego_save_start, dev.zeroinput.ime.ui.R.string.stego_save) { authenticate(save = true) }
             null -> discard()
@@ -140,9 +149,13 @@ class StegoSourceActivity : AppCompatActivity() {
         val controller = StegoWorkspace({ graph }, main, view, ::current, { null }, ::message,
             onSource = { action ->
                 when (action) {
-                    StegoAction.KEY_FILE -> pickFile()
+                    StegoAction.KEY_FILE -> {
+                        fileUse = workspace?.wordingFileUse()
+                        pickFile()
+                    }
                     StegoAction.VAULT, StegoAction.VAULT_COVER, StegoAction.VAULT_SECRET -> {
                         vaultLocalNote = workspace?.localNoteSelected == true
+                        vaultWording = workspace?.wordingProfile
                         vaultTarget = when (action) {
                             StegoAction.VAULT_COVER -> StegoField.COVER
                             StegoAction.VAULT_SECRET -> StegoField.SECRET
@@ -175,7 +188,10 @@ class StegoSourceActivity : AppCompatActivity() {
             addView(view, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
             protectInsets(this)
         })
-        controller.open(InputLanguage.CHINESE, ChineseInputOptions(), carrier, file, localNote = request?.kind == StegoHandoff.Kind.LOCAL_NOTE)
+        controller.open(InputLanguage.CHINESE, ChineseInputOptions(), carrier, file,
+            localNote = request?.kind == StegoHandoff.Kind.LOCAL_NOTE, wording = request?.wording,
+            fileUse = fileUse.takeIf { file != null })
+        fileUse = null
         request?.let { source -> if (source.target != StegoField.CARRIER)
             source.text?.let { controller.pasteText(source.target, String(it)) } }
         request?.text?.fill('\u0000'); request?.text = null
@@ -299,12 +315,14 @@ class StegoSourceActivity : AppCompatActivity() {
             }
             val editor = request?.takeIf { it.kind == StegoHandoff.Kind.VAULT }?.editor
             if (editor != null) {
-                val accepted = graph.stegoHandoff.offerPaste(value, editor, vaultTarget, generation, request?.carrier?.copyOf())
+                val accepted = graph.stegoHandoff.offerPaste(value, editor, vaultTarget, generation, request?.carrier?.copyOf(),
+                    wording = vaultWording)
                 message(if (accepted) R.string.stego_paste_return else R.string.stego_paste_failed); discard(); return
             }
             val carrier = request?.carrier?.copyOf()
             val kind = if (vaultLocalNote) StegoHandoff.Kind.LOCAL_NOTE else StegoHandoff.Kind.CARRIER
-            request?.close(); request = StegoHandoff.Request(kind, value, target = vaultTarget, carrier = carrier)
+            request?.close(); request = StegoHandoff.Request(kind, value, target = vaultTarget, carrier = carrier,
+                wording = vaultWording)
             launchWorkspace()
         } else { value?.fill('\u0000'); message(if (success) R.string.clipboard_import_saved else R.string.stego_failed); discard() }
     }
@@ -321,16 +339,35 @@ class StegoSourceActivity : AppCompatActivity() {
         } catch (_: RuntimeException) { discard() }
     }
 
+    @Suppress("DEPRECATION")
+    private fun pickKeyDestination() {
+        if (!current() || request?.kind != StegoHandoff.Kind.EXPORT_KEY_FILE) return
+        detour = true
+        resetDeadline(120_000)
+        try {
+            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .setType("application/octet-stream").addCategory(Intent.CATEGORY_OPENABLE)
+                .putExtra(Intent.EXTRA_LOCAL_ONLY, true).putExtra(Intent.EXTRA_TITLE, "zeroinput.zikey")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION), EXPORT_REQUEST)
+        } catch (_: RuntimeException) { discard() }
+    }
+
     @Deprecated("Uses the bounded legacy Activity result contract")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != FILE_REQUEST || resultCode != RESULT_OK || !deviceReady()) { discard(); return }
+        val exporting = request?.kind == StegoHandoff.Kind.EXPORT_KEY_FILE
+        val expectedCode = if (exporting) EXPORT_REQUEST else FILE_REQUEST
+        if (!detour || resultCode != RESULT_OK || !deviceReady() || requestCode != expectedCode) {
+            discard(); return
+        }
         detour = false
         val uri = data?.data
         if (uri?.scheme != "content" || data.clipData?.itemCount?.let { it != 1 } == true) { discard(); return }
+        if (exporting && !DocumentsContract.isDocumentUri(this, uri)) { discard(); return }
         selectedUri = uri
         resetDeadline(30_000)
-        showAction(R.string.stego_confirm_file, android.R.string.ok, ::readFile)
+        if (exporting) showAction(R.string.stego_export_key_confirm, R.string.stego_export_key_write, ::writeKeyFile)
+        else showAction(R.string.stego_confirm_file, android.R.string.ok, ::readFile)
     }
 
     private fun readFile() {
@@ -363,14 +400,46 @@ class StegoSourceActivity : AppCompatActivity() {
         try {
             val editor = request?.editor
             if (request?.kind == StegoHandoff.Kind.FILE && editor != null) {
-                graph.stegoHandoff.offerFile(factor, editor)
+                graph.stegoHandoff.offerFile(factor, editor, fileUse)
                 message(R.string.stego_file_imported); discard()
             } else { launchWorkspace(factor); message(R.string.stego_file_imported) }
         } finally { factor.fill(0) }
     }
 
+    private fun writeKeyFile() {
+        if (!current() || !hasWindowFocus() || request?.kind != StegoHandoff.Kind.EXPORT_KEY_FILE) return
+        val uri = selectedUri ?: return
+        selectedUri = null
+        val expected = ++operation
+        resetDeadline(30_000, R.string.stego_export_key_failed)
+        val writeDeadline = deadline
+        showBusy()
+        val context = applicationContext
+        val owner = WeakReference(this)
+        val handler = main
+        val alive = active
+        val vault = graph.secureClipboard
+        val expectedGeneration = generation
+        val write = StegoKeyFileWrite()
+        fileWrite.getAndSet(write)?.close()
+        enqueue {
+            val success = write.write(context.contentResolver, uri) {
+                alive.get() && SystemClock.elapsedRealtime() < writeDeadline &&
+                    expectedGeneration == vault.captureGeneration() && isPrivateDraftDeviceAvailable(context)
+            }
+            handler.post { owner.get()?.completeKeyFileExport(expected, success) }
+        }
+    }
+
+    private fun completeKeyFileExport(expected: Long, success: Boolean) {
+        if (!current() || expected != operation) return
+        message(if (success) R.string.stego_export_key_done else R.string.stego_export_key_failed)
+        discard()
+    }
+
     private fun closeFile() {
         fileRead.getAndSet(null)?.close()
+        fileWrite.getAndSet(null)?.close()
     }
 
     private fun showBusy() { showAction(R.string.stego_busy, null) {} }
@@ -411,5 +480,6 @@ class StegoSourceActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_TOKEN = "dev.zeroinput.ime.textstego.TOKEN"
         private const val FILE_REQUEST = 1
+        private const val EXPORT_REQUEST = 2
     }
 }

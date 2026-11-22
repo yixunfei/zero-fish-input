@@ -66,7 +66,7 @@ class MessageVectorsTest {
             MessageCredential(mode, text.toCharArray(), if (mode.file) file else null).use { credential ->
                 val expected = bytes(fixtures().single { it.startsWith("# credential-root-${mode.id}=") }.substringAfter('='))
                 val actual = MessageKeys.root(credential, ByteArray(16) { it.toByte() },
-                    if (mode.password) MessageKdf.STANDARD else MessageKdf.NONE, true)
+                    if (mode.password) MessageKdf.STANDARD else MessageKdf.NONE, 12)
                 assertArrayEquals(expected, actual)
                 actual.fill(0)
             }

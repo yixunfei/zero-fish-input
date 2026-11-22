@@ -1,27 +1,1303 @@
 # Project status
 
-Updated 2026-11-20.
+Updated 2026-11-22.
+
+## Distributed carriers, settings and import audit (2026-11-22)
+
+The two exact-cover transports write and read the [distributed format](adr/0042-distributed-exact-carriers.md).
+Old terminal complete carriers require an older app. Detached ciphertext and
+the three Debug wording profiles retain their exchange formats. The settings
+sample button was retired, and the send/receive carrier choosers include
+usage help. Damaged carrier markers block AI import. Stego dialogs filter
+obscured touches and discard a failed window-token presentation.
+
+Real-Rime x86_64 Debug, unit tests, privacyCheck, Debug lint and merged
+manifest checks passed. Android API 37 instrumentation passed 10 cases for
+the real keyboard, import host, carrier help, settings and session changes.
+Two of these cases also passed in the 800x1600 landscape/night configuration.
+Physical ARM64 transfer through third-party messaging apps remains unmeasured.
+
+The new [full ARM64 Debug APK](../app/build/outputs/test-apk/20261122-223054/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+is 97,777,830 bytes. The package checks and all three distribution hashes passed.
+The full unsigned ARM64 Release passes resource verification. See the
+[package size measurements](apk-size-optimization.md#steganography-review-2026-11-22).
+Reproduce with the Gradle commands in AGENTS.md and
+`python tools/resources/verify-apk.py full <apk> --abis arm64-v8a`.
+
+## ARM64 Debug package and archive cleanup (2026-11-22)
+
+[0.7.7 Debug APK](../app/build/outputs/test-apk/20261122-215247/zero-fish-input-0.7.7-debug-arm64-v8a.apk) · [Distribution checksums](../app/build/outputs/test-apk/20261122-215247/SHA256SUMS.txt).
+The full package is 97,773,670 bytes. The real-Rime build, unit tests,
+privacyCheck, Debug lint, signature, ABI, permissions and resource checks
+passed. All three delivery hashes were verified. Physical ARM64 installation
+remains untested for this build. Rebuild with
+`./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000`.
+
+Packaging refreshed the Debug APK staging directories. Five superseded
+deliveries were pruned of their APK and two ZIPs (15 files, 706,928,734 bytes).
+Their metadata and checksum manifests remain. Historical artifact links for
+20261121-000415, 20261121-110558, 20261121-133504, 20261121-135354 and
+20261122-004322 now refer to retired files. Retained successors with matching
+wording resource sets are 20261121-101521, 20261121-121543,
+20261121-140758 (for both middle builds) and 20261122-103554 respectively.
+
+## Natural wording Debug trial closed (2026-11-22)
+
+Five-character verse, seven-character verse and window observations are
+maintained in the protected Debug keyboard. Both directions use the same style
+labels. Starting decryption on unmarked text opens the explicit style picker;
+choosing the wrong style preserves the carrier for correction. Preview reports
+the original and complete UTF-8 byte counts and their measured ratio. The 20%
+benchmark remains in research and in the separately named public five-character
+verse sample. The existing profile digests, encodings and wrapped envelope
+remain the basis of exchange. Release is still subject to the existing gates.
+
+Baichuan2 + Discop + Basic (top-k 256) is deferred. The estimated saving over
+the archived Daily sample is about 22%. Model cost, whole-text naturalness and
+cross-device recovery need evidence before reconsideration.
+[Candidate evidence and decision](natural-wording-steganography.md#baichuan2-basic) ·
+[Keyboard workflow](themed-verse/android-test-build.md) · [ADR 0041](adr/0041-natural-wording-trial.md)
+
+Validation used JDK 21 and the real Rime x86_64 Debug build. The Debug unit
+suite passed (1,143 passed, 2 skipped), along with privacyCheck, Debug lint,
+Release Kotlin compilation, merged assets and manifest checks. The Debug APK
+contained ten wording assets and a private public-sample Activity; the Release
+merged outputs excluded both. On API 37, six targeted tests passed in English,
+including all three actual IME round trips, the eight-Han budget, and two
+public-sample page tests. Simplified Chinese dark mode passed for five-character
+verse and window observations at 480×854, 200 dpi and 1.3 font scale, and for
+seven-character verse in landscape. The IME test now resolves expected labels
+from the keyboard's resources, including when app and system languages differ.
+Physical ARM64 validation and independent full-text reading/detection reviews
+remain open. [Reproduction commands](themed-verse/android-test-build.md#当前回归)
+
+## Eight-Han passphrase messages in Android prose (2026-11-22)
+
+One independently chosen 24 B UTF-8 fixture was encrypted with a fresh test
+passphrase and the standard KDF. Each entry below measures one complete
+generated carrier, including punctuation and line breaks. Each was opened
+through the APK's own wording receiver and matched the original. The emulator
+ran API 37. The current x86_64 build and the archived 20261122-103554 ARM64
+build (under translation) both gave the window results.
+
+| Debug prose APK | Single AES-256-GCM | AES-256-GCM + XChaCha20-Poly1305 |
+| --- | ---: | ---: |
+| Daily, 20261121-140758 | 2,927 B (0.82%) | 3,763 B (0.64%) |
+| Daily, 20261121-150811 | 2,201 B (1.09%) | 3,015 B (0.80%) |
+| Current window | 3,825 B (0.63%) | 5,271 B (0.46%) |
+
+The current single and double envelopes measured 194 and 268 B. Both are
+already in their 64 B minimum inner frame. The 20% goal would allow just
+120 B of complete prose. The pinned window grammar has 6,420,585,568,352
+complete, nonempty texts up to that length, enough for every five-byte
+framed value. The number of variants and actual final bytes constrain short
+messages even after removing most of the cryptographic overhead.
+
+A host candidate adds concise clauses only to existing transitions, dropping
+ambiguous destinations and matches to normalized source sentences. Its
+median complete carriers were 3,687 B (0.65%) and 5,082 B (0.47%) for the same
+two envelope sizes. All 408 surface round trips passed across six sizes and
+two grammars, including all-zero and all-one endpoints. The four smaller
+sizes (48, 53, 64 and 69 B) benchmark transport only. With a 69 B input the
+candidate needs 1,314–1,317 B. An authenticated compact **passphrase** format
+and an independent prose reading review remain open. The Android keyboard
+still uses the pinned grammar and wrapped envelope in ADR 0041.
+
+Rebuild the Debug APKs and run the regression on the dedicated test emulator:
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest --offline --no-parallel -PrequireRime=true "-Pandroid.injected.build.abi=x86_64" "-Pandroid.injected.testOnly=false"
+# After installing both APKs on the selected test emulator:
+adb -s $serial shell am instrument -w -r -e class dev.zeroinput.ime.textstego.ShortProsePlatformTest dev.zeroinput.ime.debug.test/androidx.test.runner.AndroidJUnitRunner
+# For the two archived Daily APKs above, add "-e archivedDaily true" before the runner name.
+$py = './build/model-evaluation/prose-python314/python.exe'
+$run = "import runpy,sys; sys.path.insert(0,'tools/themed-verse'); runpy.run_path(sys.argv.pop(1),run_name='__main__')"
+& $py -X utf8 -B -c $run tools/themed-verse/short_prose_probe.py build/model-evaluation/corpus-coverage-sources/cmn_sentences_detailed.tsv.bz2
+```
+
+## Lossless narrative body compression on the host (2026-11-22)
+
+Five-character sparse same-scene verse now meets the 20% target on 38/40
+locked calibration bodies, up from 17/40. Work records improved from 16/20
+to 20/20 and free narratives from 1/20 to 18/20. This experiment changed the
+body representation. Both runs used identical verse choices, punctuation,
+hard limits, two encryption layers and padding. Each receiver independently
+rebuilt its public resources and authenticated the complete carrier.
+
+| Verse route | Exact bodies before → after | At least 20% before → after | Capacity rejects after |
+| --- | ---: | ---: | ---: |
+| Five, free | 40 → 40 | 28 → 40 | 0 |
+| Five, sparse same scene | 40 → 40 | 17 → 38 | 0 |
+| Five, sparse source couplet | 40 → 40 | 9 → 22 | 0 |
+| Seven, free | 38 → 40 | 1 → 7 | 0 |
+| Seven, sparse same scene | 28 → 40 | 0 → 0 | 0 |
+| Seven, sparse source couplet | 20 → 38 | 0 → 0 | 2 |
+
+The new candidates use the existing Rime Essay frequency file and frozen
+ZWC1 model. A dictionary leaf can supply its original or simplified spelling
+according to the selected mode. The encoder matches the exact input bytes.
+Literals and references to earlier bytes in the same message handle other
+text and repetitions. A new mode wins only when the padded envelope shrinks.
+39/40 envelopes shrank, one tied, and their total fell from 44,256 to
+37,792 B. The host decoded both candidate streams before selection when they
+fit. The unchanged modes remain eligible when they win or tie.
+[Codec and profile specification](themed-verse/word-context-probe.md#rime-essay-host-body)
+
+| Calibration genre | Original envelope total | With lexical tables only¹ | With same-message copies | Guaranteed five-character same-scene passes at each step |
+| --- | ---: | ---: | ---: | --- |
+| Work records | 18,736 B | 17,264 B | 16,688 B | 16 → 20 → 20 |
+| Free narratives | 25,520 B | 21,744 B | 21,104 B | 1 → 16 → 18 |
+
+¹ The middle column charges the exact token costs for both spellings in the
+same tree with copy choices disabled and includes the original body modes.
+Its passes use the per-sample worst-case carrier budget. The first and last
+arms also ran the full carrier exchange. In the new five-character same-scene
+arm, `pg-52238` needs 46 more stream bytes saved and `pg-52267` needs 9 to
+guarantee the target. Seven-character sparse same-scene still needs a median
+183.5 B saved across the 40 misses. The 60 holdout bodies remain sealed.
+
+All 238 emitted carriers recovered exact originals, with zero authentication
+or byte mismatches. An independent Java implementation rebuilt the frequency
+tree from the public sources and decoded 232 new-mode packets. The compiled
+Android Debug Kotlin codec checked the other six packets and reproduced their
+encoding. Additional JVM tests include mixed scripts, combining characters,
+CRLF, 1/2,045/2,046/2,048-byte bodies, overlap, invalid references, truncation,
+UTF-8 and padding (14 valid and 18 rejected Essay controls). Existing public
+vectors, binary prototype, sparse boundary/mixed-batch tests, Debug wording
+unit tests and `privacyCheck` passed.
+
+The new modes are host research. The reader packet contains 38 qualifying
+whole carriers and 38 ordinary controls matching each carrier's exact length,
+layout and scheduled scene groups. It awaits independent scores. The packet
+has no length-matched historical human-written control. Further evaluation
+needs whole-carrier reading scores and mobile model memory/load measurements
+before selecting a new Android profile. Sparse and dense seven-character
+capacity and whole-carrier naturalness are separate open issues.
+
+From the repository root, use the prepared assets and build prerequisites in
+the preceding sparse study below. The source Rime Essay table is already
+pinned by `tools/bootstrap-rime.ps1`.
+
+```powershell
+$py = './build/model-evaluation/prose-python314/python.exe'
+$toolsDir = 'tools/themed-verse'
+$cal = '.tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final'
+$tang = 'build/model-evaluation/corpus-coverage-sources/tang-20000.json'
+$out = Join-Path '.tmp-evidence' ('essay-verse-' + [guid]::NewGuid())
+& $py -X utf8 -B "$toolsDir/scene_roundtrip.py" run --essay-body --sparse-source $tang $cal $out
+& $py -X utf8 -B "$toolsDir/check_scene_kotlin.py" --essay-body --sparse-source $tang $cal $out
+& $py -X utf8 -B "$toolsDir/p2_theme_reading.py" $out "$out/blind" --sparse-source $tang
+```
+
+The recorded baseline is `.tmp-evidence/essay-body-baseline-20261122`.
+The new run is `.tmp-evidence/essay-lexical-final-20261122`. Its
+`report.json` records both spellings, copy counts, padded sizes and per-sample
+shortfalls. `jvm-body.json` records independent decoding.
+`blind/readers/scores.md` opens the anonymous full texts.
+
+## Sparse verse capacity and independent byte recovery (2026-11-22)
+
+On the same 40 public P2 calibration bodies, five-character same-scene verse
+recovered 40/40 after limiting the shared scene to the first two lines of
+each eight. The earlier four-line scene rule recovered 20/40. Seven-character
+same-scene recovery rose from 5/40 to 28/40. The six remaining lines in each
+block use the full locked five- or seven-character Wanxiang table. A second
+arm requires a source-ordered Tang couplet in those two positions. A free-line
+control uses the same rank and layout. All arms use the same frozen body
+selector, research AEAD and hard limits as the preceding host study.
+[Sparse verse codec](../tools/themed-verse/sparse_verse.py) · [Source and attribution](../SOURCES.md)
+
+| Route | Guaranteed envelope (B) | Exact bodies / 40 | Exact bytes / 78,622 attempted | Capacity rejects | 20% passes (work / narrative, each of 20) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Five, free control | 1,984 | 40 | 78,622 | 0 | 20 / 8 |
+| Five, sparse same scene | 1,793 | 40 | 78,622 | 0 | 16 / 1 |
+| Five, sparse source couplet | 1,652 | 40 | 78,622 | 0 | 9 / 0 |
+| Seven, free control | 1,391 | 38 | 74,527 | 2 | 1 / 0 |
+| Seven, sparse same scene | 1,267 | 28 | 54,058 | 12 | 0 / 0 |
+| Seven, sparse source couplet | 1,152 | 20 | 37,678 | 20 | 0 / 0 |
+
+The receiver rebuilt its tables independently. All 206 emitted carriers
+authenticated and recovered byte-for-byte. The other 34 exceeded the carrier
+budget. Of the 206, 55 met `V <= 5*S` with all punctuation and newlines
+counted. None fit the ordinary 512-unit / 1,536-byte draft. The report gives
+each sample's guaranteed envelope budget at `5*S`, the largest compressed
+stream fitting that budget with both encryption layers, and the stream bytes
+still needed to save. Among misses, the median saving needed is 157 B for
+five-character sparse same-scene verse and 225 B for its source-couplet arm.
+The 3,691 five-character and 1,412 seven-character ordered pairs retain
+source work ID, author, title and paragraph in the evidence index.
+
+The compiled Android Debug Kotlin body codec independently decoded and
+re-encoded all 206 authenticated body packets and all 102 in the repeated
+baseline. Original bytes and selected packets matched Python in both
+directions. Four extra controls per run exercised 1, 2,045, 2,046 and 2,048
+original bytes. The Kotlin verse decoder also extracted the identical envelope
+from all 68 baseline carriers using the existing frozen five/seven surfaces.
+The sparse surface rank and research AEAD remain host-only. The malformed-file
+regression reproduced a batch abort on invalid UTF-8 before the fix. Invalid
+UTF-8, oversized or truncated carriers now reject individually with no result
+file, and a later valid carrier still recovers.
+[Cross-language check](../tools/themed-verse/check_scene_kotlin.py) · [Boundary checks](../tools/themed-verse/check_scene_receive.py)
+
+Run from the repository root with JDK 21 and the prepared P2, Wanxiang,
+OpenCC and model assets. For first-time source preparation, save the
+[pinned Tang JSON](https://raw.githubusercontent.com/chinese-poetry/chinese-poetry/b8594f81a89752241442f2ce267d6f66f96704ee/%E5%85%A8%E5%94%90%E8%AF%97/poet.tang.20000.json)
+at the path assigned to `$tang`. Both processes verify its SHA-256.
+
+```powershell
+$py = './build/model-evaluation/prose-python314/python.exe'
+$probe = 'tools/themed-verse'
+$cal = '.tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final'
+$tang = 'build/model-evaluation/corpus-coverage-sources/tang-20000.json'
+$out = Join-Path '.tmp-evidence' ('sparse-' + [guid]::NewGuid())
+$base = Join-Path '.tmp-evidence' ('baseline-' + [guid]::NewGuid())
+cargo build --locked --offline --manifest-path tools/stego-vectors/Cargo.toml --bin scene-envelope
+./gradlew.bat :ime-core:bundleLibRuntimeToJarDebug :app:syncVerseTestAssets --offline --no-parallel -PrequireRime=true
+& $py -X utf8 -B "$probe/check_scene_receive.py" $tang
+& $py -X utf8 -B "$probe/scene_roundtrip.py" run --sparse-source $tang $cal $out
+& $py -X utf8 -B "$probe/check_scene_kotlin.py" --sparse-source $tang $cal $out
+& $py -X utf8 -B "$probe/scene_roundtrip.py" run $cal $base
+& $py -X utf8 -B "$probe/check_scene_kotlin.py" $cal $base
+```
+
+Reports are in `.tmp-evidence/sparse-capacity-budget-20261122` and
+`.tmp-evidence/scene-baseline-sparse-control-20261122`. Nine public vectors,
+the binary prototype regression, seven Debug wording unit tests and
+`privacyCheck` passed. Whole-carrier reader scoring, the sealed 60-body
+holdout and physical Android exchange remain open. The next capacity task
+is to compare lossless body encodings against the per-sample shortfall,
+especially on narrative text. Release activation still requires the
+independent evaluations in the implementation plan.
+
+## Authenticated host scene round trips (2026-11-22)
+
+The prior scene comparison replayed synthetic envelopes sized from the 40
+locked P2 calibration bodies. This task sends the actual public bodies through
+the frozen word model, a two-layer authenticated research envelope, and the
+same six five-/seven-character verse routes. Sender and receiver run in
+separate processes. The receiver reloads the locked public dictionaries and
+word-model asset, reconstructs each profile, and reads only the generated
+carriers and public fixture key; it does not load the corpus or sender choices.
+The parent compares recovered files against the locked original bytes.
+[Host runner](../tools/themed-verse/scene_roundtrip.py) ·
+[Frozen-model reader](../tools/themed-verse/scene_word_model.py)
+
+| Verse route | Exact bodies / attempts | Exact bytes / attempted bytes | At least 20% | Carrier capacity | Recovered but below 20% |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Five-character frozen | 40/40 | 78,622/78,622 (100.00%) | 17/40 | 0 | 23 |
+| Five-character same scene | 20/40 | 37,678/78,622 (47.92%) | 0/40 | 20 | 20 |
+| Five-character same image | 9/40 | 15,651/78,622 (19.91%) | 0/40 | 31 | 9 |
+| Seven-character frozen | 28/40 | 54,058/78,622 (68.76%) | 0/40 | 12 | 28 |
+| Seven-character same scene | 5/40 | 7,928/78,622 (10.08%) | 0/40 | 35 | 5 |
+| Seven-character same image | 0/40 | 0/78,622 (0.00%) | 0/40 | 40 | 0 |
+
+The byte numerator counts whole samples recovered exactly; capacity rejections
+remain in the denominator. All 102 produced carriers recovered exactly: there
+were no receiver rejections or byte mismatches. The 138 other attempts could
+not fit the configured carrier. Of the 102 recovered, 85 exceeded `5*S` and
+17 passed, using the complete carrier UTF-8 length. In the frozen five-character
+route the passes were 16/20 work records and 1/20 free narratives. All reported
+carriers met both the 8,192 UTF-16-unit and 16,384-byte limits. Fresh randomness
+can change an individual carrier's length; counts are the observed run.
+
+The reloaded word model matched the original training-derived Huffman and both
+rANS streams for each sample. Modes 5/6/7 were selected 15/19/6 times, and the
+two-layer envelopes totalled 44,256 B, matching the earlier size calculation.
+The public fixture uses fresh per-layer AES-256-GCM and XChaCha20-Poly1305 keys,
+the same padded-size budget, and a **host-only** authenticated profile domain and
+version; this is not a new Android or release format. The receiver separately
+checked mixed Unicode and CRLF, truncated and trailing bodies, wrong lengths and
+modes, missing/changed models, wrong keys or profile digests, and edited carrier,
+header, metadata, body and outer tag. These controls include the seven-character
+same-image route even though no long calibration body fit. Failure cases did not
+publish a recovered file.
+
+Corpus lock SHA-256: `e2c4aeaa4daf6f17e2fa2d1a6871f9183cc58a008a34fd9ea50edc1c94a17652`.
+Word-model SHA-256: `be3ab914d4ce250a2c23db6982cb040a131d7f9ba397d648cb95c641991fc01f`.
+The dictionary source lock's LF SHA-256 is
+`0f04754f84bedce500e965c3f895a444de13136a4d4e3bea68b81f12a2372767`.
+Both processes checked it, verified all 16 prepared tables and recomputed all
+six profile digests against the values pinned in the host runner. The 60
+held-out bodies were not opened.
+
+From the repository root, with the already prepared locked public dictionaries,
+P2 calibration archive and local Python 3.14 runtime with NumPy/ONNX Runtime:
+
+```powershell
+cargo build --locked --offline --manifest-path tools/stego-vectors/Cargo.toml --bin scene-envelope
+$trial = Join-Path '.tmp-evidence' ('scene-real-host-' + [guid]::NewGuid().ToString('N'))
+./build/model-evaluation/prose-python314/python.exe -X utf8 -B tools/themed-verse/scene_roundtrip.py run .tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final $trial
+```
+
+The recorded run is
+`.tmp-evidence/scene-real-host-bdbc2594fee6466f9a50da6b0afed1bf/report.json`;
+it contains per-sample sizes, outcomes and profile digests. Its decoded files
+contain only public fixtures. These are independently reloaded instances of the
+same host implementation, not an independent-language or Android interop test.
+Naturalness, reader scoring, physical devices and held-out acceptance remain
+open. The next research step remains attributed ordered couplets and sparse
+scene constraints, followed by independent whole-carrier review.
+
+The existing nine public surface vectors and binary-prototype checks also
+passed; the latter reads current working-tree documents and is not the frozen
+40-body result above. JDK 21 `privacyCheck` passed for Debug and Release. The
+binary-prototype helper was rebuilt offline from the existing
+`.tmp-evidence/rmw-cargo` cache before its check.
+
+```powershell
+python -X utf8 -B tools/themed-verse/check_vectors.py
+python -X utf8 -B tools/themed-verse/check_binary_prototype.py
+./gradlew.bat privacyCheck --offline --no-parallel -PrequireRime=true
+```
+
+## Natural wording maintenance audit (2026-11-22)
+
+Archived the three superseded window binaries under
+`build/model-evaluation/window-observation-history` after rebuilding
+each byte for byte. The generators remain available for reproducing
+earlier evidence. The current v4 graph and word model retain their
+hashes. The standalone public-fixture workbench still provides the
+single-layer interop regression.
+
+Debug packaging stages verified public assets and synchronizes an
+explicit list. A simulated obsolete file in both staging and the
+packaging directory was absent from the APK, which contained exactly
+ten wording assets. The Release merged assets and manifest exclude
+the Debug fixtures.
+
+The wrapped five- and seven-character surfaces now observe the
+worker lease during ranking, parsing and canonical readback.
+Cancelled readback clears the recovered envelope. Queued deliveries
+are rechecked at handover and any stale plaintext is wiped. The
+wording worker fails closed if the selected profile's asset source
+is unavailable. Host probes now fail when a guaranteed sample is
+rejected or exceeds its bound. Invalid stanza tests mutate a valid
+full-length carrier. Prose and verse replay reports were byte-identical
+to the prior measurements.
+
+JDK 21 passed the Debug builds, full Debug unit suite (1,143 passed,
+2 skipped), privacy checks and Debug lint. Release Kotlin compilation
+and asset merging passed. Ten API 37 x86_64 instrumentation tests
+passed, covering window and seven-character IME round trips, input
+feedback, worker cancellation, the public workbench and the key file.
+The maintenance build did not exercise physical ARM64 hardware.
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest privacyCheck :app:lintDebug :app:mergeReleaseAssets :app:compileReleaseKotlin --offline --no-parallel -PrequireRime=true "-Pandroid.injected.build.abi=x86_64" "-Pandroid.injected.testOnly=false"
+```
+
+## Scene continuity comparison for prose and verse (2026-11-22)
+
+Twelve authored three-sentence window scenes use collocations checked
+against the locked Mandarin snapshot and Wanxiang. They add 141
+sentences and increase the common-inventory codebook coverage from
+440 to 521. The optional paths are nearly always bypassed by the
+length-first rank. A required opening scene emits real new terms. At
+524 B its 64-carrier vocabulary union rises from 417–422 to 441–450.
+The worst carrier grows from 10,302 B to 10,341 B and the guaranteed
+envelope decreases from 833 B to 831 B. Each of the frozen, optional,
+and required routes recovered all 384 packets, including the holdout.
+The frozen and hybrid routes each fit four of the 40 locked bodies and
+none reached 20% utilization. The scene-only route fits 178 B but fails
+at 524 B. The separate contextual rewrite verified 20 variants and
+required exact antecedents. Its best draft carries two bits.
+[Prose measurements and language review](natural-wording-steganography.md#21-同一观察点的三句承接)
+
+Five- and seven-character host probes partition the locked verse lines
+by a reviewed scene or literal image. A scene persists for four lines.
+Both scene pools recruit lines outside the Debug baselines, and all
+six comparisons recovered 384/384 packets per route plus boundary
+vectors. At 524 B the five- and seven-character scene banks emit
+434–463 and 229–244 newly admitted lines per 64 texts. The guarantees
+are 1,150 B and 847 B, below the conservative frozen bounds of 1,728 B
+and 1,229 B. Full-sentence repeat medians stay at zero, while individual
+line repeats increase. Locked body fit with scene banks drops from
+40 to 20 in five-character verse and from 28 to 5 in seven-character verse.
+The new banks have no 20% passes. Sample stanzas still switch narrative
+voices or time periods, even when every line shares a literal image.
+[Verse measurements and language review](natural-wording-steganography.md#22-五言和七言的节内承接)
+
+These candidates remain host probes. The existing Android Debug
+wording regression and `privacyCheck` passed under JDK 21. Remaining
+work is to make short attested links common in the prose rank, and to
+compare sparse verse constraints with attributed, ordered couplets.
+Both routes still need independent language review before app use.
+
+From the repository root, use the prepared local Python 3.14 runtime
+with NumPy and ONNX Runtime, the existing Mini/OpenCC/Wanxiang assets,
+and the locked data paths below. The runner adds the probe directory to
+the embedded runtime's module path.
+
+```powershell
+$py = './build/model-evaluation/prose-python314/python.exe'
+$run = "import runpy,sys; sys.path.insert(0,'tools/themed-verse'); runpy.run_path(sys.argv.pop(1),run_name='__main__')"
+$mandarin = 'build/model-evaluation/corpus-coverage-sources/cmn_sentences_detailed.tsv.bz2'
+$cal = '.tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final'
+& $py -X utf8 -B -c $run tools/themed-verse/prose_scene_runs_probe.py $mandarin --calibration $cal
+& $py -X utf8 -B -c $run tools/themed-verse/prose_scene_rewrite_probe.py
+& $py -X utf8 -B -c $run tools/themed-verse/verse_scene_probe.py $mandarin --calibration $cal
+./gradlew.bat :app:testDebugUnitTest --tests '*StegoWordingCodecTest' privacyCheck -PrequireRime=true
+```
+
+## Attested window slots and bounded sentence ordering (2026-11-22)
+
+The window graph recruits reviewed noun slots from the pinned Mandarin
+corpus and Wanxiang. Only authored templates and reviewed slots enter
+the frozen asset. The compiler rejects added sentences identical to a
+normalized source sentence. All 100 newly emitted slot terms appeared in
+the paired workloads. All 384 host pairs recovered exactly. The 524 B
+worst carrier fell from 10,788 B to 10,302 B and guaranteed capacity rose
+from 796 B to 833 B. The 896 graph states still use 15 count rows.
+The shared vocabulary matched by the full codebook grew from 328 to 440.
+JDK 21 passed `test`, `privacyCheck`, and `:app:lintDebug`. The API 37
+x86_64 emulator passed window and seven-character round trips, the
+public clipboard receive flow, and the key-file round trip.
+The verified ARM64 artifact is
+`app/build/outputs/test-apk/20261122-004322/zero-fish-input-0.7.7-debug-arm64-v8a.apk`
+(97,772,954 B). It passed both the window keyboard round trip and the
+public clipboard receive flow under ARM64 translation. Release assets
+and the core runtime JAR exclude the Debug implementation.
+Physical ARM64 performance remains unverified.
+
+A separate four-topic host probe ranks sentence order and caps exact
+repetition. At 524 B, repetition dropped from 65.4%–70.0% to 7.4%–19.9%,
+and the 128-carrier vocabulary union grew from 2,297 to 3,079 matches.
+The 178 B carrier stays free of repeated full sentences. Direct source
+sentence continuity and attribution remain open before any app use.
+[Full paired evidence](natural-wording-steganography.md#20-语料词槽与受限重复排名)
+
+```powershell
+$mandarin = 'build/model-evaluation/corpus-coverage-sources/cmn_sentences_detailed.tsv.bz2'
+python -X utf8 -B tools/themed-verse/prose_window_slot_probe.py $mandarin --holdout --calibration .tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final
+python -X utf8 -B tools/themed-verse/prose_corpus_interleaving_probe.py $mandarin
+python -X utf8 -B tools/themed-verse/export_window_observation.py --attested-slots $mandarin tools/themed-verse/android-test-profile/window-observation-v4.bin
+```
+
+## Mandarin corpus and vocabulary coverage (2026-11-22)
+
+A host probe compares the existing window graph with four topic banks
+compiled from a pinned 89,325-sentence Mandarin export. The shared
+measurement inventory contains 29,959 Wanxiang surfaces attested in at
+least three source sentences. The frozen window vocabulary reaches 328
+under that measurement. The source-based renderer grew the 128-carrier
+524 B union from 319 to 2,297, with slower gains from the pass schedule.
+The one-pass route had no repeated sentence at 178 B. None of the routes
+matched the existing guarantee, repetition and prose continuity together.
+The Android binding and APK remain the prior linked window release.
+[Corpus provenance and paired results](natural-wording-steganography.md#19-扩大语料和词库覆盖)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_corpus_coverage_probe.py build/model-evaluation/corpus-coverage-sources/cmn_sentences_detailed.tsv.bz2
+```
+
+## Linked window progression (2026-11-21)
+
+The Debug window graph adds seven optional types of adjacent observations
+and short syntactic alternatives. There are 6,039 distinct sentences and
+896 states with the same 15 count rows. The 384 paired host cases include
+a holdout seed and recovered exactly. For 524 B, complete-sentence
+repetition fell from roughly 23% to 13%. The exact guarantee rose from
+732 B to 796 B. Worst length fell from 11,733 B to 10,788 B. The prior
+graph reproduced byte for byte and remains the host baseline.
+[Comparison and limits](natural-wording-steganography.md#18-窗边随笔的相邻句承接)
+
+The JDK 21 build passed `test`, `privacyCheck` and `:app:lintDebug`.
+The x86_64 API 37 emulator passed actual window and seven-character
+keyboard round trips, the public clipboard receive flow, and the
+key-file round trip. Release merged assets and the core runtime JAR
+exclude the Debug grammar and carrier implementation.
+
+The verified mobile artifact is
+`app/build/outputs/test-apk/20261121-234143/zero-fish-input-0.7.7-debug-arm64-v8a.apk`
+(97,766,398 B). In the ARM64 translation environment, the first run
+timed out waiting six seconds for the send preview. A retry with the
+same APK and test deadline passed both keyboard and public clipboard
+round trips. Physical ARM64 performance remains unverified.
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_window_progression_probe.py --holdout --calibration .tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final
+New-Item -ItemType Directory -Force build/model-evaluation/window-observation-history | Out-Null
+python -X utf8 -B tools/themed-verse/export_window_observation.py --progression build/model-evaluation/window-observation-history/window-observation-v3.bin
+```
+
+## Window scene corpus and daily profile removal (2026-11-21)
+
+The Debug picker now offers five-character verse, seven-character verse
+and window observations. Daily notes remains a historical host benchmark.
+The new window binding requires the current Debug build on both ends.
+
+The host joins an authored scene corpus with all 16 locked Wanxiang
+tables. It freezes 4,274 distinct sentences. Both 524 B cohorts reduced
+full-sentence repetition from about 45% to 23% and increased median
+scene vocabulary coverage from 14 to 69 terms per carrier.
+The exact envelope limit is 732 B and the 524 B worst carrier is 11,733 B.
+Both directions recovered all 256 paired synthetic packets. Two of the
+40 locked calibration bodies fit, and the 20% utilization target remains open.
+[Detailed comparisons](natural-wording-steganography.md#17-窗景语料扩展与篇内去重)
+
+The API 37 emulator passed the new window and seven-character keyboard
+round trips, the public clipboard receive flow, and the key-file round
+trip. The Debug APK includes the current graph. Static checks exclude
+the old window and daily assets, and the Release assets and core JAR
+exclude the Debug implementation.
+
+The JDK 21 build passed `test`, `privacyCheck`, and `:app:lintDebug`.
+The ARM64 Debug APK passed signature, permissions and ABI checks.
+It is 97,752,585 bytes at
+`app/build/outputs/test-apk/20261121-230949/zero-fish-input-0.7.7-debug-arm64-v8a.apk`.
+That APK also passed both the window keyboard round trip and the public
+clipboard receive test on the emulator with ARM64 translation.
+Physical ARM64 performance remains open.
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_window_scene_probe.py --calibration .tmp-evidence/themed-verse-p2-corpus-20261120/frozen-final
+New-Item -ItemType Directory -Force build/model-evaluation/window-observation-history | Out-Null
+python -X utf8 -B tools/themed-verse/export_window_observation.py --scene-corpus build/model-evaluation/window-observation-history/window-observation-v2.bin
+```
+
+## Window observation Android Debug integration (2026-11-21)
+
+The keyboard offers Window observations (trial) under Natural wording.
+The Debug asset freezes the final host grammar in 32,445 bytes. Android
+uses the existing wrapped authentication and exact word-context body.
+The worker bounds the complete envelope at 544 B and releases count rows
+after readback. The Kotlin codec matches the exact host text hashes. Its
+524 B and 544 B all-FF vectors measure 15,777 B and 16,377 B.
+[Format and profile binding](adr/0041-natural-wording-trial.md#window-observation-profile)
+
+The 256-sample host report reproduced byte for byte. The API 37 x86_64
+keyboard test passed real passphrase round trips with window, daily and
+seven-character profiles, including wrong-style recovery. App unit tests
+covered the framing boundary, damaged assets, edited follow-ups,
+cancellation and authentication failure. The 20% utilization goal and
+whole-carrier naturalness and detection checks remain open.
+
+The JDK 21 run passed `test`, `privacyCheck`, and `:app:lintDebug`.
+The Release merged assets and runtime library exclude the Debug graph
+and its codec. The verified ARM64 Debug APK is
+`app/build/outputs/test-apk/20261121-222620/zero-fish-input-0.7.7-debug-arm64-v8a.apk`.
+It is 97,728,204 bytes and meets the 180 MB test-package limit.
+The APK installed directly on the API 37 emulator with ARM64 translation
+and passed the window keyboard round trip. Physical ARM64 performance
+and the 80 MB size target remain open.
+
+The host exporter requires the previously pinned public inputs and Mini
+environment. Gradle verifies and packages the frozen result.
+
+```powershell
+New-Item -ItemType Directory -Force build/model-evaluation/window-observation-history | Out-Null
+python -X utf8 -B tools/themed-verse/export_window_observation.py build/model-evaluation/window-observation-history/window-observation-v1.bin
+.\gradlew.bat :app:testDebugUnitTest --tests '*WindowObservationProfileTest' --tests '*StegoWordingCodecTest' -PrequireRime=true
+```
+
+## Window observation action constraints (2026-11-21)
+
+The final host arm binds object, condition and concrete viewing action. It
+keeps the five-cycle requirement and passed the paired round-trip, length,
+coverage, repetition and independently reviewed excerpt gates. At 524 B it
+saved 450 B at the paired median and lowered the worst budget to 15,777 B.
+Earlier arms were rejected for insufficient backlight or obstruction outcomes.
+
+The exact counter folds nonterminal one-step states and shares identical rows.
+The window grammar grew from 55 to 145 logical states with 15 materialized
+count rows in both arms. Earlier reports reproduce byte for byte. The refined
+window arm is the host baseline and the source of the Debug Android graph.
+[Observation conditions, tests and paired reviews](natural-wording-steganography.md#16-窗边观察动作与因果承接)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_window_actions_probe.py --refined --examples
+```
+
+## Window continuity non-regression trial (2026-11-21)
+
+Three compact variants passed exact round trips, length bounds, continuity
+coverage and both repetition gates on paired synthetic batches. The revised
+language arm saved a paired median 471 B at 524 B and lowered the worst budget
+from 16,230 B to 15,756 B. The shortest arm saved more bytes. Neither it nor
+the other variants met the independent phrase-quality gate. The existing
+five-cycle window profile remains the reference. Next prioritize adjacent
+lexical repetition and concrete observation progression before further
+surface compression.
+[Paired results and blinded language decisions](natural-wording-steganography.md#15-窗边简句的防退化验证)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_window_compact_probe.py --examples
+python -X utf8 -B tools/themed-verse/prose_window_compact_probe.py --reviewed --examples
+```
+
+## Lexical repairs and explicit object continuity (2026-11-21)
+
+The host probe compares the expanded short grammar, targeted collocation
+repairs and adjacent-sentence object binding. Stateful suffix counting includes
+the rule that a started pair must finish. Strict binding could not fit 524 B,
+and optional binding used under 1% of the designated pair positions. The
+shortest guaranteed cadence was one pair every two cycles for outing and
+organizing and every five for observation. All 192 synthetic 524 B packets
+recovered at those intervals. A shuffled review of 12 public excerpts found
+same-object progression in all six periodic excerpts and none of the six
+baseline excerpts. Whole-carrier naturalness and the existing 20% target still
+need work. The prior finite-capacity report reproduced byte for byte.
+[Continuity, length and review results](natural-wording-steganography.md#14-动宾搭配与跨句对象承接)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_continuity_probe.py --examples --calibration .tmp-evidence/themed-verse-p2-corpus-20261120/calibration-input
+```
+
+## Short independent prose branch validation (2026-11-21)
+
+The A/B probe preserved the original grammar and weights and added 942 unique
+sentences from 18 short framed rules. The full-budget guaranteed envelopes rose
+to 704 B for outing, 567 B for observation and 683 B for organizing. Shortest
+enumeration recovered 64/64 at 524 B in each expanded scene. Weighted Huffman
+also recovered 64/64 in outing and organizing. All 780 B trials and all 40
+locked calibration body estimates still exceed the evaluated prose bounds.
+
+The expanded Huffman routes improved exact-sentence repetition on the 178 B
+batch. Shortest enumeration showed higher repetition. An independent review
+of 18 shuffled three-sentence excerpts flagged phrasing and progression issues
+in both arms. The exercise supports the capacity approach and leaves naturalness,
+actual encryption and device integration open.
+[Branch contributions, paired results and review](natural-wording-steganography.md#13-新增短分支的配对验证)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_short_branch_probe.py --examples --calibration .tmp-evidence/themed-verse-p2-corpus-20261120/calibration-input
+```
+
+## Finite prose capacity and length optimization (2026-11-21)
+
+Exact suffix counting establishes the finite carrier budget for each public
+prose grammar. A reversible shortest-first enumerator recovered all 64 desktop
+524 B fixtures under 16,384 B, including work that the previous Huffman codebook
+could not fit. Window observation lacks enough legal output at that budget.
+Shortening helped the outing grammar and reduced desktop capacity when it merged
+too many distinct surfaces. The outing 524 B median reached 14,286 B but repeated
+sentences more often.
+
+The verified Debug body model and default two-layer size formula yielded
+716–1,612 B on 40 locked public calibration bodies. Those sizes exceed all six
+prose grammar limits. Equal-size Daily probes had 39/40 hard-limit fits and
+2/40 fits at the 20% utilization goal. Next work should expand short, independently
+selectable phrases and count capacity before naturalness and channel evaluation.
+[Finite counts, codec comparison and public calibration](natural-wording-steganography.md#12-有限长度容量与编码优化)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_capacity_probe.py --calibration .tmp-evidence/themed-verse-p2-corpus-20261120/calibration-input
+```
+
+## Typed prose grammar with lexicon and Mini (2026-11-21)
+
+The host comparison compiles three original prose grammars, validates
+their lexical slots against all 16 locked Wanxiang tables and applies
+Mini to weights while preserving every legal branch. The two grammar
+variants recovered all 384 synthetic 178 B packets. In the outing scene,
+63/64 synthetic 524 B packets fit with Mini weights, compared with 5/64
+using grammar and corpus counts alone. The other two grammar scenes had
+no fits at that size. The existing Daily control recovered both full batches.
+
+Fact-bound rewrite rules added three bits to each new controlled draft.
+The host probe verified 87 indexed rewrites, quoted controls, grammar
+ambiguity rejection and malformed carrier rejection. Larger corpora,
+independent naturalness, real encryption and device tests remain unverified.
+[Grammar design, poetry references and results](natural-wording-steganography.md#11-语法树词库和-mini-的联合主机试验)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_grammar_probe.py --examples
+```
+
+## Mini and Tiny candidate screening and prose n-grams (2026-11-21)
+
+The two pinned ONNX graphs passed 26 reference score vectors each. On
+the same 19 public slots Mini kept 89 of 142 candidates and Tiny kept 80.
+On five existing pairs of equivalent phrases Mini kept both choices in four
+pairs and Tiny in three. This fixed filtering threshold is an experiment.
+
+The new host probe trained word bigrams and trigrams from 72 original
+segmented sentences across three scenarios. The counts, Mini and Tiny
+variants each write and recover synthetic packets through a frozen table.
+All 1,152 trials at 178 B recovered byte-for-byte. The 524 B trials reached
+the carrier limit, while Daily recovered both batches. Filtering made all
+six scene/order comparisons longer at the median. Examples show grammatical
+failures and high repetition, so naturalness and release readiness remain
+unverified. Two fresh processes reproduced the report and resource hashes.
+[Model and capacity results](natural-wording-steganography.md#10-minitiny-和词级-n-gram-主机对照)
+
+```powershell
+python -X utf8 -B tools/themed-verse/prose_model_probe.py --examples
+```
+
+## Public lexicon and prose carrier feasibility (2026-11-21)
+
+The host probe verified all 16 locked Wanxiang tables and counted 2,192,245
+distinct surfaces. The current Daily asset uses 374 distinct two-Han components
+out of 174,826 in those tables. Its independently replayed surface recovered 320
+synthetic envelopes byte-for-byte at median densities of 0.705–0.710 envelope
+bits per UTF-8 carrier byte. The probe exercised the public surface only.
+
+The requested comparison ran both routes against the same two batches of
+synthetic envelopes. Generated prose held 12–15 guaranteed bits per paragraph
+across three original scenarios. Exact-sentence rewrites held 0–4 bits across
+nine drafts and preserved every frozen span and quote control. Both prose
+routes rejected all 178 B and 524 B envelopes for capacity. Daily recovered
+64/64 in each batch. Two Python hash seeds produced identical reports. These
+are host-only seed measurements. Model inference, independent naturalness
+and a production carrier remain unverified.
+[Design and capacity results](natural-wording-steganography.md#9-非诗歌载体全量词表专用语料与端侧模型)
+
+```powershell
+python -B tools/themed-verse/surface_lexicon_probe.py
+python -B tools/themed-verse/prose_carrier_probe.py
+```
+
+## Current-only word-context format (2026-11-21)
+
+The Debug keyboard derives a single v3 profile binding from the selected
+surface and pinned word model. After authenticating a carrier, it accepts
+only the Huffman and two rANS body modes. Earlier trial carriers need to
+be regenerated for this build. The standalone public-fixture workbench
+retains its independently loaded research assets.
+[Current format](adr/0041-natural-wording-trial.md#word-context-sender-and-authenticated-body-modes)
+
+The x86_64 Debug unit checks cover rejection of v2 carriers carrying
+either a GB18030 or current word packet. A mode 4 packet under a v3
+binding also fails closed. The fixed Daily clipboard test fixture now
+uses v3 with the same public body and credential.
+
+The x86_64 API 37 emulator suite passed 75 tests with three opt-in skips.
+Both public wording interop cases passed in a separate opt-in run. The
+seven-character round trip, system clipboard reception and panel reachability
+passed on a narrow dark layout and a wide light layout.
+
+The ARM64 Debug APK passed all unit, privacy, Lint, signature, ABI and
+permission checks. It is 97,706,305 bytes, within the 180 MB package limit
+and above the 80 MB target. The packaged APK passed upgrade installation,
+the seven-character round trip, Daily clipboard reception and the public
+workbench under emulator ARM64 translation. Next: repeat the keyboard
+round trip and clipboard reception on a physical ARM64 device.
+[ARM64 Debug test APK](../app/build/outputs/test-apk/20261121-150811/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :ime-core:testDebugUnitTest :security:testDebugUnitTest privacyCheck "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
+
+## Word-context compression in the Debug keyboard (2026-11-21)
+
+This entry records the preceding trial build.
+
+New natural-wording messages choose among direct Huffman and two word
+rANS modes before encryption, using padded size and simplicity as the
+tie-break. The per-message context is reconstructed from the decoded
+prefix and cleared at operation end. The new modes identify the
+hashed Debug public model. The authenticated GB18030 mode remains
+readable, and older recipients need the updated APK to open new modes.
+[Format and security boundary](adr/0041-natural-wording-trial.md#word-context-sender-and-authenticated-body-modes)
+
+The compiled Kotlin implementation matched all 129 Python reference
+packets byte-for-byte. Against the previous body codec, the 40 P2
+excerpts used 10.1% fewer padded envelope bytes in total, the short
+controls used 12.8% fewer and the nine technical documents used
+32.1% more. Holdout excerpts remain sealed.
+[Comparison and public model reproduction](themed-verse/word-context-probe.md#android-debug-port-comparison)
+
+The x86_64 API 37 platform suite had 75 passes and three opt-in skips.
+The public wrapped GB18030 clipboard fixture and new natural-wording
+round trips passed. Unit tests compare all three chosen modes against
+independent vectors and reject malformed authenticated bodies, changed
+assets, invalid UTF-8, truncation, oversized lengths and cancellation.
+The compiled body reader also rejected 5,000 seeded randomized malformed
+packets through its format-error boundary.
+
+Full unit checks, `privacyCheck`, Debug Lint and APK signature, ABI and
+permission checks passed. The ARM64 Debug APK is 97,705,857 bytes, within
+the 180,000,000-byte package limit and above the 80,000,000-byte target.
+The delivered package passed upgrade installation, new wording round
+trip, prior wrapped clipboard reception and public-fixture recovery
+under ARM64 translation. Physical ARM64 validation remains pending.
+[ARM64 Debug test APK](../app/build/outputs/test-apk/20261121-144941/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :ime-core:testDebugUnitTest :security:testDebugUnitTest privacyCheck "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
+
+## Word-boundary prediction probe (2026-11-21)
+
+The offline probe compares actual word-token rANS streams with identical
+segmentation and literal escapes. On the 40 P2 calibration excerpts,
+frozen bigram context saved 135 stream bytes against unigram. The
+message-local last-successor cache over unigram saved 1,295 bytes.
+A three-way selector including direct Huffman saved 1,766 stream bytes
+against Huffman and reduced the padded envelope on 25 of 40 excerpts.
+The 80 short controls stayed in the same padding bucket.
+
+Byte-exact recovery and malformed frame checks passed. Distinct Python
+hash seeds reproduced the results and fixed payload hashes. The probe
+uses no zlib stage in its payloads. Holdout examples remain sealed.
+[Models, measurements and reproduction command](themed-verse/word-context-probe.md)
+
+## Wording category and bit-packing audit (2026-11-21)
+
+The keyboard's carrier picker groups five-character verse, seven-character
+verse and daily notes under Natural wording for send and receive. The
+second selection determines the profile. System paste can keep the full
+carrier in its draft while the user chooses both levels.
+
+The Android body format is unchanged. The host probe verifies the exact
+word-level Huffman stream and tests byte rANS, contextual rANS and raw LZMA2
+with all framing bytes counted. Choosing the shortest Huffman-based
+stream saved 8 stream bytes and one 64-byte envelope bucket across 40
+independent calibration excerpts. None of the second passes reduced the
+80 short controls. Holdout examples remain sealed.
+[Audit, measurements and reproduction command](themed-verse/bit-packing-probe.md)
+
+The API 37 x86_64 device suite had 75 passes and three opt-in skips.
+The physical paste-to-style flow passed three more runs. Both picker levels
+and clipboard reception passed at 240×480 dp in dark mode with 1.3 font scale
+and 640×320 dp in light landscape. Closing the first picker before opening
+the second and removing attached-window animations kept rapid taps active.
+
+Full unit tests, `privacyCheck`, Debug Lint and package checks passed.
+The ARM64 Debug APK is 97,606,501 bytes, within the 180,000,000-byte
+budget and above the separate 80,000,000-byte target. It passed upgrade
+installation, nested send and receive, public fixture recovery and repeated
+physical-tap clipboard tests under ARM64 translation. Physical ARM64 device
+validation remains pending.
+[ARM64 Debug test APK](../app/build/outputs/test-apk/20261121-140758/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest privacyCheck "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
+
+## Seven-character verse and public association probe (2026-11-21)
+
+The Debug keyboard's send and receive picker includes seven-character verse
+from 42,153 distinct pinned Wanxiang lines. The keyboard now accepts only
+wrapped wording envelopes. The single-layer carrier is exercised through
+the public fixture workbench. The wrapped five-character and daily-note
+assets are byte-identical to the prior build. Two independent generations
+matched all carrier and compression asset hashes.
+[Format and current receive choices](adr/0041-natural-wording-trial.md#seven-character-verse-and-current-receive-choices)
+
+The public association probe verified byte-exact restoration for all of its
+dictionary variants. The best mix for the 40 independent calibration
+excerpts saved 32 compressed bytes in total and moved no envelope to a lower
+padding bucket. On 80 short controls seen during association curation, it
+reduced 48 envelopes. The app uses the existing compression dictionary.
+[Measurements and reproduction command](themed-verse/association-probe.md)
+
+The x86_64 API 37 suite completed with 75 passes and three opt-in skips.
+The real IME sent and received seven-character verse, checked all four
+receive choices and rejected the wrong style before a successful retry.
+Seven-character receive and the daily system-paste regression passed at
+240×480 dp in dark mode with 1.3 font scale and at 640×320 dp in light
+landscape. Codec tests cover the retired envelope, altered punctuation,
+truncation and re-encoding ciphertext under a different profile.
+
+The standard ARM64 package checks passed with full unit tests, `privacyCheck`
+and Debug Lint. The package is 97,605,393 bytes, within the 180,000,000-byte
+budget and above the separate 80,000,000-byte target. The delivered APK also
+passed upgrade installation, seven-character send and receive, daily system
+paste and the public fixture page in the emulator's ARM64 translation.
+Physical ARM64 device and independent poetry-readability validation remain
+pending.
+[ARM64 Debug test APK](../app/build/outputs/test-apk/20261121-133504/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :ime-core:testDebugUnitTest :security:testDebugUnitTest privacyCheck "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
+
+## Natural wording receive and paste fix (2026-11-21)
+
+In the Debug keyboard, the receiving workspace now keeps bounded unmarked
+carrier text pasted from the system clipboard or explicitly imported from an
+editor selection. Start decryption opens the style picker when the carrier
+requires one. The chosen style is checked on the worker to display the
+credential needed before the user submits it. A style mismatch leaves the
+carrier available for another choice. Attached pickers keep the original
+editor focused, so opening and dismissing the paste menu preserves the active
+input session.
+
+The old Debug build rejected the public daily fixture pasted before choosing
+its style. The fixed build opened that fixture after physical long-press and
+menu taps. The selection round trip also passed after choosing the wrong style
+first. Both routes and inline controls passed at 240×480 dp in dark mode with
+1.3 font scale and 640×320 dp in light landscape on the API 37 emulator.
+
+Full unit tests, `privacyCheck`, Debug Lint and the merged Debug/Release
+manifest checks passed. The x86_64 API 37 device suite had 74 passes and three
+opt-in skips for fingerprint and host interop. The ARM64 Debug test APK is
+97,168,206 bytes, within the 180,000,000-byte package limit and above the separate
+80,000,000-byte target. The same APK passed an upgrade install and three receive
+smoke tests under the emulator's ARM64 translation. It also recovered the
+previous format's independent public host carrier. Physical ARM64 device
+validation is pending.
+[ARM64 test APK](../app/build/outputs/test-apk/20261121-121543/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest privacyCheck "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
+
+## Wrapped natural wording Debug trial (2026-11-21)
+
+The keyboard's carrier picker now offers new five-character verse and daily
+notes. The daily sender uses 50 time phrases and 2,118 verb-object phrases in
+four topics, compiled from the locked Wanxiang base lexicon. The older verse
+format has an explicit receive entry. All three profiles retain exact text
+comparison at receive time.
+
+New senders can use a nonempty user-chosen passphrase up to 1,024 UTF-8
+bytes, a random shared key, a key file, or either text credential with a
+key file. Password modes use the existing three Argon2id cost profiles.
+The default cascade is AES-256-GCM and XChaCha20-Poly1305. The cipher editor
+can set each layer's width or randomize the permitted widths independently.
+The worker draws and wraps a fresh random key and nonce for each layer.
+*Settings → Steganography → Generate and save a random key file* saves
+32 independent random bytes to a user-selected local document.
+The Android picker smoke test confirmed a zero-byte document before
+consent and a 32-byte file after confirmation. The provider tests
+reopened a generated file as a file factor and rejected a write to a populated file.
+[Format and data rules](adr/0041-natural-wording-trial.md#wrapped-debug-trial-2026-11-21)
+
+The x86_64 API 37 steganography suite completed with 51 passes and 11
+opt-in cases skipped. A real IME round trip used the daily profile,
+three body layers and a one-character passphrase. The same flow and the
+input feedback passed at 240×480 dp in dark mode with 1.3 font scale and
+640×320 dp in light landscape. The original verse profile recovered the
+1,856-byte public fixture in both directions between Android and the
+independent host. Two offline builds produced identical carrier and
+compression tables. The Android Debug unit suite, full packaging checks,
+privacy checks, Lint and the merged
+Debug/Release manifest checks passed. The ARM64 test APK includes the new
+profile and export entry. Its size is 97,161,886 bytes against the test
+package limit of 180,000,000 bytes and the 80,000,000-byte target.
+Release assessment still requires independent
+readability, detection and held-out capacity results and ARM64 device tests.
+[ARM64 test APK](../app/build/outputs/test-apk/20261121-110558/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest privacyCheck :app:lintDebug "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true
+./tools/package-test-apk.ps1 -Abi arm64-v8a -MaxApkBytes 180000000
+```
 
 ## Natural wording transport design (2026-11-20)
 
-Continue the host experiment on `zn/stego-themed-verse` using the
-[new-session handoff](stego-themed-verse-handoff.md). The local checkpoint
-before this branch is `465ffd7`.
+**P0 and P1 host acceptance complete.** The nine excerpts match the frozen
+inputs at `b763675`. The original binary and static-position results reproduced
+with 2/9 and 4/9 meeting the 20% target. The combined host sender and independent
+receiver recovered all nine documents byte-for-byte. The word-code, position
+and joint groups passed 2/9, 4/9 and 4/9 respectively. Six envelopes dropped
+one 64 B bucket in the joint group. The five misses restored exactly and
+exceeded `5*S` by 582–3,384 B. All nine met both whole-carrier limits.
+[Commands, per-stream sizes, results and fixed vectors](themed-verse/p1.md)
 
-The [design and implementation plan](natural-wording-steganography.md) maps the
-16 pinned Wanxiang tables, public associations and optional short-word scorer
-to resource preparation and evaluation. Current envelope sizes rule out an
-ordinary 512-unit cover for the proposed two-to-four-variant profile. Next is
-a host-only capacity study using reviewed rules and licensed continuous text.
-Runtime behavior and the existing carrier choices are unchanged.
+P1 profile SHA-256 is
+`151099ba9459617e0f3af72543fb876f8653ef3ae984b6d1218a2b8f361e33db`.
+Two offline builds produced identical assets. The receive process used only
+the public profile assets, fixture key and complete carrier as inputs. It
+tested actual winners for word codes and position plus fixed dictionary,
+unknown characters and CRLF, malformed and overlong inputs, authentication
+failures, and absent or mismatched resources. Three public fixed vectors and
+the corpus lock travel with the prototype. The security and ime-core unit tests
+and `privacyCheck` also passed. [P1 acceptance command](themed-verse/p1.md#运行-p1)
 
-Follow-up research in section 7 compares edit-based text, conditional poetry
-generation, compact envelopes and local-only references. An unconditioned
-five-character dictionary index round-tripped 162 public test bytes in 462
-visible characters, including punctuation. Filtering for the moon character
-raises the calculated length to 708. The next generation experiment should
-measure candidate capacity and blind-rated coherence together. No production
-format or biometric decision follows from this experiment.
+**P2 cost diagnosis.** A fresh pass over the nine frozen documents verified
+the static position round trip. The five misses contained 479–965 B of literal
+payload before secondary compression. Removing only the fixed row-type bits
+could save at most 58–77 whole bytes per miss before paying for types or
+recompressing. The clipboard design needs 49 B off its already compressed
+842 B stream to reach the 930 B envelope. Measure both stages independently.
+The historical key replay already packs each letter into five bits.
+[Counts, timing scope and reproduction command](themed-verse/p2-plan.md#拼音词号与位图各能省多少)
+
+**P2 paired regression experiments.** The prefix and bitmap alternatives
+preserved the fixed P1 tokens. Sparse bitmaps saved 414 B across the nine
+bare streams. Their dictionary-compressed total was 2,352 B above P1.
+Frequency codes and bit-cost segmentation produced local bucket reductions.
+Native replay selected 25 internal phrases and zero whole sentences out of
+18 qualifying spans. Both expanded selectors chose P1 modes for all nine
+documents, with byte-exact recovery 9/9 and 20% utilization 4/9. No additional
+document crossed the threshold. Host warm end-to-end P50 was 644 ms for P1,
+672 ms with new static modes, and 1,654 ms with native key replay.
+[Bit accounting, real carriers, cold/warm timings and commands](themed-verse/p2-results.md)
+
+**P2 independent corpus and calibration.** Work records and free narratives
+each have 16 training works, 20 calibration works, and 30 held-out works.
+The lock records the public sources, credits, work groups, excerpt hashes,
+and overlap checks. Frozen P1 recovered 20/20 per genre. Both genres met the
+two whole-carrier limits for every sample and had 0/20 at the 20% utilization
+target. The visible carriers exceeded their targets by 981–3,384 B for work
+records and 1,969–4,766 B for free narratives. [Corpus lock](themed-verse/p2-corpus-lock.json) ·
+[Per-sample results and commands](themed-verse/p2-calibration.md)
+
+**P2 training-source ablation.** With the same P1 position layout and 12,773 B
+dictionary budget, independent training lowered the actual envelope for
+12/20 work reports and 0/20 historical narratives. Both genres restored 20/20
+and added zero passes. The 60 held-out excerpts are sealed with zero attempts.
+Capacity remains the calibration gate for blind scoring. Formal format,
+binding, interoperability, mobile cost and product entry follow the planned
+reviews. [Training ablation](themed-verse/p2-calibration.md#仅更换位置字典训练来源) ·
+[P2 thresholds](themed-verse/p2-plan.md#预先登记的验收与停止条件)
+
+**P2 GB18030 training-source ablation complete.** The shared 15,021 B GB
+dictionary used the frozen independent training set. With the previous
+independent position dictionary, changing only the GB training source
+lowered the envelope for 16/20 research abstracts and 5/20 sampled fiction
+excerpts. Both genres restored 20/20 byte-for-byte and had 0/20 at the
+20% target. The tenth-smallest stream gap fell from 171 to 119 B for
+abstracts and from 284 to 267 B for fiction. Even with all five-character
+lines available, the new fiction envelopes have a theoretical ceiling of
+9/20 under the target.
+
+Both variants restored all nine P1 regression documents. The GB trial lost
+the two passes from the position-only reference, v0.7.6 and v0.7.7. Frozen P1
+reproduced 4/9. This closes the same-budget dictionary trials for the
+sampled genres. The 60 holdouts remain sealed, with zero attempts.
+[Per-sample results, verification and commands](themed-verse/p2-gb-calibration.md) ·
+[Second P2 task](themed-verse/p2-plan.md#下一会话第二张任务卡)
+
+**P2 five-character continuity calibration.** Held the selected GB18030
+streams, envelopes and layout fixed for all 20 research abstracts. The
+same-character rule had an upper bound of 0/20 and was screened out. The
+original linked rule, same-family rule and same-or-next-family rule
+recovered 20/20 each and met the 20% target for 0/20, 5/20 and 11/20.
+All 60 carriers met both whole-carrier limits. The sampled fiction is
+bounded at 9/20 with the fixed envelopes even using the full line pool.
+
+The 11 eligible same-or-next-family carriers have equally long ordinary
+controls in an anonymous calibration reading packet. Reader scores and
+a length-matched human comparison remain pending. The 60 held-out
+excerpts are sealed with zero attempts.
+[Rules, per-sample results and reading packet command](themed-verse/p2-theme-calibration.md)
+
+**Android Debug verse workbench.** The frozen same-or-next-family profile runs
+with bundled public fixtures in a private Settings page. API 37 x86_64 checks
+covered the entry, local generation and recovery, the host vector, and clearing
+on recreation. The independent host recovered the APK's 1,856 B public fixture
+from its 3,868 B carrier. The Kotlin JVM run restored 20/20 calibration
+abstracts and matched the previous 11/20 pass decisions. One sample moved up
+one 64 B envelope bucket with the JVM zlib implementation. Independent reading
+scores and the sealed holdouts remain pending.
+
+The 97,101,787 B ARM64 Debug APK passed unit tests, privacyCheck, Lint,
+native Rime builds and package verification. ARM64 device behavior awaits
+physical testing. [Implementation and verification](themed-verse/android-test-build.md) ·
+[ARM64 test APK](../app/build/outputs/test-apk/20261120-202507/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+**Android natural wording workspace trial.** Debug now accepts actual drafts
+in the keyboard's existing steganography workspace. The sender uses a 256-bit
+random shared key and previews the entire five-character carrier, with its
+measured UTF-8 utilization, before deliberate insertion. The recipient selects
+verse mode, loads the intact text and opens it with the same key. The trial's
+authenticated profile is distinct from the public fixture and exact carriers.
+Independent Python/Rust and Android each recovered 1,856 public bytes from
+the other sender. The same 20 calibration abstracts recovered exactly, with
+11 at or above 20% and nine below. Real IME round-trip, masked rendering and
+editor revocation passed on x86_64 API 37. Release activation, rated reading,
+held-out capacity and ARM64 physical-device testing are pending.
+The 97,119,343 B ARM64 Debug trial APK passed full unit tests, privacyCheck,
+Lint, native Rime builds and package verification.
+[Trial protocol](adr/0041-natural-wording-trial.md) · [Results and timings](themed-verse/android-test-build.md#工作区验证) ·
+[ARM64 trial APK](../app/build/outputs/test-apk/20261121-000415/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+**Wording preview touch regression.** On a real IME tap, the empty-key prompt
+was clipped by the form scroll area. The trial now places the key generator
+and the preview action in a fixed row and shows validation feedback alongside
+it. The complete carrier has a read-only preview surface with deliberate
+insertion. Actual touch tests passed for missing input, invalid key and full
+round trip on API 37, including narrow dark portrait and landscape layouts.
+The new ARM64 Debug APK passed full unit tests, `privacyCheck`, Lint, Rime
+build and package checks.
+[Reproduction and fix](themed-verse/android-test-build.md#生成按钮反馈修复) ·
+[ARM64 preview fix APK](../app/build/outputs/test-apk/20261121-101521/zero-fish-input-0.7.7-debug-arm64-v8a.apk)
+
+### Earlier public pilot
+
+The first themed-verse host study on `zn/stego-themed-verse` resumed from
+`b763675`, a handoff following local main checkpoint `465ffd7`. All nine public
+carriers round-tripped in a fresh receiver process. A five-character line plus
+one full stop carries 17 bits with free choice, 14 with the night-landscape
+theme, and 13 after the opening 14-bit line with scene transitions. At most 85
+lines fit the draft, giving respective maximum whole payloads of **180, 148
+and 138 bytes**, assuming the receiver already knows the length. Readability at
+these rates awaits independent readers. [Study design](natural-wording-steganography.md)
+
+**Reproduce from the repository root** with Python 3 and the generated
+`engine-rime/build/generated/publicDictionaryAssets/rime/dicts/shici.dict.yaml`.
+Both commands run offline. The first reads the published surfaces and lengths.
+The second builds fresh resources for each side, checks baseline and failure
+cases, and regenerates fixtures and blind packets in a separate directory.
+
+```powershell
+python -B tools/themed-verse/check_vectors.py
+python -B tools/themed-verse/study.py .tmp-evidence/themed-verse-v1
+```
+
+**Resource and protocol.** Wanxiang RIME-LMDG v18.1.1, revision
+`26a9efeb18e604c091f4d3890d00bec723fe755f`, CC BY 4.0. Each load checks the
+prepared 14,571,886-byte table against the locked SHA-256
+`0bc14524727ce2a8e9b4ff58f91d275e9a91b65c50b25ca6f0c7578c9ca241f3`.
+The generated packets select and repunctuate lines from this table. One local
+run took 1.83 s overall, including 0.88 s for a second resource load. These
+are host wall times. [Source lock](../tools/dictionaries/sources.lock.json) ·
+[Upstream](https://github.com/amzxyz/RIME-LMDG) · [License](https://creativecommons.org/licenses/by/4.0/)
+
+Read column one after the YAML header, keep exactly five or seven BMP Han
+characters U+4E00–U+9FFF, deduplicate and sort by code point. Free five/seven
+pools reproduced 213,300/92,141 entries. For 162 B they yielded 77/81 lines
+(462/648 UTF-16 units). Literal five-character 月/山 filters yielded
+3,942/6,404 entries and round-tripped in 118/108 lines (708/648 units).
+
+The main study uses five-character entries. The theme is the union of sky
+月星夜霞云, water 江水溪泉波 and hills 山峰岭松林, matching any listed character.
+The union has 30,908 entries, its overlapping classes 12,833/9,667/10,582.
+Linked mode starts with the union. The rightmost imagery character of the
+previous recovered line determines its class. Sky leads to water, water to
+hills, hills to sky. This lexical transition does not certify meaning, rhyme,
+or grammatical continuity. Every choice uses the first power-of-two prefix
+of the sorted pool, so lexicographically late lines are systematically omitted.
+An index consumes bits MSB first with zero padding only in the final line.
+Concatenate lines with one 。 after each, without whitespace or normalization.
+For each length S the common bytes are SHAKE256 of UTF-8
+`ZeroInput/public-verse/v1/S` (S in decimal), squeezed to S bytes.
+[Public vectors with full text and hex](themed-verse/vectors.json) ·
+[Codebook and decoder](../tools/themed-verse/verse.py)
+
+| Mode | Payload B | Lines | UTF-16 units | UTF-8 bytes | Repeated lines beyond first / lines |
+|---|---:|---:|---:|---:|---:|
+| Free | 162 | 77 | 462 | 1,386 | 0/77 |
+| Free | 226 | 107 | 642 | 1,926 | 0/107 |
+| Free | 290 | 137 | 822 | 2,466 | 0/137 |
+| Theme | 162 | 93 | 558 | 1,674 | 1/93 |
+| Theme | 226 | 130 | 780 | 2,340 | 0/130 |
+| Theme | 290 | 166 | 996 | 2,988 | 3/166 |
+| Linked | 162 | 100 | 600 | 1,800 | 0/100 |
+| Linked | 226 | 139 | 834 | 2,502 | 1/139 |
+| Linked | 290 | 179 | 1,074 | 3,222 | 2/179 |
+
+| Mode | Exact carriers | Equal bytes | Draft fits / insufficient | Whole-carrier fits / insufficient |
+|---|---:|---:|---:|---:|
+| Free | 3/3 | 678/678 | 1/3 (33%) / 2 | 3/3 (100%) / 0 |
+| Theme | 3/3 | 678/678 | 0/3 (0%) / 3 | 3/3 (100%) / 0 |
+| Linked | 3/3 | 678/678 | 0/3 (0%) / 3 | 3/3 (100%) / 0 |
+
+Both limits must hold for each fit: draft 512 units and 1,536 bytes, whole
+carrier 8,192 units and 16,384 bytes. Every size was attempted once per mode.
+Zero candidate shortages occurred in these nine trials. Each numerator counts
+the fixed fixtures only. The whole-carrier column measures space for the
+surface, without exercising Android import or extending the public draft.
+
+**Receiver checks.** The receiver has no encoder cursor or candidate list.
+It reloads the locked resource, given only the mode, byte count and surface.
+Tests cover zero/one candidate, nonzero tail padding, missing/extra line,
+punctuation, unassigned text and unknown or incompatible mode. A single
+substitution between assigned lines can silently change recovered bytes.
+Overlapping codebooks can even accept the same bytes under another mode.
+The public expected bytes are a test oracle. Authenticating configuration,
+length, envelope and complete visible text remains a prerequisite for releasing
+any plaintext. No actual encrypted message, credential or authentication tag
+was tested here. [Negative cases](../tools/themed-verse/study.py)
+
+**Blind reading pending.** Give readers only the appropriate packet and blank
+score sheet. Use separate readers for short and full packets to avoid
+recognition. Obtain independent scores before opening the matching
+`*-organizer.txt` key. Short samples mix the first four lines of each carrier
+and each matched ordinary control with three complete historical centos. The
+full packet pairs all nine carriers with nine independently sampled ordinary
+centos using identical pools, transitions, punctuation and line counts.
+The historical anchors match meter and display length only in the short
+packet. They are Wen Tianxiang's *Collected Du Fu Lines* nos. 164, 167 and
+180, shown in simplified script with standardized punctuation. There is no
+length-matched historical long poem in this pilot. [Short packet](themed-verse/short.md) ·
+[Short score sheet](themed-verse/short-scores.md) · [Full packet](themed-verse/full.md) ·
+[Full score sheet](themed-verse/full-scores.md) · [Historical source](https://zh.wikisource.org/zh-hans/集杜詩)
+
+**Decision.** Hold the independent Kotlin codec stage. The constrained modes
+miss the draft limit even at 162 B. Longer surfaces meet the numeric carrier
+limits, but independent coherence scores, an accepted long-text budget and a
+reviewed authenticated binding are outstanding. Next collect blind scores
+for adjacent lines and full passages, then decide whether the long-verse use
+case merits a binding design and independent implementation. The small host
+pilot does not establish channel robustness or detector performance. Android
+entry, capacity expansion, compact ciphertext and portable biometric credentials
+remain separate decisions.
+
+### Long-text compression probe
+
+Run `python -B tools/themed-verse/compression_probe.py` from the repository
+root. An experimental mixed-radix index uses all eligible lines with the
+same imagery transitions. Starting with the big-endian payload integer, emit
+its remainder modulo the current pool size and continue with the quotient.
+Stop when the product of the visited pool sizes covers the entire known-length
+byte range, including leading zeroes. The receiver rebuilds the pools from
+the text and uses the corresponding place values. All nine published inputs
+round-tripped with fresh receiver resources. At 162/226/290 B, free mode took
+74/103/132 lines, theme mode 87/122/156 and linked mode 97/135/173.
+Even the optimized linked 162 B surface still exceeds the 85-line draft.
+Applying zlib level 9 directly to these public pseudorandom bytes added 11 B
+at each size.
+
+For a separate pre-encryption size estimate, take three nested UTF-8 prefixes
+of Han-initial paragraphs in the public design document (Markdown retained).
+All three zlib streams decompressed byte-for-byte. Budget each size using
+the existing single-layer AES 64-byte frame buckets, then actually encode and
+decode deterministic dummy bytes of the budgeted length with the linked
+mixed-radix index. The bytes account for framing overhead but are synthetic.
+
+| Prose UTF-8 B | zlib B | Budget B, raw → compressed | Linked lines, raw → compressed | Carrier UTF-8 B, raw → compressed |
+|---:|---:|---:|---:|---:|
+| 510 | 382 | 674 → 546 | 402 → 326 | 7,236 → 5,868 |
+| 1,024 | 759 | 1,186 → 930 | 707 → 555 | 12,726 → 9,990 |
+| 2,046 | 1,353 | 2,210 → 1,506 | 1,318 → 898 | 23,724 → 16,164 |
+
+The largest compressed example fits both whole-carrier limits (5,388 units,
+220 UTF-8 bytes of headroom). It illustrates a bucket crossing for one public
+technical text. Corpus generality, long-passage readability, actual authenticated
+compression metadata, length disclosure and bounded decoding remain open.
+Any product-level compression needs separate format review. [Host probe](../tools/themed-verse/compression_probe.py)
+
+### Raw-secret utilization target
+
+The user set utilization to original UTF-8 secret bytes divided by complete
+visible UTF-8 bytes. The [20% research plan](natural-wording-steganography.md#8-原始正文利用率至少-20-的长文本方案)
+budgets public dictionary compression, the single-layer frame and visible
+punctuation/paragraphs. Reproduce with
+`python -B tools/themed-verse/utilization_probe.py`. In the exploratory
+size simulation, two of four version notes reached 21.53% and 21.16%; both
+design excerpts missed (15.04% and 17.79%). A separate synthetic repeated
+form reached 50.60%. No independent reader has evaluated these whole texts.
+Next measure the cost of curated stanza transitions and blind-rate full
+length against matched controls. Actual authenticated compressed frames and
+independent device decoding remain review gates.
+
+The subsequent [binary codec comparison](natural-wording-steganography.md#加密前的二进制文本编码)
+ran upstream rmw-utf8 0.0.6 on the same six documents. All six round-tripped;
+RMW alone reached 13.80–17.79% under the existing frame budget. Keeping the
+best exact codec retained two passes out of six. Separate CRLF, CR and emoji
+fixtures failed exact RMW reconstruction.
+
+The [binary host prototype](themed-verse/prototype.md) now performs actual
+single-layer authenticated encryption and reconstructs the original bytes from
+the UTF-8 verse in a fresh process with only the agreed profile and key.
+Run `python -B tools/themed-verse/check_binary_prototype.py` after building
+the two locked Rust helpers. All nine project documents round-tripped, with
+two above 20%; the separate synthetic form also passed. The new literal-safe
+word codec reached the smallest envelope bucket for v0.7.5 without adding a
+20% success. The three additional project documents reached 15.03–16.76%.
+The original 24 Rust reference output lines and nine previous verse vectors
+still match. Next evaluate whole-text readability and non-template prose
+before reviewing a mobile implementation.
+
+The subsequent [default-dictionary and native replay comparison](themed-verse/prototype.md#默认词库位置与原引擎按键重放)
+compared full-table positions, actual librime spelling/candidate events and the
+combination on the same corpus. All nine real documents recovered byte-for-byte.
+Static positions plus compression lowered six encrypted envelopes by 64 B each,
+raising the number at or above 20% from 2/9 to 4/9. Candidate replay alone
+did not beat the existing codec on any of the nine. A synthetic form and a
+public verse excerpt were separate controls. Keep the experimental profile
+isolated while checking wider genres and full-passage readability.
 
 ## Personal stego notes and public verse (2026-11-20)
 

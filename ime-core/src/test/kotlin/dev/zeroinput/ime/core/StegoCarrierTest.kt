@@ -57,15 +57,34 @@ class StegoCarrierTest {
         }
     }
 
-    @Test fun `malformed duplicated mixed noncanonical and nonterminal blocks reject`() {
-        val dense = StegoCarrierCodec.encode("cover", byteArrayOf(1, 20), StegoTransport.DENSE_UNICODE)
-        val visible = StegoCarrierCodec.encode("cover", byteArrayOf(1, 20), StegoTransport.VISIBLE_BASE64)
-        val invalid = listOf(dense + "x", visible + "x", dense + dense, visible + visible, dense + visible,
-            dense.dropLast(1), visible.dropLast(1), dense.replace("\ufe01", "x"),
-            visible.replace("ARQ", "ARQ="), visible.replace("ARQ", "ARR"),
-            "cover${StegoCarrierCodec.DENSE_START}${StegoCarrierCodec.DENSE_END}",
-            "cover[ZIS1:]", "cover[ZIS1:ARQ\n]", "ordinary text", "\ud800[ZIS1:ARQ]", "a\u0000[ZIS1:ARQ]")
-        invalid.forEach { assertThrows(it.length.toString(), StegoFormatFailure::class.java) { StegoCarrierCodec.decode(it) } }
+    @Test fun `distributed blocks preserve both visible ends and reject damaged framing`() {
+        val cover = "一二三四五六七八九十"
+        val bytes = ByteArray(256) { it.toByte() }
+        for (transport in StegoTransport.entries) {
+            val encoded = StegoCarrierCodec.encode(cover, bytes, transport)
+            assertTrue(encoded.startsWith("一"))
+            assertTrue(encoded.endsWith("十"))
+            val marker = if (transport == StegoTransport.DENSE_UNICODE) StegoCarrierCodec.DENSE_START else "[ZIS1:2:"
+            assertTrue(encoded.indexOf(marker) < encoded.lastIndexOf(marker))
+            for (bad in listOf(encoded.replaceFirst(marker, ""), encoded + encoded,
+                    encoded.replaceFirst(marker, marker + "!"))) {
+                assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.decode(bad) }
+            }
+        }
+        for (bad in listOf("cover[ZIS1:ARQ]", "cover${StegoCarrierCodec.DENSE_START}x${StegoCarrierCodec.DENSE_END}",
+                "cover[ZIS1:2:ARQ=]", "cover[ZIS1:2:ARR]", "cover[ZIS1:2:]", "ordinary text")) {
+            assertThrows(StegoFormatFailure::class.java) { StegoCarrierCodec.decode(bad) }
+        }
+    }
+
+    @Test fun `visible framing has a fixed interoperable column order`() {
+        val bytes = ByteArray(8) { it.toByte() }
+        val vector = "A[ZIS1:2:Awc]B[ZIS1:2:BAA]C[ZIS1:2:BQE]D[ZIS1:2:BgI]E"
+        assertEquals(vector, StegoCarrierCodec.encode("ABCDE", bytes, StegoTransport.VISIBLE_BASE64))
+        assertArrayEquals(bytes, StegoCarrierCodec.decode(vector).envelope)
+        for (cover in listOf("👩🏽‍💻", "e\u0301", "葛\uDB40\uDD00", "क्‍ष")) {
+            assertTrue(StegoCarrierCodec.encode(cover, bytes, StegoTransport.DENSE_UNICODE).endsWith(cover))
+        }
     }
 
     @Test fun `largest envelope and cover fit both limits without truncation`() {

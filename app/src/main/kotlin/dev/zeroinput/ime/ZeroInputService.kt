@@ -731,8 +731,10 @@ class ZeroInputService : InputMethodService() {
         if (privateDraftToggle != null || graph.securePaste.isAuthenticating || clipboardCopy.isAuthenticating) {
             return super.onKeyUp(keyCode, event)
         }
-        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && event.isTracking && !event.isCanceled &&
-            inputView?.navigateBack() == true) return true
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && isInputViewShown && event.isTracking && !event.isCanceled) {
+            if (inputView?.isTextStegoOpen == true && textStego?.dismissOptions() == true) return true
+            if (inputView?.navigateBack() == true) return true
+        }
         return super.onKeyUp(keyCode, event)
     }
 
@@ -1214,7 +1216,9 @@ class ZeroInputService : InputMethodService() {
                             dev.zeroinput.ime.ui.StegoAction.VAULT_SECRET -> dev.zeroinput.ime.ui.StegoField.SECRET
                             else -> dev.zeroinput.ime.ui.StegoField.CARRIER
                         },
-                        carrier = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER) workspaceDetachedCarrier() else null))
+                        carrier = if (action == dev.zeroinput.ime.ui.StegoAction.VAULT_COVER) workspaceDetachedCarrier() else null,
+                        wording = textStego?.wordingProfile,
+                        fileUse = if (kind == dev.zeroinput.ime.textstego.StegoHandoff.Kind.FILE) textStego?.wordingFileUse() else null))
                 }
             }, onSave = { value -> launchStegoSource(dev.zeroinput.ime.textstego.StegoHandoff.Request(
                 dev.zeroinput.ime.textstego.StegoHandoff.Kind.SAVE, value)) },
@@ -1236,10 +1240,11 @@ class ZeroInputService : InputMethodService() {
                 val paste = graph.stegoHandoff.takePaste(pasteEditorIdentity())
                 try {
                     val carrier = paste?.let { if (it.target == dev.zeroinput.ime.ui.StegoField.CARRIER) it.text else it.carrier }?.let(::String)
-                    workspace.open(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions, carrier, file)
+                    workspace.open(controller?.state?.language ?: InputLanguage.CHINESE, sessionChineseOptions, carrier, file?.factor,
+                        wording = paste?.wording, fileUse = file?.use)
                     if (paste != null && paste.target != dev.zeroinput.ime.ui.StegoField.CARRIER)
                         paste.text?.let { workspace.pasteText(paste.target, String(it)) }
-                } finally { file?.fill(0); paste?.close() }
+                } finally { file?.close(); paste?.close() }
             } else workspace.close()
         }
     }
@@ -1258,6 +1263,8 @@ class ZeroInputService : InputMethodService() {
 
     private fun readStegoSelection(view: ZeroInputView) {
         if (!view.isTextStegoOpen || !eligibleForPrivateDraft(view) || !isDeviceUnlocked()) return
+        val workspace = textStego ?: return
+        val authorized = workspace.selectionAuthorization() ?: return
         val session = activeSession ?: return
         val connection = session.connectionBinding.resolve(currentInputConnection) ?: return
         val interaction = interactionSequence
@@ -1265,11 +1272,11 @@ class ZeroInputService : InputMethodService() {
         selectionReader.read(length, { connection.getSelectedText(0) }, {
             view === inputView && view.isTextStegoOpen && isSessionActive(session, connection) &&
                 interactionSequence == interaction && eligibleForPrivateDraft(view) && isDeviceUnlocked() &&
-                editorConnection?.selectedLength() == length
-        }) { draft ->
+                editorConnection?.selectedLength() == length && textStego === workspace && authorized()
+        }, naturalWording = workspace.acceptsUnmarkedCarrier) { draft ->
             val chars = draft?.takeForStego()
             if (chars == null) Toast.makeText(this, R.string.stego_import_selection_failed, Toast.LENGTH_SHORT).show()
-            else try { textStego?.importCarrier(String(chars)) } finally { chars.fill('\u0000') }
+            else try { workspace.importCarrier(String(chars)) } finally { chars.fill('\u0000') }
         }
     }
 

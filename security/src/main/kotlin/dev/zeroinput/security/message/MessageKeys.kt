@@ -35,10 +35,12 @@ internal object MessageKeys {
         init(SecretKeySpec(key, "HmacSHA256")); doFinal(value)
     }
 
-    fun root(credential: MessageCredential, salt: ByteArray, kdf: MessageKdf, encrypt: Boolean,
+    fun root(credential: MessageCredential, salt: ByteArray, kdf: MessageKdf, minimumPasswordPoints: Int,
              derivePassword: (ByteArray, ByteArray, MessageKdf) -> ByteArray = ::argon): ByteArray =
         credential.withFactors { chars, file ->
             if (credential.mode.password != (kdf != MessageKdf.NONE)) throw MessageFailure()
+            if (credential.mode.password &&
+                Character.codePointCount(chars, 0, chars.size) < minimumPasswordPoints) throw MessageFailure()
             val text = utf8(chars, MessageLimits.CREDENTIAL_BYTES)
             var factor: ByteArray? = null
             var root: ByteArray? = null
@@ -64,8 +66,6 @@ internal object MessageKeys {
                         requireNotNull(file).copyOf()
                     }
                 }
-                if (credential.mode.password && (text.isEmpty() || encrypt &&
-                        Character.codePointCount(chars, 0, chars.size) < 12)) throw MessageFailure()
                 root = if (credential.mode.password) derivePassword(factor, salt, kdf) else factor.copyOf()
                 hmac(salt, root)
             } finally { text.fill(0); factor?.fill(0); root?.fill(0) }
@@ -94,6 +94,9 @@ internal object MessageKeys {
 
 /** Hashes exactly one bounded stream; the caller owns URI validation and closes the stream. */
 object MessageKeyFile {
+    /** Caller owns and clears these bytes. They are independent of all message and device keys. */
+    fun generate(): ByteArray = ByteArray(32).also(java.security.SecureRandom()::nextBytes)
+
     fun factor(input: InputStream, declaredSize: Long? = null, isCurrent: () -> Boolean = { true }): ByteArray {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(8192)
