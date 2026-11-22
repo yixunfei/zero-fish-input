@@ -28,6 +28,32 @@ def freeze(route):
     return asset
 
 
+def punctuate(route, plain):
+    """Keep required observation/follow-up pairs together and bound independent clauses."""
+    state = width = 0
+    result = []
+    clauses = plain[:-1].split("。")
+    for index, clause in enumerate(clauses):
+        group, _ = route.words[state][clause]
+        units, target, _ = route.groups[state][group]
+        width += units
+        stop = index == len(clauses) - 1 or (
+            route.endings[target] and (not route.endings[state] or width - 1 >= 16))
+        result.append(clause + ("。" if stop else "，"))
+        if stop:
+            width = 0
+        state = target
+    return "".join(result)
+
+
+def recover_window(route, text):
+    plain = text.replace("，", "。")
+    packet = route.recover(plain)
+    if punctuate(route, plain) != text:
+        raise ValueError("noncanonical window punctuation")
+    return packet
+
+
 def main(output, scene_corpus, progression, attested_slots):
     if attested_slots:
         tested = slot_routes(attested_slots)
@@ -59,7 +85,10 @@ def main(output, scene_corpus, progression, attested_slots):
             if fill == "max":
                 packet = bytes([255]) * size
             text = route.render(packet)
-            if route.recover(text) != packet:
+            if attested_slots:
+                text = punctuate(route, text)
+            recovered = recover_window(route, text) if attested_slots else route.recover(text)
+            if recovered != packet:
                 raise ValueError("host did not recover the vector")
             encoded = text.encode()
             print(f"{size:3} {fill:12} | {len(encoded):5} B | {sha256(encoded).hexdigest()}")

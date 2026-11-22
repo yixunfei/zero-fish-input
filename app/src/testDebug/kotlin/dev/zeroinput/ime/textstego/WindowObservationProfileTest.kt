@@ -27,13 +27,13 @@ class WindowObservationProfileTest {
 
     @Test fun matchesFrozenHostVectorsThroughTheGuaranteedBoundary() {
         val window = VerseProfileAssets(assets).window
-        assertEquals("d215c735861e022dceee9e8a5213c91e3b5a498e6f4676e73720b562513d455e", window.digest.hex())
+        assertEquals("4ffea5f4782af73075a051b8f71c767f489df12072ff436cee6479b6529e6de5", window.digest.hex())
         val vectors = listOf(
             Vector(1, false, 21, "404f1ca80cf5c92c8c81521d95d41d3598cb33a61a3a2eb1dfdfbe2cbdef4138"),
-            Vector(178, false, 3507, "e225b7264f73ec3f09530608b0cf93810d01c55f73b9d4ef67df07bf7daa5484"),
-            Vector(524, true, 10302, "ab64af8c08e89334aec6e411f5cfd2a10ae6060bee7bbea658a35c1702574119"),
-            Vector(833, false, 16371, "d00131bda5d7641b2b887fad5ee0a2c2d8bb5be5477adf930646c148ff0bc574"),
-            Vector(833, true, 16371, "e6a055864baef02a18f309e6e24f9095f070315ecd595a3439f7a2b3fa940245"),
+            Vector(178, false, 3507, "0475379487e49d3dd88fae9fbda0ae6876a3b613211f229e4132d9cb6ff7bbfb"),
+            Vector(524, true, 10302, "0c4911555b453fe2e7663a590dc9bc42f92f4ee1d098777f1c4af8333f9631f0"),
+            Vector(833, false, 16371, "33c1800b2aefdf215dbf68fa42b6d4c028671ddbf6a87603b8c7b124ad069f9e"),
+            Vector(833, true, 16371, "da117073b518ce3da4833e3f3110aaa2dc50fbda1302fc3350ab78c612ce9ca5"),
         )
         for ((size, max, utf8Bytes, hash) in vectors) {
             val packet = ByteArray(size) { if (max) -1 else if (it < 5) 0 else (it * 67).toByte() }
@@ -56,10 +56,10 @@ class WindowObservationProfileTest {
         val graph = VerseProfileAssets(assets).window.surface
         val packet = ByteArray(524) { -1 }
         val text = graph.operation { true }.encode(packet)
-        val introduction = "云影掠过石阶。"
+        val introduction = "云影掠过石阶，"
         val originalPair = introduction + "只剩一层影子。"
         assertTrue(originalPair in text)
-        val edited = listOf(text.dropLast(1), text.replaceFirst("。", "。\n"),
+        val edited = listOf(text.replaceFirst("，", "。"), text.replaceFirst("。", "，"), text.dropLast(1), text.replaceFirst("。", "。\n"),
             text.replaceFirst(originalPair, introduction + "水波一动。"),
             text.substringBefore(originalPair) + introduction, "人".repeat(5_461) + "。")
         for (invalid in edited) {
@@ -86,6 +86,16 @@ class WindowObservationProfileTest {
         val tampered = graph.operation { true }.encode(bytes)
         assertThrows(MessageFailure::class.java) { StegoWordingCodec.open(assets, style, tampered, key, { true }) { true } }
         assertArrayEquals(body, StegoWordingCodec.open(assets, style, text, key, { true }) { true })
+    }
+
+    @Test fun clipboardFixtureAuthenticatesWithItsPublicTestKey() {
+        val body = "公开平台回归样本\r\n保留原文本。".toCharArray()
+        val encodedKey = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() })
+        MessageCredential(MessageCredentialMode.RANDOM_KEY, encodedKey.toCharArray()).use { credential ->
+            val style = StegoWordingProfile.PROSE_WINDOW
+            val fixture = java.io.File("src/androidTest/assets/stego-wording-window-public.txt")
+            assertArrayEquals(body, StegoWordingCodec.open(assets, style, fixture.readText(), credential, { true }) { true })
+        }
     }
 
     private data class Vector(val size: Int, val max: Boolean, val utf8Bytes: Int, val hash: String)

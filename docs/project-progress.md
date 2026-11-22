@@ -2,6 +2,17 @@
 
 Updated 2026-11-22.
 
+## Window observation punctuation (2026-11-22)
+
+The Debug window prose profile now groups observations with Chinese commas and
+closes sentences with full stops. Required follow-ups stay attached. Each mark
+occupies the original delimiter width, preserving the 833-byte envelope limit.
+The profile fingerprint changed; archived all-stop messages require their old
+APK. The Python exporter and Kotlin codec agree on the boundary vectors.
+Real-Rime x86_64 Debug assembly, unit tests, privacyCheck and Debug lint passed.
+Run `./gradlew.bat :app:testDebugUnitTest --tests "*WindowObservationProfileTest"`
+for canonical punctuation, tamper rejection and the public clipboard fixture.
+
 ## Distributed carriers, settings and import audit (2026-11-22)
 
 The two exact-cover transports write and read the [distributed format](adr/0042-distributed-exact-carriers.md).

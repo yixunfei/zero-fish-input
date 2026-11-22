@@ -23,7 +23,7 @@ internal class VerseProfileAssets(assets: AssetManager) {
     }
     val window by lazy {
         val graph = readVerseAsset(assets, WindowObservationGrammar.ASSET_NAME, WindowObservationGrammar.ASSET_BYTES)
-        Profile(WindowObservationGrammar(graph), profileFingerprint("v3/prose-window-attested-slots", sha256(graph), modelHash))
+        Profile(WindowObservationGrammar(graph), profileFingerprint("v4/prose-window-clauses", sha256(graph), modelHash))
     }
 
     class Profile<T>(val surface: T, val digest: ByteArray)

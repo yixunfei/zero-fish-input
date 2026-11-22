@@ -49,7 +49,8 @@ class WindowObservationSurface internal constructor(
         var state = states.first()
         while (offset < carrier.length) {
             ensureCurrent()
-            val end = carrier.indexOf(STOP, offset)
+            var end = offset
+            while (carrier[end] != STOP && carrier[end] != COMMA) end++
             val choice = state.choices[carrier.substring(offset, end)] ?: throw VerseTestFormatFailure()
             path.add(choice)
             state = states[state.groups[choice.group].target]
@@ -81,6 +82,7 @@ class WindowObservationSurface internal constructor(
         var rank = value - table.cumulative(length - 1)
         var remaining = length
         var state = states.first()
+        var sentenceStart = 0
         val result = StringBuilder(length)
         while (remaining > 0) {
             ensureCurrent()
@@ -92,7 +94,11 @@ class WindowObservationSurface internal constructor(
                 val block = suffix.timesCount(group.sentences.size)
                 if (rank < block) {
                     val division = rank.divideAndRemainder(suffix)
-                    result.append(group.sentences[division[0].toInt()]).append(STOP)
+                    result.append(group.sentences[division[0].toInt()])
+                    val stop = remaining == group.units || states[group.target].ending &&
+                        (!state.ending || result.length - sentenceStart >= 16)
+                    result.append(if (stop) STOP else COMMA)
+                    if (stop) sentenceStart = result.length
                     rank = division[1]
                     selected = group
                     break
@@ -115,6 +121,7 @@ class WindowObservationSurface internal constructor(
     companion object {
         const val MAX_ENVELOPE_BYTES = 833
         internal const val MAX_UNITS = StegoCarrierCodec.MAX_BYTES / 3
+        private const val COMMA = '，'
         private const val STOP = '。'
     }
 }

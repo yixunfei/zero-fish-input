@@ -8,7 +8,7 @@
 
 **决定（2026-11-22）：暂缓实现。** 论文在 Baichuan2-7B 和中文上下文中，每步取概率最高的 256 个词元，用 Basic 去除切分歧义，再由 Discop 编码。表 II 报告 3.68 bit/token、困惑度 67.07、本组提取错误指标为 0。同表的 SyncPool 为 3.05 bit/token、困惑度 23.57。实验使用译成中文的影评上下文，续写 100 个词元；整篇中文自然度和跨设备回读仍需单独验证。[论文原文，表 II、实验设置](https://arxiv.org/html/2403.17524v2)
 
-对 8 个常见汉字（原始 UTF-8 正文 24 B），当前默认双层封装为 268 B。公开窗边样本的 6,375 B 用 Baichuan2 分为 1,578 个词元。据此估算，`ceil(268 × 8 / 3.68) × (6375 / 1578)` 约为 2,355 B，利用率约 1.02%。估算假定固定共享起始上下文，尚未计入可能随文发送的同步参数和收尾文字。Android 单样本实测为窗边 5,271 B、归档 Daily 3,015 B。Basic 对 Daily 的估算缩短约 22%，20% 利用率目标对应的全文预算为 120 B。[公开样本](../app/src/androidTest/assets/stego-wording-window-public.txt) · [Android 实测](project-progress.md#eight-han-passphrase-messages-in-android-prose-2026-11-22) · [模型资源](https://huggingface.co/baichuan-inc/Baichuan2-7B-Base)
+对 8 个常见汉字（原始 UTF-8 正文 24 B），当前默认双层封装为 268 B。公开窗边样本的 6,375 B 用 Baichuan2 分为 1,578 个词元。据此估算，`ceil(268 × 8 / 3.68) × (6375 / 1578)` 约为 2,355 B，利用率约 1.02%。估算假定固定共享起始上下文，尚未计入可能随文发送的同步参数和收尾文字。Android 单样本实测为窗边 5,271 B、归档 Daily 3,015 B。Basic 对 Daily 的估算缩短约 22%，20% 利用率目标对应的全文预算为 120 B。[该次测量使用的公开样本](https://github.com/yixunfei/zero-fish-input/blob/18b5efa/app/src/androidTest/assets/stego-wording-window-public.txt) · [Android 实测](project-progress.md#eight-han-passphrase-messages-in-android-prose-2026-11-22) · [模型资源](https://huggingface.co/baichuan-inc/Baichuan2-7B-Base)
 
 重新评估时，先在主机以相同随机封装和凭据配置配对测量完整发送字节数、中位数与 P95，并盲读全文。量化权重、分词器、整数概率与候选次序须在独立收发端复现。逐条核对含前导零的封装及认证正文，计入公开上下文、同步数据和句末开销，再实测离线 Android 的模型体积、峰值内存与耗时。当前的实现与分发范围仅含已有资源。
 

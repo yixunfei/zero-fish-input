@@ -216,18 +216,18 @@ The model and per-work attribution are Debug assets.
 
 Each profile digest is SHA-256 over the ASCII string
 `ZeroInput/natural-wording-trial/profile/` followed by `v3/verse`,
-`v3/verse-seven` or `v3/prose-window-attested-slots`, a zero byte, the 32-byte SHA-256
+`v3/verse-seven` or `v4/prose-window-clauses`, a zero byte, the 32-byte SHA-256
 of the surface table, and the 32-byte SHA-256 of ZWC1, in that order.
 The digest feeds the existing wrapped binding. The keyboard derives a
 single binding for the chosen style and accepts only the three
 authenticated body modes above. The standalone public-fixture workbench
 uses its separate research assets.
 
-| Binding label | Surface asset | v3 profile SHA-256 |
+| Binding label | Surface asset | Profile SHA-256 |
 | --- | --- | --- |
 | `v3/verse` | `opening.bin` | `787982af5f4d1528f92ae81e2f482f785644b2e273901a113555b36f4d32a27c` |
 | `v3/verse-seven` | `seven.bin` | `41c2538dfef35d10b6855c01bbc053458877e5cc43c37d29c7a2767bad362874` |
-| `v3/prose-window-attested-slots` | `window-observation.bin` | `d215c735861e022dceee9e8a5213c91e3b5a498e6f4676e73720b562513d455e` |
+| `v4/prose-window-clauses` | `window-observation.bin` | `4ffea5f4782af73075a051b8f71c767f489df12072ff436cee6479b6529e6de5` |
 
 The sender runs the existing minimum-bit segmentation once for all
 three codecs. It selects the lowest wrapped size for the chosen
@@ -273,10 +273,10 @@ the stable asset name in the binding table above.
 All integers are big-endian. Two u16 counts give the sentence and state
 totals. Each sentence has a u8 length and UTF-16BE BMP Han text. Each state
 has a u8 accepting flag and u16 group count. A group stores its u8 width
-including the fullwidth stop, u16 destination and u16 member count followed
+including one fullwidth delimiter, u16 destination and u16 member count followed
 by that many u16 sentence indices. State zero is the start. Within each
 length bucket the rank follows the frozen group and sentence order.
-Only concatenated sentences ending with a fullwidth stop are canonical.
+A required continuation follows a fullwidth comma. Its completion closes the sentence. Independent clauses join with commas until the sentence reaches 16 visible units before its delimiter. The final clause always takes a fullwidth stop. Both delimiters have equal encoded width.
 [Public graph exporter](../../tools/themed-verse/export_window_observation.py)
 
 The rank is the unsigned integer for `01 || envelope` minus one. Decode
