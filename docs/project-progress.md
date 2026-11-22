@@ -1,6 +1,10 @@
 # Project status
 
-Updated 2026-11-22.
+Updated 2026-11-23.
+
+## v0.7.8 testing prerelease
+
+The universal Debug-signed distribution includes the window punctuation and distributed carrier changes. The release APK passed an in-place upgrade from the published v0.7.7 on API 37. See the [release notes](releases/v0.7.8.md) and [validation and hashes](releases/v0.7.8-validation.md).
 
 ## Window observation punctuation (2026-11-22)
 

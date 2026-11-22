@@ -4,22 +4,22 @@
 
 ZeroInput 是面向 Android 的开源输入法。中文、英文、词联想、表情和安全剪贴板可离线使用。AI 联网和公开资源下载由用户主动启用。
 
-[下载 v0.7.7 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.7) · [发布说明](docs/releases/v0.7.7.md) · [发布验证](docs/releases/v0.7.7-validation.md)
+[下载 v0.7.8 测试版](https://github.com/yixunfei/zero-fish-input/releases/tag/v0.7.8) · [发布说明](docs/releases/v0.7.8.md) · [发布验证](docs/releases/v0.7.8-validation.md)
 
 ## 安装
 
-1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.7/zero-fish-input-0.7.7-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
-2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.7-debug-universal.apk -Algorithm SHA256`。
+1. 从发行页下载 [通用 APK](https://github.com/yixunfei/zero-fish-input/releases/download/v0.7.8/zero-fish-input-0.7.8-debug-universal.apk)。它支持 Android 8.0（API 26）及以上，包含 `arm64-v8a`、`armeabi-v7a` 和 `x86_64`。
+2. 对照同页的 `SHA256SUMS.txt` 核对下载。Windows 可运行 `Get-FileHash .\zero-fish-input-0.7.8-debug-universal.apk -Algorithm SHA256`。
 3. 安装后打开 **zero fish input**，点「启用」进入系统输入法设置。启用后返回应用，点「切换」并选择 **zero fish input**。设置页显示「正在使用」后，在普通文本框输入 `nihao`，点选“你好”。
 
-公开包是 Debug 签名测试版，包名为 `dev.zeroinput.ime.debug`。升级与设备验证范围见本版[发布验证](docs/releases/v0.7.7-validation.md)。遇到签名冲突时请先确认原安装来源，卸载会清除该应用的本地数据。首次启动会在后台准备中文数据，期间可用内置基础词表离线输入。
+公开包是 Debug 签名测试版，包名为 `dev.zeroinput.ime.debug`。升级与设备验证范围见本版[发布验证](docs/releases/v0.7.8-validation.md)。遇到签名冲突时请先确认原安装来源，卸载会清除该应用的本地数据。首次启动会在后台准备中文数据，期间可用内置基础词表离线输入。
 
-## v0.7.7 更新
+## v0.7.8 更新
 
-- 隐写模式提供同页编辑、六种算法按选择顺序组合、加密后自动填入原输入框，以及四类结果的认证私密保存。
-- 公开文本和待解密文本支持主动粘贴；随机主密钥支持预设和自定义长度。私密临时输入默认遮盖全部已确认文字。
-- 修复异步个人化刷新撤销模型重排的问题，保留正确候选提交路径；新获得的个人词频优先级仍然生效。
-- 设备代理未配置动作类别时不授予任何类别；同时加固动作参数、聊天历史、引擎生命周期和语言包导入边界。详见[逐项核查记录](docs/audits/2026-11-19-full-code-review-fixes.md)。
+- 隐写工作区增加五言集句、七言集句和窗边随笔。窗边随笔用逗号连接观察与后续细节，用句号收束。解密时请选择发送方使用的体裁，并保留全文标点。
+- Unicode 和可见 Base64url 将密文分散到公开文本中。收发两端新增载体使用说明，设置页移除了公开样例入口。残缺载体的识别和隐写弹窗的遮挡防护已加固。
+- 独立 AI 对话支持逐条重发、编辑或移除发送失败的问题。隐写工作区也可使用本机生物识别配合口令保存个人随笔。
+- 升级前请先用旧版解开仍需保留的末尾附加式完整载体和旧版窗边随笔。独立密文仍可配合原公开文本解密。
 
 ## 开发版 AI 对话
 
@@ -67,7 +67,7 @@ Unicode 隐写与可见 Base64url 均可被检测，也可能被目标应用改�
 
 Debug 版在键盘「隐 → 载体 → 自然措辞」提供五言集句、七言集句和窗边随笔。填写秘密正文和凭据后可生成预览，核对全文、正文与载体的 UTF-8 字节数及利用率，再确认插入。窗边随笔用逗号衔接观察与后续细节，以句号收束；新版只能解开新版窗边随笔。收端读入保留原字、标点和换行的全文，点「开始解密」选取发件人使用的样式，按提示提供凭据解密。Unicode 隐写和可见 Base64url 将密文分布在公开文本中；复制时请选择整段。新版不再读取旧版末尾附加的完整载体。独立密文仍可配合原公开文本解密。[使用范围与构建命令](docs/themed-verse/android-test-build.md)
 秘密正文上限 2048 UTF-8 字节，公开文本上限 512 UTF-16 单位／1536 UTF-8 字节，单个密钥文件 32 字节至 1 MiB。
-使用与验证范围见[隐写验收记录](docs/text-steganography-validation.md)及本版[发布验证](docs/releases/v0.7.7-validation.md)。
+使用与验证范围见[隐写验收记录](docs/text-steganography-validation.md)及本版[发布验证](docs/releases/v0.7.8-validation.md)。
 
 ## 隐私与可选联网
 
@@ -111,7 +111,7 @@ python -B tools/prepare-handwriting-stroke-model.py
   "-Pandroid.injected.build.abi=x86_64" -PrequireRime=true --no-parallel
 ```
 
-通用测试包附带许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.7-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
+通用测试包附带许可证、手写模型对应源码和 SHA-256 清单。通用包实测大小见[发布验证](docs/releases/v0.7.8-validation.md)。80 MB 包体目标针对 ARM64 完整包单独验收。
 
 ```powershell
 ./tools/package-test-apk.ps1 -Abi universal -MaxApkBytes 180000000
