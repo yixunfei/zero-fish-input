@@ -80,11 +80,6 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
             label.replace(" ", "") == snapshot.rawInput -> label
             else -> snapshot.rawInput
         }
-        if (input != snapshot.rawInput || selection != next || editableText != editable) cancelGesture()
-        if (input != snapshot.rawInput || editableText != editable) setOffsets(snapshot.rawInput, editable)
-        input = snapshot.rawInput
-        editableText = editable
-        selection = next
         val reading = candidate?.comment.orEmpty()
         val display = when {
             next == null -> label
@@ -92,7 +87,15 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
                 context.getString(R.string.pinyin_matched_reading, editable, reading)
             else -> editable
         }
-        if (text.toString() != display) text = display
+        val displayChanged = text.toString() != display
+        if (input != snapshot.rawInput || selection != next || editableText != editable || displayChanged) cancelGesture()
+        if (input != snapshot.rawInput || editableText != editable || displayChanged) {
+            setOffsets(snapshot.rawInput, editable, display.length)
+        }
+        input = snapshot.rawInput
+        editableText = editable
+        selection = next
+        if (displayChanged) text = display
         isClickable = next != null
         val announced = if (match != null && match.end < input.length)
             context.getString(R.string.pinyin_remaining_input, display) else display
@@ -101,15 +104,16 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
         invalidate()
     }
 
-    private fun setOffsets(raw: String, display: String) {
-        rawOffsets = IntArray(display.length + 1)
+    private fun setOffsets(raw: String, editable: String, displayedLength: Int) {
+        rawOffsets = IntArray(maxOf(editable.length, displayedLength) + 1)
         displayOffsets = IntArray(raw.length + 1)
         var offset = 0
-        for (index in display.indices) {
-            if (raw.getOrNull(offset) == display[index]) offset++
+        for (index in editable.indices) {
+            if (raw.getOrNull(offset) == editable[index]) offset++
             rawOffsets[index + 1] = offset
             displayOffsets[offset] = index + 1
         }
+        rawOffsets.fill(offset, fromIndex = editable.length + 1)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -161,7 +165,7 @@ internal class CompositionEditorView(context: Context) : AppCompatTextView(conte
     }
 
     private fun offset(event: MotionEvent): Int =
-        rawOffsets[getOffsetForPosition(event.x, event.y).coerceIn(0, editableText.length)]
+        rawOffsets[getOffsetForPosition(event.x, event.y).coerceIn(rawOffsets.indices)]
 
     private fun revealCaret() {
         val range = preview ?: selection ?: return

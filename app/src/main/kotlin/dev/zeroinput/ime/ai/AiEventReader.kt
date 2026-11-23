@@ -5,7 +5,11 @@ import dev.zeroinput.ai.api.AiProviderError
 import java.io.BufferedReader
 
 /** Bounded SSE framing shared by protocols whose terminal event is not [DONE]. */
-internal class AiEventReader(private val reader: BufferedReader, private val cancelled: () -> Boolean) {
+internal class AiEventReader(
+    private val reader: BufferedReader,
+    private val eventLimit: Int = AiLimits.MAX_STREAM_LINE_CHARS,
+    private val cancelled: () -> Boolean,
+) {
     private var total = 0
     private var first = true
     private var skipLf = false
@@ -19,7 +23,7 @@ internal class AiEventReader(private val reader: BufferedReader, private val can
             if (field.isEmpty() && data.isNotEmpty()) return data.toString().trimEnd('\n')
             if (field.startsWith("data:")) {
                 val part = field.substring(5).removePrefix(" ")
-                requireResponse(data.length + part.length + 1 <= AiLimits.MAX_STREAM_LINE_CHARS)
+                requireResponse(data.length + part.length + 1 <= eventLimit)
                 data.append(part).append('\n')
             }
         }
@@ -44,7 +48,7 @@ internal class AiEventReader(private val reader: BufferedReader, private val can
                 return value.toString()
             }
             if (char == '\n'.code) return value.toString().removeSuffix("\r")
-            requireResponse(value.length < AiLimits.MAX_STREAM_LINE_CHARS)
+            requireResponse(value.length < eventLimit)
             value.append(char.toChar())
         }
     }

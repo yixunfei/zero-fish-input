@@ -5,6 +5,8 @@ import org.json.JSONObject
 import java.io.BufferedReader
 
 internal object AiProtocolResponse {
+    // A completed response repeats the output and reasoning, potentially JSON-escaped.
+    private const val RESPONSES_EVENT_CHARS = 512 * 1024
     fun read(protocol: AiProtocol, json: Boolean, reader: BufferedReader,
         cancelled: () -> Boolean, emit: (String) -> Unit = {},
         thinking: (String) -> Unit = {}): String = when (protocol) {
@@ -12,10 +14,10 @@ internal object AiProtocolResponse {
             else AiSseReader().read(reader, cancelled, emit, thinking)
         AiProtocol.RESPONSES -> if (json) AiResponseReader.parse(reader, cancelled,
             AiLimits.MAX_STREAM_CHARS) { responses(it, thinking) }
-            else responsesStream(AiEventReader(reader, cancelled), emit, thinking)
+            else responsesStream(AiEventReader(reader, RESPONSES_EVENT_CHARS, cancelled), emit, thinking)
         AiProtocol.ANTHROPIC_MESSAGES -> if (json) AiResponseReader.parse(reader, cancelled,
             AiLimits.MAX_STREAM_CHARS) { anthropic(it, thinking) }
-            else AnthropicStreamReader().read(AiEventReader(reader, cancelled), emit, thinking)
+            else AnthropicStreamReader().read(AiEventReader(reader, cancelled = cancelled), emit, thinking)
     }
 
     internal fun objectValue(text: String): JSONObject = AiJsonResponse.objectValue(text)

@@ -75,6 +75,9 @@ internal class AiTaskRuntime(private val context: Context, private val configura
         observer.clear(); foreground = false; uiOwner = null
         if (!lease.destroy(owner)) revoke()
     }
+    fun foregroundInterruption(owner: String): AiTaskInterruption? =
+        if (uiOwner == owner && !background && bindingAllowed()) run.interruption() else null
+
     fun validOpen(token: String?) = token != null && lease.valid(token) && bindingAllowed()
     fun start(owner: String, request: AiToolRequest, executors: Map<String, AiToolExecutor>, labels: Map<String, String>, model: String,
         remote: AiRemoteTools?, notifications: Boolean, background: Boolean): Boolean {
@@ -94,9 +97,14 @@ internal class AiTaskRuntime(private val context: Context, private val configura
                 ContextCompat.startForegroundService(context, Intent(serviceIntent).putExtra(AiRunNotifications.TOKEN, token))
                 main.postDelayed(serviceDeadline, 5_000)
                 changed(AiToolRunEvent(AiToolRunState.THINKING))
-            } catch (_: RuntimeException) { revoke(); return false }
+            } catch (_: RuntimeException) {
+                this.remote = null
+                lease.revoke()
+                clearState()
+                return false
+            }
         } else launch()
-        return running
+        return true
     }
     private fun launch() {
         val launch = pending ?: return

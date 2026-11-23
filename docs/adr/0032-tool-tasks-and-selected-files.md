@@ -32,8 +32,10 @@ dispatched writes are uncertain and are never retried automatically.
 The private task Activity uses FLAG_SECURE and no saved private view state,
 autofill or content capture. Picker handoffs suspend dispatch and have a bounded
 single-use owner token; they cannot keep a model or file write running in the
-background. Normal backgrounding cancels the task. Later E5 may explicitly
-authorize bounded non-GUI continuation; no such mode is implied here.
+background. Normal backgrounding cancels the task. A recreated Activity can
+restore only the generic stopped or uncertain-write status. The old task,
+approvals, picker grants and drafts are revoked with their owner. Later E5 may
+explicitly authorize bounded non-GUI continuation; no such mode is implied here.
 
 Device operations remain in the existing separate device broker/task surface,
 with their target/window and Stage 6 approvals intact. They are not generic

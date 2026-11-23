@@ -299,6 +299,10 @@ clipboard, device grant, local root or arbitrary page-fetch capability is expose
   commit and deletion results are checked for surviving base/backup/new files as
   appropriate. Failed file deletion still attempts key deletion; no error claims
   a successful erase. Owned plaintext and intermediate byte buffers are wiped.
+- An unreadable independent private draft contributes only its opaque ID and
+  timestamp to the authenticated management list. Its content remains unavailable.
+  Removing that row still requires a fresh authentication grant, and healthy
+  entries remain manageable. The encrypted vault body continues to fail closed.
 - Vault JSON errors use content-free messages without parser causes. Malformed
   input cannot be silently replaced by a new empty vault. JVM strings and parser
   objects remain subject to garbage collection; complete memory erasure is not

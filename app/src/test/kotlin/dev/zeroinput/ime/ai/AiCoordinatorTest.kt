@@ -10,6 +10,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class AiCoordinatorTest {
     private val request = AiRequest(null, AiAction.ASK, "hello")
@@ -45,6 +49,43 @@ class AiCoordinatorTest {
             assertTrue(events.isEmpty())
             assertEquals(1, provider.cancelCount)
         } finally {
+            coordinator.close()
+        }
+    }
+
+    @Test
+    fun overlappingReplacementNeverCancelsTheSamePreviousHandleTwice() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val cancellations = AtomicInteger()
+        val submitted = CopyOnWriteArrayList<String>()
+        val provider = object : AiProvider {
+            override fun stream(request: AiRequest, listener: (AiStreamEvent) -> Unit): AiRequestHandle {
+                submitted += request.input
+                return object : AiRequestHandle {
+                    override fun cancel() {
+                        if (request.input == "hello" && cancellations.incrementAndGet() == 1) {
+                            entered.countDown()
+                            check(release.await(5, TimeUnit.SECONDS))
+                        }
+                    }
+                }
+            }
+        }
+        val coordinator = AiCoordinator(provider)
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            coordinator.submit(request, policy) {}
+            val older = worker.submit { coordinator.submit(AiRequest(null, AiAction.ASK, "old"), policy) {} }
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            coordinator.submit(AiRequest(null, AiAction.ASK, "new"), policy) {}
+            assertEquals(1, cancellations.get())
+            release.countDown()
+            older.get(5, TimeUnit.SECONDS)
+            assertEquals(listOf("hello", "new"), submitted)
+        } finally {
+            release.countDown()
+            worker.shutdownNow()
             coordinator.close()
         }
     }

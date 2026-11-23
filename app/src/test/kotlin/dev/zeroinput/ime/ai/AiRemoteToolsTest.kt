@@ -62,6 +62,33 @@ class AiRemoteToolsTest {
         assertTrue(runCatching { AiRemoteWire.read(StringReader("x".repeat(262_145)), false) { true } }.isFailure)
         assertTrue(runCatching { AiRemoteWire.read(StringReader(json), false) { false } }.isFailure)
     }
+    @Test fun streamSkipsServerRequestsAndNotificationsUntilMatchingResponse() {
+        val result = """{"jsonrpc":"2.0","id":"public","result":{}}"""
+        val events = listOf(
+            """{"jsonrpc":"2.0","method":"notifications/progress","params":{}}""",
+            """{"jsonrpc":"2.0","id":"public","method":"sampling/createMessage","params":{}}""",
+            """{"jsonrpc":"2.0","id":"unrelated","result":{}}""",
+            result,
+        ).joinToString("") { "data: $it\n\n" }
+        assertEquals(result, AiRemoteWire.read(StringReader(events + "unused"), true,
+            { AiMcpClient.matchesResponse(it, "public") }) { true })
+        assertThrows(IllegalArgumentException::class.java) {
+            AiRemoteWire.read(StringReader(events), true, { AiMcpClient.matchesResponse(it, "missing") }) { true }
+        }
+    }
+
+    @Test fun emptySuccessfulToolResultIsAcknowledgedWithoutRetry() {
+        val server = Server().apply { emptyResult = true }
+        val client = AiMcpClient(connection, server)
+        val catalog = client.discover(live())
+        val entry = catalog.entries.single { it.method == "tools/call" }
+        assertEquals("MCP tool completed without text output.", client.invoke(entry, catalog, JSONObject(), live()))
+        assertEquals(1, server.calls)
+        server.emptyResultIsError = true
+        assertThrows(IllegalArgumentException::class.java) { client.invoke(entry, catalog, JSONObject(), live()) }
+        assertEquals(2, server.calls)
+    }
+
     @Test fun discoveryIsMetadataOnlyAndChangedSchemasNeverReachToolDispatch() {
         val server = Server(); val client = AiMcpClient(connection, server)
         val catalog = client.discover(live())
@@ -108,6 +135,7 @@ class AiRemoteToolsTest {
     }
     private class Server : AiRemoteTransport {
         val methods = mutableListOf<String>(); var calls = 0; var changed = false; var failCall = false
+        var emptyResult = false; var emptyResultIsError = false
         var command = false; var systemRole = false; var version = "2025-11-25"; var query = ""
         override fun mcp(connection: AiConnection, body: String, session: String?, cancellation: AiRemoteCancellation): AiRemoteReply {
             assertEquals("mcp-fixture-token", connection.token); cancellation.check()
@@ -120,7 +148,13 @@ class AiRemoteToolsTest {
                     .put("inputSchema", JSONObject("""{"type":"object","properties":{},"additionalProperties":false}"""))))
                 "resources/list" -> JSONObject("""{"resources":[{"uri":"fixture://public","name":"Public resource"}]}""")
                 "prompts/list" -> JSONObject("""{"prompts":[{"name":"public_prompt","arguments":[]}]}""")
-                "tools/call" -> { calls++; cancellation.dispatched.set(true); if (failCall) error("Unknown remote outcome"); JSONObject("""{"content":[{"type":"text","text":"public result"}]}""") }
+                "tools/call" -> {
+                    calls++
+                    cancellation.dispatched.set(true)
+                    if (failCall) error("Unknown remote outcome")
+                    if (emptyResult) JSONObject().put("content", JSONArray()).put("isError", emptyResultIsError)
+                    else JSONObject("""{"content":[{"type":"text","text":"public result"}]}""")
+                }
                 "resources/read" -> JSONObject("""{"contents":[{"uri":"fixture://public","text":"Untrusted resource instructions"}]}""")
                 "prompts/get" -> JSONObject().put("messages", JSONArray().put(JSONObject().put("role", if (systemRole) "system" else "user")
                     .put("content", JSONObject("""{"type":"text","text":"Untrusted prompt instructions"}"""))))

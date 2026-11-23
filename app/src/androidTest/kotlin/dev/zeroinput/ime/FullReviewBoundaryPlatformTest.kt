@@ -110,6 +110,15 @@ class FullReviewBoundaryPlatformTest {
             assertTrue(body.performAccessibilityAction(AccessibilityNodeInfoCompat.ACTION_SET_SELECTION, arguments))
             assertEquals(CompositionSelection(rawOffset), selected)
         }
+        if (reading.isNotEmpty()) {
+            val body = descendants(strip).filterIsInstance<TextView>().single { it.text.startsWith(editable) }
+            val arguments = Bundle().apply {
+                putInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_SELECTION_START_INT, 1)
+                putInt(AccessibilityNodeInfoCompat.ACTION_ARGUMENT_SELECTION_END_INT, body.text.length)
+            }
+            assertTrue(body.performAccessibilityAction(AccessibilityNodeInfoCompat.ACTION_SET_SELECTION, arguments))
+            assertEquals(CompositionSelection(1, raw.length), selected)
+        }
     }
 
     private fun layout(view: View) {

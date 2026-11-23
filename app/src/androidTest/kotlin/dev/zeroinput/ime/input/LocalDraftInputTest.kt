@@ -47,6 +47,24 @@ class LocalDraftInputTest {
             assertFalse(draft.appendImported("x"))
         } finally { draft.close() }
     }
+    @Test fun retryOfRejectedIdleEngineCommitRetainsLengthLimitUntilCancelled() = onMain {
+        val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
+        val draft = LocalDraftInput({ graph }, { false }, {}, { _, _, _ -> }, maxChars = 1)
+        try {
+            draft.start(InputLanguage.ENGLISH)
+            assertTrue(draft.replaceCommittedText("A"))
+            draft.handle(KeyboardAction.Text("?"))
+            assertEquals(LocalDraftInput.SubmissionBlockReason.LENGTH_LIMIT, draft.submissionBlockReason)
+            draft.handle(KeyboardAction.Space)
+            assertEquals(LocalDraftInput.SubmissionBlockReason.LENGTH_LIMIT, draft.submissionBlockReason)
+            draft.command(dev.zeroinput.ime.core.InputCommand.Enter)
+            assertNull(draft.submittedChars())
+            draft.handle(KeyboardAction.Backspace)
+            assertNull(draft.submissionBlockReason)
+            assertEquals("A", draft.committedText())
+        } finally { draft.close() }
+    }
+
     @Test fun rejectedEnglishAndRealRimeCandidatesCannotSubmitAnIncompleteDraft() {
         val graph = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ZeroInputApplication).graph
         val handler = Handler(Looper.getMainLooper())

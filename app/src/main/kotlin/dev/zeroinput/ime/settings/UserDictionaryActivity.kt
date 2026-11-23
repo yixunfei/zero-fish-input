@@ -94,6 +94,7 @@ class UserDictionaryActivity : AppCompatActivity() {
         phraseDialog?.dismiss()
         phraseDialog = null
         adapter.submit(emptyList())
+        pageOffset = 0
         searchField.text.clear()
         searchField.removeCallbacks(searchRefresh)
         status.clear()

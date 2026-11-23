@@ -25,6 +25,8 @@ Redirects, retries, proxies, cookies and persistent connection reuse are disable
 
 MCP is a bounded 2025-11-25 Streamable HTTP subset: initialize/initialized,
 tools/list/call, resources/list/read and prompts/list/get, with JSON/bounded SSE.
+The SSE reader skips server requests and notifications without executing or
+answering them, and stops at the response matching the originating request.
 No stdio, OAuth, sampling, elicitation, roots, subscriptions, reconnect or code
 installation. Resource/prompt results are quoted tool context, never system
 instructions. Unsupported schemas are unavailable. Remote annotations cannot

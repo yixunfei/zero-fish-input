@@ -88,6 +88,7 @@
     <string name="secure_item_label">标签（可选）</string>
     <string name="secure_item_value">私密内容</string>
     <string name="secure_item_required">请输入私密内容</string>
+    <string name="secure_item_unavailable">内容不可用 · %1$s</string>
     <string name="secure_item_details">%1$d 个字符 · %2$s</string>
     <string name="cancel">取消</string>
     <string name="save">保存</string>

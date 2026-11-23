@@ -61,11 +61,9 @@ internal class SecureClipboardAdapter(
         val locale = holder.itemView.resources.configuration.locales[0]
         val updatedAt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
             .format(Date(item.updatedAtEpochMillis))
-        holder.details.text = holder.itemView.context.getString(
-            R.string.secure_item_details,
-            item.valueLength,
-            updatedAt,
-        )
+        val context = holder.itemView.context
+        holder.details.text = item.valueLength?.let { context.getString(R.string.secure_item_details, it, updatedAt) }
+            ?: context.getString(R.string.secure_item_unavailable, updatedAt)
         holder.delete.setOnClickListener { onDelete(item) }
     }
 

@@ -27,6 +27,7 @@ class AiToolTaskActivity : AppCompatActivity() {
     private val main = Handler(Looper.getMainLooper())
     private val foreground = AtomicBoolean()
     private var rejectedEntry = false
+    private var interruption: AiTaskInterruption? = null
     private lateinit var panel: AiToolTaskView
     private lateinit var picker: AiTaskDocumentPicker
     private var workspace = AiWorkspaceContext()
@@ -77,6 +78,9 @@ class AiToolTaskActivity : AppCompatActivity() {
         val entryToken = intent.getStringExtra(AiRunNotifications.TOKEN)
         val valid = !notification || run.validOpen(entryToken) && intent.dataString == "zeroinput-task://$entryToken"
         rejectedEntry = !valid
+        interruption = AiTaskInterruption.entries.firstOrNull {
+            it.name == savedInstanceState?.getString(INTERRUPTION_STATE)
+        }
         intent = Intent(); window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         panel = AiToolTaskView(this)
         picker = AiTaskDocumentPicker(this, graph.aiDocumentExecutor, graph.aiDataGeneration, main, ::visible) { revoke(); panel.error() }
@@ -163,9 +167,10 @@ class AiToolTaskActivity : AppCompatActivity() {
         panel.newRun()
         val model = config.activeProvider()?.let { getString(R.string.ai_tool_provider_model, it.name, config.activeModel()) }.orEmpty()
         val accepted = run.start(owner, request, executors, labels, model, remote, notificationOptIn, backgroundOptIn)
-        if (accepted) remote = null
-        clearBindings()
-        if (!accepted) panel.error()
+        if (accepted) {
+            remote = null
+            clearBindings()
+        } else panel.error()
         refresh()
     }
     private fun notifications(enabled: Boolean) {
@@ -270,13 +275,18 @@ class AiToolTaskActivity : AppCompatActivity() {
         run.attach(owner, taskObserver)
         run.snapshot?.let { panel.restoreDraft(it.request.input) }
         if (run.events.isNotEmpty()) { panel.newRun(); run.events.forEach { panel.event(it, run.snapshot) } }
+        else interruption?.event()?.let { panel.event(it) }
+        interruption = null
         graph.readAiConfiguration { main.post { if (foreground.get()) refresh() } }
         refresh()
     }
     override fun onResume() { super.onResume(); picker.resume() }
     override fun onStop() {
         foreground.set(false)
-        if (!rejectedEntry) run.leave(owner, picker.external)
+        if (!rejectedEntry) {
+            if (!picker.external) interruption = foregroundInterruption()
+            run.leave(owner, picker.external)
+        }
         if (!picker.external || !baseAllowed()) clearLocal()
         super.onStop()
     }
@@ -301,5 +311,21 @@ class AiToolTaskActivity : AppCompatActivity() {
             panel.newRun(); run.events.forEach { panel.event(it, run.snapshot) }; refresh()
         }
     }
-    override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); outState.clear() }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.clear()
+        // The previous owner still revokes its task. Only generic feedback survives.
+        val stopped = interruption ?: foregroundInterruption() ?:
+            AiTaskInterruption.STOPPED.takeIf { picker.external && !run.running }
+        if (stopped != null) outState.putString(INTERRUPTION_STATE, stopped.name)
+    }
+
+    private fun foregroundInterruption() = run.foregroundInterruption(owner)?.let {
+        // Save As has not written while the destination is still awaiting review.
+        if (picker.hasPendingDestination) AiTaskInterruption.STOPPED else it
+    }
+
+    private companion object {
+        const val INTERRUPTION_STATE = "task_interruption"
+    }
 }

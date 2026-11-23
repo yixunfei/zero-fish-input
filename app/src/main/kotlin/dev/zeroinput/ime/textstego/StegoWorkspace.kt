@@ -70,7 +70,7 @@ internal class StegoWorkspace(
     private val valid = AtomicBoolean(false)
     private val expire = object : Runnable {
         override fun run() {
-            if (!current()) { notify(R.string.stego_expired); close(); view.closeAuxiliaryInput(); return }
+            if (!current()) { closeInactiveWorkspace(); return }
             if (gate.phase == Phase.EDITING && gate.remainingMillis() <= 30_000) render()
             main.postDelayed(this, 1000)
         }
@@ -211,8 +211,16 @@ internal class StegoWorkspace(
     }
 
     private fun appendCredential(value: String) {
-        if (credential.length + value.length <= 1024 && value.none { it == '\u0000' }) { credential.append(value); credentialLimit = false }
-        else { credentialLimit = true; notify(R.string.stego_failed) }
+        val existingBytes = dev.zeroinput.ime.input.exactUtf8ByteLength(credential)
+        val addedBytes = dev.zeroinput.ime.input.exactUtf8ByteLength(value)
+        if (existingBytes != null && addedBytes != null && addedBytes <= MessageLimits.CREDENTIAL_BYTES - existingBytes &&
+            value.none { it == '\u0000' }) {
+            credential.append(value)
+            credentialLimit = false
+        } else {
+            credentialLimit = true
+            notify(R.string.stego_wording_credential_limit)
+        }
     }
 
     private fun typeBits(value: String) {
@@ -614,7 +622,7 @@ internal class StegoWorkspace(
         if (insert && (decrypt || !isKeyboard || commitTarget() == null)) {
             notify(R.string.stego_commit_unavailable); render(); return
         }
-        if (credentialLimit) { notify(R.string.stego_failed); return }
+        if (credentialLimit) { notify(R.string.stego_wording_credential_limit); render(); return }
         val kdf = try {
             if (decrypt) {
                 val carrier = submittedField(StegoField.CARRIER) ?: return
@@ -773,11 +781,20 @@ internal class StegoWorkspace(
     }
 
     fun publish(lease: StegoCryptoOperation) {
-        if (!lease.current() || pending !== lease || !current() || !gate.accepts(lease.token)) { lease.close(); return }
-        val delivery = lease.take() ?: run { lease.close(); return }
+        if (pending !== lease) { lease.close(); return }
+        if (!current()) { closeInactiveWorkspace(); return }
         val token = lease.token
+        val delivery = if (gate.accepts(token)) lease.take() else null
         lease.close()
         pending = null
+        if (delivery == null) {
+            gate.fail(token)
+            boundCommit = null
+            insertOnReady = false
+            notify(R.string.stego_failed)
+            render()
+            return
+        }
         if (delivery.encoded == null && delivery.result == null) {
             gate.fail(token)
             if (gate.phase != Phase.EDITING) { delivery.close(); return }
@@ -941,6 +958,12 @@ internal class StegoWorkspace(
         prepared = null; boundCommit = null; insertOnReady = false; result?.fill('\u0000'); result = null
         wordingPreview = null
         outputs?.close(); outputs = null
+    }
+
+    private fun closeInactiveWorkspace() {
+        if (valid.get() && !gate.current()) notify(R.string.stego_expired)
+        close()
+        view.closeAuxiliaryInput()
     }
 
     override fun close() {

@@ -28,6 +28,21 @@ class AiProtocolPlatformTest {
         }
     }
 
+    @Test fun responsesCompletionCanRepeatTheFullBoundedOutput() {
+        Fixture(AiProtocol.RESPONSES, true).use { f ->
+            val output = "x".repeat(AiLimits.MAX_OUTPUT_CHARS)
+            val deltas = output.chunked(4096).joinToString("") {
+                """data: {"type":"response.output_text.delta","delta":"$it"}""" + "\n\n"
+            }
+            val completed = f.exchange.response
+            f.exchange.response = deltas + completed.replace("\"OK\"", JSONObject.quote(output))
+            assertEquals(output, (f.generate() as AiStreamEvent.Completed).text)
+            val oversized = output + "x"
+            f.exchange.response = deltas + completed.replace("\"OK\"", JSONObject.quote(oversized))
+            assertTrue(f.generate() is AiStreamEvent.Failed)
+        }
+    }
+
     @Test fun catalog404AndGeneration404RemainSeparateAndNeverRetryOrReadErrorBodies() {
         Fixture(AiProtocol.CHAT_COMPLETIONS, true).use { f ->
             f.exchange.code = 404

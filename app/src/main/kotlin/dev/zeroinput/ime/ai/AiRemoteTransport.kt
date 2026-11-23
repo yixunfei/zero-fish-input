@@ -24,13 +24,22 @@ internal interface AiRemoteTransport {
 }
 
 internal object AiRemoteWire {
-    /** Stops at one complete RPC response; never waits for a persistent SSE connection to close. */
-    fun read(reader: Reader, sse: Boolean, current: () -> Boolean): String {
+    /** Stops at the first accepted response without waiting for the SSE connection to close. */
+    fun read(
+        reader: Reader,
+        sse: Boolean,
+        acceptEvent: (String) -> Boolean = { true },
+        current: () -> Boolean,
+    ): String {
         val body = StringBuilder(); val line = StringBuilder(); var total = 0; var skipLf = false
         fun lineFinished(): String? {
             val text = line.toString(); line.setLength(0)
             if (text.isEmpty()) {
-                if (body.isNotEmpty()) return body.toString().trimEnd('\n')
+                if (body.isNotEmpty()) {
+                    val event = body.toString().trimEnd('\n')
+                    body.setLength(0)
+                    if (acceptEvent(event)) return event
+                }
             } else if (text.startsWith("data:")) {
                 val payload = text.substring(5).removePrefix(" ")
                 if (body.isNotEmpty() || payload.isNotBlank()) body.append(payload).append('\n')

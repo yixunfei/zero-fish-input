@@ -92,6 +92,7 @@
     <string name="secure_item_label">Label (optional)</string>
     <string name="secure_item_value">Private content</string>
     <string name="secure_item_required">Enter private content</string>
+    <string name="secure_item_unavailable">Content unavailable · %1$s</string>
     <string name="secure_item_details">Characters: %1$d · %2$s</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>

@@ -39,7 +39,9 @@ bounded and generation-fenced. File IDs resolve only to task-selected temporary
 SAF URIs. Save As accepts a fresh system creation result with a second destination
 review, rejects known/reused targets and never retries uncertain writes. A
 bounded picker handoff suspends dispatch; lock/settings/data revocation cancels
-it. Device tasks keep their separate foreground/Stage 6 gate. No permission or
+it. Activity reconstruction can restore a generic interruption status. Task
+contents, approvals and picker grants are revoked with the previous owner.
+Device tasks keep their separate foreground/Stage 6 gate. No permission or
 additional network destination is introduced by E3.
 
 Declarative Skills and compaction follow ADR 0031. Skill import is one explicitly

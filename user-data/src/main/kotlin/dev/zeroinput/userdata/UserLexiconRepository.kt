@@ -250,6 +250,7 @@ class UserLexiconRepository(
                 throw failure
             }
             deletionPending = false
+            writeFailure = null
         }
     }
 

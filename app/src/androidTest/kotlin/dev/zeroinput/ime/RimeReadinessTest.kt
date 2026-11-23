@@ -63,6 +63,20 @@ class RimeReadinessTest {
         }.get(600, TimeUnit.SECONDS)
     }
 
+    @Test fun interruptedInstallationReplacesIncompleteSharedGeneration() = withFixture { factory, root ->
+        assertTrue(factory.warmUp())
+        factory.close()
+        val shared = File(root, "rime").listFiles().orEmpty().single { it.name.startsWith("shared-") }
+        val marker = File(shared, ".installed")
+        assertTrue(marker.delete())
+        val leftover = File(shared, "public-interrupted-install-fixture")
+        leftover.writeText("Public interrupted installation")
+        assertTrue(factory.warmUp())
+        assertTrue(marker.isFile)
+        assertFalse(leftover.exists())
+        requireNotNull(factory.createNativeOrNull()).close()
+    }
+
     @Test fun closeAndLastSessionReleaseAllowLaterNativeRetry() = withFixture { factory, _ ->
         assertTrue(factory.warmUp())
         requireNotNull(factory.createNativeOrNull()).use { engine ->

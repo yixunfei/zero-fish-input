@@ -239,6 +239,8 @@
     <string name="symbol_group_phonetic">拼音注音</string>
     <string name="symbol_group_latin">拉丁字母</string>
     <string name="symbol_group_box">制表符号</string>
+    <string name="direct_commit_rejected">输入框未接受本次输入。</string>
+    <string name="direct_commit_uncertain">无法确认是否已输入，请检查输入框。</string>
     <string name="commit_rejected">尚未提交。请点候选、空格或回车重试；退格可撤销，再继续输入。</string>
     <string name="commit_uncertain">无法确认是否已提交。请先检查输入框，退格结束待处理状态后继续。</string>
 </resources>

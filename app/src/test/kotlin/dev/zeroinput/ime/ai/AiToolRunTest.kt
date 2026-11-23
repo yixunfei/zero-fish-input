@@ -95,6 +95,23 @@ class AiToolRunTest {
         assertFalse(revoked.run.running); assertEquals(0, revoked.executions)
     }
 
+    @Test fun stoppedWriteReportsOnlyGenericUncertaintyAndRevokesExecution() {
+        val f = Fixture(AiToolEffect.WRITE)
+        f.start()
+        f.reply(AiToolResponse("", f.call()))
+        assertEquals(AiTaskInterruption.STOPPED, f.run.interruption())
+        assertTrue(f.run.approve(requireNotNull(f.events.last().approval), true))
+        assertEquals(AiTaskInterruption.UNCERTAIN, f.run.interruption())
+        f.run.stop()
+        val stopped = f.events.last()
+        assertEquals(AiToolRunState.STOPPED, stopped.state)
+        assertEquals(AiToolRunFailure.UNCERTAIN, stopped.failure)
+        assertNull(stopped.call)
+        assertNull(stopped.result)
+        assertFalse(requireNotNull(f.current).invoke())
+        assertNull(f.run.interruption())
+    }
+
     @Test fun deadlineAndRoundLimitReleaseTaskEvenWhenPolicyWasRevoked() {
         val f = Fixture(); f.start(); f.allowed = false; f.timeout!!()
         assertFalse(f.run.running)

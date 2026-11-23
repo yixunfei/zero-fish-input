@@ -713,9 +713,9 @@ class InputSessionController(
             if (pendingCommit != null) return
             if (!flushUnconsumedComposition(activeEngine, state.snapshot)) return
         }
-        connection.commitText(text)
+        val result = connection.commitTextResult(text)
         associations.clear()
-        publish(rawEngineSnapshot)
+        publish(rawEngineSnapshot, directResult = result)
     }
 
     private fun commitPaired(activeEngine: InputEngine, opening: String, closing: String) {
@@ -728,9 +728,9 @@ class InputSessionController(
             if (pendingCommit != null) return
             if (!flushUnconsumedComposition(activeEngine, state.snapshot)) return
         }
-        connection.commitPairedText(opening + closing, opening.length)
+        val result = connection.commitPairedTextResult(opening + closing, opening.length)
         associations.clear()
-        publish(rawEngineSnapshot)
+        publish(rawEngineSnapshot, directResult = result)
     }
 
     private fun performEnterAction() {
@@ -812,13 +812,14 @@ class InputSessionController(
 
     private fun handleEditorFallback(command: InputCommand) {
         associations.clear()
-        when (command) {
-            is InputCommand.Text -> connection.commitText(command.value)
-            is InputCommand.LiteralText -> connection.commitText(command.value)
-            is InputCommand.PairedText -> connection.commitPairedText(command.opening + command.closing, command.opening.length)
-            InputCommand.Backspace -> connection.deleteBeforeCursor()
-            InputCommand.Space -> connection.commitText(" ")
-            InputCommand.Enter -> performEnterAction()
+        val result = when (command) {
+            is InputCommand.Text -> connection.commitTextResult(command.value)
+            is InputCommand.LiteralText -> connection.commitTextResult(command.value)
+            is InputCommand.PairedText ->
+                connection.commitPairedTextResult(command.opening + command.closing, command.opening.length)
+            InputCommand.Backspace -> { connection.deleteBeforeCursor(); CommitTextResult.ACCEPTED }
+            InputCommand.Space -> connection.commitTextResult(" ")
+            InputCommand.Enter -> { performEnterAction(); CommitTextResult.ACCEPTED }
             is InputCommand.SelectCandidate,
             is InputCommand.SelectReading,
             is InputCommand.ChangeCandidatePage,
@@ -826,12 +827,16 @@ class InputSessionController(
             InputCommand.UndoSelection,
             InputCommand.SelectSyllable,
             is InputCommand.SelectComposition,
-            -> Unit
+            -> CommitTextResult.ACCEPTED
         }
-        publish(EngineSnapshot.Empty)
+        publish(EngineSnapshot.Empty, directResult = result)
     }
 
-    private fun publish(engineSnapshot: EngineSnapshot, preserveModelRanking: Boolean = false) {
+    private fun publish(
+        engineSnapshot: EngineSnapshot,
+        preserveModelRanking: Boolean = false,
+        directResult: CommitTextResult = CommitTextResult.ACCEPTED,
+    ) {
         if (pendingCommit != null) { publishPendingCommit(); return }
         rawEngineSnapshot = engineSnapshot
         val browsed = candidateWindow.snapshot(engineSnapshot)
@@ -868,7 +873,8 @@ class InputSessionController(
         state = InputSessionState(language, privacy, visibleSnapshot, languagePackKey, engine?.descriptor,
             canReconvert = recentComposition.available && !visibleSnapshot.isComposing,
             modelRanked = winner != null,
-            candidateRevision = state.candidateRevision + 1)
+            candidateRevision = state.candidateRevision + 1,
+            directCommitFailure = directResult.takeUnless { it == CommitTextResult.ACCEPTED })
         // Rendering cannot trigger conversion fallback. Ordinary observer faults
         // leave the published state usable; cancellation and fatal failures propagate.
         recoverable { onStateChanged(state) }
@@ -900,8 +906,7 @@ class InputSessionController(
             ?: beforeSnapshot.takeIf(EngineSnapshot::isComposing)
         associations.clear()
         if (!flushUnconsumedComposition(activeEngine, snapshot, beforeSnapshot)) return
-        connection.commitText(text)
-        publish(rawEngineSnapshot)
+        publish(rawEngineSnapshot, directResult = connection.commitTextResult(text))
     }
 
     private fun flushUnconsumedComposition(
@@ -1053,4 +1058,5 @@ data class InputSessionState(
     val candidateRevision: Long = 0,
     val modelRanked: Boolean = false,
     val commitFailure: CommitTextResult? = null,
+    val directCommitFailure: CommitTextResult? = null,
 )

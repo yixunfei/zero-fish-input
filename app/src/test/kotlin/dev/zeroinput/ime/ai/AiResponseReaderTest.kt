@@ -23,8 +23,12 @@ class AiResponseReaderTest {
         }
     }
 
-    @Test fun malformedEmptyOversizedAndCoercedModelListsFailClosed() {
-        for (wire in listOf("{}", "{\"data\":[]}", "{\"data\":[{\"id\":42}]}",
+    @Test fun emptyModelCatalogIsAValidResponse() {
+        assertTrue(AiResponseReader.models(StringReader("""{"data":[]}"""), { false }).isEmpty())
+    }
+
+    @Test fun malformedOversizedAndCoercedModelListsFailClosed() {
+        for (wire in listOf("{}", "{\"data\":[{\"id\":42}]}",
             "{\"data\":[{\"id\":\" \"}]}", "{\"data\":[{\"id\":\"x\\n\"}]}",
             "{\"data\":[{\"id\":\"x\"}]} trailing", "x".repeat(512 * 1024 + 1))) {
             assertThrows(AiProviderError.Response::class.java) { AiResponseReader.models(StringReader(wire), { false }) }

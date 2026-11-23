@@ -81,12 +81,9 @@ internal class RimeAssetInstaller(
         // The base schema still contains the optional grammar. Verify the exact
         // generation-specific staging bytes after that field is normalized.
         val marker = File(shared, ".installed")
-        if (marker.isFile && prebuilt != null && !prebuiltMatches(Directories(shared, user), prebuilt)) {
-            File(shared, "build").deleteRecursively()
-            marker.delete()
-            shared.deleteRecursively()
-        }
-        if (!marker.isFile) {
+        val reusable = marker.isFile && (prebuilt == null || prebuiltMatches(Directories(shared, user), prebuilt))
+        if (!reusable) {
+            check(!shared.exists() || shared.deleteRecursively()) { "Unable to remove incomplete dictionary generation" }
             val staging = java.nio.file.Files.createTempDirectory(root.toPath(), "prepare-").toFile()
             try {
                 linkTree(base, staging)

@@ -17,6 +17,7 @@ import androidx.core.view.WindowCompat
 import dev.zeroinput.engine.api.InputLanguage
 import dev.zeroinput.engine.api.ChineseInputOptions
 import dev.zeroinput.engine.api.ChineseKeyboardLayout
+import dev.zeroinput.engine.api.DoublePinyinScheme
 import dev.zeroinput.ime.core.privacy.PrivacyConfiguration
 import dev.zeroinput.engine.rime.RimeRuntimeState
 import dev.zeroinput.ime.concurrency.BoundedExecutors
@@ -557,7 +558,7 @@ class ZeroInputService : InputMethodService() {
         updateNavigationBarAppearance()
         syncSessionPrivacy()
         controller?.requestAssociationWarmup()
-        reconcileChineseOptions()
+        activeSession?.let { scheduleEngineWarmup(it) }
         inputView?.let(::renderLocalPanels)
         bindPasteConsent()
         bindCopyConfirmation()
@@ -842,7 +843,10 @@ class ZeroInputService : InputMethodService() {
     private fun bindSearchInput(view: ZeroInputView) {
         view.onSearchVisibilityChanged = { open ->
             searchDraft.close()
-            if (open && searchInputAvailable()) searchDraft.start(controller?.state?.language ?: InputLanguage.CHINESE)
+            if (open && searchInputAvailable()) searchDraft.start(
+                controller?.state?.language ?: InputLanguage.CHINESE,
+                sessionChineseOptions.copy(keyboardLayout = ChineseKeyboardLayout.FULL, doublePinyinScheme = DoublePinyinScheme.OFF),
+            )
         }
         view.onSearchAction = { action ->
             registerInteraction()

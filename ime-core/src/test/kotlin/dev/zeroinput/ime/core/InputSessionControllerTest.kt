@@ -128,6 +128,32 @@ class InputSessionControllerTest {
         controller.close()
     }
 
+    @Test fun `rejected or uncertain direct input reports feedback without opening a retry`() {
+        val attempts = mutableListOf<String>()
+        var result = CommitTextResult.REJECTED
+        val connection = object : EditorConnection by RecordingConnection() {
+            override fun commitTextResult(text: String): CommitTextResult {
+                attempts += text
+                return result
+            }
+            override fun commitPairedTextResult(text: String, cursorOffset: Int) = commitTextResult(text)
+        }
+        InputSessionController(connection, { ClearingUnconsumedEngine() }, RecordingPersonalization()).use { controller ->
+            controller.start(textEditor(), InputLanguage.CHINESE, PrivacyConfiguration())
+            controller.handle(InputCommand.LiteralText("!"))
+            assertEquals(CommitTextResult.REJECTED, controller.state.directCommitFailure)
+            assertEquals(null, controller.state.commitFailure)
+            result = CommitTextResult.UNKNOWN
+            controller.handle(InputCommand.PairedText("(", ")"))
+            assertEquals(CommitTextResult.UNKNOWN, controller.state.directCommitFailure)
+            assertEquals(null, controller.state.commitFailure)
+            result = CommitTextResult.ACCEPTED
+            controller.handle(InputCommand.Text("¥"))
+            assertEquals(null, controller.state.directCommitFailure)
+            assertEquals(listOf("!", "()", "¥"), attempts)
+        }
+    }
+
     @Test fun `rejected enter preserves preedit and allows retry`() {
         var accept = false
         var preedit = ""

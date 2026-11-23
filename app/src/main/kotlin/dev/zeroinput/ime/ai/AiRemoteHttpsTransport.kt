@@ -28,7 +28,8 @@ internal class AiRemoteHttpsTransport(private val resolve: (String) -> List<Inet
             .post(body.toRequestBody("application/json; charset=utf-8".toMediaType()))
         if (connection.token.isNotEmpty()) request.header("Authorization", "Bearer ${connection.token}")
         if (session != null) { requireSession(session); request.header("Mcp-Session-Id", session) }
-        return exchange(request.build(), cancellation)
+        val responseId = org.json.JSONObject(body).opt("id") as? String
+        return exchange(request.build(), cancellation, responseId)
     }
     override fun search(connection: AiConnection, query: String, cancellation: AiRemoteCancellation): AiRemoteReply {
         require(connection.kind == AiConnectionKind.BRAVE && connection.endpoint == AiConnection.BRAVE_ENDPOINT)
@@ -38,7 +39,7 @@ internal class AiRemoteHttpsTransport(private val resolve: (String) -> List<Inet
         return exchange(Request.Builder().url(url).header("Accept", "application/json")
             .header("X-Subscription-Token", connection.token).get().build(), cancellation)
     }
-    private fun exchange(request: Request, cancellation: AiRemoteCancellation): AiRemoteReply {
+    private fun exchange(request: Request, cancellation: AiRemoteCancellation, responseId: String? = null): AiRemoteReply {
         cancellation.check()
         val expectedHost = AiRemotePolicy.endpoint(request.url.toString()).host
         val attempted = java.util.concurrent.atomic.AtomicBoolean()
@@ -97,7 +98,11 @@ internal class AiRemoteHttpsTransport(private val resolve: (String) -> List<Inet
                         if (read > 0) { count += read; require(count <= 262_144) }; return read
                     }
                 }
-                val text = java.io.InputStreamReader(limited, decoder).buffered().use { AiRemoteWire.read(it, type.subtype == "event-stream", cancellation::live) }
+                val streaming = type.subtype == "event-stream"
+                require(!streaming || responseId != null)
+                val text = java.io.InputStreamReader(limited, decoder).buffered().use { reader ->
+                    AiRemoteWire.read(reader, streaming, { AiMcpClient.matchesResponse(it, responseId) }, cancellation::live)
+                }
                 cancellation.check(); AiRemoteReply(200, text, session)
             }
         } finally { cancellation.unbind(); client.connectionPool.evictAll(); client.dispatcher.executorService.shutdown() }

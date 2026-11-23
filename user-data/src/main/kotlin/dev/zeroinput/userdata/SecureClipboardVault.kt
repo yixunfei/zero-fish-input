@@ -9,6 +9,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.nio.charset.StandardCharsets
+import java.security.GeneralSecurityException
+import java.security.ProviderException
 import java.util.UUID
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicLong
@@ -69,12 +71,23 @@ class SecureClipboardVault private constructor(
             checkOperationActive(expected) { true }
             val drafts = draftSummaries().map { draft ->
                 checkOperationActive(expected) { true }
-                SecureClipboardMetadata(draft.id, "", checkNotNull(draftEntries).length(draft.id),
-                    draft.updatedAtEpochMillis)
+                SecureClipboardMetadata(draft.id, "", draftLength(draft.id), draft.updatedAtEpochMillis)
             }
             checkOperationActive(expected) { true }
             (entries.map { it.toMetadata() } + drafts).sortedByDescending(SecureClipboardMetadata::updatedAtEpochMillis)
         }
+    }
+
+    private fun draftLength(id: String): Int? = try {
+        checkNotNull(draftEntries).length(id)
+    } catch (_: IOException) {
+        null
+    } catch (_: GeneralSecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    } catch (_: ProviderException) {
+        null
     }
 
     /** Capture before queuing an addition; deletion invalidates older requests. */
@@ -539,6 +552,6 @@ data class SecureClipboardSummary(
 data class SecureClipboardMetadata(
     val id: String,
     val label: String,
-    val valueLength: Int,
+    val valueLength: Int?,
     val updatedAtEpochMillis: Long,
 )

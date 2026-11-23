@@ -47,6 +47,17 @@ class UserLexiconRepositoryTest {
         assertEquals(9, UserLexiconRepository(store).list().single().frequency)
     }
 
+    @Test fun `successful clear resets an earlier write failure`() {
+        val store = MemoryStore()
+        val repository = UserLexiconRepository(store, TrackingExportCipher())
+        store.failWrite = true
+        assertThrows(IOException::class.java) { repository.addPhrase("cs", "测试", InputLanguage.CHINESE) }
+        assertEquals(UserDictionaryFailure.WRITE_FAILED, repository.lastWriteFailure())
+        repository.clear()
+        assertNull(repository.lastWriteFailure())
+        assertTrue(repository.list().isEmpty())
+    }
+
     @Test fun `management search is case independent bounded and updates the same identity`() {
         val repository = UserLexiconRepository(MemoryStore())
         val first = repository.addPhrase("cs", "测试", InputLanguage.CHINESE, 3)

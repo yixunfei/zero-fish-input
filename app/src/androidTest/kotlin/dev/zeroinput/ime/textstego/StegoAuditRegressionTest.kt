@@ -70,6 +70,18 @@ class StegoAuditRegressionTest {
         }
     }
 
+    @Test fun credentialRejectsUtf8OverflowBeforeCrypto() = withWorkspace { _, view ->
+        val panel = view.textStegoPanel
+        panel.onAction(StegoAction.CREDENTIAL)
+        val exactLimit = "汉".repeat(341) + "a"
+        view.dispatchKeyboardAction(KeyboardAction.LiteralText(exactLimit))
+        view.dispatchKeyboardAction(KeyboardAction.LiteralText("b"))
+        assertTrue(texts(panel).any { it.text.toString() == view.context.getString(R.string.stego_wording_credential_limit) })
+        panel.onAction(StegoAction.REVEAL)
+        assertTrue(texts(view).any { it.isShown && it.text.toString() == exactLimit })
+        assertFalse(texts(view).any { it.text.toString() == exactLimit + "b" })
+    }
+
     @Test fun disabledVaultHasNoPasteEntryAndPublicCoverAloneIsAccessible() {
         val enabled = graph.settings.secureClipboardEnabled
         val defaults = graph.settings.stegoDefaults

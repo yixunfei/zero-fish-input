@@ -37,6 +37,7 @@ internal class AiTaskDocumentPicker(private val activity: AppCompatActivity, pri
     private var createTicket: Long? = null
     var external = false
         private set
+    val hasPendingDestination get() = pending?.output != null
     private val timeout = Runnable { close(); expired() }
     private val open = activity.registerForActivityResult(ActivityResultContracts.OpenDocument()) {
         val ticket = openTicket; openTicket = null; returned(ticket, it)

@@ -2,6 +2,24 @@
 
 Updated 2026-11-23.
 
+## Comprehensive review follow-up (2026-11-23)
+
+The [review follow-up](audits/2026-11-23-comprehensive-code-review.md) records 19
+confirmed findings and their fixes across input, Rime, private data and AI.
+Foreground task recreation restores generic interruption feedback. Old task
+content, approvals and picker grants are revoked. Authenticated clipboard
+management can still remove an unreadable independent private draft.
+
+The x86_64 Debug and instrumentation APKs built with real Rime. Debug unit
+tests, privacyCheck, Debug lint and Debug/Release merged-manifest checks passed.
+The API 37 emulator passed 48 selected instrumentation cases, including long
+Responses output, interrupted Rime deployment, draft limits and accessibility
+selection. Physical-device and live-provider validation remain open.
+
+```powershell
+./gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest privacyCheck :app:lintDebug :app:processReleaseMainManifest -PrequireRime=true "-Pandroid.injected.build.abi=x86_64"
+```
+
 ## v0.7.8 testing prerelease
 
 The universal Debug-signed distribution includes the window punctuation and distributed carrier changes. The release APK passed an in-place upgrade from the published v0.7.7 on API 37. See the [release notes](releases/v0.7.8.md) and [validation and hashes](releases/v0.7.8-validation.md).

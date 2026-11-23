@@ -30,6 +30,9 @@ interface EditorConnection {
      */
     fun commitPairedText(text: String, cursorOffset: Int): Boolean = commitText(text)
 
+    fun commitPairedTextResult(text: String, cursorOffset: Int): CommitTextResult =
+        if (commitPairedText(text, cursorOffset)) CommitTextResult.ACCEPTED else CommitTextResult.REJECTED
+
     fun deleteBeforeCursor()
 
     fun performEditorAction(actionId: Int): Boolean

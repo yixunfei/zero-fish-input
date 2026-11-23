@@ -14,7 +14,11 @@ internal class CommitFailureNotice(private val context: Context) {
         val message = when (state?.commitFailure) {
             CommitTextResult.REJECTED -> R.string.commit_rejected
             CommitTextResult.UNKNOWN -> R.string.commit_uncertain
-            else -> return
+            else -> when (state?.directCommitFailure) {
+                CommitTextResult.REJECTED -> R.string.direct_commit_rejected
+                CommitTextResult.UNKNOWN -> R.string.direct_commit_uncertain
+                else -> return
+            }
         }
         toast = Toast.makeText(context, message, Toast.LENGTH_LONG).also { it.show() }
     }

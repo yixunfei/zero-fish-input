@@ -49,7 +49,8 @@ internal class AiMcpClient(private val connection: AiConnection, private val tra
         val result = rpc(entry.method, params, cancel)
         if (entry.method == "tools/call") {
             require(!result.has("isError") || result.opt("isError") == false)
-            return textContent(result.getJSONArray("content"))
+            val content = result.getJSONArray("content")
+            return if (content.length() == 0) "MCP tool completed without text output." else textContent(content)
         }
         if (entry.method == "resources/read") {
             val contents = result.getJSONArray("contents"); require(contents.length() in 1..8)
@@ -154,11 +155,17 @@ internal class AiMcpClient(private val connection: AiConnection, private val tra
         require(it.length <= 3_800 && it.none { c -> c.isISOControl() && c !in "\n\r\t" })
     }
     override fun close() { closed.set(true); session = null; capabilities = emptySet() }
-    private companion object {
-        const val VERSION = "2025-11-25"
-        const val EMPTY_SCHEMA = """{"type":"object","properties":{},"additionalProperties":false}"""
-        fun hash(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-        fun canonical(value: Any): String = when (value) {
+    companion object {
+        internal fun matchesResponse(event: String, id: String?): Boolean {
+            val message = AiToolJson.objectValue(event, 262_144)
+            require(message.opt("jsonrpc") == "2.0")
+            // Server requests and notifications cannot dispatch any client operation.
+            return id != null && message.opt("id") == id && !message.has("method")
+        }
+        private const val VERSION = "2025-11-25"
+        private const val EMPTY_SCHEMA = """{"type":"object","properties":{},"additionalProperties":false}"""
+        private fun hash(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        private fun canonical(value: Any): String = when (value) {
             is JSONObject -> value.keys().asSequence().sorted().joinToString(",", "{", "}") { JSONObject.quote(it) + ":" + canonical(value.get(it)) }
             is JSONArray -> (0 until value.length()).joinToString(",", "[", "]") { canonical(value.get(it)) }
             is String -> JSONObject.quote(value)

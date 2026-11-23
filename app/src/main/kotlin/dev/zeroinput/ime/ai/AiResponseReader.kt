@@ -9,7 +9,7 @@ import java.io.Reader
 internal object AiResponseReader {
     fun models(reader: Reader, cancelled: () -> Boolean): List<String> = parse(reader, cancelled, 512 * 1024) { root ->
         val data = root.getJSONArray("data")
-        require(data.length() in 1..2048)
+        require(data.length() <= 2048)
         val ids = LinkedHashSet<String>()
         repeat(data.length()) { index ->
             val id = data.getJSONObject(index).get("id") as? String ?: throw IllegalArgumentException()

@@ -79,17 +79,25 @@ class AndroidEditorConnection(
         return if (result == false) CommitTextResult.REJECTED else CommitTextResult.UNKNOWN
     }
 
-    override fun commitPairedText(text: String, cursorOffset: Int): Boolean {
-        if (text.isEmpty()) return false
-        val connection = current() ?: run { invalidateContext(); onCommitted(null); return false }
+    override fun commitPairedText(text: String, cursorOffset: Int): Boolean =
+        commitPairedTextResult(text, cursorOffset) == CommitTextResult.ACCEPTED
+
+    override fun commitPairedTextResult(text: String, cursorOffset: Int): CommitTextResult {
+        if (text.isEmpty()) return CommitTextResult.REJECTED
+        val connection = current() ?: run {
+            invalidateContext()
+            onCommitted(null)
+            return CommitTextResult.UNKNOWN
+        }
         committedConnection = null
         val start = selection.insertionStart()
         selection.replaced(text.length, composing = false)
-        if (platformCall { connection.commitText(text, 1) } != true) {
+        val result = platformCall { connection.commitText(text, 1) }
+        if (result != true) {
             selection.unknown()
             onContextInvalidated()
             onCommitted(null)
-            return false
+            return if (result == false) CommitTextResult.REJECTED else CommitTextResult.UNKNOWN
         }
         committedConnection = connection
         onCommitted(text)
@@ -102,7 +110,7 @@ class AndroidEditorConnection(
                 // authorize callers to replay the insertion.
             }
         }
-        return true
+        return CommitTextResult.ACCEPTED
     }
 
     override fun invalidateReconversion() { selection.invalidate(); committedConnection = null }

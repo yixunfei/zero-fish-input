@@ -6,6 +6,13 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 internal enum class AiToolRunState { IDLE, THINKING, APPROVAL, EXECUTING, COMPLETED, FAILED, STOPPED }
+internal enum class AiTaskInterruption {
+    STOPPED, UNCERTAIN;
+
+    fun event() = AiToolRunEvent(AiToolRunState.STOPPED,
+        failure = AiToolRunFailure.UNCERTAIN.takeIf { this == UNCERTAIN })
+}
+
 internal enum class AiToolRunFailure { UNAVAILABLE, INVALID_CALL, LIMIT, MODEL, EXECUTION, UNCERTAIN }
 internal class AiToolRunEvent(val state: AiToolRunState, val message: String = "",
     val approval: String? = null, val call: AiToolCall? = null, val tool: AiToolDefinition? = null,
@@ -49,11 +56,10 @@ internal class AiToolRun(
         if (!task.current()) { task.fail(AiToolRunFailure.UNAVAILABLE); return false }
         task.approve(token, accepted)
     }
+    fun interruption(): AiTaskInterruption? = synchronized(lock) { active?.interruption() }
+
     fun stop(): Unit = synchronized(lock) {
-        active?.let { task ->
-            val uncertain = task.state == AiToolRunState.EXECUTING && task.pendingTool?.effect?.let { it != AiToolEffect.READ } == true
-            task.end(AiToolRunEvent(AiToolRunState.STOPPED, failure = if (uncertain) AiToolRunFailure.UNCERTAIN else null))
-        } ?: generation.incrementAndGet()
+        active?.let { it.end(it.interruption().event()) } ?: generation.incrementAndGet()
         Unit
     }
     override fun close() = synchronized(lock) { stop(); closed = true; generation.incrementAndGet(); Unit }
@@ -71,6 +77,10 @@ internal class AiToolRun(
         private var rounds = 0
         private var serial = 0L
         private var handle: AiRequestHandle? = null
+
+        fun interruption(): AiTaskInterruption =
+            if (state == AiToolRunState.EXECUTING && pendingTool?.effect?.let { it != AiToolEffect.READ } == true)
+                AiTaskInterruption.UNCERTAIN else AiTaskInterruption.STOPPED
 
         fun current() = active === this && generation.get() == token && !closed && allowed()
         private fun emit(event: AiToolRunEvent): Boolean {

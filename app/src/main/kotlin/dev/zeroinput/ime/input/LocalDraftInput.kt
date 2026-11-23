@@ -93,7 +93,7 @@ internal class LocalDraftInput(
             KeyboardAction.SwitchLanguage -> { input.switchLanguage(); prepare() }
             else -> Unit
         }
-        if (recovering && !input.state.snapshot.isComposing) lengthLimitReached = false
+        if (recovering && input.state.commitFailure == null && !input.state.snapshot.isComposing) lengthLimitReached = false
         // Editor fallbacks (notably deleting committed text) run after the
         // controller publishes its engine snapshot. Publish the final draft too.
         emit(input.state)
@@ -102,10 +102,11 @@ internal class LocalDraftInput(
 
     fun command(command: InputCommand) {
         if (cancelRejectedDirectInput(command == InputCommand.Backspace)) return
-        val recovering = controller?.state?.commitFailure != null
-        controller?.handle(command)
-        if (recovering && controller?.state?.snapshot?.isComposing == false) lengthLimitReached = false
-        controller?.state?.let(::emit)
+        val input = controller ?: return
+        val recovering = input.state.commitFailure != null
+        input.handle(command)
+        if (recovering && input.state.commitFailure == null && !input.state.snapshot.isComposing) lengthLimitReached = false
+        emit(input.state)
         resumePreparation()
     }
 

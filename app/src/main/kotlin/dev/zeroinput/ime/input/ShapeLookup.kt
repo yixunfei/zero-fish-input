@@ -80,11 +80,12 @@ internal class ShapeLookup(
             return
         }
         val radical = query.isEmpty()
+        val seeds = choices
         seed = value
-        load { it.similar(value, radical) }
+        load(fallback = seeds) { it.similar(value, radical) }
     }
 
-    private fun load(search: (HanShapeIndex) -> List<HanShapeIndex.Match>) {
+    private fun load(fallback: List<ShapeChoice> = emptyList(), search: (HanShapeIndex) -> List<HanShapeIndex.Match>) {
         cancel()
         val revision = generation
         choices = emptyList()
@@ -95,13 +96,21 @@ internal class ShapeLookup(
                 main.post {
                     if (generation != revision || view == null) return@post
                     task = null
-                    choices = result.getOrDefault(emptyList())
-                    render(failed = result.isFailure)
+                    result.fold(
+                        onSuccess = { choices = it; render() },
+                        onFailure = { loadFailed(fallback) },
+                    )
                 }
             }
         } catch (_: RejectedExecutionException) {
-            render(failed = true)
+            loadFailed(fallback)
         }
+    }
+
+    private fun loadFailed(fallback: List<ShapeChoice>) {
+        seed = null
+        choices = fallback
+        render(failed = true)
     }
 
     private fun render(loading: Boolean = false, failed: Boolean = false) {
